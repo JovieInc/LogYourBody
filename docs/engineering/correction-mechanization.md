@@ -120,3 +120,12 @@ file cannot hide an unresolved staged source. Resolve and stage the source, then
 retry the same command. Unrelated unstaged edits remain untouched.
 Both resolver modes require an active merge before writing; conflicted cherry-picks
 are refused without changing the ledger or index.
+
+With `--stage`, guard validation reads the Git index throughout resolution, so
+unrelated working edits cannot invalidate the reviewed staged snapshot. The
+unstaged resolver continues to validate guards from the working tree.
+Staged verification accepts only regular indexed guard files (including executable
+files); a symlink blob cannot supply guard evidence, even when its text matches
+the anchor and the working file is regular. The batched blob reader enforces file
+modes for final verification and staged retries. Unstaged guard text or symlinks
+cannot change the reviewed staged snapshot. Refusal preserves the ledger and index.

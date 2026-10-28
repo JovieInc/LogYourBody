@@ -160,6 +160,26 @@ function readGitSources(root, objects, execute) {
   for (const object of objects) {
     assert.doesNotMatch(object, /[\r\n\0]/u, 'invalid Git source request');
   }
+  // Only regular indexed files can provide staged guard evidence.
+  const regularGuards = new Set(
+    execute(
+      'git',
+      [
+        '-C',
+        root,
+        '--literal-pathspecs',
+        'ls-files',
+        '--stage',
+        '-z',
+        '--',
+        ...objects.filter((object) => object.startsWith(':0:')).map((object) => object.slice(3)),
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+      .split('\0')
+      .filter((entry) => /^100(?:644|755) [a-f0-9]+ 0\t/u.test(entry))
+      .map((entry) => entry.slice(entry.indexOf('\t') + 1)),
+  );
   const output = execute('git', ['-C', root, 'cat-file', '--batch'], {
     input: objects.map((object) => `${object}\n`).join(''),
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -177,7 +197,10 @@ function readGitSources(root, objects, execute) {
       const size = Number(match[1]);
       const source = output.toString('utf8', offset, offset + size);
       offset += size + 1;
-      return [object, source];
+      return [
+        object,
+        object.startsWith(':0:') && !regularGuards.has(object.slice(3)) ? '' : source,
+      ];
     }),
   );
 }
@@ -229,21 +252,9 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
           ),
         ];
         const sources = readGitSources(root, objects, execute);
-        // Guard evidence must be a regular staged file, never a symlink target string.
-        const regularGuards = new Set(
-          git(
-            'ls-files', '--stage', '-z', '--',
-            ...new Set(receipts.filter(({ guard }) => guard).map(({ guard }) => guard.path)),
-          )
-            .split('\0')
-            .filter((entry) => /^100(?:644|755) [a-f0-9]+ 0\t/u.test(entry))
-            .map((entry) => entry.slice(entry.indexOf('\t') + 1)),
-        );
-        const current = guardCoverageReport(
-          receipts,
-          (guard) => (regularGuards.has(guard) ? sources.get(`:0:${guard}`) : ''),
-          { requireClassification: true },
-        );
+        const current = guardCoverageReport(receipts, (guard) => sources.get(`:0:${guard}`), {
+          requireClassification: true,
+        });
         for (const { ref, receipts } of baselines) {
           const baseline = coverageReport(receipts, (guard) => sources.get(`${ref}:${guard}`));
           assertNoRegression(current, baseline);
@@ -276,7 +287,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
           // Keep incoming order, then append branch-only receipts so future main
           // prepends do not collide with the same branch receipt on every repair.
           mergeCorrectionLedgers(stages[0], stages[2], stages[1], (guard) =>
-            readSource(guard, { root }),
+            stagingMerge ? git('show', `:0:${guard}`) : readSource(guard, { root }),
           ),
         );
       }

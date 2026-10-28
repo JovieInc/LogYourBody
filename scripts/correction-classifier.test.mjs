@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -337,10 +345,13 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
   ].map((scenario) => [scenario, false]);
   scenarios.push(
     ['additions', true],
+    ['unstaged-guard', true],
     ['concurrent', true],
     ['missing-index-guard', true],
     ['missing-index-source', true],
     ['symlink-index-guard', true],
+    ['symlink-index-blob', true],
+    ['unstaged-symlink-guard', true],
     ['guard-conflict', true],
     ['unrelated-conflict', true],
     ...markerScenarios.map((scenario) => [scenario, true]),
@@ -357,6 +368,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       'missing-index-guard',
       'missing-index-source',
       'symlink-index-guard',
+      'symlink-index-blob',
       'guard-conflict',
       ...markerScenarios,
       'manual-missing-receipt',
@@ -500,7 +512,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     const parents = git('rev-parse', 'HEAD', operationHead);
     const unrelated = join(repository, 'unrelated.txt');
     writeFileSync(unrelated, 'uncommitted user edit\n');
-    if (scenario === 'missing-guard') {
+    if (['missing-guard', 'unstaged-guard'].includes(scenario)) {
       writeFileSync(join(repository, rows[0].guard.path), 'missing guard');
     }
     if (scenario === 'missing-index-guard') {
@@ -520,6 +532,17 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       git('add', rows[0].guard.path);
       rmSync(path);
       writeFileSync(path, rows[0].guard.anchor);
+    }
+    if (scenario === 'symlink-index-blob') {
+      // Matching blob text is not evidence when the staged guard is a symlink.
+      const blob = git('rev-parse', `:0:${rows[0].guard.path}`).trim();
+      git('update-index', '--cacheinfo', `120000,${blob},${rows[0].guard.path}`);
+    }
+    if (scenario === 'unstaged-symlink-guard') {
+      // A staged repair must ignore the unrelated working file's type as well as its text.
+      const path = join(repository, rows[0].guard.path);
+      rmSync(path);
+      symlinkSync('unrelated.txt', path);
     }
     if (scenario === 'binary-marker') {
       // Binary attributes must not hide markers from either resolver mode.
@@ -581,6 +604,21 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         expected,
       );
       assert.equal(git('ls-files', '-u'), '');
+      if (scenario === 'unstaged-symlink-guard') {
+        const path = join(repository, rows[0].guard.path);
+        assert.equal(readlinkSync(path), 'unrelated.txt', 'repair preserves the working symlink');
+        rmSync(path);
+        writeFileSync(path, rows[0].guard.anchor);
+      }
+      if (scenario === 'unstaged-guard') {
+        assert.equal(
+          readFileSync(join(repository, rows[0].guard.path), 'utf8'),
+          'missing guard',
+          'staged resolution preserves unrelated working guard edits',
+        );
+        assert.ok(git('diff', '--name-only').split('\n').includes(rows[0].guard.path));
+        writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
+      }
       assert.equal(git('diff', '--name-only').trim(), 'unrelated.txt');
       assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
       assert.equal(git('rev-parse', 'HEAD', 'MERGE_HEAD'), parents);
@@ -685,6 +723,43 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       }
       writeFileSync(ledger, resolved);
       assert.equal((await run('--resolve-merge', repository, '--stage')).status, 0);
+      const blob = git('rev-parse', `:0:${rows[0].guard.path}`).trim();
+      git('update-index', '--cacheinfo', `120000,${blob},${rows[0].guard.path}`);
+      const symlinkIndex = git('ls-files', '--stage');
+      for (const args of [
+        ['--check-merge', repository],
+        ['--resolve-merge', repository, '--stage'],
+      ]) {
+        const rejected = run(...args);
+        assert.equal(rejected.status, 1, 'a symlink blob cannot count as a staged guard');
+        assert.match(rejected.stderr, /missing guard anchor/);
+        assert.equal(git('ls-files', '--stage'), symlinkIndex);
+        assert.equal(readFileSync(ledger, 'utf8'), resolved);
+      }
+      git('add', rows[0].guard.path);
+      assert.equal(run('--check-merge', repository).status, 0);
+      git('update-index', '--chmod=+x', rows[0].guard.path);
+      assert.equal(run('--check-merge', repository).status, 0, 'executable guards remain valid');
+      git('add', rows[0].guard.path);
+      if (scenario === 'additions') {
+        // Removing a guard between retries must fail on the index, even with a valid working file.
+        git('update-index', '--force-remove', '--', rows[0].guard.path);
+        const missingIndex = git('ls-files', '--stage');
+        for (const args of [
+          ['--check-merge', repository],
+          ['--resolve-merge', repository],
+          ['--resolve-merge', repository, '--stage'],
+        ]) {
+          const rejected = run(...args);
+          assert.equal(rejected.status, 1, 'a working file cannot replace a missing indexed guard');
+          assert.match(rejected.stderr, /missing guard anchor/);
+          assert.equal(git('ls-files', '--stage'), missingIndex);
+          assert.equal(readFileSync(ledger, 'utf8'), resolved);
+          assert.equal(readFileSync(join(repository, rows[0].guard.path), 'utf8'), rows[0].guard.anchor);
+        }
+        git('add', rows[0].guard.path);
+        assert.equal(run('--check-merge', repository).status, 0);
+      }
       // A clean worktree cannot hide conflict markers already staged as resolved.
       git('config', 'color.ui', 'always');
       writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
