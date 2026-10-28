@@ -3379,5 +3379,45 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "ui-background-transition-waits-for-state",
+    "correction": "PR #1583: Merging the current reduced-motion fixture makes the existing fixed-sleep ratchet fail. Chaos background transitions must wait for application state instead of assuming a fixed delay is sufficient.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1583",
+    "mechanization": "Replace the two chaos-suite background sleeps with bounded XCTest predicates for runningBackground or runningBackgroundSuspended. Reduce the existing required detection-suite sleep ceiling from two to one, retaining the deliberate reduced-motion observation interval. The detection suite failed on the composed merge before the change and passes after it; native XCTest execution remains a hosted CI gate.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "XCTest can observe application state and bound the wait, so background transition correctness does not depend on runner speed or a fixed delay."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "test('UI tests are hermetic: no localhost, and fixed sleeps only shrink'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "diagnostic-refusal-fixtures-do-not-follow-candidate",
+    "correction": "PR #1583: Reconstructing previously reviewed, now-rejected audit scripts from the changing candidate makes legitimate audit edits break historical trust fixtures before the real CLI is exercised.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1583",
+    "mechanization": "Freeze the exact prior-main and prior-branch audit bytes as inert compressed fixtures with fixed SHA-256 checks. Derive older refusal fixtures from the frozen main, retain every existing negative case and add actual trusted-CLI refusal of both merge-parent audits. The isolated proposal failed before the fixture repair and passed afterward; actual old-main and old-branch fallback mutants are rejected. Bind the final composed audit digest only after independent review of the exact audit and digest patch. All seven dependency pins and the validator implementation remain unchanged relative to merged main; the separate Xcode-project mismatch still fails closed. The live routing suite passes all 53 cases. No candidate self-approval or diagnostic runtime acceptance is claimed.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application and native build logic cannot prevent a regression fixture from reconstructing historical evidence from mutable candidate bytes."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing suite executes the actual trusted workflow CLI against immutable prior audit bytes, preserving hash, source, path and dependency refusal before candidate tooling can execute."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
