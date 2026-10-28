@@ -39,6 +39,13 @@ from indexed sources, preserves unstaged source edits, and refuses unstaged
 projection edits or pinned-source drift. Bot commits created outside local
 hooks still need this refresh during repair; CI continues to reject stale output.
 
+When the generated source map and correction ledger both conflict, resolve and
+stage the source inputs, then run the same `--staged` command before the ledger
+resolver. It rebuilds only the conflicted projection from stage-zero inputs and
+leaves unrelated conflicts untouched. A conflicted input still fails without
+changing the projection or index; ordinary unstaged projection edits remain
+protected.
+
 For dependency bumps with an already updated lockfile, run
 `python3 scripts/resolve-repository-docs.py --verify-lockfile`. It verifies the
 existing lockfile with pinned Corepack pnpm (frozen, offline, lockfile-only,

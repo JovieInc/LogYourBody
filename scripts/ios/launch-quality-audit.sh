@@ -555,13 +555,17 @@ for test_id in "${CHAT_QUALIFICATION_UNIT_TESTS[@]}"; do
   CHAT_UNIT_EVIDENCE_ARGS+=(--expected-test "${test_id}()")
 done
 
-# The whole unit target is the gate: every journey test in docs/USER_JOURNEYS.md
-# runs on every PR (all 67 files are registered in the target as of the orphan rescue).
+# StoreKitPurchaseRestoreTests is skipped here: it shares one StoreKit test environment, is gated by the
+# dedicated StoreKit job (ci.yml ios_storekit, test plan StoreKit, merge queue and main) and failed 2 of 13
+# Launch Quality runs on 2026-10-25 with the LYB-231 signature (empty StoreKit state at restore).
+# Launch Quality gates the general unit target. The StoreKit lifecycle suite
+# remains required in the dedicated merge-group and main job.
 run_xcodebuild_test \
   "launch-quality-unit-tests" \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" \
   "$ARTIFACT_DIR/launch-quality-unit-tests.log" \
-  -only-testing:LogYourBodyTests
+  -only-testing:LogYourBodyTests \
+  -skip-testing:LogYourBodyTests/StoreKitPurchaseRestoreTests
 assert_xcresult_evidence \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"
 
@@ -657,7 +661,7 @@ fi
   printf -- '- Required passing test IDs and ten screenshot hashes: `launch-quality-ui.evidence.json`. First failed attempt bundles are retained.\n'
   printf -- '- Source: `source-revision.txt` plus `source-working-tree.patch`; this is not exact deployed-build certification.\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
-  printf -- '- Build strategy: one `build-for-testing`, the complete unit target, then one UI invocation covering inherited surface cases, two canvas cases, and twelve bounded chaos regressions with simulator parallelism disabled\n'
+  printf -- '- Build strategy: one `build-for-testing`, the general unit target (StoreKit lifecycle tests run in the required dedicated job), then one UI invocation covering inherited surface cases, two canvas cases, and twelve bounded chaos regressions with simulator parallelism disabled\n'
   printf -- '- Required native coverage: biometric policy, SettingsRow, chaos action accounting, and executed MesocycleCanvas app/view lines. Canvas captures cover reduced motion, replay/readback, and undo.\n'
   printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"

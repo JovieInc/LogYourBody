@@ -49,6 +49,7 @@ export const endpoints = {
     'waitlist_entries',
     'waitlist_rate_limits',
     'native_records',
+    'gyms',
     'training_revision_proposals',
     'training_program_revisions',
     'training_revision_state',
@@ -388,6 +389,11 @@ export const endpoints = {
       value: 'https://linear.app/jovie/issue/LYB-74',
       reason:
         'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-85',
+      reason:
+        'LYB-85 source evidence for filmstrip appearance within the single owned photo timeline.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-95',

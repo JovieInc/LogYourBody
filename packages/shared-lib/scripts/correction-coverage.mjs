@@ -352,7 +352,7 @@ export function assertLedgerMergeReady(root) {
     { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
   );
   // Staging a file does not prove its conflict markers were resolved.
-  // Inspect raw staged bytes; Git attributes must not hide unresolved markers.
+  // Read staged bytes as text so binary attributes cannot conceal conflict markers.
   // conflict-marker-size can emit markers shorter than the default seven characters.
   assert.doesNotMatch(
     staged,
@@ -395,6 +395,17 @@ export function assertLedgerMergeReady(root) {
   );
 }
 
+export function assertLedgerResolutionUnchanged(original, merged, message) {
+  let workingReceipts;
+  try {
+    workingReceipts = JSON.parse(original);
+  } catch {
+    // Unresolved Git conflict markers are not valid JSON.
+    return;
+  }
+  assert.equal(JSON.stringify(workingReceipts), JSON.stringify(merged), message);
+}
+
 export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
   if (argv.length === 1 && argv[0] === '--merge-ledger') {
     assertLedgerMergeReady(root);
@@ -402,7 +413,12 @@ export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
     const merged = mergeCorrectionLedgers(stages[0], stages[2], stages[1], (path) =>
       readSource(path, { root }),
     );
-    readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
+    const original = readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
+    assertLedgerResolutionUnchanged(
+      original,
+      merged,
+      'merge-ledger refuses to overwrite a manually resolved ledger; review and stage it explicitly',
+    );
     writeFileSync(resolve(root, LEDGER_PATH), `${JSON.stringify(merged, null, 2)}\n`);
     argv = [];
   }
