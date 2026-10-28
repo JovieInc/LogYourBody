@@ -3763,5 +3763,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-chaos-verified-text-entry-fast-path",
+    "correction": "PR #1621 (fix-red-5df69c1e5f, occurrence 20): Launch Quality run 40769266298 exceeded the two-minute execution allowance in testKeyboardDismissalPreservesDraftWithoutSending, then finished its assertions at 123.296 seconds. The shared typing helper waited for the keyboard and each exact prefix even when they were already present.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40769266298/job/123104269672",
+    "mechanization": "Extend the existing typeVerifiedText harness with immediate keyboard and exact-prefix checks. Only a missing keyboard triggers refocus and its bounded wait; only pending readback triggers the existing two-second predicate wait and failure diagnostic. Both random typing and the dismissal regression use this path. Extend the required shared-lib launch audit source guard to reject unconditional keyboard waits and missing immediate prefix readback, retaining every per-character assertion, mismatch failure, full draft, post-dismissal and no-send check. The added regression fails against the original helper and passes after repair. No test allowance, runner retry, selector, CI or coverage gate changes. Native execution remains unverified on Linux and requires the real macOS CI runner. The lanes harness owns pushes and PR-body edits and must include exactly one Machine line: Machine: built apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared native typing harness can prevent redundant polling for already-satisfied state by construction while preserving bounded recovery and exact readback of every prefix."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift",
+      "anchor": "if field.value as? String == expected { continue }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

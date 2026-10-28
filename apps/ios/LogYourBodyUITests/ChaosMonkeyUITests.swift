@@ -1052,16 +1052,21 @@ final class ChaosMonkeyUITests: XCTestCase {
 
     /// Pace native input through SwiftUI layout/focus updates and require every
     /// prefix to land. Never clear or retry a mismatched draft: that is a failure.
+    /// Poll only pending state; ready input must not pay a wait for every character.
     private func typeVerifiedText(_ text: String, into field: XCUIElement, app: XCUIApplication) -> Bool {
         guard !text.isEmpty, field.exists, field.isHittable,
               let value = field.value as? String else { return false }
         var expected = value == field.placeholderValue ? "" : value
         field.tap()
+        let keyboard = app.keyboards.firstMatch
         for character in text {
-            if !app.keyboards.firstMatch.exists { field.tap() }
-            guard app.keyboards.firstMatch.waitForExistence(timeout: 1.5) else { return false }
+            if !keyboard.exists {
+                field.tap()
+                guard keyboard.waitForExistence(timeout: 1.5) else { return false }
+            }
             field.typeText(String(character))
             expected.append(character)
+            if field.value as? String == expected { continue }
             let entered = XCTNSPredicateExpectation(
                 predicate: NSPredicate(format: "value == %@", expected), object: field
             )
