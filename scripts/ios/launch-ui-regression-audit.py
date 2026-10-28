@@ -260,6 +260,19 @@ def main() -> int:
         detail="One timestamp cannot establish no change.", violations=violations,
     )
 
+    # Identified chart containers must not overwrite their interactive plot's identity.
+    detail_path = app_dir / "Components/FullMetricChartView+Part01.swift"
+    detail_source = detail_path.read_text()
+    chart_card = detail_source.split("var chartCard: some View {", 1)[-1].split("@ViewBuilder", 1)[0]
+    if not re.search(
+        r'\.accessibilityElement\(children:\s*\.contain\)\s*'
+        r'\.accessibilityIdentifier\("metric_detail_chart"\)', chart_card
+    ):
+        violations.append(AuditViolation(
+            check="dashboard.chart_accessibility_containment", file=str(detail_path.relative_to(root)), line=1,
+            detail="The chart container must contain its children before assigning its identifier, preserving the adjustable plot.",
+        ))
+
     system_b_surface_files = [
         app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift",
         app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift",

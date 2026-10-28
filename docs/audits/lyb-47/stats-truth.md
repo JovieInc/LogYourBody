@@ -240,6 +240,56 @@ GBrain `put lyb-47-png-truth-repair-20261028` and
 localhost:7801. Neither persistence nor readback could be established. This
 document retains the findings for the harness.
 
+## 2026-10-28 chart accessibility repair
+
+`git fetch origin main` refreshed the base; `git merge --no-edit origin/main`
+reported already up to date at main `e3fffe422`. Read the current failure with
+`gh run view 40633922695 --repo JovieInc/LogYourBody --log-failed`. The unit target
+executed 1,959 cases with 50 skipped and no failures, including the preceding PNG
+repair. The UI target had one failure among 29 cases: the Stats truth drilldown
+could not find `metric_detail_chart_plot`.
+
+Its native hierarchy contained the rendered “Weight chart” with the parent
+identifier `metric_detail_chart`. Give `chartCard` explicit accessibility
+containment before its identifier, matching the neighboring headline and related
+containers. This preserves the adjustable plot's own identity and value. Retain
+the existing native drag, selection persistence and observation-context assertions.
+
+Extend the existing launch UI regression audit to reject missing containment,
+ignored/combined children and containment placed after the identifier. Include
+the audit, its mutation suite and chart source in shared-lib's existing Turbo
+test inputs so those changes invalidate cached results. Record the correction in
+the existing ledger. No new workflow, baseline, timeout or gate is needed.
+
+Verification on Node 22.23.2 with pinned pnpm 10.34.1:
+
+- `python3 scripts/ios/launch-ui-regression-audit.py --artifact-dir
+/tmp/pr1535-before-audit` failed on the unchanged chart with the new containment
+  violation. The same command with `/tmp/pr1535-after-audit` passed after the fix.
+- `python3 scripts/ios/test_launch_ui_regression_audit.py` passed all 15 cases.
+- `corepack pnpm lint`, `corepack pnpm typecheck`, and `corepack pnpm test`
+  passed: four, four and eight Turbo tasks respectively. The test run reused six
+  cached tasks; shared-lib executed all 192 Vitest and 122 Node cases. Its audit
+  wrapper measured 99% audit line coverage. The initial sandboxed test attempt
+  failed on denied subprocess operations; the complete run with access passed.
+- `swiftlint lint --strict --no-cache --config apps/ios/.swiftlint.yml
+apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift` passed with
+  zero violations. SourceKit-dependent rules are unavailable on Linux. The first
+  cached attempt could not write `/var/tmp/SwiftLint`; `--no-cache` resolved it.
+- Correction coverage against both `origin/main` and pre-repair
+  `8faae69298655000864c00f1d8b3ce09d40df3c2` passed: 91/91 mechanized rules.
+  `correction-ratchet.mjs --base-ref origin/main` and
+  `guard-reference.mjs --base-ref origin/main` passed, retaining the same 11
+  public-copy findings. These Git-backed guards required subprocess access.
+- `xcodebuild -project LogYourBody.xcodeproj -scheme LogYourBody -destination
+'platform=iOS Simulator,name=iPhone 16' build-for-testing` from `apps/ios`
+  exited 127 because Xcode is unavailable. Native execution and exact-head
+  coverage remain required from the harness-pushed CI run.
+
+GBrain write and same-slug readback succeeded for
+`lyb-47-chart-identity-repair-20261028` with network access outside the sandbox.
+The initial sandboxed query, write and readback attempts could not connect.
+
 The harness owns pushes and PR edits. Use exactly this machine line in the PR body:
 
-Machine: built apps/ios/LogYourBodyTests/BodyScoreShareCardTests.swift
+Machine: built scripts/ios/launch-ui-regression-audit.py

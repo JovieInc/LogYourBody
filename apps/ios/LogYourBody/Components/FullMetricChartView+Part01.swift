@@ -291,6 +291,7 @@ var chartCard: some View {
                     .frame(height: chartHeight)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("metric_detail_chart")
     }
 

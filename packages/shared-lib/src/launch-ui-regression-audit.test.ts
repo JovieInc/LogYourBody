@@ -39,6 +39,14 @@ it('requires verified native text entry before testing draft preservation', () =
 
 it('checks Stats composition and real card styling through the launch audit with executed coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
+  for (const input of [
+    '$TURBO_ROOT$/scripts/ios/launch-ui-regression-audit.py',
+    '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
+    '$TURBO_ROOT$/apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift',
+  ]) {
+    expect(turbo.tasks.test.inputs).toContain(input);
+  }
   const coverage = mkdtempSync(`${tmpdir()}/lyb-ui-audit-coverage-`);
   try {
     const pythonLibrary = execFileSync('python3', ['-c', 'import sys; print(sys.prefix)'], {
@@ -73,7 +81,7 @@ sys.exit(status)
         .filter((line) => /launch-ui-regression-audit|behavior tests executed/.test(line))
         .join('\n'),
     );
-    expect(output).toContain('Launch UI audit behavior tests executed: 12');
+    expect(output).toContain('Launch UI audit behavior tests executed: 15');
     expect(output).toContain('launch-ui-regression-audit');
   } finally {
     rmSync(coverage, { recursive: true, force: true });

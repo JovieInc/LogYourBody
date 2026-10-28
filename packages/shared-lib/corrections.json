@@ -2578,5 +2578,23 @@
     },
     "level": "codebase",
     "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "metric-chart-container-preserves-adjustable-plot-identity",
+    "correction": "PR #1535 (fix-red-5df69c1e5f) Launch Quality run 40633922695 failed testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance: the chart rendered, but its parent accessibility identifier replaced metric_detail_chart_plot in the native hierarchy.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40633922695/job/122636571085",
+    "mechanization": "Give the existing chart container explicit accessibility containment before assigning its identifier, preserving its adjustable plot and separate header by construction. Extend the existing launch UI regression audit and its required shared-lib mutation suite to reject missing containment, ignored or combined children, and containment applied after the identifier. The extended audit fails against the unchanged parent and passes after the one-line fix; all 15 mutation cases pass. Include the audit, mutation suite and chart source in the existing Turbo test inputs so source-only changes invalidate cached guard results. Keep the existing native drilldown drag, selection and provenance assertions and all required CI gates. Native execution and exact-head coverage remain unverified on this Linux host without Xcode. The lanes harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "An explicit containing accessibility element on the existing parent isolates its identifier from the interactive chart children, matching the adjacent headline and related-metrics containers without changing the chart data or interaction model."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "# Identified chart containers must not overwrite their interactive plot's identity."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
