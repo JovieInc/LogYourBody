@@ -2655,5 +2655,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "storekit-job-cap-cancels-fourth-lifecycle",
+    "correction": "Merge-group CI cancelled the 30-minute StoreKit job after three lifecycles passed and the fourth xcodebuild had started. The job cap must cover all four serial lifecycles, and the release wait must enclose that cap. All four cases still have to pass.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40627001572",
+    "mechanization": "The existing release-budget test rejects a StoreKit job cap under 45 minutes and requires the release-source wait and its Linux job timeout to enclose StoreKit plus Unit plus the measured macOS queue. The same four purchase and restore cases remain required.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A hosted Actions job timeout is outside the app runtime, so purchase and restore code cannot keep the fourth lifecycle from being cancelled."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing release-budget test reads the StoreKit job cap and fails when it is below the four-lifecycle floor or when the release wait no longer encloses it."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/release-check-budget.test.mjs",
+      "anchor": "StoreKit cap ${storekitMinutes}m cancels the fourth lifecycle"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
