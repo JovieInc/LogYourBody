@@ -16,6 +16,7 @@
         "$TURBO_ROOT$/packages/shared-lib/scripts/installed-build-xcresult.behavior.mjs",
         "$TURBO_ROOT$/packages/shared-lib/src/installed-build-xcresult.ts",
         "$TURBO_ROOT$/apps/ios/LogYourBody/**/*.swift",
+        "$TURBO_ROOT$/apps/ios/LogYourBodyWidget/**/*.swift",
         "$TURBO_ROOT$/apps/ios/LogYourBodyTests/**/*.swift",
         "$TURBO_ROOT$/apps/ios/LogYourBodyUITests/**/*.swift",
         "$TURBO_ROOT$/apps/ios/.swiftlint.yml",

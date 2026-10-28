@@ -41,6 +41,7 @@ it('checks Stats composition and real card styling through the launch audit with
   for (const input of [
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-audit.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
+    '$TURBO_ROOT$/apps/ios/LogYourBodyWidget/**/*.swift',
     '$TURBO_ROOT$/apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift',
   ]) {
     expect(turbo.tasks.test.inputs).toContain(input);
@@ -79,7 +80,7 @@ sys.exit(status)
         .filter((line) => /launch-ui-regression-audit|behavior tests executed/.test(line))
         .join('\n'),
     );
-    expect(output).toContain('Launch UI audit behavior tests executed: 17');
+    expect(output).toContain('Launch UI audit behavior tests executed: 19');
     expect(output).toContain('launch-ui-regression-audit');
   } finally {
     rmSync(coverage, { recursive: true, force: true });

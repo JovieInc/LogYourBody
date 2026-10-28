@@ -4,6 +4,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 from pathlib import Path
 import shutil
 import sys
@@ -48,6 +49,42 @@ class StatsCardCompositionTests(unittest.TestCase):
         result, output = self.run_audit()
         self.assertEqual(result, 1)
         self.assertIn(check, "\n".join(path.read_text() for path in output.glob("*.json")))
+
+    def test_geometry_requires_typed_nonfinite_arguments_in_every_native_tree(self):
+        cases = [
+            "CGPoint(x: .infinity, y: 0)",
+            "CGPoint(x: 0, y: -.infinity)",
+            "CGPoint(\n  x: 0,\n  y: .nan\n)",
+            "CGSize(width: .nan, height: 1)",
+            "CGSize(width: 1, height: +.infinity)",
+            "CGRect(x: 0, y: 0, width: .infinity, height: 1)",
+            "CGVector(dx: 0, dy: .nan)",
+            "CGAffineTransform(a: 1, b: 0, c: .nan, d: 1, tx: 0, ty: 0)",
+        ]
+        expected = []
+        # Audit all fixtures together; retain exact per-file findings under tracing.
+        for directory in ("LogYourBody", "LogYourBodyTests", "LogYourBodyUITests", "LogYourBodyWidget"):
+            for index, source in enumerate(cases):
+                path = self.root / "apps/ios" / directory / f"GeometryFixture{index}.swift"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"let invalid = {source}\n")
+                expected.append(("swift.explicit_geometry_nonfinite", str(path.relative_to(self.root))))
+        result, output = self.run_audit()
+        self.assertEqual(result, 1)
+        findings = json.loads((output / "launch-ui-regression-audit.json").read_text())["violations"]
+        self.assertCountEqual([(finding["check"], finding["file"]) for finding in findings], expected)
+
+    def test_geometry_allows_explicit_types_and_contextually_typed_constants(self):
+        source = """
+let point = CGPoint(x: CGFloat.infinity, y: -CGFloat.infinity)
+let size = CGSize(width: Double.nan, height: 1)
+let rect = CGRect(origin: .zero, size: CGSize(width: CGFloat.infinity, height: 1))
+let transform = CGAffineTransform(translationX: 0, y: 1)
+let scales: [CGFloat] = [0, -1, .infinity, .nan]
+let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, scale: 1)
+"""
+        (self.app / "GeometryFixture.swift").write_text(source)
+        self.assertEqual(self.run_audit()[0], 0)
 
     def test_stats_container_can_delegate_themed_cards(self):
         page = (self.app / "Views/DashboardViewLiquid+PhotoTimelineAnalytics.swift").read_text()

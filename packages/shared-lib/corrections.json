@@ -3723,5 +3723,27 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "swift-geometry-nonfinite-overload-ambiguity",
+    "correction": "PR #1621 (fix-red-5df69c1e5f, occurrence 19): Launch Quality run 40756790962 failed to compile SubjectPlateRendererTests.swift because CGPoint(x: .infinity, y: 0) is ambiguous between CGFloat.infinity and Double.infinity.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40756790962/job/123058082407",
+    "mechanization": "Explicitly qualify the invalid translation fixture as CGFloat.infinity while preserving the non-finite rejection assertion and all product behavior. Extend the existing launch UI regression audit to reject untyped infinity and nan in geometry constructors across app, widget, unit-test and UI-test sources. The real audit behavior suite rejects 32 violating fixtures across those trees and accepts explicitly typed or contextually typed constants. The current regression fails against the original audit; batch all 32 fixtures into one invocation with exact per-file findings to retain the existing 30-second coverage-wrapper limit, which passes in about 10 seconds; the extended audit then rejects the original test at line 37 and passes after qualification. Add the widget sources to the existing shared-lib Turbo inputs, retain the executed Python coverage wrapper, and record this receipt with the existing classifier. SwiftLint on this Linux host skips custom rules without SourceKit, so use the existing Python audit instead of relying on a skipped rule. origin/main was already merged. Native XCTest execution and coverage require the macOS CI runner. The lanes harness owns push and PR-body updates and must supply Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Swift and the SDK own the overloaded geometry constructors; a product implementation cannot prevent future test or app source from using an ambiguous untyped constant."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required static launch audit can reject untyped non-finite geometry arguments in Swift sources before the native build while permitting explicit types and constants with an unambiguous context."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "check=\"swift.explicit_geometry_nonfinite\","
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   }
 ]

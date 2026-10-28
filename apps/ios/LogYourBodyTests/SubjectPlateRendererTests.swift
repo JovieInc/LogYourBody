@@ -34,7 +34,7 @@ final class SubjectPlateRendererTests: XCTestCase {
             XCTAssertNil(BodyPhotoRegistration(translation: .zero, scale: scale))
         }
         XCTAssertNil(BodyPhotoRegistration(translation: .zero, rotation: .nan, scale: 1))
-        XCTAssertNil(BodyPhotoRegistration(translation: CGPoint(x: .infinity, y: 0), scale: 1))
+        XCTAssertNil(BodyPhotoRegistration(translation: CGPoint(x: CGFloat.infinity, y: 0), scale: 1))
         XCTAssertNil(AspectFillCropper.registration(imageSize: .zero, in: CGSize(width: 40, height: 50), anchor: nil))
     }
 

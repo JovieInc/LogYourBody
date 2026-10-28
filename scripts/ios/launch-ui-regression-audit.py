@@ -123,6 +123,7 @@ def write_outputs(artifact_dir: Path, violations: list[AuditViolation]) -> None:
             [
                 "## Covered Contracts",
                 "",
+                "- Geometry constructors explicitly type non-finite constants to avoid Swift overload ambiguity.",
                 "- Dashboard ScrollViews do not use large fake bottom spacers that create dead over-scroll.",
                 "- Onboarding fixed-CTA screens use size-based vertical scroll bounce to avoid empty over-scroll.",
                 "- The removed bottom stats-card hook stays out of app source.",
@@ -150,6 +151,20 @@ def main() -> int:
     app_dir = root / "apps/ios/LogYourBody"
     app_swift_files = sorted(app_dir.rglob("*.swift"))
     violations: list[AuditViolation] = []
+
+    add_pattern_violations(
+        root=root,
+        paths=sorted(path for directory in (
+            "LogYourBody", "LogYourBodyTests", "LogYourBodyUITests", "LogYourBodyWidget"
+        ) for path in (root / "apps/ios" / directory).rglob("*.swift")),
+        pattern=re.compile(
+            r"\b(?:CGPoint|CGSize|CGRect|CGVector|CGAffineTransform)\s*\("
+            r"[^()]*?\b\w+\s*:\s*[+-]?\s*\.(?:infinity|nan)\b"
+        ),
+        check="swift.explicit_geometry_nonfinite",
+        detail="Qualify non-finite geometry arguments with CGFloat or Double to avoid ambiguous overloads.",
+        violations=violations,
+    )
 
     add_pattern_violations(
         root=root,
