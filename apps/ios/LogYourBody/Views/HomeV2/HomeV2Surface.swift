@@ -788,14 +788,32 @@ enum AspectFillCropper {
 
     static func crop(_ image: UIImage, to target: CGSize, anchor: CGPoint?) -> UIImage {
         guard target.width > 0, target.height > 0 else { return image }
+        guard let registration = registration(imageSize: image.size, in: target, anchor: anchor) else {
+            return UIGraphicsImageRenderer(size: target).image { _ in }
+        }
+        return crop(image, to: target, registration: registration)
+    }
+
+    static func registration(imageSize: CGSize, in target: CGSize, anchor: CGPoint?) -> BodyPhotoRegistration? {
+        guard imageSize.width > 0, imageSize.height > 0, target.width > 0, target.height > 0 else { return nil }
         let rect = fillRect(
-            imageSize: image.size,
+            imageSize: imageSize,
             in: target,
             anchor: anchor,
             anchorTarget: TorsoFocusService.stageAnchor
         )
-        return UIGraphicsImageRenderer(size: target).image { _ in
-            image.draw(in: rect)
+        return BodyPhotoRegistration(
+            translation: rect.origin,
+            scale: max(target.width / imageSize.width, target.height / imageSize.height)
+        )
+    }
+
+    /// Render a disposable stage image; never rewrite the source with its crop.
+    static func crop(_ image: UIImage, to target: CGSize, registration: BodyPhotoRegistration) -> UIImage {
+        guard target.width > 0, target.height > 0 else { return image }
+        return UIGraphicsImageRenderer(size: target).image { context in
+            context.cgContext.concatenate(registration.transform)
+            image.draw(in: CGRect(origin: .zero, size: image.size))
         }
     }
 }
