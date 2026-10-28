@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "fix-red-1a39536f40",
+    "correction": "PR #1622 (fix-red-e3b0c44298 occurrence 33): Both merge-group attempts fail JavaScript/TypeScript because the correction-classifier real-Git suite exceeds its unchanged 30-second deadline; the shared private-data guard passes.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40762530604",
+    "mechanization": "Extend the existing classifier batch reader to read staged and immutable parent ledgers together, and collect NUL-delimited index stages and regular-file modes once per command. Reuse those snapshots only within that invocation so retries still observe removed guards, symlinks and staged mutations. Extend the existing required real-Git matrix with a fixed four-process verification budget, one index listing, two blob batches and no per-ledger Git show calls. The command-count regression fails on the previous implementation and passes after the extension; all 57 covered cases retain 100 percent line, branch and function coverage, and covered suite time falls from 26.2 to 18.6 seconds on this host. The full two-worker graph still exceeds the classifier deadline and the correction-checks five-second wrapper deadline, so serialize shared-lib test files through its existing package test script while retaining the fixture matrix concurrency. Preserve every CLI scenario, assertion, deadline, coverage gate and the private-data workflow. Run the same classifier to classify this receipt. The required origin/main merge is already up to date. The lanes harness retains push and PR ownership, including the single Machine line supplied in the handoff.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The reusable classifier batches staged and immutable parent guard reads per verification, removing per-guard Git startup by construction while retaining fresh index reads and the same repair semantics."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "// Batch guard blobs per verification; never cache the mutable index across retries."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-5df69c1e5f",
     "correction": "PR #1568 / LYB-247: Launch Quality run 40589668494 failed before XCTest because a shell behavior fixture exhausted its 10-second child-process deadline on hosted macOS. Repair the recurring red-check class without relaxing native qualification.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40589668494/job/122490587152",
