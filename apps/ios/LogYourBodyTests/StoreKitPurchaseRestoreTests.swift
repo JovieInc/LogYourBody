@@ -259,7 +259,11 @@ private final class LocalStoreKitPurchasesClient: RevenueCatPurchasesProtocol {
         throw LocalStoreKitError.unexpectedOfferingsRequest
     }
 
-    func purchase(package: Package, entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
+    func purchase(
+        package: Package,
+        entitlementID: String,
+        verifiesOutcome: Bool
+    ) async throws -> RevenueCatCustomerSnapshot {
         let product = try XCTUnwrap(package.storeProduct.sk2Product)
         switch try await product.purchase() {
         case .success(let verification):

@@ -206,7 +206,8 @@ func sourceMetadata(from sample: HKQuantitySample) -> BodyMetricSourceMetadata {
             deviceManufacturer: sample.device?.manufacturer,
             deviceModel: sample.device?.model,
             sampleId: idempotencyKey(for: sample),
-            quantityType: sample.quantityType.identifier
+            quantityType: sample.quantityType.identifier,
+            importedAt: ISO8601DateFormatter().string(from: Date())
         ).recordingHealthKitContext(context)
     }
 
@@ -227,7 +228,8 @@ func combinedHealthKitMetadata(
             deviceModel: primary?.deviceModel ?? bodyFatMetadata?.deviceModel,
             sampleId: primary?.sampleId ?? bodyFatMetadata?.sampleId,
             quantityType: primary?.quantityType ?? bodyFatMetadata?.quantityType,
-            bodyFatSampleId: bodyFatMetadata?.sampleId
+            bodyFatSampleId: bodyFatMetadata?.sampleId,
+            importedAt: primary?.importedAt ?? bodyFatMetadata?.importedAt
         ).recordingHealthKitContext(primary?.healthKitContext ?? [:])
         return bodyFatMetadata.map { combined.pairingHealthKitBodyFat($0) } ?? combined
     }
