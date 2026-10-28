@@ -771,6 +771,25 @@ def test_hosted_ios_jobs_retain_existing_test_quality_and_summary_gates() -> Non
     assert 'heartbeat' not in summary
 
 
+def test_unit_reuses_package_cache_without_archiving_test_builds() -> None:
+    # Run 40648671494 passed Unit and coverage, then hit the 40m job cap
+    # uploading 4.2 GB of DerivedData. Setup already owns the package cache.
+    unit = _job_block('ios-unit.yml', 'unit')
+    assert 'uses: ./.github/actions/setup-ios-build' in unit
+    assert 'working-directory: apps/ios' in unit
+    assert 'actions/cache' not in unit, 'reuse setup package cache; do not archive Unit build outputs'
+    assert 'timeout-minutes: 40' in unit
+    setup = (_REPO_ROOT / '.github/actions/setup-ios-build/action.yml').read_text()
+    cache = setup.split('    - name: Cache Swift Package Manager\n', 1)[1].split('\n    - name:', 1)[0]
+    assert "if: runner.environment == 'github-hosted'" in cache
+    assert 'uses: actions/cache@' in cache
+    paths = cache.split('        path: |\n', 1)[1].split('        key:', 1)[0]
+    assert [line.strip() for line in paths.splitlines() if line.strip()] == [
+        '${{ inputs.working-directory }}/SourcePackages',
+        '~/Library/Developer/Xcode/DerivedData/**/SourcePackages',
+    ]
+
+
 def _run_manual_quality_guard(tmp_path: Path, **overrides: str) -> subprocess.CompletedProcess[str]:
     quality = _job_block("ios-quality.yml", "quality")
     guard_step = quality.split("      - name: Validate manual qualification source\n", 1)[1]

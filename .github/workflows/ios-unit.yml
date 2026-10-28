@@ -66,20 +66,8 @@ jobs:
           setup-ruby: 'true'
           create-config-files: 'true'
 
-      # Hosted VMs start cold. A persistent Mac keeps these locally, and
-      # saving multi-GB caches over its home uplink would outlast the job.
-      - name: Cache Swift packages
-        if: ${{ runner.environment == 'github-hosted' }}
-        uses: actions/cache@v6
-        with:
-          path: |
-            apps/ios/.build
-            ~/Library/Developer/Xcode/DerivedData
-            ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-spm-xcode-stable-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-xcode-stable-
-            ${{ runner.os }}-spm-
+      # Setup already caches SourcePackages on hosted runners. Archiving all
+      # DerivedData here made run 40648671494 time out after Unit and coverage passed.
 
       - name: Fastlane source integrity regression controls
         run: |

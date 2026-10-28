@@ -2788,5 +2788,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-unit-cache-saves-only-package-inputs",
+    "correction": "PR #1535 (fix-red-e3b0c44298): merge-group run 40648671494 passed all 1712 Unit cases (49 skipped), native coverage and receipt upload, then exceeded the 40-minute job cap while saving a 4.2 GB DerivedData cache.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1535",
+    "mechanization": "Reuse setup-ios-build's existing hosted-only SourcePackages cache instead of adding a second Unit cache over complete build outputs. Extend the existing required runner-routing suite to reject a direct Unit cache, broader setup cache paths, loss of shared setup or a changed 40-minute cap. The new regression fails on the original workflow and passes after removing the redundant cache. Keep every build, native selector, assertion, coverage ratchet, evidence upload and summary gate. The earlier classifier timeout in run 40647895974 passed on the next same-head queue run; local validation retains its 30-second wrapper and 100% coverage thresholds. No native or hosted cache-save execution is available on this Linux host. The harness owns pushes and PR edits.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The failure is in GitHub Actions post-job cache archival after successful native validation. Product types and runtime logic do not control those cache paths or the hosted job lifecycle."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required Mac Runner Routing Tests can enforce shared package-only cache ownership and retain the existing native job cap before scheduling any macOS work."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_unit_reuses_package_cache_without_archiving_test_builds()"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
