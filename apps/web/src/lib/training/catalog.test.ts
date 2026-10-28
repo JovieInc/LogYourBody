@@ -1,5 +1,6 @@
 import {
   EXERCISE_CATALOG,
+  type CatalogEquipment,
   catalogVariantMetadataSchema,
   catalogVariantSchema,
   catalogVariantSeedSchema,
@@ -7,6 +8,7 @@ import {
   isEligibleVariant,
   missingEquipment,
   profileEquipment,
+  queryExerciseLibrary,
   resolveAvailableEquipment,
   substitutionCandidates,
   variantToleranceTagsSchema,
@@ -168,6 +170,20 @@ describe('exercise catalog eligibility', () => {
         excludedConcerns: ['low_back_symptoms'],
       }),
     ).toBe(false);
+  });
+});
+
+describe('exercise library gym filter', () => {
+  it('allows the whole library until a gym equipment set is confirmed', () => {
+    expect(queryExerciseLibrary(null).map((variant) => variant.id)).toEqual(
+      EXERCISE_CATALOG.map((variant) => variant.id),
+    );
+    const confirmed = new Set<CatalogEquipment>(['dumbbells', 'bodyweight']);
+    const ids = queryExerciseLibrary(confirmed).map((variant) => variant.id);
+    expect(ids).toContain('dumbbell_curl');
+    expect(ids).not.toContain('cable_curl');
+    expect(ids).not.toContain('smith_incline_press');
+    expect(queryExerciseLibrary(new Set()).map((variant) => variant.id)).toEqual([]);
   });
 });
 

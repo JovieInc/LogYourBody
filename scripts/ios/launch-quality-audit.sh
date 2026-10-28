@@ -29,9 +29,9 @@ MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-
 # killed healthy runs. 1020s still stops a hung simulator well inside the step
 # budget. A command timeout is not retried; see is_simulator_infra_failure.
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
-# Run 40416849347 was still compiling test targets when the 600s cap killed it.
-# Bound the cold build at 15m independently of the unchanged XCTest limits,
-# startup retry policy and 52-minute outer audit cap.
+# Bound the one cold build independently of XCTest execution. Run 40388372132
+# missed every Swift package cache and was still compiling test targets at 600s.
+# Allow 15m for compilation; keep test timeouts, retries and the outer step cap.
 BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
@@ -63,6 +63,8 @@ git -C "$ROOT_DIR" rev-parse HEAD > "$ARTIFACT_DIR/source-revision.txt"
 git -C "$ROOT_DIR" diff HEAD --binary > "$ARTIFACT_DIR/source-working-tree.patch"
 
 if [[ "$AUDIT_MODE" == full ]]; then
+  # Finish validator shell fixtures before simulator boot competes for host resources.
+  python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
   bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
 fi
 
@@ -535,7 +537,6 @@ else
   echo "Skipping optical grid audit" | tee "$ARTIFACT_DIR/optical-grid-audit.log"
 fi
 
-python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
 build_for_testing_once
 
 CHAT_QUALIFICATION_UNIT_TESTS=(
@@ -585,6 +586,7 @@ LAUNCH_QUALITY_UI_TESTS=(
   "HomeV2TimelineIntegrationUITests/testHorizontalPhotoDragPagesPixelsAndMetricsWithoutOpeningViewer"
   "HomeV2PhotoViewerLayoutUITests/testPhotoViewerHoldScrubsAndResetsAfterToolsNavigation"
   "LogYourBodyUITests/testProgressShareKeepsSelectedMetricAndVisibleValue"
+  "LogYourBodyUITests/testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance"
   "LogYourBodyUITests/testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch"
   "LogYourBodyUITests/testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity"
   "LogYourBodyUITests/testHomeV2AskSyntheticCancelledTurnRecovers"

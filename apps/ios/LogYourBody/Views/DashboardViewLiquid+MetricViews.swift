@@ -19,6 +19,7 @@ extension DashboardViewLiquid {
     }
 
     var metricsView: some View {
+        let summaries = metricTruthSummaries
         let stepsGoalText: String? = {
             let formatted = FormatterCache.stepsFormatter.string(from: NSNumber(value: stepGoal)) ?? "\(stepGoal)"
             return "Goal \(formatted) steps"
@@ -48,6 +49,9 @@ extension DashboardViewLiquid {
             metricsOrder: $metricsOrder,
             draggedMetric: $draggedMetric,
             onReorder: saveMetricsOrder,
+            truthSummaries: summaries,
+            truthSnapshots: metricTruthSnapshots(summaries: summaries),
+            truthSyncText: metricTruthSyncText,
             selectedRange: $selectedRange,
             selectedMetricType: $selectedMetricType,
             isMetricDetailActive: $isMetricDetailActive,
@@ -101,7 +105,8 @@ extension DashboardViewLiquid {
                 selectedTimeRange: $selectedRange,
                 selectedTimelineDate: metricDetailSelectedDateBinding,
                 shareSnapshots: dashboardMetricShareSnapshots,
-                isShareContextVisible: isMetricShareContextVisible
+                isShareContextVisible: isMetricShareContextVisible,
+                synchronizationText: metricTruthSyncText
             )
 
         case .weight:
@@ -129,7 +134,8 @@ extension DashboardViewLiquid {
                 selectedTimelineDate: metricDetailSelectedDateBinding,
                 shareSnapshots: dashboardMetricShareSnapshots,
                 isShareContextVisible: isMetricShareContextVisible,
-                initialChartMode: weightUsesTrend ? .trend : .raw
+                initialChartMode: weightUsesTrend ? .trend : .raw,
+                synchronizationText: metricTruthSyncText
             )
 
         case .bodyFat:
@@ -150,7 +156,8 @@ extension DashboardViewLiquid {
                 selectedTimeRange: $selectedRange,
                 selectedTimelineDate: metricDetailSelectedDateBinding,
                 shareSnapshots: dashboardMetricShareSnapshots,
-                isShareContextVisible: isMetricShareContextVisible
+                isShareContextVisible: isMetricShareContextVisible,
+                synchronizationText: metricTruthSyncText
             )
 
         case .ffmi:
@@ -169,7 +176,8 @@ extension DashboardViewLiquid {
                 selectedTimeRange: $selectedRange,
                 selectedTimelineDate: metricDetailSelectedDateBinding,
                 shareSnapshots: dashboardMetricShareSnapshots,
-                isShareContextVisible: isMetricShareContextVisible
+                isShareContextVisible: isMetricShareContextVisible,
+                synchronizationText: metricTruthSyncText
             )
 
         case .bodyScore:
@@ -234,6 +242,9 @@ extension DashboardViewLiquid {
     }
 
     var dashboardMetricShareSnapshots: [ContextualMetricSnapshot] {
+        if MetricStatsTruthPolicy.isEnabled() {
+            return metricTruthSnapshots(summaries: metricTruthSummaries).filter(\.isAvailable)
+        }
         let date = currentMetric.map { formatDate($0.date) } ?? ""
         let source = currentMetric.map { HomeV2Provenance.label(for: $0, field: .bodyFat) }
         let range = selectedRange.accessibilityLabel
@@ -267,6 +278,45 @@ extension DashboardViewLiquid {
                 evidence: ContextualMetricEvidencePolicy.label(for: .bodyScore)))
         }
         return snapshots.filter(\.isAvailable)
+    }
+
+    var metricTruthSyncText: String {
+        MetricStatsTruthPolicy.synchronizationText(
+            status: syncStatusTitle, lastCloudSync: realtimeSyncManager.lastSyncDate,
+            healthAccessStatus: HealthKitManager.shared.authorizationStatusText)
+    }
+
+    var metricTruthSummaries: [ContextualMetricKind: MetricObservationSummary] {
+        guard MetricStatsTruthPolicy.isEnabled() else { return [:] }
+        let now = Date()
+        return [
+            .steps: MetricObservationSummary(points: generateFullScreenStepsChartData(), range: selectedRange, now: now),
+            .weight: MetricObservationSummary(
+                points: generateFullScreenWeightChartData(), range: selectedRange, selectedDate: currentMetric?.date, now: now),
+            .bodyFat: MetricObservationSummary(
+                points: generateFullScreenBodyFatChartData(), range: selectedRange, selectedDate: currentMetric?.date, now: now),
+            .ffmi: MetricObservationSummary(
+                points: generateFullScreenFFMIChartData(), range: selectedRange, selectedDate: currentMetric?.date, now: now)
+        ]
+    }
+
+    func metricTruthSnapshots(summaries: [ContextualMetricKind: MetricObservationSummary]) -> [ContextualMetricSnapshot] {
+        summaries.compactMap { kind, summary in
+            let source: String?
+            switch kind {
+            case .steps: source = "Apple Health"
+            case .ffmi: source = "Derived from smoothed weight, body fat and height"
+            default:
+                let entries = kind == .weight ? weightEntriesPayload()?.entries : bodyFatEntriesPayload()?.entries
+                source = ContextualMetricSourcePolicy.source(for: summary.point, entries: entries ?? [], fallback: nil)
+                    ?? "Source unavailable or mixed"
+            }
+            return ContextualMetricSnapshot.observationSummary(
+                summary, kind: kind,
+                unit: kind == .steps ? "steps" : (kind == .weight ? weightUnit : (kind == .bodyFat ? "%" : "")),
+                provenance: source
+            )
+        }
     }
 
     func metricDetailRelatedMetrics(excluding selected: MetricType) -> [MetricDetailRelatedMetric] {

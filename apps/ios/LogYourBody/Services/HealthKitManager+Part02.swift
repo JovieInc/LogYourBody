@@ -1151,7 +1151,8 @@ func scheduleObservedBodyMetricSync() {
             : sample.quantity.doubleValue(for: HKUnit.percent()) * 100
         return HealthKitSmartScaleSyncPolicy.makeSample(
             sampleId: idempotencyKey(for: sample), kind: kind, value: value,
-            date: sample.startDate, sourceName: sample.sourceRevision.source.name
+            date: sample.startDate, sourceName: sample.sourceRevision.source.name,
+            sourceBundleId: sample.sourceRevision.source.bundleIdentifier
         )
     }
 
@@ -1215,10 +1216,12 @@ func scheduleObservedBodyMetricSync() {
         let now = Date()
         let isWeight = sample.kind == .weight
         let metadata = BodyMetricSourceMetadata(
-            vendor: "apple_health", sourceName: sample.sourceName, sampleId: sample.sampleId,
+            vendor: "apple_health", sourceName: sample.sourceName,
+            sourceBundleId: sample.sourceBundleId, sampleId: sample.sampleId,
             quantityType: isWeight
                 ? HKQuantityTypeIdentifier.bodyMass.rawValue
-                : HKQuantityTypeIdentifier.bodyFatPercentage.rawValue
+                : HKQuantityTypeIdentifier.bodyFatPercentage.rawValue,
+            importedAt: ISO8601DateFormatter().string(from: now)
         )
         return BodyMetrics(
             id: UUID().uuidString, userId: userId, date: sample.date, weight: isWeight ? sample.value : nil,

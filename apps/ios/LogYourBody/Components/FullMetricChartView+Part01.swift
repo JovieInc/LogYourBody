@@ -63,7 +63,7 @@ var body: some View {
             await preprocessHistorySectionsIfNeeded()
         }
         .onChange(of: selectedTimeRange) { _, _ in
-            activePoint = nil
+            if !usesStatsTruth { activePoint = nil }
             HapticManager.shared.selection()
         }
         .onChange(of: chartMode) { _, _ in
@@ -100,6 +100,9 @@ var body: some View {
     }
 
 var contextualSharePayload: BodyScoreSharePayload? {
+        if usesStatsTruth, let snapshot = observationSnapshot {
+            return .contextual([snapshot], selected: snapshot.kind)
+        }
         guard let kind = ContextualMetricKind.from(title: title) else { return nil }
         let point = validatedActivePoint
         let isSmoothed = point != nil && chartMode == .trend
@@ -133,7 +136,7 @@ var headlineBlock: some View {
                             .fill(iconColor.opacity(0.16))
                     )
 
-                Text("Latest")
+                Text(usesStatsTruth ? "Observation" : "Latest")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(Color.metricTextSecondary)
             }
@@ -158,13 +161,19 @@ var headlineBlock: some View {
                     }
                 }
 
-                Text(activePoint == nil ? "Updated \(headlineDateText)" : headlineDateText)
+                Text(usesStatsTruth ? headlineDateText : (activePoint == nil ? "Updated \(headlineDateText)" : headlineDateText))
                     .font(.system(size: 15, weight: .medium))
                     .foregroundColor(Color.white.opacity(0.65))
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            if let stats = computeSeriesStats(for: displayedSeries) {
+            if usesStatsTruth, let snapshot = observationSnapshot {
+                Text([snapshot.evidence, snapshot.provenanceLabel, snapshot.range, snapshot.trend, synchronizationText]
+                    .compactMap { $0 }.joined(separator: "\n"))
+                    .font(.footnote)
+                    .foregroundStyle(Color.metricTextSecondary)
+                    .accessibilityIdentifier("metric_detail_observation_context")
+            } else if let stats = computeSeriesStats(for: displayedSeries) {
                 HStack(spacing: 12) {
                     statsCell(
                         title: "Average",
@@ -282,6 +291,7 @@ var chartCard: some View {
                     .frame(height: chartHeight)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("metric_detail_chart")
     }
 
@@ -408,12 +418,18 @@ var chartHeader: some View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(alignment: .center, spacing: 12) {
-                chartModeToggle
+                if usesStatsTruth {
+                    Text("\(observationSummary.periodLabel) · Observations; gaps unfilled")
+                        .font(.footnote)
+                        .foregroundStyle(Color.metricTextSecondary)
+                } else {
+                    chartModeToggle
+                }
 
                 Spacer()
             }
 
-            if let goalValue {
+            if let goalValue = plottedGoalValue {
                 goalLegend(goalValue)
             }
 
@@ -528,6 +544,12 @@ var chartView: some View {
                             : chartPointColor(for: point.presence).opacity(0.62)
                     )
                 }
+            } else if usesStatsTruth {
+                ForEach(series) { point in
+                    PointMark(x: .value("Observation date", point.date), y: .value("Value", point.value))
+                        .symbolSize(chartPointSymbolSize(for: point.presence))
+                        .foregroundStyle(chartPointColor(for: point.presence))
+                }
             } else {
                 ForEach(series) { point in
                     LineMark(
@@ -565,13 +587,13 @@ var chartView: some View {
                 }
             }
 
-            if let goalValue {
+            if let goalValue = plottedGoalValue {
                 RuleMark(y: .value("Goal", goalValue))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                     .foregroundStyle(Color.metricAccent.opacity(0.45))
             }
 
-            if let stats = computeSeriesStats(for: activeSeries) {
+            if let stats = usesStatsTruth ? observationSummary.stats : computeSeriesStats(for: activeSeries) {
                 RuleMark(y: .value("Average", stats.average))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 2]))
                     .foregroundStyle(Color.metricGridMajor.opacity(0.6))
@@ -626,7 +648,8 @@ var chartView: some View {
                     .font(.caption2.weight(.medium))
             }
         }
-        .chartYScale(domain: .automatic(includesZero: false))
+        .chartXScale(domain: chartDisplayInterval)
+        .chartYScale(domain: .automatic(includesZero: isStepsMetric && usesStatsTruth))
         .chartOverlay { proxy in
             GeometryReader { geo in
                 Rectangle().fill(Color.clear).contentShape(Rectangle())
@@ -653,7 +676,7 @@ var chartView: some View {
                             }
                             .onEnded { _ in
                                 isScrubbing = false
-                                activePoint = nil
+                                if !usesStatsTruth { activePoint = nil }
                             }
                     )
             }
