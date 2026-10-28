@@ -48,8 +48,9 @@ def resolve_staged(root):
         ["git", "ls-files", "--unmerged", "-z", "--", config["output"]],
         cwd=root, check=True, capture_output=True,
     ).stdout
-    # Rebuild a conflicted projection only from stage-0 inputs. An unrelated
-    # ledger conflict must not deadlock the two existing merge resolvers.
+    # Rebuild a conflicted projection from staged inputs before resolving unrelated ledgers.
+    # Every actual input must have stage zero; staged_bytes fails closed otherwise.
+    # An unrelated ledger conflict must not deadlock the two existing merge resolvers.
     if (dirty and not conflicted) or (output.exists() and not tracked):
         raise ValueError("unstaged projection edits: " + config["output"])
     # Render the index, so partially staged manifests cannot leak into the commit.

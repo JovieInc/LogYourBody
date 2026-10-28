@@ -92,26 +92,21 @@ branch-only receipts, allowing later main-side prepends to merge without
 repeating the same conflict. It preserves independent additions and
 one-sided edits, rejects deletions, duplicate identities and divergent concurrent
 edits, and validates retained guards before writing the classified result.
-Missing conflict stages fail without writing. If Git refuses to stage the
-resolved ledger (for example, because another writer holds `index.lock`), the
-resolver restores the original ledger bytes and reports the staging error.
-Remove the external obstruction and retry the same command.
+Missing conflict stages fail without writing. Annotation conflicts identify the
+existing and incoming source receipts; review their classifications and retained
+guards explicitly before retrying. Conflicting annotations are never selected
+automatically. If Git refuses to stage the resolved ledger (for example, because
+another writer holds `index.lock`), the resolver restores the original ledger
+bytes and reports the staging error. Remove the obstruction and retry the same
+command.
+If the working ledger is already valid JSON and differs from the computed merge,
+both resolver entrypoints refuse to overwrite it through the same shared guard.
+Review and stage that manual resolution,
+then use `--check-merge` to verify retention against both parents. Repeating an
+unstaged resolver run with its unchanged computed result remains safe.
 Both resolver entrypoints share a preflight that refuses other unresolved Git
 paths before reading guard evidence or writing the ledger. Resolve and stage
 those source conflicts first, even when their files still contain guard anchors.
-The preflight reads raw staged changes with binary hiding and text conversions
-disabled, so diff attributes cannot conceal unresolved conflict markers. Git's
-marker check also honors per-path `conflict-marker-size` values below seven;
-whitespace policy remains with the existing lint gates. Both
-resolution and pre-commit merge verification refuse those markers without writes.
-The Git fixtures combine forced color with binary/textconv attributes and cover
-all four CRLF marker forms and wider markers, so composing protections during
-a main merge cannot silently discard either parent's guard.
-If the generated repository source map also conflicts, run
-`python3 scripts/resolve-repository-docs.py --staged` before the ledger resolver.
-It reconstructs only the generated output from staged inputs, leaving unrelated
-ledger conflicts and unstaged source edits untouched. Unresolved generator inputs
-and pinned-source drift still fail before writing or staging the output.
 Review the result, stage the ledger, and run the coverage check against both
 merge parents. The command leaves the index and unrelated edits untouched.
 
@@ -121,13 +116,12 @@ to staging only the resolved ledger after validating its classification, staged
 guard sources and receipt retention against both merge parents. A failed
 validation preserves the ledger and index. Retrying after staging runs the
 read-only merge check; it does not restage files or overwrite unrelated edits.
-Ordinary classification, file merges and staged verification share the resolver's
-normalized receipt identity check,
-rejecting both identical duplicates and conflicting text under the same identity.
 Both the merge check and staged retry refuse any other unresolved Git path,
 even when the staged ledger and all of its guard sources are valid.
 Conflict-marker scanning disables Git color output as well as text conversion
-and external diff drivers so presentation settings cannot conceal staged markers.
+and external diff drivers, and forces text output so binary attributes or NUL bytes
+cannot conceal staged markers.
+It also rejects markers shorter than seven characters.
 A staged retry refuses any unstaged ledger edits rather than reporting success
 while ignoring new receipts. Review and stage those edits explicitly before
 retrying; refusal preserves both the index and working file.
@@ -140,6 +134,8 @@ policy. It rejects a lost rule or source, a missing guard, or unclassified
 metadata even when the working tree is correct. Pre-commit runs this check for
 every merge, including merges whose staged ledger has no diff against `HEAD`.
 An absent merge or an unstaged ledger conflict fails without writing files.
+The staged ledger must be a regular file; a symlink blob containing valid JSON
+cannot pass verification or a staged resolver retry.
 
 For exported parent snapshots, `node scripts/correction-classifier.mjs left.json
 --merge right.json` writes the validated union to `left.json` without changing

@@ -466,7 +466,7 @@ extension DashboardViewLiquid {
     }
 
     func formatHUDDate(_ date: Date) -> String {
-        FormatterCache.mediumDateFormatter.string(from: date)
+        DashboardMetricFormatting.readingDateLabel(effectiveDate: date)
     }
 
     var photoTimelineHUDEmptyState: some View {

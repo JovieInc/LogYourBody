@@ -135,12 +135,7 @@ struct ChartSeriesPreprocessor {
     }
 
     func filter(_ points: [MetricChartDataPoint], for range: TimeRange) -> [MetricChartDataPoint] {
-        guard let days = range.days else {
-            return points
-        }
-
-        let cutoff = calendar.date(byAdding: .day, value: -days, to: referenceDate) ?? referenceDate
-        return points.filter { $0.date >= cutoff }
+        MetricObservationSummary.window(points, range: range, now: referenceDate, calendar: calendar)
     }
 
     func maxPointCount(for range: TimeRange) -> Int {
@@ -264,6 +259,7 @@ struct MetricHistoryEntry: Identifiable, Sendable {
     let primaryValue: Double
     let secondaryValue: Double?
     let source: MetricEntrySourceType
+    var sourceName: String?
 }
 
 struct MetricEntriesConfiguration {
@@ -332,6 +328,9 @@ struct FullMetricChartView: View {
     let relatedMetrics: [MetricDetailRelatedMetric]
 
     let goalValue: Double?
+    let statsTruthEnabled: Bool
+    let referenceDate: Date
+    let synchronizationText: String?
 
     @Binding var selectedTimeRange: TimeRange
     @Binding var selectedTimelineDate: Date?
@@ -374,7 +373,10 @@ struct FullMetricChartView: View {
         selectedTimelineDate: Binding<Date?> = .constant(nil),
         shareSnapshots: [ContextualMetricSnapshot] = [],
         isShareContextVisible: Bool = true,
-        initialChartMode: ChartMode = .trend
+        initialChartMode: ChartMode = .trend,
+        statsTruthEnabled: Bool? = nil,
+        referenceDate: Date = Date(),
+        synchronizationText: String? = nil
     ) {
         self.title = title
         self.icon = icon
@@ -390,6 +392,9 @@ struct FullMetricChartView: View {
         self.metricEntries = metricEntries
         self.relatedMetrics = relatedMetrics
         self.goalValue = goalValue
+        self.statsTruthEnabled = statsTruthEnabled ?? MetricStatsTruthPolicy.isEnabled()
+        self.referenceDate = referenceDate
+        self.synchronizationText = synchronizationText
         _selectedTimeRange = selectedTimeRange
         _selectedTimelineDate = selectedTimelineDate
         _chartMode = State(initialValue: initialChartMode)

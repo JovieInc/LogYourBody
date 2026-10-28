@@ -636,13 +636,14 @@ function sourceMapConflict({ sourceConflict = false, ledgerConflict = false } = 
     'README.md': 'Local instructions\n',
     'repository-docs.json': JSON.stringify(config),
     'workflow.yml': source,
+    ...(ledgerConflict ? { 'corrections.json': 'base receipt\n' } : {}),
   }, 'base sources');
   const generate = () => execFileSync('python3', [
     path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', root, '--write',
   ], { env: gitEnv });
   const checkpoint = (contents, message) => {
     fs.writeFileSync(path.join(root, 'workflow.yml'), contents);
-    if (ledgerConflict) fs.writeFileSync(path.join(root, 'ledger.json'), JSON.stringify({ receipt: message }));
+    if (ledgerConflict) fs.writeFileSync(path.join(root, 'corrections.json'), `${message}\n`);
     generate();
     git(root, 'add', '.');
     git(root, 'commit', '-q', '-m', message);
@@ -654,62 +655,11 @@ function sourceMapConflict({ sourceConflict = false, ledgerConflict = false } = 
   checkpoint(source.replace(sourceConflict ? 'first' : 'last', 'main'), 'main workflow');
   git(root, 'checkout', '-q', 'feature');
   assert.throws(() => git(root, 'merge', '--no-commit', 'main'), 'fixture must conflict');
-  const resolve = () => spawnSync('python3', [
+  const resolve = ({ staged = false } = {}) => spawnSync('python3', [
     path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root,
+    ...(staged ? ['--staged'] : []),
   ], { env: gitEnv, encoding: 'utf8' });
   return { root, output, config, resolve };
-}
-
-for (const failure of [null, 'source-conflict', 'pinned-drift']) {
-  test(`staged source-map conflict repair ${failure ? `refuses ${failure}` : 'preserves an unrelated ledger conflict'}`, () => {
-    const fx = sourceMapConflict({ sourceConflict: failure === 'source-conflict', ledgerConflict: true });
-    try {
-      if (failure === 'pinned-drift') {
-        fx.config.imports = [{
-          repository: 'example/policy', revision: 'a'.repeat(40),
-          path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
-        }];
-        fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
-        fs.writeFileSync(path.join(fx.root, 'policy.md'), 'Changed pinned policy\n');
-        git(fx.root, 'add', 'repository-docs.json', 'policy.md');
-      }
-      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
-      const ledger = fs.readFileSync(path.join(fx.root, 'ledger.json'), 'utf8');
-      const index = git(fx.root, 'ls-files', '--stage');
-      const otherEntries = () => git(fx.root, 'ls-files', '--stage', '--', '.', `:(exclude)${fx.output}`);
-      const others = otherEntries();
-      if (!failure) fs.writeFileSync(path.join(fx.root, 'workflow.yml'), 'Unstaged source edit\n');
-      const result = spawnSync('python3', [
-        path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', fx.root, '--staged',
-      ], { env: gitEnv, encoding: 'utf8' });
-      assert.equal(result.status, failure ? 1 : 0, result.stderr);
-      assert.equal(fs.readFileSync(path.join(fx.root, 'ledger.json'), 'utf8'), ledger);
-      assert.equal(otherEntries(), others, 'only the generated projection may be staged');
-      if (failure) {
-        assert.match(result.stderr, failure === 'source-conflict' ? /workflow.yml/ : /pinned copy missing or changed/);
-        assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
-        assert.equal(git(fx.root, 'ls-files', '--stage'), index);
-      } else {
-        assert.equal(git(fx.root, 'diff', '--name-only', '--diff-filter=U'), 'ledger.json');
-        const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
-        assert.doesNotMatch(projection, /<<<<<<<|=======|>>>>>>>/);
-        assert.equal(git(fx.root, 'show', `:${fx.output}`), projection.trim());
-        assert.equal(fs.readFileSync(path.join(fx.root, 'workflow.yml'), 'utf8'), 'Unstaged source edit\n');
-        fs.writeFileSync(path.join(fx.root, 'workflow.yml'), `${git(fx.root, 'show', ':workflow.yml')}\n`);
-        const parity = spawnSync('python3', [
-          path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', fx.root,
-        ], { env: gitEnv, encoding: 'utf8' });
-        assert.equal(parity.status, 0, parity.stderr);
-        const retry = spawnSync('python3', [
-          path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', fx.root, '--staged',
-        ], { env: gitEnv, encoding: 'utf8' });
-        assert.equal(retry.status, 0, retry.stderr);
-        assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
-      }
-    } finally {
-      fs.rmSync(fx.root, { recursive: true, force: true });
-    }
-  });
 }
 
 test('source-map merge repair regenerates from both parents and stages only the projection', () => {
@@ -734,6 +684,51 @@ test('source-map merge repair regenerates from both parents and stages only the 
     assert.equal(parity.status, 0, parity.stderr);
     assert.equal(fx.resolve().status, 0, 'repair is idempotent');
     assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test('staged source-map repair resolves its projection before an unrelated ledger conflict', () => {
+  const fx = sourceMapConflict({ ledgerConflict: true });
+  try {
+    const ledger = fs.readFileSync(path.join(fx.root, 'corrections.json'), 'utf8');
+    const ledgerStages = git(fx.root, 'ls-files', '--stage', '--', 'corrections.json');
+    assert.match(ledger, /<<<<<<< HEAD/);
+    const stagedSource = git(fx.root, 'show', ':workflow.yml');
+    fs.appendFileSync(path.join(fx.root, 'workflow.yml'), 'unstaged source edit\n');
+    const result = fx.resolve({ staged: true });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(git(fx.root, 'diff', '--name-only', '--diff-filter=U'), 'corrections.json');
+    assert.equal(git(fx.root, 'ls-files', '--stage', '--', 'corrections.json'), ledgerStages);
+    assert.equal(fs.readFileSync(path.join(fx.root, 'corrections.json'), 'utf8'), ledger);
+    assert.equal(git(fx.root, 'show', ':workflow.yml'), stagedSource);
+    assert.match(fs.readFileSync(path.join(fx.root, 'workflow.yml'), 'utf8'), /unstaged source edit/);
+    const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    assert.doesNotMatch(projection, /<<<<<<<|=======|>>>>>>>/);
+    assert.equal(git(fx.root, 'show', `:${fx.output}`), projection.trim());
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(fx.resolve({ staged: true }).status, 0, 'repair is idempotent');
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    // The result must describe the staged source, even while its worktree differs.
+    git(fx.root, 'restore', '--worktree', '--', 'workflow.yml');
+    const parity = spawnSync('python3', [
+      path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', fx.root,
+    ], { env: gitEnv, encoding: 'utf8' });
+    assert.equal(parity.status, 0, parity.stderr);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test('staged source-map repair refuses a conflicted input without changing the index or projection', () => {
+  const fx = sourceMapConflict({ sourceConflict: true });
+  try {
+    const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.notEqual(fx.resolve({ staged: true }).status, 0);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
   } finally {
     fs.rmSync(fx.root, { recursive: true, force: true });
   }

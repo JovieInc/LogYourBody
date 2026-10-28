@@ -145,6 +145,12 @@ trailing_comma:
 
 # Custom rules
 custom_rules:
+  xctskip_message:
+    name: "XCTSkip Message"
+    regex: '\bXCTAssertTrue\s*\(\s*(\w+)\s+is\s+XCTSkip\s*\)(?:(?!\})[\s\S])*\bString\s*\(\s*(?:describing|reflecting)\s*:\s*\1\s*\)'
+    message: "Assert XCTSkip.message; its reflected description does not expose the skip reason."
+    severity: error
+
   no_hardcoded_strings:
     name: "Hardcoded Strings"
     regex: '(Text|Label|Button|NavigationLink)\s*\(\s*(verbatim:\s*)?"[^"\n]{5,}"'

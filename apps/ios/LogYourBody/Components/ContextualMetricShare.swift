@@ -37,9 +37,37 @@ struct ContextualMetricSnapshot: Equatable, Identifiable {
     let trend: String?
     let provenance: String?
     var evidence: String?
+    var includesObservationContract = false
+    var trendWithoutDates: String?
 
     var id: ContextualMetricKind { kind }
     var isAvailable: Bool { !["", "–", "—", "-"].contains(value.trimmingCharacters(in: .whitespacesAndNewlines)) }
+    var provenanceLabel: String? {
+        provenance.map { includesObservationContract ? "Observation source: \($0)" : $0 }
+    }
+
+    /// The same dated observation and comparison copy used by the Stats card and detail.
+    static func observationSummary(_ summary: MetricObservationSummary, kind: ContextualMetricKind,
+                                   unit: String, provenance: String?) -> Self {
+        let value = summary.point.map {
+            kind == .steps ? (FormatterCache.formattedSteps($0.value) ?? "—") : String(format: "%.1f", $0.value)
+        } ?? "—"
+        let average = summary.stats.map {
+            "\(formatAverageFootnote(value: $0.average, unit: unit)) · \(summary.averageLabel ?? "")"
+        }
+        return Self(
+            kind: kind, value: value, unit: unit,
+            observation: kind == .ffmi
+                ? summary.observationLabel.replacingOccurrences(of: "Observed ", with: "Derived for ") : summary.observationLabel,
+            range: summary.periodLabel,
+            trend: [summary.changeText(unit: unit), average].compactMap { $0 }.joined(separator: " · "),
+            provenance: provenance,
+            evidence: ContextualMetricEvidencePolicy.label(for: kind, isEstimated: summary.point?.isEstimated == true),
+            includesObservationContract: true,
+            trendWithoutDates: [summary.changeText(unit: unit, includesDates: false), average]
+                .compactMap { $0 }.joined(separator: " · ")
+        )
+    }
 
     static func steps(_ daily: DailyMetrics?, value: String, range: String) -> Self {
         Self(kind: .steps, value: value, unit: "steps",
@@ -68,10 +96,13 @@ struct ContextualMetricSnapshot: Equatable, Identifiable {
     }
 
     func detail(options: BodyScoreShareOptions) -> String {
-        [evidence, options.includeObservation ? observation : nil,
-         options.includeRange ? range : nil,
-         options.includeTrend ? trend : nil,
-         options.includeProvenance ? provenance : nil]
+        let visibleTrend = includesObservationContract && !options.includeObservation ? trendWithoutDates : trend
+        return [
+            evidence, options.includeObservation ? observation : nil,
+            options.includeRange ? range : nil,
+            options.includeTrend ? visibleTrend : nil,
+            options.includeProvenance ? provenanceLabel : nil
+        ]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 }
@@ -90,11 +121,12 @@ enum ContextualMetricProgressPolicy {
     /// A removed, refreshed or hidden chart focus cannot outlive the current data.
     static func presentationSelection(
         points: [MetricChartDataPoint], averages: [MetricChartDataPoint],
-        focus: HomeV2ChartIntegrity.Sample?
+        focus: HomeV2ChartIntegrity.Sample?, usesCalendarDayDomain: Bool = false
     ) -> Selection? {
         let observed = HomeV2MetricEditorial.observedPoints(points)
         if HomeV2TrendPolicy.hasEnoughData(observed), let focus,
-           let selected = selection(points: observed, averages: averages, focus: focus) {
+           let selected = selection(points: observed, averages: averages, focus: focus,
+                                    usesCalendarDayDomain: usesCalendarDayDomain) {
             return selected
         }
         return selection(points: observed, focus: nil)
@@ -102,13 +134,19 @@ enum ContextualMetricProgressPolicy {
 
     static func selection(
         points: [MetricChartDataPoint], averages: [MetricChartDataPoint] = [],
-        focus: HomeV2ChartIntegrity.Sample?
+        focus: HomeV2ChartIntegrity.Sample?, usesCalendarDayDomain: Bool = false, calendar: Calendar = .current
     ) -> Selection? {
         if let focus {
             let candidates = focus.kind == .daily ? points : averages
-            guard let point = candidates.first(where: {
-                $0.date == focus.date && abs($0.value - focus.value) < 0.0001
-            }) else { return nil }
+            // The native Progress plot explicitly uses calendar-day positions.
+            // Recover the original observation timestamp rather than borrowing a later reading.
+            let matches = candidates.filter {
+                let sameDate = usesCalendarDayDomain && focus.date == calendar.startOfDay(for: focus.date)
+                    ? calendar.isDate($0.date, inSameDayAs: focus.date) : $0.date == focus.date
+                return sameDate && abs($0.value - focus.value) < 0.0001
+            }.sorted { $0.date < $1.date }
+            guard matches.indices.contains(focus.occurrence) else { return nil }
+            let point = matches[focus.occurrence]
             return Selection(point: point, isSmoothed: focus.kind == .sevenDayAverage, isFocused: true)
         }
         return HomeV2MetricEditorial.observedPoints(points).max { $0.date < $1.date }

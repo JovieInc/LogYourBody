@@ -632,10 +632,15 @@ struct FixtureChatService: ChatServicing {
 
     let mode: Mode
     let replayStore: ChatFixtureReplayStore?
+    private let slowTick: @MainActor () async throws -> Void
 
-    init(mode: Mode, replayStore: ChatFixtureReplayStore? = nil) {
+    init(mode: Mode, replayStore: ChatFixtureReplayStore? = nil,
+         slowTick: @escaping @MainActor () async throws -> Void = {
+             try await Task.sleep(nanoseconds: 1_000_000_000)
+         }) {
         self.mode = mode
         self.replayStore = replayStore
+        self.slowTick = slowTick
     }
 
     func loadLatest(accessToken: String) async throws -> ChatConversationSnapshot? {
@@ -711,10 +716,7 @@ struct FixtureChatService: ChatServicing {
                 case .slow:
                     continuation.yield(.delta("Reviewing your authorized trend…"))
                     do {
-                        // Keep the fixture deterministically in-flight until the
-                        // UI test exercises cancellation. A short delay races
-                        // simulator startup and accessibility snapshot latency.
-                        try await Task.sleep(nanoseconds: 30_000_000_000)
+                        try await waitForCancellation()
                     } catch {
                         continuation.finish(throwing: CancellationError())
                         return
@@ -761,7 +763,7 @@ struct FixtureChatService: ChatServicing {
             }
             if mode == .slow && row.attempts == 1 && !replayed {
                 continuation.yield(.delta("Reviewing your authorized trend…"))
-                try await Task.sleep(nanoseconds: 30_000_000_000)
+                try await waitForCancellation()
             }
             try Task.checkCancellation()
             continuation.yield(.delta(ChatFixtureReplayStore.answer))
@@ -776,6 +778,16 @@ struct FixtureChatService: ChatServicing {
         } catch {
             _ = try? store.finish("failed", gate: gate)
             continuation.finish(throwing: error)
+        }
+    }
+
+    @MainActor
+    private func waitForCancellation() async throws {
+        // XCTest can wait 60s for animations after Send. Elapsed time must
+        // never complete the slow fixture before the test can press Stop.
+        while true {
+            try Task.checkCancellation()
+            try await slowTick()
         }
     }
 
