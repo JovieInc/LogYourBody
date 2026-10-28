@@ -231,12 +231,28 @@ final class MetricSourceAdapterTests: XCTestCase {
         let adapter = healthKit()
         XCTAssertEqual(adapter.capabilities, MetricSourceCapabilities(pushEvents: true, incrementalPull: true))
         let type = try XCTUnwrap(HKQuantityType.quantityType(forIdentifier: .bodyMass))
+        let measured = Date(timeIntervalSince1970: 1_520_078_400)
         let sample = HKQuantitySample(
             type: type, quantity: HKQuantity(unit: .gramUnit(with: .kilo), doubleValue: 80),
-            start: Date(), end: Date()
+            start: measured, end: measured,
+            metadata: [
+                HKMetadataKeyTimeZone: "America/Los_Angeles",
+                HKMetadataKeySyncIdentifier: "weight-edit",
+                HKMetadataKeySyncVersion: NSNumber(value: 1)
+            ] as [String: Any]
         )
         XCTAssertEqual(adapter.idempotencyKey(for: sample), sample.uuid.uuidString)
-        XCTAssertEqual(adapter.sourceMetadata(from: sample).sampleId, adapter.idempotencyKey(for: sample))
+        let metadata = adapter.sourceMetadata(from: sample)
+        XCTAssertEqual(metadata.sampleId, adapter.idempotencyKey(for: sample))
+        // Unsaved HealthKit samples can have an empty source bundle identifier.
+        let bundleId = sample.sourceRevision.source.bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertEqual(metadata.sourceBundleId, bundleId.isEmpty ? nil : bundleId)
+        XCTAssertEqual(metadata.healthKitContext["sync_identifier"], "weight-edit")
+        XCTAssertEqual(metadata.healthKitContext["sync_version"], "1")
+        XCTAssertEqual(metadata.healthKitContext["time_zone"], "America/Los_Angeles")
+        let imported = try XCTUnwrap(metadata.importedAt.flatMap(ISO8601DateFormatter().date(from:)))
+        XCTAssertGreaterThan(imported, measured)
+        XCTAssertEqual(adapter.weightImportSample(from: sample).date, measured)
     }
 
     func testHealthKitReplayUsesRequestedBoundaryAndRecordsAccountScopedCompletion() async throws {

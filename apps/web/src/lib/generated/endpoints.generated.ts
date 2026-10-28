@@ -257,6 +257,10 @@ export const endpoints = {
       reason: 'Fastlane Match certificates repository.',
     },
     {
+      value: 'https://github.com/JovieInc/LogYourBody/pull/1565',
+      reason: 'PR #1565 source evidence for generated product-registry merge repair.',
+    },
+    {
       value: 'https://github.com/clerk/clerk-ios',
       reason: 'Historical audit/docs remnants; Clerk is not a runtime dependency.',
     },
@@ -369,6 +373,10 @@ export const endpoints = {
       reason: 'Linear GraphQL API used by CI remediation intake.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-40',
+      reason: 'LYB-40 source evidence for share export lifecycle and confirmed Photos writes.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-43',
       reason: 'LYB-43 source evidence for metric identity and accessible action ownership.',
     },
@@ -412,6 +420,10 @@ export const endpoints = {
       reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-47',
+      reason: 'LYB-47 source evidence for dated metric observations and neutral trend semantics.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-204',
       reason:
         'LYB-204 source evidence for the correction ledger, retained receipts and recurrence contract.',
@@ -446,6 +458,10 @@ export const endpoints = {
     {
       value: 'https://linear.app/jovie/issue/LYB-239',
       reason: 'LYB-239 source evidence for HealthKit import identity and the correction ledger.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-240',
+      reason: 'LYB-240 source evidence for per-reading provenance and effective-date labels.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-252',

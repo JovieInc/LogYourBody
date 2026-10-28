@@ -45,6 +45,8 @@ private final class BenefitEventRecorder: AnalyticsTracking {
 private final class BenefitPlanningFixture: DelegatedTrainingServicing {
     var commitReadback = true
     var failNextProposal = false
+    var noOpPlanReadback = false
+    var omitPlanReadback = false
     var responseJSON: String
     private var committed = false
 
@@ -58,7 +60,14 @@ private final class BenefitPlanningFixture: DelegatedTrainingServicing {
     }
 
     func planningContext(accessToken: String) async throws -> TrainingPlanContext {
-        let setup = committed && commitReadback ? #"{"programRevisionId":"committed-revision"}"# : "null"
+        let response = try JSONDecoder().decode(TrainingPlanProposalResponse.self, from: Data(responseJSON.utf8))
+        let encoded = try response.stored.map { try JSONEncoder().encode($0.proposal.plan) } ?? Data("{}".utf8)
+        var plan = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
+        if noOpPlanReadback { plan["sessions"] = [] }
+        let planJSON = String(data: try JSONSerialization.data(withJSONObject: plan), encoding: .utf8)!
+        let delegated = omitPlanReadback ? "" : ",\"delegated\":{\"plan\":\(planJSON)}"
+        let setup = committed && commitReadback
+            ? "{\"programRevisionId\":\"committed-revision\"\(delegated)}" : "null"
         return try JSONDecoder().decode(TrainingPlanContext.self, from: Data("""
         {"generation":0,"delegatedProgramming":true,"knownInputs":{"goal":"Build muscle"},"currentSetup":\(setup)}
         """.utf8))
@@ -77,9 +86,10 @@ private final class BenefitPlanningFixture: DelegatedTrainingServicing {
     func decidePlan(
         accessToken: String, request: TrainingPlanDecisionRequest
     ) async throws -> TrainingPlanDecisionResponse {
-        committed = true
+        committed = request.decision == "apply"
         let receipt: [String: Any] = [
-            "proposalId": request.proposalId, "requestId": request.requestId, "status": "applied",
+            "proposalId": request.proposalId, "requestId": request.requestId,
+            "status": request.decision == "apply" ? "applied" : "rejected",
             "revisionId": "committed-revision", "setup": ["programRevisionId": "committed-revision"]
         ]
         return try JSONDecoder().decode(
@@ -458,6 +468,63 @@ final class BenefitEventsContractTests: XCTestCase {
         XCTAssertEqual(recorder.events.map(\.0), ["home_decision_rejected"])
         XCTAssertEqual(recorder.events[0].1?["decision_id"], "next-block")
         XCTAssertEqual(recorder.events[0].1?["decision_kind"], "next_block")
+    }
+
+    func testCardMismatchAndMissingPlanCannotEmitAcceptanceOrReversal() async throws {
+        for missing in [false, true] {
+            let service = try BenefitPlanningFixture(
+                id: "11111111-1111-4111-8111-000000000001", includeTransition: true
+            )
+            service.noOpPlanReadback = !missing
+            service.omitPlanReadback = missing
+            let model = DelegatedTrainingModel(service: service, accessToken: { "token" }, isCurrent: { true })
+            await model.refresh()
+            await model.propose(restoreRevision: "prior-revision")
+            let reference = try XCTUnwrap(model.proposal?.cardReference)
+
+            let applied = await model.decideCard(TrainingCardAction(reference: reference, name: .apply))
+
+            XCTAssertFalse(applied)
+            XCTAssertTrue(recorder.events.isEmpty, "A rejected readback must not emit success benefits.")
+            XCTAssertNotNil(model.proposal, "Keep the pending draft available after rejected readback.")
+            XCTAssertEqual(model.message, "The saved program does not match the reviewed draft. Refresh before starting.")
+        }
+    }
+
+    func testMatchingCardReadbackEmitsAcceptanceAndReversal() async throws {
+        let service = try BenefitPlanningFixture(
+            id: "11111111-1111-4111-8111-000000000001", includeTransition: true
+        )
+        let model = DelegatedTrainingModel(service: service, accessToken: { "token" }, isCurrent: { true })
+        await model.refresh()
+        await model.propose(restoreRevision: "prior-revision")
+        let reference = try XCTUnwrap(model.proposal?.cardReference)
+
+        let applied = await model.decideCard(TrainingCardAction(reference: reference, name: .apply))
+
+        XCTAssertTrue(applied)
+        XCTAssertNil(model.proposal)
+        XCTAssertEqual(recorder.events.map(\.0), ["home_decision_accepted", "reversal"])
+        XCTAssertEqual(recorder.events[0].1?["decision_id"], reference.objectId)
+        XCTAssertEqual(recorder.events[1].1?["proposal_id"], reference.objectId)
+    }
+
+    func testRejectedCardReceiptEmitsOnlyRejection() async throws {
+        let service = try BenefitPlanningFixture(
+            id: "11111111-1111-4111-8111-000000000001", includeTransition: true
+        )
+        let model = DelegatedTrainingModel(service: service, accessToken: { "token" }, isCurrent: { true })
+        await model.refresh()
+        await model.propose(restoreRevision: "prior-revision")
+        let reference = try XCTUnwrap(model.proposal?.cardReference)
+
+        let applied = await model.decideCard(TrainingCardAction(reference: reference, name: .reject))
+
+        XCTAssertFalse(applied)
+        XCTAssertNil(model.proposal)
+        XCTAssertNil(model.context?.currentSetup)
+        XCTAssertEqual(recorder.events.map(\.0), ["home_decision_rejected"])
+        XCTAssertEqual(recorder.events[0].1?["decision_id"], reference.objectId)
     }
 
     func testFirstRunApplyAndRejectAreNotHomeDecisions() async throws {

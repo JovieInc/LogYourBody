@@ -49,6 +49,11 @@ runs:
         ruby -rrbconfig -rdigest -e '
           puts "version=#{RUBY_VERSION}p#{RUBY_PATCHLEVEL}"
           identity = [RUBY_DESCRIPTION, RUBY_PLATFORM, File.realpath(RbConfig.ruby), RbConfig::CONFIG.sort]
+          # Homebrew rebuilds can change native compatibility at the same path/version.
+          files = [RbConfig.ruby]
+          library = File.join(RbConfig::CONFIG.fetch("libdir"), RbConfig::CONFIG.fetch("LIBRUBY_SO"))
+          files << library if File.file?(library)
+          identity << files.map { |path| [path, Digest::SHA256.file(path).hexdigest] }
           puts "abi=#{Digest::SHA256.hexdigest(Marshal.dump(identity))}"
         ' >> "$GITHUB_OUTPUT"
 
@@ -112,5 +117,6 @@ runs:
         echo "Ruby: $(ruby --version)"
         echo "Bundler: $(bundle --version)"
         echo "Bundle path: $(bundle config get path)"
-        # bundle check checks installed specs, not whether native gems can load.
-        bundle exec ruby -e 'require "date"; require "psych"; require "json"; require "ffi"'
+        # bundle check validates gem presence, not native-extension loadability.
+        # Require after Bundler setup so Ruby cannot activate default gems first.
+        bundle exec ruby -e 'require "date"; require "psych"; require "json"; require "ffi"; puts "Ruby native dependencies loaded"'

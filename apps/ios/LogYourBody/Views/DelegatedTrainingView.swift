@@ -85,8 +85,47 @@ final class DelegatedTrainingModel: ObservableObject {
         BenefitEvents.planOverride(proposalId: proposalId, overrideKind: "steering")
     }
 
+    func adjustCard(utterance: String) async {
+        let reference: TrainingCardReference
+        if let proposal {
+            reference = proposal.cardReference
+        } else if let revision = context?.currentSetup?.programRevisionId,
+                  let plan = context?.currentSetup?.delegated?.plan {
+            reference = TrainingCardReference(component: .mesoPlan, objectId: revision, revision: plan.revision)
+        } else { return }
+        do {
+            try TrainingCardAdapter.authorize(
+                TrainingCardAction(reference: reference, name: .adjust),
+                current: reference, ownsSession: isCurrent(), canWrite: !busy
+            )
+            await propose(utterance: utterance)
+        } catch { message = "Refresh the saved plan before adjusting it." }
+    }
+
+    func decideCard(_ action: TrainingCardAction) async -> Bool {
+        guard let proposal else { return false }
+        do {
+            try TrainingCardAdapter.authorize(
+                action, current: proposal.cardReference, ownsSession: isCurrent(),
+                canWrite: proposal.status == "proposed" && !busy
+            )
+            guard action.name == .apply || action.name == .reject else {
+                throw TrainingCardContractError.unsupportedAction
+            }
+            return await decide(action.name.rawValue, requireMatchingPlan: true)
+        } catch {
+            message = "This card changed or is unavailable. Refresh the plan before trying again."
+            return false
+        }
+    }
+
     func decide(_ decision: String) async -> Bool {
-        guard let proposal, proposal.status == "proposed" else { return false }
+        await decide(decision, requireMatchingPlan: false)
+    }
+
+    private func decide(_ decision: String, requireMatchingPlan: Bool) async -> Bool {
+        guard ["apply", "reject"].contains(decision),
+              let proposal, proposal.status == "proposed" else { return false }
         let decisionId = proposal.proposal.id
         let isHomeDecision = proposal.proposal.transition != nil
         let isReversal = pendingReversal
@@ -96,6 +135,11 @@ final class DelegatedTrainingModel: ObservableObject {
                 requestId: self.decisionRequestId, proposalId: proposal.proposal.id, decision: decision
             ))
             guard self.isCurrent() else { throw TrainingServiceError.authenticationExpired }
+            guard response.receipt.proposalId == proposal.proposal.id,
+                  response.receipt.requestId == self.decisionRequestId,
+                  response.receipt.status == (decision == "apply" ? "applied" : "rejected") else {
+                throw TrainingServiceError.invalidResponse
+            }
             let loaded = try await self.service.planningContext(accessToken: token)
             guard self.isCurrent() else { throw TrainingServiceError.authenticationExpired }
             if decision == "apply" {
@@ -103,6 +147,10 @@ final class DelegatedTrainingModel: ObservableObject {
                       let revision = response.receipt.revisionId,
                       loaded.currentSetup?.programRevisionId == revision else {
                     throw TrainingServiceError.invalidResponse
+                }
+                if requireMatchingPlan && loaded.currentSetup?.delegated?.plan != proposal.proposal.plan {
+                    self.message = "The saved program does not match the reviewed draft. Refresh before starting."
+                    return
                 }
                 applied = true
                 if isHomeDecision {
@@ -146,6 +194,7 @@ final class DelegatedTrainingModel: ObservableObject {
 }
 
 struct DelegatedTrainingView: View {
+    var cardsEnabled = false
     @StateObject private var model: DelegatedTrainingModel
     @Environment(\.dismiss) private var dismiss
     @State private var adultConfirmed = false
@@ -157,6 +206,7 @@ struct DelegatedTrainingView: View {
 
     init(
         initialProposal: TrainingPlanStoredProposal? = nil,
+        cardsEnabled: Bool = false,
         accessToken: @escaping () async -> String?,
         isCurrent: @escaping () -> Bool,
         onApplied: @escaping () async -> Void
@@ -165,6 +215,7 @@ struct DelegatedTrainingView: View {
             service: URLSessionTrainingService(), initialProposal: initialProposal,
             accessToken: accessToken, isCurrent: isCurrent
         ))
+        self.cardsEnabled = cardsEnabled
         self.onApplied = onApplied
     }
 
@@ -314,6 +365,15 @@ struct DelegatedTrainingView: View {
     }
 
     @ViewBuilder private func review(_ stored: TrainingPlanStoredProposal) -> some View {
+        if cardsEnabled {
+            Section {
+                PlanChangeCard(stored: stored, busy: model.busy) { action in
+                    Task {
+                        if await model.decideCard(action) { await onApplied(); dismiss() }
+                    }
+                }
+            }
+        }
         Section(stored.status == "proposed" ? "Recommended draft" : "Draft status: \(stored.status)") {
             Text(stored.proposal.reason)
             Text("Proposed by \(stored.proposal.actor.kind)")
@@ -328,7 +388,7 @@ struct DelegatedTrainingView: View {
         }
         planSections(stored.proposal.plan)
         Section("Assumptions") { ForEach(stored.proposal.assumptions, id: \.self) { Text($0) } }
-        if stored.status == "proposed" {
+        if stored.status == "proposed" && !cardsEnabled {
             Button(stored.proposal.transition == nil ? "Start program" : "Start next block") {
                 Task {
                     if await model.decide("apply") { await onApplied(); dismiss() }
@@ -357,7 +417,15 @@ struct DelegatedTrainingView: View {
             TextField("Keep cable curls, prioritize biceps…", text: $steering)
             Text("Kept movements and exclusions persist. Muscle priorities last for this block.")
                 .font(.footnote)
-            Button("Review changes") { Task { await model.propose(utterance: steering) } }
+            Button("Review changes") {
+                Task {
+                    if cardsEnabled {
+                        await model.adjustCard(utterance: steering)
+                    } else {
+                        await model.propose(utterance: steering)
+                    }
+                }
+            }
                 .disabled(steering.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityIdentifier("training_review_steering")
         }
