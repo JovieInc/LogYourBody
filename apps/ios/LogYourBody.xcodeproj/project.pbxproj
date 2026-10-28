@@ -442,6 +442,8 @@
 		A24720261025000100000002 /* WorkoutAttendancePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24720261025000100000001 /* WorkoutAttendancePolicy.swift */; };
 		A24720261025000100000004 /* WorkoutAttendancePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24720261025000100000003 /* WorkoutAttendancePolicyTests.swift */; };
 		F00720261007000100000002 /* TrainingDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000001 /* TrainingDraftStore.swift */; };
+		A248B1000000000000000002 /* GymRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A248B1000000000000000001 /* GymRegistry.swift */; };
+		A248B1000000000000000004 /* GymRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A248B1000000000000000003 /* GymRegistryTests.swift */; };
 		F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000003 /* TrainingSessionDraft.swift */; };
 		153A00000000000000000004 /* TrainingNumericScrubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153A00000000000000000003 /* TrainingNumericScrubTests.swift */; };
 		F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000005 /* TrainingSessionDraftTests.swift */; };
@@ -1075,6 +1077,8 @@
 		A24720261025000100000001 /* WorkoutAttendancePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutAttendancePolicy.swift; sourceTree = "<group>"; };
 		A24720261025000100000003 /* WorkoutAttendancePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutAttendancePolicyTests.swift; sourceTree = "<group>"; };
 		F00720261007000100000001 /* TrainingDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDraftStore.swift; sourceTree = "<group>"; };
+		A248B1000000000000000001 /* GymRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymRegistry.swift; sourceTree = "<group>"; };
+		A248B1000000000000000003 /* GymRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GymRegistryTests.swift; sourceTree = "<group>"; };
 		F00720261007000100000003 /* TrainingSessionDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraft.swift; sourceTree = "<group>"; };
 		153A00000000000000000003 /* TrainingNumericScrubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingNumericScrubTests.swift; sourceTree = "<group>"; };
 		F00720261007000100000005 /* TrainingSessionDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraftTests.swift; sourceTree = "<group>"; };
@@ -1445,6 +1449,7 @@
 				E1A2630100000000000000B1 /* EarnedWinDetectorTests.swift */,
 				620823F9E8905856BB1B666D /* GlobalTimelineServiceTests.swift */,
 				9F7D800638256D10A5ACB992 /* Glp1DoseCoreDataTests.swift */,
+				A248B1000000000000000003 /* GymRegistryTests.swift */,
 				0DBA8FB9B9980A35A865BCAA /* Glp1DoseHistoryFormatterTests.swift */,
 				22FEDB2A6B2D920273613C82 /* Glp1WeeklyCheckInPolicyTests.swift */,
 				E84A7C68943959BD45325D9B /* HealthKitAuthorizationPolicyTests.swift */,
@@ -1615,6 +1620,7 @@
 				E11020261025000100000001 /* TrainingProgress.swift */,
 				A24720261025000100000001 /* WorkoutAttendancePolicy.swift */,
 				F00720261007000100000001 /* TrainingDraftStore.swift */,
+				A248B1000000000000000001 /* GymRegistry.swift */,
 				F00720261007000100000003 /* TrainingSessionDraft.swift */,
 				AD8F12F42ED7C987003C4559 /* BugReportManager.swift */,
 				ADF1F6BD2ED58E3F00745F33 /* HealthSyncCoordinator.swift */,
@@ -2411,6 +2417,7 @@
 				B11404E6ED2FB64ADE0E0EAE /* EditEntrySavePolicyTests.swift in Sources */,
 				18ED1A86B416E8821C250840 /* GlobalTimelineServiceTests.swift in Sources */,
 				1076FA3654BE00406F8AE052 /* Glp1DoseCoreDataTests.swift in Sources */,
+				A248B1000000000000000004 /* GymRegistryTests.swift in Sources */,
 				5B7AE8C326E41DD74C9042CE /* Glp1DoseHistoryFormatterTests.swift in Sources */,
 				DF4A68C6C15578CBB9293C37 /* Glp1WeeklyCheckInPolicyTests.swift in Sources */,
 				1CCAD9C764D3D35B5BF0522B /* HealthKitAuthorizationPolicyTests.swift in Sources */,
@@ -2576,6 +2583,7 @@
 				E11020261025000100000002 /* TrainingProgress.swift in Sources */,
 				A24720261025000100000002 /* WorkoutAttendancePolicy.swift in Sources */,
 				F00720261007000100000002 /* TrainingDraftStore.swift in Sources */,
+				A248B1000000000000000002 /* GymRegistry.swift in Sources */,
 				E24920261025000300000002 /* WorkoutReconciliationViewModel.swift in Sources */,
 				E24920261025000200000002 /* CoreDataWorkoutReconciliationStore.swift in Sources */,
 				E24920261025000100000002 /* WorkoutReconciliationPolicy.swift in Sources */,

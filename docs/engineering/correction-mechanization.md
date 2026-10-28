@@ -118,3 +118,10 @@ merge bases and their shared parent before applying the same union. The pre-comm
 `--check-merge` path and staged retries use the same check; cleaning only the working
 file cannot hide an unresolved staged source. Resolve and stage the source, then
 retry the same command. Unrelated unstaged edits remain untouched.
+
+With `--stage`, guard validation reads the Git index throughout resolution, so
+unrelated working edits cannot invalidate the reviewed staged snapshot. The
+unstaged resolver continues to validate guards from the working tree.
+Staged verification accepts only regular indexed guard files (including executable
+files); a symlink blob cannot supply guard evidence, even when its text matches
+the anchor and the working file is regular. Refusal preserves the ledger and index.

@@ -1906,6 +1906,9 @@ name=pathlib.Path(sys.argv[0]).name
 args=sys.argv[1:]
 with open(os.environ['FAKE_CALLS'],'a') as f:f.write(json.dumps([name,*args])+'\\n')
 if name=='fake-timeout':
+    if ('build-for-testing' in args
+            and int(args[1].removesuffix('s')) < int(os.environ.get('BUILD_DURATION_SECONDS','0'))):
+        sys.exit(124)
     sys.exit(subprocess.call(args[2:]))
 if name=='xcrun':
     if args[:3]==['xcresulttool','get','test-results']:
@@ -2021,6 +2024,38 @@ def test_focused_diagnostic_one_ui_command_even_for_infrastructure_failure_and_d
     assert not any('diagnostic-seven.xcresult' in c for c in calls)
     result, calls, receipt = _run_diagnostic_dispatch(tmp_path / 'unknown', mode='--diagnostic-typo')
     assert result.returncode == 64 and not calls and receipt is None
+
+
+def test_full_launch_cold_build_budget_reaches_the_complete_unit_target(tmp_path: Path) -> None:
+    for name, overrides, expected in [
+            ('default', {'BUILD_DURATION_SECONDS': '750'}, '900s'),
+            ('override', {'BUILD_FOR_TESTING_TIMEOUT_SECONDS': '37', 'BUILD_DURATION_SECONDS': '25'}, '37s')]:
+        result, calls, receipt = _run_diagnostic_dispatch(tmp_path / name, mode='', **overrides)
+        assert result.returncode == 88 and receipt is None, result.stdout + result.stderr
+        timed = [json.loads(c) for c in calls if c.startswith('["fake-timeout"')]
+        assert len(timed) == 2
+        assert timed[0][2] == expected and 'build-for-testing' in timed[0]
+        assert timed[1][2] == '1020s' and '-only-testing:LogYourBodyTests' in timed[1]
+        assert '-enableCodeCoverage' in timed[0]
+        assert timed[0][timed[0].index('-enableCodeCoverage') + 1] == 'YES'
+        assert timed[1][timed[1].index('-default-test-execution-time-allowance') + 1] == '90'
+        assert timed[1][timed[1].index('-maximum-test-execution-time-allowance') + 1] == '180'
+
+
+def test_full_launch_build_failure_or_timeout_stops_without_retry_or_qualification(tmp_path: Path) -> None:
+    for status in ('65', '124'):
+        result, calls, receipt = _run_diagnostic_dispatch(tmp_path / status, mode='', BUILD_EXIT=status)
+        assert result.returncode == int(status) and receipt is None, result.stdout + result.stderr
+        commands = [json.loads(c) for c in calls if c.startswith('["xcodebuild"')]
+        assert len(commands) == 1 and 'build-for-testing' in commands[0]
+        artifacts = tmp_path / status / 'artifacts'
+        log = (artifacts / 'launch-quality-build-for-testing.log').read_text()
+        if status == '124':
+            assert 'build-for-testing timed out after 900s' in log
+        assert not list(artifacts.glob('*.xcresult'))
+        assert not list(artifacts.glob('*.evidence.json'))
+        assert not list(artifacts.glob('*.coverage.json'))
+        assert not (artifacts / 'summary.md').exists()
 
 
 def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_preserves_pending_runs() -> None:

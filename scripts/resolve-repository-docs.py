@@ -44,7 +44,13 @@ def resolve_staged(root):
         ["git", "ls-files", "--error-unmatch", "--", config["output"]],
         cwd=root, capture_output=True,
     ).returncode == 0
-    if dirty or (output.exists() and not tracked):
+    conflicted = subprocess.run(
+        ["git", "ls-files", "--unmerged", "-z", "--", config["output"]],
+        cwd=root, check=True, capture_output=True,
+    ).stdout
+    # Rebuild a conflicted projection from staged inputs before resolving unrelated ledgers.
+    # Every actual input must have stage zero; staged_bytes fails closed otherwise.
+    if (dirty and not conflicted) or (output.exists() and not tracked):
         raise ValueError("unstaged projection edits: " + config["output"])
     # Render the index, so partially staged manifests cannot leak into the commit.
     with tempfile.TemporaryDirectory(prefix="repository-docs-index-") as directory:
