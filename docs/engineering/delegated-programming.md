@@ -89,40 +89,6 @@ never rewinds completed history or trainer authority.
 
 ## Verification
 
-### Structured steering records (LYB-278)
-
-`persistSteeringRevision` is the internal writer for an explicitly authorized
-record containing `priorityFocus`, opaque `constraintId`, actor, rationale and a
-caller-stable UUID `revisionId`. It updates the accepted delegated program's
-block-scoped `temporaryPriority` and retains the latest record as `steering`.
-Null focus clears the temporary priority; null constraint clears the recorded
-constraint reference. Existing prescriptions, schedule, inputs and completed
-history stay intact. Recording intent does not claim that new work or a movement
-substitution has been applied.
-
-The writer uses the existing default-off delegated-programming admission and
-`TrainingRevisionsPort` proposal/decision transaction. That boundary remains
-responsible for owner locking, freshness, active-workout delay and atomic storage
-of setup, revision, head and receipt. The proposal stores the actor and rationale;
-the revision and setup retain the supplied revision ID. Identical retries return
-the original receipt; changed content under that ID conflicts. A pending write
-cannot be applied through the conversational decision service.
-
-Trusted `SteeringHealthPolicyPort` evaluation is mandatory. Review decisions stop
-the write. Only an explicit movement decision matching the record's constraint ID
-can request an existing LYB-113 qualitative trunk-demand cap or concern exclusion
-through `SteeringMovementRequestsPort`, after the revision commits. That boundary
-must deduplicate subject/revision ID and reject superseded program revisions.
-A failed movement request can be retried using the committed revision; a replay
-after a newer revision returns its old receipt without requesting an old constraint.
-Policy evaluation and the LYB-113 request consumer are injected dependencies;
-this slice does not define clinical policy, connect a new caller, activate a
-rollout, or edit workout cards. No load/volume engine or message provider is called.
-
-`steering-revisions.test.ts` uses a saved-program fixture and fake LYB-37 boundary
-to verify attributed persistence, idempotency, unchanged prescriptions, policy
-admission, LYB-113 requests, failure/retry behavior and conversational bypass refusal.
-
 `delegated-revisions.test.ts` exercises all eight issue fixtures through proposal,
 apply, completed set logging, next-block preparation and the existing workout and
 controller services. Additional cases cover initial-draft steering, renewal,

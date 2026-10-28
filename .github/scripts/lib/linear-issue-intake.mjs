@@ -612,9 +612,6 @@ export async function upsertLinearIssue({
   }
 
   const terminal = ['completed', 'canceled'].includes(match.state?.type);
-  // Recurrence callers decide from retained evidence; old receipts alone must
-  // not reopen a completed issue. Boolean callers keep their existing behavior.
-  if (typeof reopenTerminal === 'function') reopenTerminal = terminal && reopenTerminal(match);
   const states = found.data?.team?.states?.nodes ?? [];
   const backlogState =
     states.find((state) => state?.name === 'Backlog') ??
@@ -624,10 +621,8 @@ export async function upsertLinearIssue({
     states.find((state) => state?.type === 'unstarted');
   const sourceStateId = terminal ? todoState?.id : match.state?.id;
   if (sourceProvenance && !sourceStateId) return { ok: false, reason: 'linear_red_state_missing' };
-  if (!sourceProvenance && terminal && reopenTerminal &&
-      !(createStateName === 'Todo' ? todoState : backlogState)) {
-    return { ok: false, reason: createStateName === 'Todo'
-      ? 'linear_create_state_missing' : 'linear_backlog_state_missing' };
+  if (!sourceProvenance && terminal && reopenTerminal && !backlogState) {
+    return { ok: false, reason: 'linear_backlog_state_missing' };
   }
   const alreadyLabeled =
     !labelName || (match.labels?.nodes ?? []).some((item) => item?.name === labelName);

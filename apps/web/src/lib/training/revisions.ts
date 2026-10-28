@@ -187,7 +187,7 @@ export async function createInitialTrainingProposal(input: {
     proposedDiff: 'create_supported_baseline_program',
     policyVersion: setup.cycle ? TRAINING_CYCLE_POLICY : TRAINING_BASELINE_POLICY,
     assumptions: [
-      'This baseline distributes training across your selected weekly schedule; additional goals and constraints are not personalized.',
+      'This is the existing two- or three-day baseline, not a personalized response to additional goals or constraints.',
       'The program starts when you apply it.',
     ],
     inputEvidence: {

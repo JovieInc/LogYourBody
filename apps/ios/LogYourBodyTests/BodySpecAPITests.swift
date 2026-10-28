@@ -117,7 +117,7 @@ private final class RotatingSyntheticBodySpecAuthorization: BodySpecAuthTokenPro
     }
 }
 
-enum BodySpecAPIFixture {
+private enum BodySpecAPIFixture {
     static let userJSON = """
         {"user_id":"user-123","email":"dexa@example.com","first_name":"Alex","last_name":"Rivera"}
         """

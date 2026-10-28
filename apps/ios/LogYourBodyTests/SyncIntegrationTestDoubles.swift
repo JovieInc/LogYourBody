@@ -13,7 +13,6 @@ import UIKit
 
 final class StubProductAPIClient: ProductAPIClient {
     private(set) var bodyMetricsBatches: [[[String: Any]]] = []
-    var bodyMetricConflicts: [BodyMetricPushConflict] = []
     private(set) var dailyMetricsBatches: [[[String: Any]]] = []
     private(set) var profilePayloads: [[String: Any]] = []
     private(set) var dexaPayloads: [[String: Any]] = []
@@ -22,13 +21,12 @@ final class StubProductAPIClient: ProductAPIClient {
     private(set) var endedActiveMedicationRequests: [(userId: String, endedAt: Date)] = []
     private(set) var deletedRecords: [(table: String, id: String)] = []
 
-    override func upsertBodyMetricsBatch(_ metrics: [[String: Any]], token: String) async throws -> BodyMetricBatchPushResult {
+    override func upsertBodyMetricsBatch(_ metrics: [[String: Any]], token: String) async throws -> [[String: Any]] {
         bodyMetricsBatches.append(metrics)
-        let records: [[String: Any]] = metrics.compactMap { metric in
+        return metrics.compactMap { metric in
             guard let id = metric["id"] as? String else { return [:] }
             return ["id": id]
         }
-        return BodyMetricBatchPushResult(records: records, conflicts: bodyMetricConflicts)
     }
 
     override func upsertDailyMetricsBatch(_ metrics: [[String: Any]], token: String) async throws -> [[String: Any]] {

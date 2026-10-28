@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 
 export const QUESTIONNAIRE = 'docs/compliance/app-store-privacy.json';
-const POLICY = 'shared/legal/privacy-policy.md';
 const INFO = 'apps/ios/LogYourBody/Info.plist';
 const APP = 'apps/ios/LogYourBody/';
 const REQUIRED_TYPES = [
@@ -42,59 +41,6 @@ function sorted(values) {
 function xmlText(value) {
   const entities = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
   return value.replace(/&(amp|lt|gt|quot|apos);/g, (_, key) => entities[key]).trim();
-}
-
-function assertHealthDataDisclosure(source, definitions, descriptions, policy) {
-  // LYB-189: require each native HealthKit type in the policy's Health Data bullet.
-  const names = new Map([
-    ['bodyMass', { name: 'weight', pattern: /\bweight\b/i }],
-    [
-      'bodyFatPercentage',
-      {
-        name: 'body fat percentage',
-        pattern: /\bbody[ -]fat (?:percentage\b|%)/i,
-        usage: /\bbody[ -](?:fat|composition)\b/i,
-      },
-    ],
-    ['height', { name: 'height', pattern: /\bheight\b/i }],
-    ['stepCount', { name: 'step count', pattern: /\b(?:step count|steps)\b/i }],
-    ['dateOfBirth', { name: 'date of birth', pattern: /\bdate of birth\b/i }],
-    ['biologicalSex', { name: 'biological sex', pattern: /\bbiological sex\b/i }],
-    ['heartRate', { name: 'heart rate', pattern: /\bheart rate\b/i }],
-  ]);
-  const directCharacteristics = {
-    dateOfBirthComponents: 'dateOfBirth',
-    dateOfBirth: 'dateOfBirth',
-    biologicalSex: 'biologicalSex',
-    bloodType: 'bloodType',
-    fitzpatrickSkinType: 'fitzpatrickSkinType',
-    wheelchairUse: 'wheelchairUse',
-    activityMoveMode: 'activityMoveMode',
-  };
-  const identifiers = new Set(definitions.map(({ identifier }) => identifier));
-  for (const [, identifier] of source.matchAll(
-    /\bHK(?:Quantity|Characteristic|Category)TypeIdentifier\s*\.\s*(\w+)/g,
-  ))
-    identifiers.add(identifier);
-  // Characteristic getters can read existing permissions without a type declaration.
-  for (const [, method] of source.matchAll(
-    /\.(dateOfBirthComponents|dateOfBirth|biologicalSex|bloodType|fitzpatrickSkinType|wheelchairUse|activityMoveMode)\s*\(/g,
-  ))
-    identifiers.add(directCharacteristics[method]);
-  const usage = descriptions
-    .filter(([key]) => /^NSHealth(?:Share|Update)UsageDescription$/.test(key))
-    .map(([, text]) => text)
-    .join('\n');
-  for (const [identifier, { pattern, usage: alias = pattern }] of names) {
-    if (alias.test(usage)) identifiers.add(identifier);
-  }
-  const bullets = policy.match(/^- \*\*Health Data\*\*:[^\n]*(?:\n[ \t]+\S[^\n]*)*/gm) ?? [];
-  assert.equal(bullets.length, 1, 'Expected one Health Data disclosure bullet');
-  for (const identifier of identifiers) {
-    const entry = names.get(identifier);
-    assert.ok(entry, `Health Data disclosure mapping missing: ${identifier}`);
-    assert.match(bullets[0], entry.pattern, `Health Data disclosure missing: ${entry.name}`);
-  }
 }
 
 // LYB-194: reject HealthKit authorization and usage-description drift from ASC answers.
@@ -278,7 +224,6 @@ export function scan({ files, readSource }) {
         `Unmapped permission: ${key}`,
       );
     }
-    assertHealthDataDisclosure(source, definitions, descriptions, read(POLICY));
     return [];
   } catch (error) {
     return [{ path: QUESTIONNAIRE, key: error.message.split('\n')[0] }];

@@ -38,9 +38,6 @@ describe('neonUserDirectory.deleteUser', () => {
     const expected = [
       'delete from public.chat_usage_limits where user_subject = ?',
       'delete from public.chat_conversations where user_subject = ?',
-      'delete from public.weight_operation_receipts where user_subject = ?',
-      'delete from public.body_metric_audit where user_subject = ?',
-      'delete from public.metrics_agent_grants where user_subject = ?',
       'delete from public.body_metrics where user_subject = ?',
       'delete from public.native_records where user_subject = ?',
       "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ?",

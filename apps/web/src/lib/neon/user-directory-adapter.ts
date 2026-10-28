@@ -146,9 +146,6 @@ export const neonUserDirectory: UserDirectoryPort = {
     await executeNativeMutationQueries(database, admission, [
       database`delete from public.chat_usage_limits where user_subject = ${subject}`,
       database`delete from public.chat_conversations where user_subject = ${subject}`,
-      database`delete from public.weight_operation_receipts where user_subject = ${subject}`,
-      database`delete from public.body_metric_audit where user_subject = ${subject}`,
-      database`delete from public.metrics_agent_grants where user_subject = ${subject}`,
       database`delete from public.body_metrics where user_subject = ${subject}`,
       database`delete from public.native_records where user_subject = ${subject}`,
       database`delete from public.app_users

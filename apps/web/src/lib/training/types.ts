@@ -1,6 +1,5 @@
 export const TRAINING_CONSENT_VERSION = 'hypertrophy-coach-v1';
 export const MESOCYCLE_WEEKS = 4;
-export const TRAINING_SESSIONS_PER_WEEK = [2, 3, 4, 5, 6] as const;
 export type CycleLength = 4 | 5 | 6;
 export type CyclePhase =
   'accumulation' | 'adjustment' | 'planned_deload' | 'reactive_deload' | 'review' | 'next_block';
@@ -189,7 +188,7 @@ export type TrainingProgramSetup = {
   consentVersion: typeof TRAINING_CONSENT_VERSION;
   adultConfirmed: true;
   safetyConfirmed: true;
-  sessionsPerWeek: (typeof TRAINING_SESSIONS_PER_WEEK)[number];
+  sessionsPerWeek: 2 | 3 | 4 | 5 | 6;
   equipment: Equipment;
   startedAt: string;
   programRevisionId?: string;

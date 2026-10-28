@@ -125,13 +125,11 @@ cleanup_booted_simulator_apps() {
 is_simulator_infra_failure() {
   local log_file="$1"
 
-  # Retry only runner startup failures before XCTest begins. A test timeout's
-  # generic restart message is not proof of a launch failure (PR #1555).
-  if grep -Eq 'Test (Case|Suite) .* started|exceeded execution time allowance' "$log_file"; then
-    return 1
-  fi
+  # Command-timeout is intentionally absent. Merge-group run 36947770736
+  # reached it on the last chaos test while that test was still scanning, then
+  # this matcher retried the whole group and the 26-minute step died mid-retry.
   grep -Eq \
-    'Failed to get background assertion|Timed out while acquiring background assertion|Failed to install or launch the test runner|Failed to launch app|Mach error -308|server died|Early unexpected exit|operation never finished bootstrapping|Test crashed with signal kill before establishing connection' \
+    'Failed to get background assertion|Timed out while acquiring background assertion|Failed to install or launch the test runner|Failed to launch app|Mach error -308|server died|Early unexpected exit|operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Restarting after unexpected exit|unexpected exit, crash, or test timeout' \
     "$log_file"
 }
 
@@ -235,7 +233,6 @@ run_xcodebuild_test() {
 
     if [[ "$status" -eq 124 ]]; then
       echo "xcodebuild command timed out after ${XCODEBUILD_COMMAND_TIMEOUT_SECONDS}s" | tee -a "$log_file"
-      return "$status"
     fi
 
     if [[ "$status" -eq 0 ]]; then

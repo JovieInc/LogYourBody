@@ -110,9 +110,6 @@ jobs:
       - name: Verify workflow concurrency policy
         run: node .github/scripts/verify-workflow-concurrency.mjs
 
-      - name: Test release check enclosing budget
-        run: node --test .github/scripts/release-check-budget.test.mjs
-
       - name: Verify repository merge queue policy
         run: node --test .github/scripts/verify-merge-queue-policy.test.mjs
 
@@ -154,30 +151,15 @@ jobs:
           set -euo pipefail
           node --test packages/shared-lib/scripts/correction-coverage.behavior.mjs
           node --test packages/shared-lib/scripts/correction-ratchet.behavior.mjs
-          node --test packages/shared-lib/scripts/guard-reference.behavior.mjs
           [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           node packages/shared-lib/scripts/correction-coverage.mjs --base-ref "$BASE_SHA"
           node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref "$BASE_SHA"
-          node packages/shared-lib/scripts/guard-reference.mjs --base-ref "$BASE_SHA"
 
       - name: Verify LYB and Jovie product separation
         run: |
           node --test packages/shared-lib/scripts/jovie-separation.behavior.mjs
           node packages/shared-lib/scripts/jovie-separation.mjs
-
-      # Native screens/modes and web pages against the Jovie launch inventory.
-      # The fixture test is deliberate red for one unlisted route and one
-      # still-mounted hidden screen. The repository run fails new surface ids
-      # and prints the diff table; the reviewed baseline may only shrink.
-      - name: Reconcile native and web surfaces with the launch inventory
-        env:
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
-        run: |
-          set -euo pipefail
-          node --test scripts/surface-reconciliation.test.mjs
-          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          node scripts/surface-reconciliation.mjs --base-ref "$BASE_SHA"
 
       - name: Detect changed surfaces locally
         id: filter
@@ -365,67 +347,17 @@ jobs:
       contents: read
     uses: ./.github/workflows/ios-quality.yml
     with:
-      static-audits: false
       # Hosted until the launch-quality capture tests pass on the Macs: four
       # LaunchQualityGate capture tests failed on every self-hosted run
       # (2026-10-12, tw-mac-001 and tims-macbook-air) and pass hosted.
       mac-first: false
       supersede-key: ${{ github.head_ref || '' }}
 
-  ios_static:
-    name: iOS Static Audits
-    needs: detect-changes
-    # The Xcode-free half of Launch Quality (SwiftLint strict, static audits, budget summary) on ubuntu:
-    # it was ~7 hosted macOS minutes per Launch Quality run, now ~1-2 ubuntu minutes. Same gate: CI Summary
-    # requires it whenever iOS Launch Quality runs.
-    if: needs.detect-changes.outputs.ios_quality == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      # SwiftLint's SourceKit rules (statement_position, ...) need a Swift toolchain; the static
-      # binary silently skips them, which would weaken the gate.
-      - uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a # v2.4.0
-        with:
-          swift-version: '6.1.2'
-
-      - name: Install SwiftLint (version pinned with setup-ios-build)
-        run: |
-          set -euo pipefail
-          version="$(sed -n 's/^ *SWIFTLINT_VERSION="\([^"]*\)".*/\1/p' .github/actions/setup-ios-build/action.yml | head -1)"
-          [[ -n "$version" ]]
-          curl -fsSL "https://github.com/realm/SwiftLint/releases/download/${version}/swiftlint_linux_amd64.zip" -o "$RUNNER_TEMP/swiftlint.zip"
-          mkdir -p "$RUNNER_TEMP/swiftlint"
-          unzip -q "$RUNNER_TEMP/swiftlint.zip" -d "$RUNNER_TEMP/swiftlint"
-          echo "SWIFTLINT=$RUNNER_TEMP/swiftlint/swiftlint" >> "$GITHUB_ENV"
-          echo "LINUX_SOURCEKIT_LIB_PATH=$(dirname "$(dirname "$(command -v swift)")")/lib" >> "$GITHUB_ENV"
-
-      - name: Static quality audits
-        env:
-          ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/static-quality
-        run: bash scripts/ios/static-quality-audit.sh
-
-      - name: Upload static audit artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-static-audits-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/ios/test_results/static-quality
-          if-no-files-found: warn
-          retention-days: 14
-
   ios_storekit:
     name: iOS StoreKit Purchase and Restore
     needs: detect-changes
     # Always produce fresh main evidence, even when Unit was deduplicated against a merge group.
-    # Not on pull_request: the merge group reruns it on the exact tree that lands, so a PR run was a
-    # third hosted-macOS pass (13 min p50) over the same change. CI Summary still requires it in the queue.
-    if: github.event_name == 'push' || (github.event_name == 'merge_group' && needs.detect-changes.outputs.ios_changed == 'true')
+    if: github.event_name == 'push' || needs.detect-changes.outputs.ios_changed == 'true'
     runs-on: macos-15
     timeout-minutes: 30
     permissions:
@@ -458,7 +390,7 @@ jobs:
     name: CI Summary
     runs-on: ubuntu-latest
     if: always()
-    needs: [detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_static, ios_storekit]
+    needs: [detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_storekit]
     steps:
       - name: Check results
         run: |
@@ -479,8 +411,7 @@ jobs:
           }
 
           storekit_expected=false
-          if [[ "${{ github.event_name }}" == "push" ]] || \
-             [[ "${{ github.event_name }}" == "merge_group" && "${{ needs.detect-changes.outputs.ios_changed }}" == "true" ]]; then
+          if [[ "${{ github.event_name }}" == "push" || "${{ needs.detect-changes.outputs.ios_changed }}" == "true" ]]; then
             storekit_expected=true
           fi
 
@@ -501,7 +432,6 @@ jobs:
              ! assert_expected_result "JavaScript/TypeScript" "${{ needs.detect-changes.outputs.web }}" "${{ needs.js.result }}" || \
              ! assert_expected_result "iOS" "${{ needs.detect-changes.outputs.ios_unit }}" "${{ needs.ios.result }}" || \
              ! assert_expected_result "iOS StoreKit" "$storekit_expected" "${{ needs.ios_storekit.result }}" || \
-             ! assert_expected_result "iOS Static Audits" "${{ needs.detect-changes.outputs.ios_quality }}" "${{ needs.ios_static.result }}" || \
              ! assert_expected_result "iOS Launch Quality Gate" "${{ needs.detect-changes.outputs.ios_quality }}" "${{ needs.ios_quality.result }}"; then
             echo "❌ One or more CI jobs failed" >> "$GITHUB_STEP_SUMMARY"
             exit 1

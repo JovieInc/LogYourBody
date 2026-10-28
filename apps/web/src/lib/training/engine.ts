@@ -2,7 +2,6 @@ import { cycleConfigurationSchema } from './cycle-contract';
 import {
   MESOCYCLE_WEEKS,
   MUSCLE_GROUPS,
-  TRAINING_SESSIONS_PER_WEEK,
   type DeloadState,
   type CycleLength,
   type Equipment,
@@ -231,70 +230,6 @@ const EXERCISES: Record<Equipment, Record<ExercisePattern, ExerciseSeed[]>> = {
   },
 };
 
-type SessionFocus = 'Full body' | 'Upper body' | 'Lower body' | 'Push' | 'Pull' | 'Legs';
-const FOCUS_MUSCLES: Record<SessionFocus, readonly MuscleGroup[]> = {
-  'Full body': MUSCLE_GROUPS,
-  'Upper body': ['chest', 'back', 'shoulders', 'biceps', 'triceps'],
-  'Lower body': ['quads', 'hamstrings', 'glutes', 'calves', 'core'],
-  Push: ['chest', 'shoulders', 'triceps'],
-  Pull: ['back', 'biceps'],
-  Legs: ['quads', 'hamstrings', 'glutes', 'calves', 'core'],
-};
-const SESSION_TEMPLATES: Record<
-  TrainingProgramSetup['sessionsPerWeek'],
-  Array<{ focus: SessionFocus; pattern: ExercisePattern }>
-> = {
-  2: [
-    { focus: 'Full body', pattern: 'A' },
-    { focus: 'Full body', pattern: 'B' },
-  ],
-  3: [
-    { focus: 'Full body', pattern: 'A' },
-    { focus: 'Full body', pattern: 'B' },
-    { focus: 'Full body', pattern: 'A' },
-  ],
-  4: [
-    { focus: 'Upper body', pattern: 'A' },
-    { focus: 'Lower body', pattern: 'A' },
-    { focus: 'Upper body', pattern: 'B' },
-    { focus: 'Lower body', pattern: 'B' },
-  ],
-  5: [
-    { focus: 'Push', pattern: 'A' },
-    { focus: 'Pull', pattern: 'A' },
-    { focus: 'Legs', pattern: 'A' },
-    { focus: 'Upper body', pattern: 'B' },
-    { focus: 'Lower body', pattern: 'B' },
-  ],
-  6: [
-    { focus: 'Push', pattern: 'A' },
-    { focus: 'Pull', pattern: 'A' },
-    { focus: 'Legs', pattern: 'A' },
-    { focus: 'Push', pattern: 'B' },
-    { focus: 'Pull', pattern: 'B' },
-    { focus: 'Legs', pattern: 'B' },
-  ],
-};
-
-function sessionSeeds(
-  equipment: Equipment,
-  focus: SessionFocus,
-  pattern: ExercisePattern,
-): ExerciseSeed[] {
-  const seeds = EXERCISES[equipment][pattern];
-  if (focus === 'Full body') return seeds;
-  // Both lower sessions use a hinge. Squat + hinge contributions give quads,
-  // hamstrings and glutes four weekly sets each, rather than counting the hip
-  // thrust's small hamstring contribution as the second hamstring exposure.
-  return seeds
-    .filter((seed) => FOCUS_MUSCLES[focus].includes(seed.primaryMuscle))
-    .map((seed) =>
-      seed.primaryMuscle === 'glutes'
-        ? EXERCISES[equipment].A.find((candidate) => candidate.primaryMuscle === 'hamstrings')!
-        : seed,
-    );
-}
-
 const RIR_LADDER = [4, 3, 3, 2] as const;
 // Bounded engine policy, not a claim that one block length is optimal for everyone.
 export const CYCLE_RIR_LADDERS: Record<CycleLength, readonly number[]> = {
@@ -365,7 +300,7 @@ const REP_RANGE = { min: 8, max: 12 } as const;
 function eligibleSubstitutions(input: {
   seed: ExerciseSeed;
   equipment: Equipment;
-  plannedSeeds: ExerciseSeed[];
+  pattern: ExercisePattern;
   sets: number;
   targetRir: number;
 }): ExerciseSubstitution[] {
@@ -373,7 +308,7 @@ function eligibleSubstitutions(input: {
     input.equipment === 'full_gym'
       ? [EXERCISES.full_gym.A, EXERCISES.full_gym.B, EXERCISES.dumbbells.A, EXERCISES.dumbbells.B]
       : [EXERCISES.dumbbells.A, EXERCISES.dumbbells.B];
-  const plannedIds = new Set(input.plannedSeeds.map((item) => item.id));
+  const plannedIds = new Set(EXERCISES[input.equipment][input.pattern].map((item) => item.id));
   const seen = new Set<string>();
   return pools
     .flat()
@@ -913,16 +848,7 @@ export function buildSession(input: {
   logs: SetLog[];
   feedback: TrainingFeedback[];
 }): Session {
-  const template = SESSION_TEMPLATES[input.setup.sessionsPerWeek][input.slot];
-  if (!template) throw new Error('unsupported_training_session_slot');
-  const { focus, pattern } = template;
-  const seeds = input.setup.delegated
-    ? (input.setup.delegated.plan.sessions[input.slot]?.exercises.map((row) => {
-        const variant = catalogVariantById(row.variantId);
-        if (!variant) throw new Error('training_variant_requires_review');
-        return variant;
-      }) ?? [])
-    : sessionSeeds(input.setup.equipment, focus, pattern);
+  const pattern: ExercisePattern = input.slot % 2 === 0 ? 'A' : 'B';
   const sessionDeload = evaluateDeload(input.feedback);
   const safetyStop = sessionDeload.action === 'pause_session';
   const plannedDeload = input.block.phase === 'planned_deload';
@@ -932,7 +858,14 @@ export function buildSession(input: {
   );
   const exercises = safetyStop
     ? []
-    : seeds.map((seed) => {
+    : (input.setup.delegated
+        ? (input.setup.delegated.plan.sessions[input.slot]?.exercises.map((row) => {
+            const variant = catalogVariantById(row.variantId);
+            if (!variant) throw new Error('training_variant_requires_review');
+            return variant;
+          }) ?? [])
+        : EXERCISES[input.setup.equipment][pattern]
+      ).map((seed) => {
         const muscleDeload = muscleDeloads.get(seed.primaryMuscle);
         const planned = input.setup.delegated?.plan.sessions[input.slot]?.exercises.find(
           (r) => r.variantId === seed.id,
@@ -1005,7 +938,7 @@ export function buildSession(input: {
             : eligibleSubstitutions({
                 seed,
                 equipment: input.setup.equipment,
-                plannedSeeds: seeds,
+                pattern,
                 sets,
                 targetRir,
               }),
@@ -1026,7 +959,7 @@ export function buildSession(input: {
     week: input.block.currentWeek,
     slot: input.slot,
     pattern,
-    title: input.setup.delegated?.plan.sessions[input.slot]?.title ?? `${focus} ${pattern}`,
+    title: input.setup.delegated?.plan.sessions[input.slot]?.title ?? `Full body ${pattern}`,
     exercises,
     safetyStop,
     explanation,
@@ -1072,7 +1005,9 @@ export function isProgramSetup(value: unknown): value is TrainingProgramSetup {
     setup.consentVersion === 'hypertrophy-coach-v1' &&
     setup.adultConfirmed === true &&
     setup.safetyConfirmed === true &&
-    TRAINING_SESSIONS_PER_WEEK.some((count) => setup.sessionsPerWeek === count) &&
+    (setup.sessionsPerWeek === 2 ||
+      setup.sessionsPerWeek === 3 ||
+      (setup.delegated !== undefined && [4, 5, 6].includes(Number(setup.sessionsPerWeek)))) &&
     (setup.equipment === 'dumbbells' || setup.equipment === 'full_gym') &&
     (setup.cycle === undefined || cycleConfigurationSchema.safeParse(setup.cycle).success) &&
     typeof setup.startedAt === 'string' &&
