@@ -119,16 +119,22 @@ merge bases and their shared parent before applying the same union. The pre-comm
 file cannot hide an unresolved staged source. Resolve and stage the source, then
 retry the same command. Unrelated unstaged edits remain untouched.
 The check disables Git text conversion so display filters cannot hide staged markers.
+Both resolver modes require an active merge before writing; conflicted cherry-picks
+are refused without changing the ledger or index.
 
 With `--stage`, guard validation reads the Git index throughout resolution, so
 unrelated working edits cannot invalidate the reviewed staged snapshot. The
 unstaged resolver continues to validate guards from the working tree.
 Staged verification accepts only regular indexed guard files (including executable
 files); a symlink blob cannot supply guard evidence, even when its text matches
-the anchor and the working file is regular. Refusal preserves the ledger and index.
+the anchor and the working file is regular. The batched blob reader enforces file
+modes for final verification and staged retries. Unstaged guard text or symlinks
+cannot change the reviewed staged snapshot. Refusal preserves the ledger and index.
 
 Initial resolution also refuses to overwrite a valid JSON working ledger that differs
 from the parent union. Review and stage a manual resolution explicitly, then rerun
 `--resolve-merge . --stage` or `--check-merge .` to verify both parents and guards.
 Both merge resolvers also preserve malformed working ledgers without Git conflict
 markers, including empty files, so an incomplete manual edit cannot be discarded.
+Marker widths must also agree; partially edited conflict markers require explicit
+review and staging instead of automatic replacement.

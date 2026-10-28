@@ -11,11 +11,13 @@ struct HomeV2PhotoTimelineRuler: View {
     let dates: [Date]
     let selected: Int
     let onSelect: (Int) -> Void
+    var photoURLs: [String?] = []
     var showsMonthLabels = true
     var allowsVerticalScrolling = false
     var calendar = Calendar.current
     var accessibilityId = "home_v2_photo_ruler"
     var accessibilityName = "Photo timeline"
+    @Environment(\.layoutDirection) private var layoutDirection
 
     private static let monthFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -24,17 +26,21 @@ struct HomeV2PhotoTimelineRuler: View {
     }()
 
     private var span: DateInterval { HomeV2PhotoRulerPolicy.span(for: dates, calendar: calendar) }
+    private var usesFilmstrip: Bool {
+        HomeV2FilmstripPolicy.canRender(photoURLs: photoURLs, dateCount: dates.count) &&
+            HomeV2FilmstripPolicy.isEnabled()
+    }
 
     var body: some View {
         VStack(spacing: HomeV2Tokens.Space.tight) {
-            if showsMonthLabels {
+            if showsMonthLabels && !usesFilmstrip {
                 monthLabels
             }
             ticks
         }
         .padding(.horizontal, HomeV2Tokens.Space.inset)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityName)
+        .accessibilityLabel(usesFilmstrip ? "\(accessibilityName), thumbnail strip" : accessibilityName)
         .accessibilityValue(dates.indices.contains(selected) ? HomeV2ContextCopy.dayFormatter.string(from: dates[selected]) : "")
         .accessibilityAdjustableAction { direction in
             switch direction {
@@ -71,7 +77,7 @@ struct HomeV2PhotoTimelineRuler: View {
         GeometryReader { geometry in
             let width = geometry.size.width
             if allowsVerticalScrolling {
-                tickMarks(width: width)
+                track(width: width)
                     .gesture(HomeV2HorizontalPhotoScrub { position in
                         select(at: position, width: width)
                     })
@@ -79,13 +85,24 @@ struct HomeV2PhotoTimelineRuler: View {
                         SpatialTapGesture().onEnded { value in select(at: value.location.x, width: width) }
                     )
             } else {
-                tickMarks(width: width)
+                track(width: width)
                     .gesture(DragGesture(minimumDistance: 0).onChanged { value in
                         select(at: value.location.x, width: width)
                     })
             }
         }
         .frame(height: JovieTokens.minimumHitTarget)
+    }
+
+    @ViewBuilder
+    private func track(width: CGFloat) -> some View {
+        if usesFilmstrip {
+            HomeV2Filmstrip(photoURLs: photoURLs, selected: selected)
+                .frame(width: width, height: JovieTokens.minimumHitTarget)
+                .contentShape(Rectangle())
+        } else {
+            tickMarks(width: width)
+        }
     }
 
     private func tickMarks(width: CGFloat) -> some View {
@@ -117,8 +134,14 @@ struct HomeV2PhotoTimelineRuler: View {
     }
 
     private func select(at position: CGFloat, width: CGFloat) {
-        let fraction = position / max(width, 1)
-        if let index = HomeV2PhotoRulerPolicy.nearestIndex(to: fraction, dates: dates, span: span), index != selected {
+        let index: Int?
+        if usesFilmstrip {
+            index = HomeV2FilmstripPolicy.Layout(count: dates.count, width: width)?
+                .index(at: position, rightToLeft: layoutDirection == .rightToLeft)
+        } else {
+            index = HomeV2PhotoRulerPolicy.nearestIndex(to: position / max(width, 1), dates: dates, span: span)
+        }
+        if let index, index != selected {
             onSelect(index)
             HapticManager.shared.selection()
         }

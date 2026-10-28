@@ -352,7 +352,7 @@ export function assertLedgerMergeReady(root) {
     { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
   );
   // Staging a file does not prove its conflict markers were resolved.
-  // Inspect raw staged bytes; Git attributes must not hide unresolved markers.
+  // Read staged bytes as text so binary attributes cannot conceal conflict markers.
   // conflict-marker-size can emit markers shorter than the default seven characters.
   assert.doesNotMatch(
     staged,
@@ -402,6 +402,14 @@ export function assertLedgerResolutionUnchanged(original, merged, message) {
   } catch {
     // Only conflict text may be replaced; preserve malformed manual edits too.
     assert.match(original, /^<+ [^\r\n]*\r?\n[\s\S]*?^=+\r?\n[\s\S]*?^>+ /m, message);
+    // Conflict markers must retain a consistent width before replacing working text.
+    const widths = [...original.matchAll(/^(<+|\|+|=+|>+)(?: |\r?$)/gm)].map(
+      ([, marker]) => marker.length,
+    );
+    assert.ok(
+      widths.every((width) => width === widths[0]),
+      message,
+    );
     return;
   }
   assert.equal(JSON.stringify(workingReceipts), JSON.stringify(merged), message);

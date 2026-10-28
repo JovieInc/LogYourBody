@@ -1579,7 +1579,7 @@ def test_chat_corpus_selects_public_turns_and_requires_exact_unit_and_ui_passes(
     import pytest
 
     source = (_REPO_ROOT / "scripts/ios/launch-quality-audit.sh").read_text()
-    unit = "CHAT_QUALIFICATION_UNIT_TESTS=(" + source.split("CHAT_QUALIFICATION_UNIT_TESTS=(", 1)[1].split("# The whole unit target", 1)[0]
+    unit = "CHAT_QUALIFICATION_UNIT_TESTS=(" + source.split("CHAT_QUALIFICATION_UNIT_TESTS=(", 1)[1].split("# Launch Quality gates the general unit target.", 1)[0]
     ui = "LAUNCH_QUALITY_UI_TESTS=(" + source.split("LAUNCH_QUALITY_UI_TESTS=(", 1)[1].split("UI_RESULT_BUNDLE=", 1)[0]
     result = subprocess.run(["bash", "-e", "-u", "-c", unit + ui +
         '\nprintf "selector:%s\\n" "${UI_SELECTORS[@]}"\n' +
@@ -1806,7 +1806,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        'ad4098afa11c60dededb52592a74de1c3374d84f87da891f754b4b47f6aba2aa'
+        'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -2070,7 +2070,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = 'ad4098afa11c60dededb52592a74de1c3374d84f87da891f754b4b47f6aba2aa'" in source
+    assert "REVIEWED_AUDIT_SHA256 = 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -2307,7 +2307,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = 'ad4098afa11c60dededb52592a74de1c3374d84f87da891f754b4b47f6aba2aa'
+    expected = 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
@@ -2322,12 +2322,18 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     unlanded = _reviewed_diagnostic_candidate_bytes()
     reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert hashlib.sha256(reviewed).hexdigest() == expected
-    # Both merge parents and previously approved audits remain rejected inert evidence.
-    previous_main = reviewed.replace(
+    # Historical refusal fixtures must not be reconstructed from the changing candidate.
+    frozen_main = gzip.decompress(
+        (_REPO_ROOT / 'scripts/tests/fixtures/diagnostic-audit-ad4098afa11c.sh.gz').read_bytes())
+    assert hashlib.sha256(frozen_main).hexdigest() == 'ad4098afa11c60dededb52592a74de1c3374d84f87da891f754b4b47f6aba2aa'
+    frozen_branch = gzip.decompress(
+        (_REPO_ROOT / 'scripts/tests/fixtures/diagnostic-audit-ffdea3b6fb51.sh.gz').read_bytes())
+    assert hashlib.sha256(frozen_branch).hexdigest() == 'ffdea3b6fb517caf8e47ff9ffcc2d348840d59b57c150842b5253dfdb0f16fea'
+    previous_main = frozen_main.replace(
         b'  "LogYourBodyUITests/testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance"\n',
         b'', 1)
     assert hashlib.sha256(previous_main).hexdigest() == 'd77acce04a7d6eff69ddadcf28e869a703ed3ae98b50921b3625878490c481a8'
-    previous_branch = reviewed.replace(
+    previous_branch = frozen_main.replace(
         b'  # Finish validator shell fixtures before simulator boot competes for host resources.\n'
         b'  python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"\n', b'', 1)
     previous_branch = previous_branch.replace(
@@ -2385,7 +2391,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'previous-main-audit', 'previous-branch-audit', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'frozen-main-audit', 'frozen-branch-audit', 'previous-main-audit', 'previous-branch-audit', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
                 'dependency-symlink', 'changed-project', 'wrong-resolver']
     for scenario in fixtures:
@@ -2402,7 +2408,11 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         audit = root / 'scripts/ios/launch-quality-audit.sh'
         audit.write_bytes(reviewed)
         helper = root / 'scripts/ios/bootstrap-local-config.sh'
-        if scenario == 'previous-main-audit':
+        if scenario == 'frozen-main-audit':
+            audit.write_bytes(frozen_main)
+        elif scenario == 'frozen-branch-audit':
+            audit.write_bytes(frozen_branch)
+        elif scenario == 'previous-main-audit':
             audit.write_bytes(previous_main)
         elif scenario == 'previous-branch-audit':
             audit.write_bytes(previous_branch)

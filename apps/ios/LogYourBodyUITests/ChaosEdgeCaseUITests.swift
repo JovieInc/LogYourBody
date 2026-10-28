@@ -250,7 +250,12 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         saveBar.tap()
 
         XCUIDevice.shared.press(.home)
-        Thread.sleep(forTimeInterval: 2)
+        let backgrounded = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                app.state == .runningBackground || app.state == .runningBackgroundSuspended
+            }, object: app)
+        XCTAssertEqual(XCTWaiter.wait(for: [backgrounded], timeout: 5), .completed,
+                       "The app must enter the background before reactivation.")
         app.activate()
         // `activate()` returns before the state transition is guaranteed to
         // have landed. A real device under notification pressure can take

@@ -192,6 +192,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-43', reason: 'LYB-43 source evidence for metric identity and accessible action ownership.' },
       { value: 'https://linear.app/jovie/issue/LYB-44', reason: 'LYB-44 source evidence for chart responsiveness and playhead label mapping.' },
       { value: 'https://linear.app/jovie/issue/LYB-74', reason: 'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.' },
+      { value: 'https://linear.app/jovie/issue/LYB-85', reason: 'LYB-85 source evidence for filmstrip appearance within the single owned photo timeline.' },
       { value: 'https://linear.app/jovie/issue/LYB-95', reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.' },
       { value: 'https://linear.app/jovie/issue/LYB-111', reason: 'LYB-111 source evidence for bounded weekly training splits and enrollment parity.' },
       { value: 'https://linear.app/jovie/issue/LYB-112', reason: 'LYB-112 source evidence for bounded adaptive recovery learning and the correction ledger.' },

@@ -3474,13 +3474,33 @@ final class LogYourBodyUITests: XCTestCase {
 
     private func submitSyntheticChatQuestion(in app: XCUIApplication) {
         let composer = app.textFields["chat_composer"]
-        composer.tap()
         let question = "Synthetic full-turn question"
-        composer.typeText(question)
-        let entered = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value == %@", question), object: composer
-        )
-        let complete = XCTWaiter.wait(for: [entered], timeout: 8) == .completed
+        // Launch Quality run 40189917522 kept only "S" after one typeText while
+        // the app was still settling. Top up a prefix; never send anything else.
+        var complete = false
+        for attempt in 0..<3 {
+            let current = enteredSyntheticQuestion(in: composer)
+            if current != question {
+                // A center tap in a short draft can leave the caret before the
+                // committed prefix. The trailing edge puts it after that text.
+                if current.isEmpty {
+                    composer.tap()
+                } else {
+                    composer.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+                }
+                _ = app.keyboards.element.waitForExistence(timeout: 2)
+                let addition = syntheticQuestionInsertion(current: current, question: question)
+                if !addition.isEmpty {
+                    composer.typeText(addition)
+                }
+            }
+            let entered = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "value == %@", question), object: composer
+            )
+            let timeout: TimeInterval = attempt == 0 ? 8 : 4
+            complete = XCTWaiter.wait(for: [entered], timeout: timeout) == .completed
+            if complete { break }
+        }
         if !complete {
             let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             screenshot.name = "chat-synthetic-incomplete-draft-screen"
@@ -3491,12 +3511,31 @@ final class LogYourBodyUITests: XCTestCase {
             hierarchy.lifetime = .keepAlways
             add(hierarchy)
         }
-        XCTAssertTrue(complete, "Require the complete synthetic question before Send; never submit partial input")
+        let observed = composer.value ?? "nil"
+        XCTAssertTrue(
+            complete,
+            "Require the complete synthetic question before Send; never submit partial input (saw \(observed))"
+        )
         guard complete else { return }
         let send = app.buttons["chat_send_button"]
         let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: send)
         XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 8), .completed)
         send.tap()
+    }
+
+    /// Committed composer text. An empty SwiftUI field reports its placeholder.
+    private func enteredSyntheticQuestion(in composer: XCUIElement) -> String {
+        guard let value = composer.value as? String, !value.isEmpty else { return "" }
+        if value == composer.placeholderValue || value == "Ask about your progress" { return "" }
+        return value
+    }
+
+    /// Keystrokes still required. A value that is not a prefix is cleared first.
+    private func syntheticQuestionInsertion(current: String, question: String) -> String {
+        if question.hasPrefix(current) {
+            return String(question.dropFirst(current.count))
+        }
+        return String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count) + question
     }
 
     private func assertSyntheticChatCompleted(in app: XCUIApplication, capture: String) {

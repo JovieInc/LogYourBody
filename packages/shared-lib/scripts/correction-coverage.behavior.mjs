@@ -352,6 +352,9 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
     `${computed}\nmanual edit`,
     '',
     '< unfinished manual edit',
+    marker.replace('=======', '======'),
+    marker.replace('>>>>>>>', '>>>>>>'),
+    marker.replace('<<<<<<<', '<<<<<<'),
   ]) {
     writeFileSync(path, manual);
     const index = git(['ls-files', '--stage']);
