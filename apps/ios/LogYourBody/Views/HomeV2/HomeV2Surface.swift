@@ -82,7 +82,7 @@ struct HomeV2Surface: View {
         }
         .sheet(isPresented: $showsProvenance) {
             if let detail = HomeV2MetricEditorial.timelineProvenance(for: metric) {
-                HomeV2ProvenanceSheet(detail: detail)
+                HomeV2ProvenanceSheet(detail: detail, isPresented: $showsProvenance)
             }
         }
         .onChange(of: metric.id) { _, _ in showsProvenance = false }
