@@ -321,7 +321,7 @@ struct LogYourBodyApp: App {
                     Task {
                         await bootstrapHealthKit()
 
-                        if healthKitManager.isAuthorized {
+                        if !HealthKitForegroundRefreshPolicy.isEnabled(), healthKitManager.isAuthorized {
                             try? await HealthSyncCoordinator.shared.syncStepsFromHealthKit()
                         }
                     }

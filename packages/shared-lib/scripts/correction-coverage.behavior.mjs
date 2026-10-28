@@ -321,7 +321,7 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
   const { root } = fixtureRepo(t, [row('kept')]);
   const git = (args, input) => execFileSync('git', args, { cwd: root, encoding: 'utf8', input });
   const path = join(root, LEDGER_PATH);
-  const marker = 'unresolved conflict';
+  const marker = '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> incoming\n';
   writeFileSync(path, marker);
   const stages = [[], [row('ours')], [row('theirs')]].map((added) => [row('kept'), ...added]);
   const stage = () => {
@@ -349,6 +349,12 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
     JSON.stringify([...JSON.parse(computed), row('manual-receipt')]),
     '[]',
     'null',
+    `${computed}\nmanual edit`,
+    '',
+    '< unfinished manual edit',
+    marker.replace('=======', '======'),
+    marker.replace('>>>>>>>', '>>>>>>'),
+    marker.replace('<<<<<<<', '<<<<<<'),
   ]) {
     writeFileSync(path, manual);
     const index = git(['ls-files', '--stage']);
@@ -540,7 +546,7 @@ test('coverage CLI retains reporting and ledger repair modes after concurrent ch
       })
       .join(''),
   );
-  writeFileSync(join(root, LEDGER_PATH), 'unresolved conflict');
+  writeFileSync(join(root, LEDGER_PATH), '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> incoming\n');
   assert.equal(runCoverage(['--merge-ledger'], { root, env: {} }).mechanized, 3);
   const merged = readFileSync(join(root, LEDGER_PATH), 'utf8');
   assert.deepEqual(JSON.parse(merged), [row('kept'), row('theirs'), row('ours')]);

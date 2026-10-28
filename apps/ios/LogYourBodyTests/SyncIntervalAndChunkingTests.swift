@@ -42,6 +42,32 @@ final class SyncIntervalAndChunkingTests: XCTestCase {
         XCTAssertEqual(BatterySyncIntervalPolicy.interval(state: .unknown, level: -1), 1_800)
     }
 
+    func testForegroundRefreshDebounceUsesObserverWindow() {
+        XCTAssertEqual(BatterySyncIntervalPolicy.debounceInterval, 5)
+    }
+
+    func testForegroundRefreshIsDueInitiallyAndAtEachBatteryIntervalBoundary() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let states: [(UIDevice.BatteryState, Float)] = [
+            (.charging, 0.1), (.unplugged, 0.6), (.unplugged, 0.5), (.unknown, -1)
+        ]
+        for (state, level) in states {
+            let interval = BatterySyncIntervalPolicy.interval(state: state, level: level)
+            XCTAssertTrue(BatterySyncIntervalPolicy.permitsRefresh(
+                lastRefresh: nil, now: now, minimumInterval: interval
+            ))
+            XCTAssertFalse(BatterySyncIntervalPolicy.permitsRefresh(
+                lastRefresh: now.addingTimeInterval(-interval + 0.001), now: now, minimumInterval: interval
+            ))
+            XCTAssertTrue(BatterySyncIntervalPolicy.permitsRefresh(
+                lastRefresh: now.addingTimeInterval(-interval), now: now, minimumInterval: interval
+            ))
+            XCTAssertFalse(BatterySyncIntervalPolicy.permitsRefresh(
+                lastRefresh: now.addingTimeInterval(1), now: now, minimumInterval: interval
+            ), "A clock moving backwards must not bypass the cooldown")
+        }
+    }
+
     // MARK: - Array.chunked(into:)
 
     func testChunkExactMultiple() {

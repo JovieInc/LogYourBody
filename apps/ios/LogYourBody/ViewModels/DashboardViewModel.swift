@@ -57,6 +57,10 @@ final class DashboardViewModel: ObservableObject {
         )
     }
 
+    func requestForegroundHealthRefresh(syncEnabled: Bool) {
+        healthSyncCoordinator.requestForegroundRefresh(syncEnabled: syncEnabled)
+    }
+
     func loadData(
         authManager: AuthManager,
         loadOnlyNewest: Bool = false,

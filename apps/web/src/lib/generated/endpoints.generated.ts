@@ -470,6 +470,11 @@ export const endpoints = {
       reason: 'LYB-240 source evidence for per-reading provenance and effective-date labels.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-242',
+      reason:
+        'LYB-242 source evidence for automatic HealthKit foreground refresh and lifecycle coalescing.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-252',
       reason:
         'LYB-252 source evidence for recurring correction escalation and guard-failure detection.',

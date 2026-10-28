@@ -87,6 +87,7 @@ struct ContentView: View {
     @State private var releaseReviewDestination: ReleaseReviewDestination?
     @State private var pendingDexaPDF: DexaPDFFileSelection?
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
+    @AppStorage(Constants.healthKitSyncEnabledKey) private var healthKitSyncEnabled = true
     private let releaseReviewStateStore = ReleaseReviewStateStore()
 
     private var suppressWhatsNewForUITests: Bool {
@@ -308,6 +309,9 @@ struct ContentView: View {
             showLegalConsent = newValue
         }
         .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                HealthSyncCoordinator.shared.requestForegroundRefresh(syncEnabled: healthKitSyncEnabled)
+            }
             if BiometricLockPolicy.shouldRelock(
                 onEntering: newPhase,
                 lockEnabled: isBiometricLockArmed

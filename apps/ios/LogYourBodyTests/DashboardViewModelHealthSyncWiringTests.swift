@@ -14,6 +14,250 @@ import UIKit
 
 @MainActor
 final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
+    func testAppearanceDelegatesToTheSharedCoordinatorWithSyncPreference() {
+        let coordinator = MockHealthSyncCoordinator()
+        let viewModel = DashboardViewModel(healthSyncCoordinator: coordinator)
+
+        viewModel.requestForegroundHealthRefresh(syncEnabled: true)
+        viewModel.requestForegroundHealthRefresh(syncEnabled: false)
+
+        XCTAssertEqual(coordinator.foregroundRefreshRequests, [true, false])
+        XCTAssertFalse(viewModel.isSyncingData)
+    }
+
+    func testForegroundRefreshGateDefaultsToOffAndUsesStableKey() {
+        XCTAssertFalse(HealthKitForegroundRefreshPolicy.isEnabled { key in
+            XCTAssertEqual(key, "healthkit_foreground_refresh_v1")
+            return false
+        })
+    }
+
+    func testSceneActiveAndViewAppearancesDebounceOneRefreshWithoutBlockingFirstPaint() async {
+        let manager = MockHealthKitSyncManager()
+        let clock = ForegroundHealthRefreshTestClock()
+        let coordinator = makeForegroundCoordinator(manager: manager, clock: clock)
+        let viewModel = DashboardViewModel(healthSyncCoordinator: coordinator)
+
+        coordinator.requestForegroundRefresh(syncEnabled: true) // Scene active.
+        viewModel.requestForegroundHealthRefresh(syncEnabled: true) // Dashboard appears.
+        viewModel.requestForegroundHealthRefresh(syncEnabled: true) // Metric appears.
+        coordinator.bootstrapIfNeeded(syncEnabled: true)
+
+        XCTAssertEqual(manager.smartScaleRefreshCallCount, 0)
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 0)
+        XCTAssertFalse(viewModel.isSyncingData)
+        await completeForegroundRefresh(clock: clock, manager: manager)
+        XCTAssertEqual(clock.requestedDelays, [BatterySyncIntervalPolicy.debounceInterval])
+        XCTAssertEqual(manager.smartScaleRefreshCallCount, 1)
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 1)
+        XCTAssertEqual(manager.syncStepsFromHealthKitCallCount, 1)
+    }
+
+    func testRapidSceneActivationHonorsMinimumIntervalAndRefreshesWhenDue() async {
+        let manager = MockHealthKitSyncManager()
+        let clock = ForegroundHealthRefreshTestClock()
+        let coordinator = makeForegroundCoordinator(manager: manager, clock: clock)
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+        await completeForegroundRefresh(clock: clock, manager: manager)
+
+        clock.now = clock.now.addingTimeInterval(299)
+        for _ in 0..<10 { coordinator.requestForegroundRefresh(syncEnabled: true) }
+        XCTAssertEqual(clock.requestedDelays.count, 1)
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 1)
+
+        clock.now = clock.now.addingTimeInterval(1)
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+        await completeForegroundRefresh(clock: clock, manager: manager, count: 2)
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 2)
+        XCTAssertEqual(clock.requestedDelays.count, 2)
+    }
+
+    func testForegroundRefreshSkipsUnauthorizedUnavailableDisabledAndOtherAccount() async {
+        for scenario in ["unauthorized", "unavailable", "disabled", "preferenceOff", "gateOff", "otherAccount"] {
+            let manager = MockHealthKitSyncManager()
+            manager.isAuthorized = scenario != "unauthorized"
+            manager.isHealthKitAvailable = scenario != "unavailable"
+            manager.admitsAutomaticImport = scenario != "otherAccount"
+            let clock = ForegroundHealthRefreshTestClock()
+            let coordinator = makeForegroundCoordinator(
+                manager: manager, clock: clock,
+                enabled: { scenario != "gateOff" }, syncEnabled: { scenario != "preferenceOff" }
+            )
+
+            coordinator.requestForegroundRefresh(syncEnabled: scenario != "disabled")
+            await Task.yield()
+
+            XCTAssertTrue(clock.requestedDelays.isEmpty, scenario)
+            XCTAssertEqual(manager.smartScaleRefreshCallCount, 0, scenario)
+            XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 0, scenario)
+            XCTAssertEqual(manager.syncStepsFromHealthKitCallCount, 0, scenario)
+        }
+    }
+
+    func testPermissionRevokedDuringDebounceDoesNotQueryHealthKit() async {
+        let manager = MockHealthKitSyncManager()
+        let clock = ForegroundHealthRefreshTestClock()
+        let coordinator = makeForegroundCoordinator(manager: manager, clock: clock)
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+        await waitForForegroundCondition { clock.hasPendingSleep }
+        manager.isAuthorized = false
+        clock.finishDebounce()
+        await waitForForegroundCondition { manager.checkAuthorizationCallCount == 2 }
+
+        XCTAssertEqual(manager.smartScaleRefreshCallCount, 0)
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 0)
+        XCTAssertEqual(manager.syncStepsFromHealthKitCallCount, 0)
+    }
+
+    func testAnchoredRefreshAvoidsASecondFullWeightImport() async {
+        let manager = MockHealthKitSyncManager()
+        manager.smartScaleRefreshResult = HealthKitSmartScaleRefreshResult(outcome: .refreshed, imported: 1)
+        let clock = ForegroundHealthRefreshTestClock()
+        let coordinator = makeForegroundCoordinator(manager: manager, clock: clock)
+
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+        await completeForegroundRefresh(clock: clock, manager: manager)
+
+        XCTAssertEqual(manager.smartScaleRefreshCallCount, 1)
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 0)
+        XCTAssertEqual(manager.syncStepsFromHealthKitCallCount, 1)
+    }
+
+    func testInFlightRefreshCoalescesFurtherSceneActivations() async {
+        let manager = MockHealthKitSyncManager()
+        var finishWeight: CheckedContinuation<Void, Never>?
+        manager.weightSyncAction = { await withCheckedContinuation { finishWeight = $0 } }
+        let clock = ForegroundHealthRefreshTestClock()
+        let coordinator = makeForegroundCoordinator(manager: manager, clock: clock)
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+        await waitForForegroundCondition { clock.hasPendingSleep }
+        clock.finishDebounce()
+        await waitForForegroundCondition { finishWeight != nil }
+
+        clock.now = clock.now.addingTimeInterval(1_800)
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+        XCTAssertEqual(clock.requestedDelays.count, 1)
+        finishWeight?.resume()
+        await waitForForegroundCondition { manager.syncStepsFromHealthKitCallCount == 1 }
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 1)
+    }
+
+    func testAnchoredPermissionDenialDoesNotFallBackToMoreHealthKitQueries() async {
+        let manager = MockHealthKitSyncManager()
+        manager.smartScaleRefreshResult = .denied
+        let clock = ForegroundHealthRefreshTestClock()
+        let coordinator = makeForegroundCoordinator(manager: manager, clock: clock)
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+        await waitForForegroundCondition { clock.hasPendingSleep }
+        clock.finishDebounce()
+        await waitForForegroundCondition { manager.smartScaleRefreshCallCount == 1 }
+        await Task.yield()
+
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 0)
+        XCTAssertEqual(manager.syncStepsFromHealthKitCallCount, 0)
+    }
+
+    func testWeightFailureDoesNotBlockStepsOrBypassCooldown() async {
+        let manager = MockHealthKitSyncManager()
+        manager.weightSyncAction = { throw HealthKitError.syncFailed }
+        let clock = ForegroundHealthRefreshTestClock()
+        let coordinator = makeForegroundCoordinator(manager: manager, clock: clock)
+
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+        await completeForegroundRefresh(clock: clock, manager: manager)
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 1)
+        XCTAssertEqual(manager.syncStepsFromHealthKitCallCount, 1)
+        XCTAssertEqual(clock.requestedDelays.count, 1)
+    }
+
+    func testSignOutCancelsPendingRefreshWithoutCancellingNextAccountsRequest() async {
+        let manager = MockHealthKitSyncManager()
+        let clock = ForegroundHealthRefreshTestClock()
+        let coordinator = makeForegroundCoordinator(manager: manager, clock: clock)
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+        await waitForForegroundCondition { clock.hasPendingSleep }
+        await coordinator.suspendAutomaticImportAfterSignOut()
+        clock.finishDebounce()
+
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+        await completeForegroundRefresh(clock: clock, manager: manager)
+        XCTAssertEqual(manager.smartScaleRefreshCallCount, 1)
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 1)
+    }
+
+    func testAccountResetClearsCompletedForegroundRefreshCooldown() async {
+        let manager = MockHealthKitSyncManager()
+        let clock = ForegroundHealthRefreshTestClock()
+        let coordinator = makeForegroundCoordinator(manager: manager, clock: clock)
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+        await completeForegroundRefresh(clock: clock, manager: manager)
+
+        await coordinator.resetForCurrentUser()
+        coordinator.requestForegroundRefresh(syncEnabled: true)
+        await completeForegroundRefresh(clock: clock, manager: manager, count: 2)
+
+        XCTAssertTrue(manager.didCallResetForCurrentUser)
+        XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 2)
+    }
+
+    func testForegroundImportMakesNewMeasurementAvailableToDashboard() async throws {
+        let userId = "dashboard_foreground_\(UUID().uuidString)"
+        let auth = AuthManager()
+        auth.currentUser = LocalUser(
+            id: userId, email: "foreground@example.com", name: "Foreground",
+            avatarUrl: nil, profile: nil, onboardingCompleted: true
+        )
+        try await saveHistoryMetric(userId: userId, index: 0, date: Date().addingTimeInterval(-86_400))
+        let manager = MockHealthKitSyncManager()
+        manager.weightSyncAction = {
+            try await self.saveHistoryMetric(userId: userId, index: 1, date: Date())
+        }
+        let clock = ForegroundHealthRefreshTestClock()
+        let coordinator = makeForegroundCoordinator(manager: manager, clock: clock)
+        let viewModel = DashboardViewModel(healthSyncCoordinator: coordinator)
+        await viewModel.loadData(authManager: auth, selectedIndex: 0)
+        XCTAssertEqual(viewModel.bodyMetrics.count, 1)
+
+        viewModel.requestForegroundHealthRefresh(syncEnabled: true)
+        await completeForegroundRefresh(clock: clock, manager: manager)
+        // Dashboard's existing Core Data change handler reloads this same cache.
+        await viewModel.loadData(authManager: auth, loadOnlyNewest: true, selectedIndex: 0)
+
+        XCTAssertEqual(viewModel.bodyMetrics.first?.id, "\(userId)_1")
+        XCTAssertEqual(viewModel.bodyMetrics.count, 2)
+    }
+
+    private func makeForegroundCoordinator(
+        manager: MockHealthKitSyncManager, clock: ForegroundHealthRefreshTestClock,
+        enabled: @escaping @MainActor () -> Bool = { true },
+        syncEnabled: @escaping @MainActor () -> Bool = { true }
+    ) -> HealthSyncCoordinator {
+        HealthSyncCoordinator(
+            healthKitManager: manager, foregroundRefreshEnabled: enabled, syncEnabled: syncEnabled,
+            minimumInterval: { BatterySyncIntervalPolicy.interval(state: .unplugged, level: 0.6) },
+            now: { clock.now }, sleep: { await clock.sleep($0) }
+        )
+    }
+
+    private func completeForegroundRefresh(
+        clock: ForegroundHealthRefreshTestClock, manager: MockHealthKitSyncManager, count: Int = 1
+    ) async {
+        await waitForForegroundCondition { clock.hasPendingSleep }
+        clock.finishDebounce()
+        await waitForForegroundCondition { manager.syncStepsFromHealthKitCallCount == count }
+        await Task.yield()
+    }
+
+    private func waitForForegroundCondition(_ condition: () -> Bool) async {
+        let deadline = Date().addingTimeInterval(3)
+        while !condition(), Date() < deadline {
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+        XCTAssertTrue(condition())
+    }
+
     func testNewestRefreshPreservesLoadedHistoryAndIncludesNewMeasurement() async throws {
         let userId = "dashboard_history_\(UUID().uuidString)"
         let authManager = AuthManager()
@@ -175,5 +419,25 @@ final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
         XCTAssertTrue(viewModel.hasLoadedInitialData)
         XCTAssertEqual(viewModel.bodyMetrics.first?.id, localMetric.id)
         XCTAssertEqual(viewModel.bodyMetrics.first?.dataSource, "manual")
+    }
+}
+
+@MainActor
+private final class ForegroundHealthRefreshTestClock {
+    var now = Date(timeIntervalSince1970: 10_000)
+    private(set) var requestedDelays: [TimeInterval] = []
+    private var continuation: CheckedContinuation<Void, Never>?
+    var hasPendingSleep: Bool { continuation != nil }
+
+    func sleep(_ interval: TimeInterval) async {
+        requestedDelays.append(interval)
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func finishDebounce() {
+        now = now.addingTimeInterval(requestedDelays.last ?? 0)
+        let pending = continuation
+        continuation = nil
+        pending?.resume()
     }
 }

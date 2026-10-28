@@ -339,6 +339,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     'manual-resolution',
     'manual-missing-receipt',
     'manual-invalid',
+    'malformed-resolution',
     'cherry-pick',
     'duplicate-parent',
     'short-ledger-markers',
@@ -360,6 +361,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       'manual-resolution',
       'manual-missing-receipt',
       'manual-invalid',
+      'malformed-resolution',
       'cherry-pick',
       'duplicate-parent',
       'short-ledger-markers',
@@ -381,6 +383,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       ...markerScenarios,
       'manual-missing-receipt',
       'manual-invalid',
+      'malformed-resolution',
       'cherry-pick',
     ].includes(scenario);
     const repository = join(directory, `repository with spaces ${scenario} ${stageMerge}`);
@@ -666,6 +669,22 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       }
       return;
     }
+    if (scenario === 'malformed-resolution') {
+      const index = await git('ls-files', '--stage');
+      for (const marker of ['<<<<<<<', '=======', '>>>>>>>']) {
+        const manual = '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> incoming\n'.replace(
+          marker,
+          marker.slice(1),
+        );
+        writeFileSync(ledger, manual);
+        const rejected = run('--resolve-merge', repository, ...(stageMerge ? ['--stage'] : []));
+        assert.equal(rejected.status, 1, 'inconsistent marker widths preserve manual edits');
+        assert.match(rejected.stderr, /manually resolved ledger/);
+        assert.equal(readFileSync(ledger, 'utf8'), manual);
+        assert.equal(await git('ls-files', '--stage'), index);
+      }
+      writeFileSync(ledger, `${JSON.stringify(classifyLedger(expectedRows))}\nmanual edit`);
+    }
     if (scenario === 'manual-missing-receipt') writeLedger(rows.slice(0, -1));
     if (scenario === 'manual-invalid') writeFileSync(ledger, '{invalid json');
     before = readFileSync(ledger, 'utf8');
@@ -910,7 +929,9 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       );
       assert.match(
         result.stderr,
-        /concurrent receipt edits|removed receipt|missing guard anchor|resolve other conflicts first|staged conflict markers|Expected property name|MERGE_HEAD|manually resolved ledger/,
+        scenario === 'malformed-resolution'
+          ? /Unexpected non-whitespace character after JSON/
+          : /concurrent receipt edits|removed receipt|missing guard anchor|resolve other conflicts first|staged conflict markers|Expected property name|MERGE_HEAD|manually resolved ledger/,
       );
       assert.equal(readFileSync(ledger, 'utf8'), before);
       if (scenario === 'binary-marker') {

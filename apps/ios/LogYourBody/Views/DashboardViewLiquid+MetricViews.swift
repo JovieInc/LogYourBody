@@ -83,6 +83,7 @@ extension DashboardViewLiquid {
             formatTrendWeightHeadline: formatTrendWeightHeadline
         )
         .padding(.horizontal, 20)
+        .onAppear { requestForegroundHealthRefresh() }
     }
 
     @ViewBuilder

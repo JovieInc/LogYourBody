@@ -138,6 +138,7 @@ struct DashboardViewLiquid: View {
     @State private var showsScreenshotShareChoice = false
     @State var bodyScoreSharePresentationID: UUID?
     @State private var hasPerformedInitialRefresh = false
+    @AppStorage(Constants.healthKitSyncEnabledKey) private var healthKitSyncEnabled = true
     @State var featureGateRefreshToken = UUID()
     @State var addEntryInitialTab = 0
     @State var addEntryIncludesGlp1Entry = false
@@ -365,6 +366,7 @@ struct DashboardViewLiquid: View {
             }
             .navigationDestination(isPresented: $isMetricDetailActive) {
                 fullMetricChartView
+                    .onAppear { requestForegroundHealthRefresh() }
             }
             .navigationDestination(isPresented: $isStatsDestinationActive) {
                 photoTimelineStatsDestination
@@ -503,8 +505,11 @@ struct DashboardViewLiquid: View {
             }
         }
 
-        // Then refresh async (loads all data in background) once per dashboard lifecycle
-        if !hasPerformedInitialRefresh && !usesTimelinePerformanceTraceFixture {
+        // Automatic refresh coalesces with scene activation; retain the legacy rollout path.
+        if HealthKitForegroundRefreshPolicy.isEnabled() && !usesTimelinePerformanceTraceFixture {
+            requestForegroundHealthRefresh()
+            realtimeSyncManager.syncIfNeeded()
+        } else if !hasPerformedInitialRefresh && !usesTimelinePerformanceTraceFixture {
             hasPerformedInitialRefresh = true
             Task {
                 await viewModel.refreshData(
@@ -521,6 +526,11 @@ struct DashboardViewLiquid: View {
         isPhotosTabEnabled = true
 
         loadGlp1WeeklyCheckInDataIfNeeded()
+    }
+
+    func requestForegroundHealthRefresh() {
+        guard !usesTimelinePerformanceTraceFixture else { return }
+        viewModel.requestForegroundHealthRefresh(syncEnabled: healthKitSyncEnabled)
     }
 
     private func migrateLegacyWeightGoalIfNeeded() {

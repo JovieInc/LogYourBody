@@ -400,7 +400,16 @@ export function assertLedgerResolutionUnchanged(original, merged, message) {
   try {
     workingReceipts = JSON.parse(original);
   } catch {
-    // Unresolved Git conflict markers are not valid JSON.
+    // Only conflict text may be replaced; preserve malformed manual edits too.
+    assert.match(original, /^<+ [^\r\n]*\r?\n[\s\S]*?^=+\r?\n[\s\S]*?^>+ /m, message);
+    // Conflict markers must retain a consistent width before replacing working text.
+    const widths = [...original.matchAll(/^(<+|\|+|=+|>+)(?: |\r?$)/gm)].map(
+      ([, marker]) => marker.length,
+    );
+    assert.ok(
+      widths.every((width) => width === widths[0]),
+      message,
+    );
     return;
   }
   assert.equal(JSON.stringify(workingReceipts), JSON.stringify(merged), message);

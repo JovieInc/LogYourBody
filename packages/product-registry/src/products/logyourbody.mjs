@@ -210,6 +210,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-232', reason: 'LYB-232 source evidence for Statsig client-key injection into the production web build.' },
       { value: 'https://linear.app/jovie/issue/LYB-239', reason: 'LYB-239 source evidence for HealthKit import identity and the correction ledger.' },
       { value: 'https://linear.app/jovie/issue/LYB-240', reason: 'LYB-240 source evidence for per-reading provenance and effective-date labels.' },
+      { value: 'https://linear.app/jovie/issue/LYB-242', reason: 'LYB-242 source evidence for automatic HealthKit foreground refresh and lifecycle coalescing.' },
       { value: 'https://linear.app/jovie/issue/LYB-252', reason: 'LYB-252 source evidence for recurring correction escalation and guard-failure detection.' },
       { value: 'https://linear.app/jovie/issue/LYB-307', reason: 'LYB-307 source evidence for emitted lint correction checks and recurrence-based severity.' },
       { value: 'https://linear.app/jovie/issue/LYB-97', reason: 'LYB-97, Pro intro-offer audit in docs/audits/lyb-97.' },
