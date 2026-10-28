@@ -517,30 +517,6 @@ func saveAndWait() {
                     cached.createdAt = metrics.createdAt
                 }
 
-                let existingMetadata = BodyMetricSourceMetadata(jsonString: cached.sourceMetadataJSON)
-                let localWrite = BodyMetricLoggingService.decideLocalWrite(
-                    hasExisting: results.first != nil,
-                    existingOperationId: existingMetadata?.weightOperationId,
-                    incomingOperationId: metrics.sourceMetadata?.weightOperationId,
-                    weightsEqual: BodyMetricLoggingService.canonicalWeightsEqual(
-                        cached.weight, metrics.weight
-                    ),
-                    existingDeleted: cached.isMarkedDeleted
-                )
-                if localWrite == .preserveTombstone {
-                    completion?(.success(()))
-                    return
-                }
-                if localWrite == .conflict {
-                    cached.isSynced = false
-                    cached.syncStatus = "conflict"
-                    if context.hasChanges {
-                        try context.save()
-                    }
-                    completion?(.success(()))
-                    return
-                }
-
                 // Update values
                 cached.userId = userId
                 cached.date = metrics.date
@@ -571,13 +547,11 @@ func saveAndWait() {
                         legacyDataSource: legacyDataSource
                     ).jsonString
                 }
-                if localWrite != .retryKeepingTimestamps || results.first == nil {
-                    cached.updatedAt = Date()
-                    cached.lastModified = Date()
-                    cached.isMarkedDeleted = false
-                }
+                cached.updatedAt = Date()
+                cached.lastModified = Date()
                 cached.isSynced = markAsSynced
                 cached.syncStatus = markAsSynced ? "synced" : "pending"
+                cached.isMarkedDeleted = false
 
                 // Save immediately within the perform block
                 if context.hasChanges {

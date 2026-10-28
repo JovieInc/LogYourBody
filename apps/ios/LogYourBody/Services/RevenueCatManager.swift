@@ -174,9 +174,6 @@ enum RevenueCatPurchasingError: Error, Equatable {
     case unexpected(String)
 
     static func from(_ error: Error) -> RevenueCatPurchasingError {
-        if let purchasingError = error as? RevenueCatPurchasingError {
-            return purchasingError
-        }
         guard let errorCode = error as? ErrorCode else {
             return .unexpected(error.localizedDescription)
         }
@@ -196,17 +193,6 @@ enum RevenueCatPurchasingError: Error, Equatable {
     }
 }
 
-/// Roll out verified purchase outcomes without changing entitlement admission.
-enum RevenueCatPurchaseVerificationPolicy {
-    static let gateName = "billing_verified_purchase_outcome_v1"
-
-    @MainActor
-    static func isEnabled(isGateEnabled: ((String) -> Bool)? = nil) -> Bool {
-        let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        return checkGate(gateName)
-    }
-}
-
 enum RevenueCatCustomerInfoRead: Equatable {
     case cached
     case current(expectedAppUserID: String)
@@ -223,11 +209,7 @@ protocol RevenueCatPurchasesProtocol: AnyObject {
     func logOut() async throws
     func customerInfo(entitlementID: String, read: RevenueCatCustomerInfoRead) async throws -> RevenueCatCustomerSnapshot
     func offerings() async throws -> Offerings
-    func purchase(
-        package: Package,
-        entitlementID: String,
-        verifiesOutcome: Bool
-    ) async throws -> RevenueCatCustomerSnapshot
+    func purchase(package: Package, entitlementID: String) async throws -> RevenueCatCustomerSnapshot
     func restorePurchases(entitlementID: String) async throws -> RevenueCatCustomerSnapshot
 }
 
@@ -299,32 +281,13 @@ final class LiveRevenueCatPurchasesClient: RevenueCatPurchasesProtocol {
         try await Purchases.shared.offerings()
     }
 
-    func purchase(
-        package: Package,
-        entitlementID: String,
-        verifiesOutcome: Bool
-    ) async throws -> RevenueCatCustomerSnapshot {
+    func purchase(package: Package, entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
         do {
-            let (_, customerInfo, userCancelled) = try await Purchases.shared.purchase(package: package)
-            return try Self.purchaseSnapshot(
-                customer: RevenueCatCustomerSnapshot(customerInfo: customerInfo, entitlementID: entitlementID),
-                userCancelled: userCancelled,
-                verifiesOutcome: verifiesOutcome
-            )
+            let (_, customerInfo, _) = try await Purchases.shared.purchase(package: package)
+            return RevenueCatCustomerSnapshot(customerInfo: customerInfo, entitlementID: entitlementID)
         } catch {
             throw RevenueCatPurchasingError.from(error)
         }
-    }
-
-    static func purchaseSnapshot(
-        customer: RevenueCatCustomerSnapshot,
-        userCancelled: Bool,
-        verifiesOutcome: Bool
-    ) throws -> RevenueCatCustomerSnapshot {
-        guard !verifiesOutcome || !userCancelled else {
-            throw RevenueCatPurchasingError.purchaseCancelled
-        }
-        return customer
     }
 
     func restorePurchases(entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
@@ -387,7 +350,6 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     let purchasesClient: RevenueCatPurchasesProtocol
     let userDefaults: UserDefaults
-    let purchaseVerificationEnabled: () -> Bool
     var currentEntitlementSnapshot: RevenueCatEntitlementSnapshot?
 
     struct BillingSessionOwnership: Equatable {
@@ -491,12 +453,10 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     init(
         purchasesClient: RevenueCatPurchasesProtocol,
-        userDefaults: UserDefaults = .standard,
-        purchaseVerificationEnabled: (() -> Bool)? = nil
+        userDefaults: UserDefaults = .standard
     ) {
         self.purchasesClient = purchasesClient
         self.userDefaults = userDefaults
-        self.purchaseVerificationEnabled = purchaseVerificationEnabled ?? { RevenueCatPurchaseVerificationPolicy.isEnabled() }
         super.init()
         // print("💰 RevenueCatManager initialized")
 

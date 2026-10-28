@@ -47,7 +47,7 @@ struct CanvasClientRequest {
     }
 }
 
-struct CanvasExercise: Codable, Equatable, Identifiable, Sendable {
+struct CanvasExercise: Codable, Equatable, Identifiable {
     var id: String { instanceId }
     let instanceId: String
     let variantId: String
@@ -57,7 +57,7 @@ struct CanvasExercise: Codable, Equatable, Identifiable, Sendable {
     let priority: String
 }
 
-struct CanvasSession: Codable, Equatable, Identifiable, Sendable {
+struct CanvasSession: Codable, Equatable, Identifiable {
     let id: String
     let day: String
     let slot: String
@@ -65,7 +65,7 @@ struct CanvasSession: Codable, Equatable, Identifiable, Sendable {
     let exercises: [CanvasExercise]
 }
 
-struct CanvasPlan: Codable, Equatable, Sendable {
+struct CanvasPlan: Codable, Equatable {
     let revision: Int
     let sessions: [CanvasSession]
 }

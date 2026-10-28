@@ -423,11 +423,7 @@ private final class IdleRevenueCatClient: RevenueCatPurchasesProtocol {
         throw IdleRevenueCatError.unused
     }
 
-    func purchase(
-        package: Package,
-        entitlementID: String,
-        verifiesOutcome: Bool
-    ) async throws -> RevenueCatCustomerSnapshot {
+    func purchase(package: Package, entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
         throw IdleRevenueCatError.unused
     }
 

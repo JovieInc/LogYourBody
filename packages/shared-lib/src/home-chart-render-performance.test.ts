@@ -20,19 +20,3 @@ it('keeps full-history plot preparation outside each chart sample closure (LYB-1
     expect(body).not.toMatch(/HomeV2ChartIntegrity\.(?:plot|filter)\s*\(/);
   }
 });
-
-it('retains the gated, view-owned chart preparation cache during playhead updates (LYB-44)', () => {
-  const source = readFileSync(chartPath, 'utf8');
-  expect(source).toContain(
-    '@State private var preparationCache = HomeV2ChartIntegrity.PreparationCache()',
-  );
-  expect(source).toContain('isFeatureEnabled(flagKey: "chart_playhead_v2")');
-  expect(source).toContain('return preparationCache.value(for: request)');
-  expect(source).toContain('if responsivePlayheadEnabled { return preparation.plot }');
-  expect(source).toContain('prefersLatestReading: false');
-  expect(source).toContain('guard next != selectedX else { return }');
-  expect(source).toMatch(
-    /onChange\(of: responsivePlayheadEnabled \? plotted\.selectionSamples : \[\]\)[\s\S]*?if responsivePlayheadEnabled \{ selectedX = nil \}/,
-  );
-  expect(source).not.toMatch(/HomeV2ChartIntegrity\.(?:filter|nearest)\s*\(/);
-});

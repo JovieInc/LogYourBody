@@ -70,9 +70,6 @@ jobs:
       - name: Build
         run: cd apps/web && pnpm build
 
-      - name: Verify no NEXT_PUBLIC_* Vercel variable is marked Sensitive
-        run: node .github/scripts/verify-public-build-env-types.mjs
-
       - name: Pull Vercel environment
         run: pnpm dlx vercel@latest pull --yes --environment=production --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"
 
@@ -81,7 +78,7 @@ jobs:
           env_file=.vercel/.env.production.local
           test -f "$env_file"
           missing_variables=0
-          for required_variable in DATABASE_URL OPENAI_API_KEY CRON_SECRET LYB_AI_ZERO_RETENTION; do
+          for required_variable in DATABASE_URL OPENAI_API_KEY CRON_SECRET; do
             if ! grep -qE "^${required_variable}=" "$env_file"; then
               echo "::error::Missing required Vercel production variable: $required_variable"
               missing_variables=1

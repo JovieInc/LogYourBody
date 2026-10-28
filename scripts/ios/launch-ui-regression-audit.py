@@ -230,15 +230,6 @@ def main() -> int:
             violations=violations,
         )
 
-    require_token(
-        root=root,
-        path=app_dir / "Components/ContextualMetricShare.swift",
-        token="guard let provenance, !Self.omitsDerivationInputs(provenance) else { return nil }",
-        check="share.derivation_inputs_are_not_a_source",
-        detail="A derived FFMI share must not export weight, body fat and height as an observation source.",
-        violations=violations,
-    )
-
     # LYB-47: direction alone cannot establish safe goal progress.
     for relative_path, token in [
         ("DesignSystem/Organisms/MetricSummaryCard.swift",

@@ -43,15 +43,14 @@ struct SecondaryMetricsRow: View {
             )
 
             // FFMI - Tappable
-            Group {
-                let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        displayMode = .ffmiChart
-                    }
-                    // Haptic feedback
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    displayMode = .ffmiChart
                 }
+                // Haptic feedback
+                let impact = UIImpactFeedbackGenerator(style: .medium)
+                impact.impactOccurred()
+            } label: {
                 MetricSummaryCard(
                     icon: "figure.arms.open",
                     accentColor: Color.metricAccentFFMI,
@@ -73,7 +72,7 @@ struct SecondaryMetricsRow: View {
                             footnote: nil
                         ))
                     } ?? .empty(title: "FFMI", message: "No data", action: nil),
-                    detailAction: detailAction
+                    isButtonContext: true
                 )
                 .scaleEffect(displayMode == .ffmiChart ? 1.05 : 1.0)
                 .overlay(

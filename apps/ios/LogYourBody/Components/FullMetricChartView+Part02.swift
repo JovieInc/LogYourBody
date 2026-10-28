@@ -745,9 +745,3 @@ var isStepsMetric: Bool {
         }
     }
 }
-
-/// Shared by the chart and its deterministic calculation fixtures.
-func computeSeriesStats(for series: [MetricChartDataPoint]) -> MetricSeriesStats? {
-    guard series.count >= 2 else { return nil }
-    return computeRangeStats(points: series, requiresComparison: false, includesInferredValues: true)
-}

@@ -2,8 +2,7 @@
 
 CI's **iOS StoreKit Purchase and Restore** job runs on every `main` push,
 including commits for which Unit was already verified by the merge queue. It
-also gates merge groups that change iOS inputs (not the pull request run: the
-queue reruns it on the exact tree that lands). CI Summary
+also gates pull requests and merge groups that change iOS inputs. CI Summary
 requires this job to succeed when selected. No release, submission or App Store
 Connect operation runs in this job, and it requires no credentials.
 
@@ -32,22 +31,11 @@ does **not** verify `LiveRevenueCatPurchasesClient`, RevenueCat's hosted product
 mapping/receipt validation, App Store sandbox accounts, or the installed signed
 TestFlight binary. Preserve the existing live TestFlight submission gate.
 
-StoreKit has one shared test environment per simulator. The runner uses the
-existing destination resolver to choose a compatible device type and runtime,
-then creates a fresh simulator and test process for each of the four lifecycles.
-It shuts down and deletes only the devices it creates, including on failure.
-The dedicated `StoreKit` plan still disables parallel execution and uses
-real-time dates with explicit expiration/refund. Each case passes the existing
-evidence validator before the next starts; a failed case stops the runner
-without retry. Unit excludes this simulator suite; its selectors and coverage
-floors are unchanged. Run 40300882343 failed the fourth case's restore despite
-one transaction before restore; transaction count alone does not prove access.
-
-Cleanup deletes the existing transaction IDs once, then waits for both
-`SKTestSession.allTransactions()` and `Transaction.all` to become empty. This
-includes expired and refunded history, which is absent from current entitlements.
-Setup, teardown and warm-up share this bounded cleanup; a timeout throws before
-another purchase can start. No repeated global clear can erase a later purchase.
+StoreKit has one shared test environment. The dedicated `StoreKit` test plan and
+runner disable parallel execution, reset transactions/settings between cases,
+and use real-time subscription dates with explicit expiration/refund. Unit
+excludes this new simulator integration suite; its other selectors and coverage
+floors are unchanged.
 
 On a Mac with the repo's Xcode toolchain, from a clean checkout:
 
@@ -62,15 +50,9 @@ and requires all four exact XCTest identifiers to pass through the existing
 XCTest evidence validator. Skipped, missing and duplicate required cases fail.
 CI always uploads `ios-storekit-<commit>-<attempt>`, including failure receipts:
 
-- `<test-name>.xcresult` and the combined `storekit.log`
-- `<test-name>.evidence.json` and `<test-name>.coverage.json` on successful validation
-- `source-revision.txt`, before/after source patches, and `<test-name>.destination.txt`
-
-The required runner-routing regressions execute this runner with fake native
-tools and the real evidence validator. They reject shared destinations, skipped
-or duplicate cases, coverage failures, build/test failures and dirty source,
-and verify device cleanup on failures. These are orchestration regressions;
-only a passing macOS run establishes native StoreKit behavior.
+- `storekit.xcresult` and `storekit.log`
+- `storekit.evidence.json` and `storekit.coverage.json` on successful validation
+- `source-revision.txt`, before/after source patches, and `destination.txt`
 
 For LYB-199 closeout, select a successful **main-branch** CI run whose source
 revision is the latest TestFlight-uploading Release Loop revision or a

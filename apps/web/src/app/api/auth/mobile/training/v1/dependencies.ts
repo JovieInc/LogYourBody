@@ -1,5 +1,4 @@
 import { mesocycleCanvasApiEnabled } from '@/lib/flags/mesocycle-canvas';
-import { delegatedProgrammingEnabled } from '@/lib/flags/delegated-programming';
 import { mesocycleOptimizerEnabled } from '@/lib/flags/mesocycle-optimizer';
 import { createNeonCanvasLedger, neonCanvasAccounts } from '@/lib/neon/training-canvas-adapter';
 import { neonTrainingRevisions } from '@/lib/neon/training-revisions-adapter';
@@ -13,8 +12,6 @@ import { neonChatConversations } from '@/lib/neon/chat-conversations-adapter';
 import { neonNativeProductRecords } from '@/lib/neon/native-product-records-adapter';
 import { neonUserDirectory } from '@/lib/neon/user-directory-adapter';
 import { createTrainingRouteHandlers } from './route-handlers';
-import { createRecoveryRouteHandlers } from './recovery-route-handlers';
-import { adaptiveRecoveryEnabled } from '@/lib/flags/adaptive-recovery';
 
 async function authenticate(request: NextRequest) {
   const token = request.headers.get('authorization')?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
@@ -25,7 +22,6 @@ export const trainingHandlers = createTrainingRouteHandlers({
   authenticate,
   records: neonNativeProductRecords,
   revisions: neonTrainingRevisions,
-  delegatedEnabled: delegatedProgrammingEnabled,
   users: neonUserDirectory,
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
   createId: randomUUID,
@@ -33,19 +29,9 @@ export const trainingHandlers = createTrainingRouteHandlers({
   enabled: () => process.env.LYB_HYPERTROPHY_COACH_API_ENABLED === 'true',
 });
 
-export const recoveryHandlers = createRecoveryRouteHandlers({
-  authenticate,
-  records: neonNativeProductRecords,
-  reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
-  now: () => new Date(),
-  enabled: adaptiveRecoveryEnabled,
-});
-
 export const trainingRevisionHandlers = createTrainingRevisionHandlers({
   authenticate,
   revisions: neonTrainingRevisions,
-  records: neonNativeProductRecords,
-  delegatedEnabled: delegatedProgrammingEnabled,
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
   now: () => new Date(),
   enabled: () => process.env.LYB_HYPERTROPHY_COACH_API_ENABLED === 'true',
@@ -65,13 +51,4 @@ export const canvasHandlers = createCanvasRouteHandlers({
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
   now: () => new Date(),
   enabled: () => mesocycleCanvasApiEnabled(),
-  canonicalProgramRequired: async (subject) =>
-    (await neonTrainingRevisions.readContext(subject))?.legacySetups.some((s) =>
-      Boolean(
-        s &&
-        typeof s === 'object' &&
-        'programPolicyVersion' in s &&
-        s.programPolicyVersion === 'delegated-canvas-v1',
-      ),
-    ) ?? false,
 });

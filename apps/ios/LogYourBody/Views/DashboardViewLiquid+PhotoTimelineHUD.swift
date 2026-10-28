@@ -114,6 +114,13 @@ extension DashboardViewLiquid {
         .fullScreenCover(isPresented: $isHomeV2AllPhotosPresented) {
             homeV2AllPhotosFromHome
         }
+        .sheet(item: $homeV2EditingSession) { session in
+            homeV2EditEntrySheet(for: session)
+                #if DEBUG
+                .onAppear { recordHomeEditTransition("sheet.appear") }
+                .onDisappear { recordHomeEditTransition("sheet.disappear") }
+                #endif
+        }
         #if DEBUG
         .onChange(of: homeV2EditingSession?.id) { _, _ in
             recordHomeEditTransition("item.changed")
@@ -124,13 +131,6 @@ extension DashboardViewLiquid {
         #endif
         .navigationDestination(isPresented: $isHomeV2ContextPresented) {
             homeV2ContextView
-                .sheet(item: $homeV2EditingSession) { session in
-                    homeV2EditEntrySheet(for: session)
-                        #if DEBUG
-                        .onAppear { recordHomeEditTransition("sheet.appear") }
-                        .onDisappear { recordHomeEditTransition("sheet.disappear") }
-                        #endif
-                }
         }
         .navigationDestination(isPresented: $isHomeV2EntriesPresented) {
             homeV2EntriesView

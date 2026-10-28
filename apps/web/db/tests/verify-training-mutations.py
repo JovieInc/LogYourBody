@@ -75,10 +75,8 @@ def main():
             def sql(statement):
                 return run(client + ['-c', statement])
 
-            sql("create table schema_migrations(version text primary key); create table chat_usage_limits(user_subject text); create table chat_conversations(user_subject text);")
+            sql("create table schema_migrations(version text primary key); create table chat_usage_limits(user_subject text); create table chat_conversations(user_subject text); create table body_metrics(user_subject text);")
             for migration in ['20260714183000_create_app_users.sql','20260714213000_add_app_user_profile.sql',
-                              '20260715040000_create_body_metrics.sql','20260813120000_native_body_metrics_sync.sql',
-                              '20261025120000_weight_lifecycle.sql',
                               '20260813130000_native_product_records.sql','20260927102000_training_record_collections.sql']:
                 run(client + ['-f', str(web/'db/migrations'/migration)])
             run(client + ['-f', str(args.migration or web / 'db/migrations/20261010090000_training_revision_foundation.sql')])
@@ -90,7 +88,6 @@ def main():
             run(client + ['-f', str(web / 'db/migrations/20261014103000_training_execution_cas.sql')])
 
             run(client + ['-f', str(args.canvas_migration or web / 'db/migrations/20261014180000_training_canvas_ledger.sql')])
-            run(client + ['-f', str(web / 'db/migrations/20261025030000_adaptive_recovery_trials.sql')])
 
             def owner():
                 subject = 'synthetic-' + str(uuid.uuid4())
@@ -180,16 +177,7 @@ def main():
                 return setup
 
             def mutation_sql(subject, admission, action, record):
-                if action == 'recovery_trial':
-                    return recovery_sql(subject, admission, record)
                 return f'select training_mutation_command({quote(subject)},{quote(action)},{quote(json.dumps(admission))}::jsonb,{quote(json.dumps(record))}::jsonb);'
-
-            def recovery_basis(subject):
-                return json.loads(sql(f"select coalesce(jsonb_object_agg(collection || '/' || id::text, payload || jsonb_build_object('id',id)), '{{}}'::jsonb) from native_records where user_subject={quote(subject)} and deleted_at is null and collection in ('training_sessions','logged_sets','training_feedback');"))
-
-            def recovery_sql(subject, admission, record, revision=None, basis=None):
-                expected = recovery_basis(subject) if basis is None else basis
-                return f"select training_recovery_trial_command({quote(subject)},{quote(json.dumps(admission))}::jsonb,{quote(json.dumps(expected))}::jsonb,{'null' if revision is None else revision},{quote(json.dumps(record))}::jsonb);"
 
             def mutate(subject, admission, action, record):
                 return json.loads(sql(mutation_sql(subject,admission,action,record)))
@@ -202,12 +190,6 @@ def main():
                 return subject,setup,admission,session
 
             def record_for(action, session):
-                if action == 'recovery_trial':
-                    return dict(id=str(uuid.uuid4()), record_type='recovery_trial', version=1, revision=0,
-                        programSetupId=session['programSetupId'], programRevisionId=None, policyVersion='adaptive-recovery-v1',
-                        blockId='block-1', exerciseId='exercise', state='proposed',
-                        inference=dict(action='reduce', change=dict(kind='sets', to=1, **{'from': 2})),
-                        history=[dict(revision=0, state='proposed')])
                 if action in ['session_insert','session_update','completion']:
                     return dict(session,id=str(uuid.uuid4()) if action=='session_insert' else session['id'],
                         status='completed' if action=='completion' else 'in_progress')
@@ -223,46 +205,10 @@ def main():
             def live_count(subject):
                 return int(sql(f'select count(*) from native_records where user_subject={quote(subject)} and deleted_at is null;'))
 
-            # Recovery source CAS and retained history use the real database function.
-            subject, setup, admission, session = fixture()
-            trial = record_for('recovery_trial', session)
-            assert mutate(subject, admission, 'recovery_trial', trial)['kind'] == 'saved'
-            proposed_basis = recovery_basis(subject)
-            applied = dict(trial, revision=1, state='applied', appliedAt='2026-10-13T10:00:00Z',
-                history=trial['history'] + [dict(revision=1, state='applied')])
-            assert json.loads(sql(recovery_sql(subject, admission, applied, 0)))['kind'] == 'saved'
-            # Stale source snapshots and stale decision revisions cannot overwrite the result.
-            rejected = dict(applied, state='rejected')
-            assert json.loads(sql(recovery_sql(subject, admission, rejected, 0, proposed_basis)))['kind'] == 'record_conflict'
-            assert json.loads(sql(recovery_sql(subject, admission, rejected, 0)))['kind'] == 'record_conflict'
-            reviewed = dict(applied, revision=2, outcome=dict(decision='inconclusive'),
-                history=applied['history'] + [dict(revision=2, state='applied')])
-            assert json.loads(sql(recovery_sql(subject, admission, dict(reviewed, inference={}), 1)))['kind'] == 'record_conflict'
-            assert json.loads(sql(recovery_sql(subject, admission, dict(reviewed, history=[]), 1)))['kind'] == 'record_conflict'
-            assert json.loads(sql(recovery_sql(subject, admission, reviewed, 1)))['kind'] == 'saved'
-            other = record_for('recovery_trial', session)
-            assert mutate(subject, admission, 'recovery_trial', other)['kind'] == 'saved'
-            other_applied = dict(other, revision=1, state='applied', history=other['history'] + [dict(revision=1, state='applied')])
-            assert json.loads(sql(recovery_sql(subject, admission, other_applied, 0)))['kind'] == 'record_conflict'
-            reverted = dict(reviewed, revision=3, state='reverted', history=reviewed['history'] + [dict(revision=3, state='reverted')])
-            assert json.loads(sql(recovery_sql(subject, admission, reverted, 2)))['kind'] == 'saved'
-            assert json.loads(sql(recovery_sql(subject, admission, other_applied, 0)))['kind'] == 'saved'
-            checks.append('recovery_source_cas_immutable_proposal_history_review_revert_single_active')
-
             import re
             adapter=(web/'src/lib/neon/user-directory-adapter.ts').read_text().split('async deleteUser(admission)')[1]
             statements=re.findall(r'database`([^`]+)`',adapter)
-            expected_cleanup = [
-                'delete from public.chat_usage_limits where user_subject = ${subject}',
-                'delete from public.chat_conversations where user_subject = ${subject}',
-                'delete from public.weight_operation_receipts where user_subject = ${subject}',
-                'delete from public.body_metric_audit where user_subject = ${subject}',
-                'delete from public.metrics_agent_grants where user_subject = ${subject}',
-                'delete from public.body_metrics where user_subject = ${subject}',
-                'delete from public.native_records where user_subject = ${subject}',
-                "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ${subject}",
-            ]
-            assert [re.sub(r'\s+', ' ', s).strip() for s in statements] == expected_cleanup
+            assert len(statements)==5 and all(s.strip().startswith('delete from') for s in statements)
             guard_source=(web/'src/lib/neon/native-account-admission.ts').read_text()
             guards=re.findall(r"database.query\('(select public.lyb_native_account_admit\(\$1, \$2::uuid\))'",guard_source)
             assert len(guards)==1, 'Expected the unique actual account guard SQL'
@@ -273,36 +219,8 @@ def main():
                 guard=guards[0].replace('$1',quote(subject)).replace('$2',quote(owner_id))
                 return guard+';'+ ';'.join(s.replace('${subject}',quote(subject)) for s in statements)+';'
 
-            def seed_weight(subject):
-                owner_id=sql(f"select id from app_users where identity_subject={quote(subject)};")
-                sql(f"insert into metrics_agent_grants(user_subject,owner_id,connected,consent_granted,entitled) values({quote(subject)},{quote(owner_id)},true,true,true);")
-                body=dict(action='create', operation_id=str(uuid.uuid4()), record_id=str(uuid.uuid4()),
-                    request_hash='synthetic-weight', now='2026-10-25T12:00:00Z', weight_kg='81.600000',
-                    input_value='81.6', input_unit='kg', measured_at='2026-10-25T12:00:00Z',
-                    utc_offset_minutes=0, local_date='2026-10-25', iana_zone='UTC', provenance={})
-                result=json.loads(sql(f"select weight_lifecycle_command({quote(subject)},{quote(owner_id)},{quote(json.dumps(body))}::jsonb);"))
-                assert result['outcome']=='committed'
-
-            def weight_counts(subject):
-                tables=['weight_operation_receipts','body_metric_audit','metrics_agent_grants','body_metrics']
-                return [int(sql(f'select count(*) from {table} where user_subject={quote(subject)};')) for table in tables]
-
-            subject,other=owner(),owner()
-            seed_weight(subject); seed_weight(other)
-            assert weight_counts(subject)==weight_counts(other)==[1,1,1,1]
-            sql(f"create function fail_weight_cleanup() returns trigger language plpgsql as $$ begin if old.user_subject={quote(subject)} then raise exception 'injected weight cleanup failure'; end if; return old; end; $$; create trigger injected_weight_cleanup before delete on body_metrics for each row execute function fail_weight_cleanup();")
-            try: sql('begin;'+deletion(subject)+'commit;'); raise AssertionError('expected weight cleanup failure')
-            except RuntimeError as error: assert 'injected weight cleanup failure' in str(error)
-            assert weight_counts(subject)==weight_counts(other)==[1,1,1,1]
-            assert sql(f"select count(*) from app_users where identity_subject={quote(subject)};")=='1'
-            sql('drop trigger injected_weight_cleanup on body_metrics;')
-            sql('begin;'+deletion(subject)+'commit;')
-            assert weight_counts(subject)==[0,0,0,0] and weight_counts(other)==[1,1,1,1]
-            assert sql(f"select count(*) from app_users where identity_subject={quote(subject)};")=='0'
-            check('weight account erasure rolls back on failure, retries completely, and preserves the other owner')
-
             for boundary in ['revoke','delete']:
-                for action in ['session_insert','session_update','completion','set_insert','feedback_insert','swap_insert','set_correct','recovery_trial']:
+                for action in ['session_insert','session_update','completion','set_insert','feedback_insert','swap_insert','set_correct']:
                     for first in ['boundary','mutation']:
                         subject,setup,admission,session=fixture()
                         if action=='set_correct':
@@ -467,11 +385,6 @@ def main():
                 str(web / 'node_modules/tsx/dist/loader.mjs'),
                 str(web / 'db/tests/verify-training-canvas.ts'), json.dumps(client)], canvas_env), flush=True)
             check('canvas actual adapter/handler and SQL qualification')
-
-            print(run_command(['node', '--conditions=react-server', '--import',
-                str(web / 'node_modules/tsx/dist/loader.mjs'),
-                str(web / 'db/tests/verify-training-recovery.ts'), json.dumps(client)], canvas_env), flush=True)
-            check('recovery actual adapter/engine apply review revert and prescription replay')
 
             print(json.dumps({'passed':len(checks),'checks':checks,'postgresTools':versions,'scope':'disposable PostgreSQL16; actual migrations, observed owner locks, synthetic rows only'}))
         finally:

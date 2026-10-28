@@ -13,26 +13,6 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(packageRoot, '../..');
 const storefront = logYourBodyStorefront;
 const featureById = new Map(logYourBody.features.map((feature) => [feature.id, feature]));
-// Review-only input: the generator never reads this held publication proposal.
-const proposal = JSON.parse(
-  await readFile(
-    resolve(repoRoot, 'docs/marketing/app-store/listing-proposal-2026-10-26.json'),
-    'utf8',
-  ),
-);
-assert.equal(proposal.schema, 'lyb-app-store-listing-proposal/v1');
-assert.equal(proposal.status, 'held-not-published');
-assert.equal(proposal.productId, storefront.productId);
-assert.equal(proposal.platform, storefront.platform);
-assert.equal(proposal.locale, storefront.defaultLocale);
-assert.match(proposal.sourceRevision, /^[a-f0-9]{40}$/u);
-assert.match(proposal.baseRevision, /^[a-f0-9]{40}$/u);
-const heldLocale = { id: proposal.locale, metadata: proposal.metadata };
-const canonicalMetadata = storefront.locales.find(
-  (locale) => locale.id === proposal.locale,
-).metadata;
-assert.deepEqual(Object.keys(heldLocale.metadata).sort(), Object.keys(canonicalMetadata).sort());
-assert(Object.values(heldLocale.metadata).every((value) => typeof value === 'string'));
 
 const unique = (values, message) => {
   assert.equal(new Set(values).size, values.length, message);
@@ -81,9 +61,7 @@ const localeIds = storefront.locales.map((locale) => locale.id);
 unique(localeIds, 'storefront locale IDs must be unique');
 assert(localeIds.includes(storefront.defaultLocale), 'default locale must exist');
 
-// Both the unchanged upload listing and the held candidate obey Apple limits,
-// keyword uniqueness, canonical links, and the supported product identity.
-for (const locale of [...storefront.locales, heldLocale]) {
+for (const locale of storefront.locales) {
   const { metadata } = locale;
   const limits = storefront.metadataLimits;
 
@@ -145,38 +123,6 @@ for (const locale of [...storefront.locales, heldLocale]) {
   assert.equal(metadata.supportUrl, logYourBody.links.support);
   assert.equal(metadata.marketingUrl, logYourBody.links.home);
   assert.equal(metadata.privacyUrl, logYourBody.links.privacy);
-  if (locale !== heldLocale) continue;
-
-  // These new requirements stay enforced on the reviewable proposal without
-  // forcing an unauthorized write to the metadata-sync inputs on main.
-  assert(
-    metadata.description.includes(logYourBody.links.terms),
-    `${locale.id} description needs the canonical Terms of Use link`,
-  );
-  assert(
-    metadata.description.includes(logYourBody.links.privacy),
-    `${locale.id} description needs the canonical Privacy Policy link`,
-  );
-  assert.match(
-    metadata.description,
-    /monthly.*annual/iu,
-    `${locale.id} must disclose subscription periods`,
-  );
-  assert.match(
-    metadata.description,
-    /eligible.*free trial/iu,
-    `${locale.id} must qualify trial eligibility`,
-  );
-  assert.match(
-    metadata.description,
-    /automatically renew/iu,
-    `${locale.id} must disclose automatic renewal`,
-  );
-  assert.match(
-    metadata.description,
-    /manage or cancel/iu,
-    `${locale.id} must explain subscription management`,
-  );
 }
 
 const intentIds = storefront.searchIntents.map((intent) => intent.id);
@@ -202,10 +148,7 @@ for (const intent of storefront.searchIntents) {
 const screenshotSetIds = storefront.screenshotSets.map((set) => set.id);
 unique(screenshotSetIds, 'screenshot-set IDs must be unique');
 for (const screenshotSet of storefront.screenshotSets) {
-  assert(
-    localeIds.includes(screenshotSet.locale),
-    `${screenshotSet.id} references an unknown locale`,
-  );
+  assert(localeIds.includes(screenshotSet.locale), `${screenshotSet.id} references an unknown locale`);
   assert(
     screenshotSet.frames.length >= storefront.screenshotPolicy.minimumCount &&
       screenshotSet.frames.length <= storefront.screenshotPolicy.maximumCount,
@@ -244,14 +187,8 @@ for (const experiment of storefront.experiments) {
   unique(experiment.treatmentAssetIds, `${experiment.id} treatment asset IDs must be unique`);
 }
 
-assert(
-  storefront.measurement.primaryMetric.trim(),
-  'storefront measurement needs a primary metric',
-);
-assert(
-  storefront.measurement.guardrailMetrics.length > 0,
-  'storefront measurement needs guardrails',
-);
+assert(storefront.measurement.primaryMetric.trim(), 'storefront measurement needs a primary metric');
+assert(storefront.measurement.guardrailMetrics.length > 0, 'storefront measurement needs guardrails');
 unique(storefront.measurement.guardrailMetrics, 'storefront guardrail metrics must be unique');
 
 for (const [path, expected] of await expectedStorefrontFiles(repoRoot)) {
@@ -266,9 +203,7 @@ for (const [path, expected] of await expectedStorefrontFiles(repoRoot)) {
 
 const screenshotAssets = await collectScreenshotAssets(repoRoot);
 const acceptedSizes = new Set(
-  storefront.screenshotPolicy.acceptedPortraitSizes.map(
-    ({ width, height }) => `${width}x${height}`,
-  ),
+  storefront.screenshotPolicy.acceptedPortraitSizes.map(({ width, height }) => `${width}x${height}`),
 );
 const modernRequiredSizes = new Set([
   '1260x2736',
@@ -287,20 +222,13 @@ for (const locale of storefront.locales) {
   for (const screenshot of screenshots) {
     const size = `${screenshot.width}x${screenshot.height}`;
 
-    assert(
-      acceptedSizes.has(size),
-      `${screenshot.filename} uses unsupported portrait size ${size}`,
-    );
+    assert(acceptedSizes.has(size), `${screenshot.filename} uses unsupported portrait size ${size}`);
     assert.equal(
       screenshot.hasAlpha,
       false,
       `${screenshot.filename} contains an alpha channel or transparency`,
     );
-    assert.match(
-      screenshot.gitBlobSha,
-      /^[a-f0-9]{40}$/u,
-      `${screenshot.filename} needs provenance`,
-    );
+    assert.match(screenshot.gitBlobSha, /^[a-f0-9]{40}$/u, `${screenshot.filename} needs provenance`);
     assert.equal(screenshot.truthStatus, 'real-app-capture');
     countBySize.set(size, (countBySize.get(size) ?? 0) + 1);
     hasModernRequiredSize ||= modernRequiredSizes.has(size);

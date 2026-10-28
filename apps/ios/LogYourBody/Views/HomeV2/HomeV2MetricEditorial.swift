@@ -32,8 +32,6 @@ enum HomeV2ChartIntegrity {
         var kind: Kind = .daily
         /// Distinguishes two readings that share a day and a value.
         var occurrence = 0
-        /// Keep the reading time even though marks use calendar-day positions.
-        var recordedAt: Date?
 
         var id: String { "\(date.timeIntervalSinceReferenceDate)-\(value)-\(occurrence)-\(kind.rawValue)" }
     }
@@ -51,25 +49,18 @@ enum HomeV2ChartIntegrity {
         let droppedCarried: Int
         let droppedNonFinite: Int
 
-        /// Prepared once, in date order, with one selectable value per day.
-        let selectionSamples: [Sample]
-
-        func nearest(to date: Date) -> Sample? {
-            var lower = 0
-            var upper = selectionSamples.count
-            while lower < upper {
-                let middle = (lower + upper) / 2
-                if selectionSamples[middle].date < date {
-                    lower = middle + 1
-                } else {
-                    upper = middle
+        /// A date selects its daily value when available, otherwise its labeled average.
+        var selectionSamples: [Sample] {
+            let groupedByDate = Dictionary(grouping: marks, by: \.date)
+            var selected: [Sample] = []
+            for sameDay in groupedByDate.values {
+                if let daily = sameDay.first(where: { $0.kind == .daily }) {
+                    selected.append(daily)
+                } else if let fallback = sameDay.first {
+                    selected.append(fallback)
                 }
             }
-            if lower == 0 { return selectionSamples.first }
-            if lower == selectionSamples.count { return selectionSamples.last }
-            let before = selectionSamples[lower - 1]
-            let after = selectionSamples[lower]
-            return date.timeIntervalSince(before.date) <= after.date.timeIntervalSince(date) ? before : after
+            return selected.sorted { $0.date < $1.date }
         }
 
         var yTicks: [Double] {
@@ -88,90 +79,12 @@ enum HomeV2ChartIntegrity {
         let droppedNonFinite: Int
     }
 
-    struct Request: Equatable {
-        var daily: [MetricChartDataPoint]
-        var trend: [MetricChartDataPoint]
-        var range: TimeRange
-        var now: Date
-        var calendar: Calendar
-        var showsDots: Bool
-        var usesSevenDayAverage: Bool
-        var anchorsToZero: Bool
-
-        static func == (lhs: Self, rhs: Self) -> Bool {
-            lhs.range == rhs.range && lhs.now == rhs.now && lhs.calendar == rhs.calendar
-                && lhs.showsDots == rhs.showsDots && lhs.usesSevenDayAverage == rhs.usesSevenDayAverage
-                && lhs.anchorsToZero == rhs.anchorsToZero
-                && samePoints(lhs.daily, rhs.daily) && samePoints(lhs.trend, rhs.trend)
-        }
-
-        private static func samePoints(_ lhs: [MetricChartDataPoint], _ rhs: [MetricChartDataPoint]) -> Bool {
-            guard lhs.count == rhs.count else { return false }
-            // Swift arrays share storage until a write. Most playhead updates reuse
-            // exactly that storage; equal, freshly loaded histories still compare by value.
-            return lhs.withUnsafeBufferPointer { left in
-                rhs.withUnsafeBufferPointer { right in
-                    if left.baseAddress == right.baseAddress { return true }
-                    return left.elementsEqual(right) {
-                        $0.date == $1.date && $0.value.bitPattern == $1.value.bitPattern && $0.presence == $1.presence
-                    }
-                }
-            }
-        }
-    }
-
-    struct Preparation {
-        let visibleDaily: [MetricChartDataPoint]
-        let hasEnoughData: Bool
-        let plot: Plot
-    }
-
-    /// View-owned, never shared across metrics or accounts. Selection is not an input.
-    final class PreparationCache {
-        private var request: Request?
-        private var preparation: Preparation?
-        private(set) var preparationCount = 0
-
-        func value(for request: Request) -> Preparation {
-            if self.request == request, let preparation { return preparation }
-            let preparation = HomeV2ChartIntegrity.prepare(request, prefersLatestReading: true)
-            self.request = request
-            self.preparation = preparation
-            preparationCount += 1
-            return preparation
-        }
-    }
-
-    static func prepare(_ request: Request, prefersLatestReading: Bool) -> Preparation {
-        let daily = HomeV2TrendPolicy.points(
-            request.daily, in: request.range, now: request.now, calendar: request.calendar
-        )
-        let trend = HomeV2TrendPolicy.points(
-            request.trend, in: request.range, now: request.now, calendar: request.calendar
-        )
-        return Preparation(
-            visibleDaily: daily,
-            hasEnoughData: HomeV2TrendPolicy.hasEnoughData(
-                HomeV2MetricEditorial.observedPoints(daily), calendar: request.calendar
-            ),
-            plot: plot(
-                points: request.usesSevenDayAverage ? trend : daily,
-                dotPoints: request.showsDots ? daily : [],
-                anchorsToZero: request.anchorsToZero,
-                keepsCarriedValues: request.usesSevenDayAverage,
-                calendar: request.calendar,
-                prefersLatestReading: prefersLatestReading
-            )
-        )
-    }
-
     static func plot(
         points: [MetricChartDataPoint],
         dotPoints: [MetricChartDataPoint] = [],
         anchorsToZero: Bool,
         keepsCarriedValues: Bool,
-        calendar: Calendar = .current,
-        prefersLatestReading: Bool = true
+        calendar: Calendar = .current
     ) -> Plot {
         let line = filter(points, keepsCarriedValues: keepsCarriedValues, calendar: calendar,
                           kind: keepsCarriedValues ? .sevenDayAverage : .daily)
@@ -194,26 +107,8 @@ enum HomeV2ChartIntegrity {
             droppedNegative: line.droppedNegative + dots.droppedNegative,
             droppedMissing: line.droppedMissing + dots.droppedMissing,
             droppedCarried: line.droppedCarried + dots.droppedCarried,
-            droppedNonFinite: line.droppedNonFinite + dots.droppedNonFinite,
-            selectionSamples: selectionSamples(in: marks, prefersLatestReading: prefersLatestReading)
+            droppedNonFinite: line.droppedNonFinite + dots.droppedNonFinite
         )
-    }
-
-    private static func selectionSamples(in marks: [Sample], prefersLatestReading: Bool) -> [Sample] {
-        var byDay: [Date: Sample] = [:]
-        for sample in marks {
-            guard let previous = byDay[sample.date] else {
-                byDay[sample.date] = sample
-                continue
-            }
-            if previous.kind != sample.kind {
-                if sample.kind == .daily { byDay[sample.date] = sample }
-            } else if prefersLatestReading,
-                      (sample.recordedAt ?? sample.date) > (previous.recordedAt ?? previous.date) {
-                byDay[sample.date] = sample
-            }
-        }
-        return byDay.values.sorted { $0.date < $1.date }
     }
 
     static func filter(
@@ -253,8 +148,7 @@ enum HomeV2ChartIntegrity {
             let key = "\(day.timeIntervalSinceReferenceDate)-\(point.value)"
             let occurrence = occurrences[key] ?? 0
             occurrences[key] = occurrence + 1
-            samples.append(Sample(date: day, value: point.value, kind: kind, occurrence: occurrence,
-                                  recordedAt: point.date))
+            samples.append(Sample(date: day, value: point.value, kind: kind, occurrence: occurrence))
         }
         return FilterResult(
             samples: samples,

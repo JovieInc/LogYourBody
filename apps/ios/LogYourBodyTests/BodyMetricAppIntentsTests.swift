@@ -174,7 +174,6 @@ final class BodyMetricAppIntentsTests: XCTestCase {
         XCTAssertEqual(metric.bodyFatPercentage, 15.5)
         XCTAssertEqual(metric.bodyFatMethod, "Manual")
         XCTAssertNil(metric.weight)
-        XCTAssertNil(metric.sourceMetadata?.weightOperationId)
         XCTAssertEqual(metric.dataSource, BodyMetricSource.manual.rawValue)
     }
 
@@ -244,183 +243,6 @@ final class BodyMetricAppIntentsTests: XCTestCase {
         }
     }
 
-    func testLogWeightIntentRetryKeepsTheSameRecordAndOperation() async throws {
-        let userId = installTestUser(named: "log-weight-retry")
-        var intent = LogWeightIntent()
-        intent.weight = 180
-        intent.unit = .pounds
-
-        _ = try await intent.perform()
-        _ = try await intent.perform()
-
-        let metrics = await CoreDataManager.shared.fetchAllBodyMetrics(for: userId)
-        XCTAssertEqual(metrics.count, 1)
-        XCTAssertEqual(metrics.first?.id, intent.recordId)
-        XCTAssertEqual(metrics.first?.sourceMetadata?.weightOperationId, intent.operationId)
-        XCTAssertEqual(metrics.first?.sourceMetadata?.weightRevision, 1)
-    }
-
-    func testASecondLogWeightIntentGetsANewRecord() async throws {
-        let userId = installTestUser(named: "log-weight-second")
-        var first = LogWeightIntent()
-        first.weight = 180
-        first.unit = .pounds
-        var second = LogWeightIntent()
-        second.weight = 181
-        second.unit = .pounds
-
-        _ = try await first.perform()
-        _ = try await second.perform()
-
-        let metrics = await CoreDataManager.shared.fetchAllBodyMetrics(for: userId)
-        XCTAssertEqual(metrics.count, 2)
-        XCTAssertNotEqual(first.recordId, second.recordId)
-        XCTAssertEqual(Set(metrics.map(\.id)), Set([first.recordId, second.recordId]))
-    }
-
-    func testDeniedHealthKitStillSavesLocallyAndDoesNotClaimCloud() async throws {
-        let userId = installTestUser(named: "log-weight-healthkit-denied")
-        XCTAssertFalse(HealthKitManager.shared.isAuthorized)
-        let identity = BodyMetricLogIdentity(recordId: UUID().uuidString, operationId: UUID().uuidString)
-        let result = try await BodyMetricLoggingService.shared.log(
-            weight: "82.5",
-            bodyFat: nil,
-            unit: "kg",
-            identity: identity,
-            protectedDataAvailable: true
-        )
-
-        XCTAssertEqual(result.completion.local, .saved)
-        XCTAssertEqual(result.completion.healthKit, .denied)
-        XCTAssertEqual(result.completion.cloud, .notClaimed)
-        let metrics = await CoreDataManager.shared.fetchAllBodyMetrics(for: userId)
-        XCTAssertEqual(metrics.count, 1)
-        XCTAssertEqual(metrics.first?.weight, 82.5)
-    }
-
-    func testLockedDeviceAndCancelledClarificationDoNotSave() async throws {
-        let userId = installTestUser(named: "log-weight-locked")
-        let service = BodyMetricLoggingService.shared
-
-        do {
-            _ = try await service.log(
-                weight: "180", bodyFat: nil, unit: "lbs", protectedDataAvailable: false
-            )
-            XCTFail("Expected a locked device to reject the log")
-        } catch BodyMetricLoggingError.protectedDataUnavailable {
-        } catch {
-            XCTFail("Unexpected error: \(error)")
-        }
-
-        do {
-            _ = try await service.log(
-                weight: "180", bodyFat: nil, unit: "lbs", clarificationCancelled: true
-            )
-            XCTFail("Expected a cancelled clarification to reject the log")
-        } catch BodyMetricLoggingError.clarificationCancelled {
-        } catch {
-            XCTFail("Unexpected error: \(error)")
-        }
-
-        let metrics = await CoreDataManager.shared.fetchAllBodyMetrics(for: userId)
-        XCTAssertTrue(metrics.isEmpty)
-    }
-
-    func testBackdatedMidnightAndSameDayEntriesKeepTheirLocalDates() async throws {
-        let userId = installTestUser(named: "log-weight-midnight")
-        let zone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
-        let parser = ISO8601DateFormatter()
-        parser.formatOptions = [.withInternetDateTime]
-        parser.timeZone = zone
-        let midnight = try XCTUnwrap(parser.date(from: "2026-10-13T00:00:00-07:00"))
-        let yesterday = try XCTUnwrap(parser.date(from: "2026-10-12T23:30:00-07:00"))
-        let service = BodyMetricLoggingService.shared
-        let first = try await service.log(
-            weight: "180", bodyFat: nil, unit: "lbs", date: midnight, timeZone: zone,
-            identity: BodyMetricLogIdentity(recordId: UUID().uuidString, operationId: UUID().uuidString)
-        )
-        let second = try await service.log(
-            weight: "181", bodyFat: nil, unit: "lb", date: midnight, timeZone: zone,
-            identity: BodyMetricLogIdentity(recordId: UUID().uuidString, operationId: UUID().uuidString)
-        )
-        let prior = try await service.log(
-            weight: "179", bodyFat: nil, unit: "lbs", date: yesterday, timeZone: zone,
-            identity: BodyMetricLogIdentity(recordId: UUID().uuidString, operationId: UUID().uuidString)
-        )
-
-        XCTAssertEqual(first.metrics.localDate, "2026-10-13")
-        XCTAssertEqual(second.metrics.localDate, "2026-10-13")
-        XCTAssertEqual(prior.metrics.localDate, "2026-10-12")
-        XCTAssertNotEqual(first.metrics.id, second.metrics.id)
-        let metrics = await CoreDataManager.shared.fetchAllBodyMetrics(for: userId)
-        XCTAssertEqual(metrics.count, 3)
-        XCTAssertEqual(first.completion.cloud, .notClaimed)
-    }
-
-    func testSameOperationDoesNotResurrectADeleteOrOverwriteADifferentWeight() async throws {
-        let userId = installTestUser(named: "log-weight-tombstone")
-        let service = BodyMetricLoggingService.shared
-        let identity = BodyMetricLogIdentity(recordId: UUID().uuidString, operationId: UUID().uuidString)
-        let created = try await service.log(
-            weight: "180", bodyFat: nil, unit: "lbs", identity: identity
-        )
-        let deleted = await CoreDataManager.shared.markBodyMetricDeleted(id: identity.recordId, userId: userId)
-        XCTAssertTrue(deleted)
-
-        _ = try await service.log(weight: "180", bodyFat: nil, unit: "lbs", identity: identity)
-        let stillDeleted = await cachedFlag(id: identity.recordId)
-        XCTAssertEqual(stillDeleted?.isMarkedDeleted, true)
-        XCTAssertEqual(stillDeleted?.weight ?? 0, created.metrics.weight ?? 0, accuracy: 0.001)
-
-        let liveIdentity = BodyMetricLogIdentity(recordId: UUID().uuidString, operationId: UUID().uuidString)
-        let live = try await service.log(weight: "80", bodyFat: nil, unit: "kg", identity: liveIdentity)
-        let replacement = BodyMetrics(
-            id: live.metrics.id,
-            userId: userId,
-            date: live.metrics.date,
-            localDate: live.metrics.localDate,
-            weight: 90,
-            weightUnit: "kg",
-            bodyFatPercentage: nil,
-            bodyFatMethod: nil,
-            muscleMass: nil,
-            boneMass: nil,
-            notes: nil,
-            photoUrl: nil,
-            dataSource: BodyMetricSource.manual.rawValue,
-            sourceMetadata: live.metrics.sourceMetadata,
-            createdAt: live.metrics.createdAt,
-            updatedAt: live.metrics.updatedAt
-        )
-        try await CoreDataManager.shared.saveBodyMetricsAndWait(replacement, userId: userId)
-        let conflicted = await cachedFlag(id: liveIdentity.recordId)
-        XCTAssertEqual(conflicted?.syncStatus, "conflict")
-        XCTAssertEqual(conflicted?.weight ?? 0, 80, accuracy: 0.001)
-        XCTAssertFalse(conflicted?.isMarkedDeleted ?? true)
-    }
-
-    func testSaveForAnotherOwnersRecordFailsWithoutChangingIt() async throws {
-        let owner = installTestUser(named: "log-weight-owner")
-        let identity = BodyMetricLogIdentity(recordId: UUID().uuidString, operationId: UUID().uuidString)
-        _ = try await BodyMetricLoggingService.shared.log(
-            weight: "82.5", bodyFat: nil, unit: "kg", identity: identity
-        )
-        _ = installTestUser(named: "log-weight-other")
-
-        do {
-            _ = try await BodyMetricLoggingService.shared.log(
-                weight: "70", bodyFat: nil, unit: "kg", identity: identity
-            )
-            XCTFail("Expected another account's record to be rejected")
-        } catch {
-            XCTAssertFalse(error is BodyMetricLoggingError)
-        }
-
-        let metrics = await CoreDataManager.shared.fetchAllBodyMetrics(for: owner)
-        XCTAssertEqual(metrics.count, 1)
-        XCTAssertEqual(metrics.first?.weight, 82.5)
-    }
-
     // MARK: - Parameter glue
 
     func testWeightUnitStorageUnitMatchesValidationContract() {
@@ -480,17 +302,6 @@ final class BodyMetricAppIntentsTests: XCTestCase {
             createdAt: date,
             updatedAt: date
         )
-    }
-
-    private func cachedFlag(id: String) async -> (isMarkedDeleted: Bool, weight: Double, syncStatus: String?)? {
-        let context = CoreDataManager.shared.viewContext
-        return await context.perform {
-            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-            request.predicate = NSPredicate(format: "id == %@", id)
-            request.fetchLimit = 1
-            guard let row = try? context.fetch(request).first else { return nil }
-            return (row.isMarkedDeleted, row.weight, row.syncStatus)
-        }
     }
 
     private func captureValidationError(

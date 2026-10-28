@@ -265,10 +265,7 @@ function metric(subject: string): ProductBodyMetric {
   };
 }
 
-function makeHarness(
-  trainingOutput?: NextWorkoutResult,
-  steering?: { content: string; proposalId?: string },
-) {
+function makeHarness(trainingOutput?: NextWorkoutResult) {
   const store = new MemoryConversationStore();
   const model = new FixtureModel();
   const getUser = jest.fn(async (subject: string) => user(subject));
@@ -296,7 +293,6 @@ function makeHarness(
     createModel: () => model,
     reportStreamOutcome,
     getTrainingOutput,
-    proposeTrainingSteering: async () => steering ?? null,
     modelName: 'fixture-model',
     createLeaseToken: () => `33333333-3333-4333-8333-${String(++lease).padStart(12, '0')}`,
   });
@@ -319,22 +315,6 @@ function chatBody(message = 'How am I doing?') {
 }
 
 describe('/api/auth/mobile/chat/v1', () => {
-  it('chat and voice persist a reviewable steering proposal without a model-generated change claim', async () => {
-    const h = makeHarness(undefined, {
-      content: 'Draft ready. Keep the exact cable curl variant. Your saved plan has not changed.',
-      proposalId: 'proposal-id',
-    });
-    const response = await h.handlers.POST(
-      request('POST', 'user-a', { ...chatBody('keep cable curls'), voiceMode: true }),
-    );
-    const stream = await response.text();
-    expect(stream).toContain('event: plan_proposal');
-    expect(stream).toContain('"applied":false');
-    expect(stream).toContain('Your saved plan has not changed.');
-    expect(h.model.calls).toHaveLength(0);
-    expect(h.getTrainingOutput).not.toHaveBeenCalled();
-  });
-
   it('rejects missing and expired bearer tokens before context access', async () => {
     const { handlers, getUser, listMetrics } = makeHarness();
     const missing = new NextRequest('http://localhost/api/auth/mobile/chat/v1', { method: 'GET' });

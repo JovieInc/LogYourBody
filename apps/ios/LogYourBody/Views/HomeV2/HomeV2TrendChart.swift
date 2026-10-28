@@ -67,10 +67,8 @@ struct HomeV2TrendChart: View {
     var formatValue: (Double) -> String = { String(format: "%.1f", $0) }
     var onSelection: (HomeV2ChartIntegrity.Sample?) -> Void = { _ in }
     var now = Date()
-    var responsivePlayheadEnabled = AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: "chart_playhead_v2")
 
     @State private var selectedX: Date?
-    @State private var preparationCache = HomeV2ChartIntegrity.PreparationCache()
 
     private static let startFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -78,31 +76,16 @@ struct HomeV2TrendChart: View {
         return formatter
     }()
 
-    private var preparation: HomeV2ChartIntegrity.Preparation {
-        let request = HomeV2ChartIntegrity.Request(
-            daily: daily, trend: trend, range: range, now: now, calendar: .current,
-            showsDots: showsDots, usesSevenDayAverage: usesSevenDayAverage, anchorsToZero: anchorsToZero
-        )
-        return preparationCache.value(for: request)
-    }
-
-    private var visibleDaily: [MetricChartDataPoint] {
-        responsivePlayheadEnabled ? preparation.visibleDaily : HomeV2TrendPolicy.points(daily, in: range, now: now)
-    }
-
-    private var hasEnoughData: Bool {
-        responsivePlayheadEnabled ? preparation.hasEnoughData
-            : HomeV2TrendPolicy.hasEnoughData(HomeV2MetricEditorial.observedPoints(visibleDaily))
-    }
+    private var visibleDaily: [MetricChartDataPoint] { HomeV2TrendPolicy.points(daily, in: range, now: now) }
+    private var visibleTrend: [MetricChartDataPoint] { HomeV2TrendPolicy.points(trend, in: range, now: now) }
+    private var hasEnoughData: Bool { HomeV2TrendPolicy.hasEnoughData(HomeV2MetricEditorial.observedPoints(visibleDaily)) }
 
     private var plotted: HomeV2ChartIntegrity.Plot {
-        if responsivePlayheadEnabled { return preparation.plot }
-        return HomeV2ChartIntegrity.plot(
-            points: usesSevenDayAverage ? HomeV2TrendPolicy.points(trend, in: range, now: now) : visibleDaily,
+        HomeV2ChartIntegrity.plot(
+            points: usesSevenDayAverage ? visibleTrend : visibleDaily,
             dotPoints: showsDots ? visibleDaily : [],
             anchorsToZero: anchorsToZero,
-            keepsCarriedValues: usesSevenDayAverage,
-            prefersLatestReading: false
+            keepsCarriedValues: usesSevenDayAverage
         )
     }
 
@@ -113,7 +96,7 @@ struct HomeV2TrendChart: View {
 
     private var selectedSample: HomeV2ChartIntegrity.Sample? {
         guard let selectedX else { return nil }
-        return plotted.nearest(to: selectedX)
+        return HomeV2ChartIntegrity.nearest(to: selectedX, in: plotted.selectionSamples)
     }
 
     private var selectedTooltip: String? {
@@ -175,9 +158,6 @@ struct HomeV2TrendChart: View {
             }
         }
         .onChange(of: range) { _, _ in selectedX = nil }
-        .onChange(of: responsivePlayheadEnabled ? plotted.selectionSamples : []) { _, _ in
-            if responsivePlayheadEnabled { selectedX = nil }
-        }
         .onChange(of: selectedSample) { _, sample in onSelection(sample) }
     }
 
@@ -201,21 +181,10 @@ struct HomeV2TrendChart: View {
     @ViewBuilder
     private var plottedChart: some View {
         if allowsSelection {
-            plotMarks.chartXSelection(value: selectionBinding)
+            plotMarks.chartXSelection(value: $selectedX)
         } else {
             plotMarks
         }
-    }
-
-    private var selectionBinding: Binding<Date?> {
-        Binding(
-            get: { selectedX },
-            set: { date in
-                let next = responsivePlayheadEnabled ? date.flatMap { plotted.nearest(to: $0)?.date } : date
-                guard next != selectedX else { return }
-                selectedX = next
-            }
-        )
     }
 
     private var plotMarks: some View {

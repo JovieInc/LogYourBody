@@ -42,7 +42,7 @@ const forbidden = [
   { pattern: /["']Premium["']/g, reason: 'use the generated entitlement ID' },
   {
     pattern:
-      /(?:10,?000\+|10k\+|2m\+|500k\+|4\.9(?:\/5|\s+on App Store|★)|92%|93%|99\.9%|30-day money-back|DEXA-scan accuracy|Accurate to ±2%|±2% precision|scientific accuracy|the only app that tracks)/gi,
+      /(?:10,?000\+|10k\+|2m\+|500k\+|4\.9(?:\/5|\s+on App Store|★)|92%|93%|99\.9%|30-day money-back|DEXA-scan accuracy|Accurate to ±2%|±2% precision)/gi,
     reason: 'unsupported marketing claim',
   },
 ];

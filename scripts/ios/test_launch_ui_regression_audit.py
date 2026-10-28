@@ -106,14 +106,6 @@ class StatsCardCompositionTests(unittest.TestCase):
                      'LineMark(x: .value("Observation date", date)')
         self.assert_rejected("dashboard.observation_plot")
 
-    def test_share_provenance_cannot_export_derivation_inputs(self):
-        self.replace(
-            "Components/ContextualMetricShare.swift",
-            "guard let provenance, !Self.omitsDerivationInputs(provenance) else { return nil }",
-            "guard let provenance else { return nil }",
-        )
-        self.assert_rejected("share.derivation_inputs_are_not_a_source")
-
     def test_single_timestamp_cannot_establish_no_change(self):
         self.replace("Helpers/DashboardMetricFormatting.swift",
                      "if requiresComparison && first.date == last.date { return nil }", "")

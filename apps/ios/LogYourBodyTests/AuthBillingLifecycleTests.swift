@@ -432,11 +432,7 @@ private final class AuthBillingClient: RevenueCatPurchasesProtocol {
         return AuthBillingLifecycleTests.customer(active: true)
     }
     func offerings() async throws -> Offerings { throw URLError(.unsupportedURL) }
-    func purchase(
-        package: Package,
-        entitlementID: String,
-        verifiesOutcome: Bool
-    ) async throws -> RevenueCatCustomerSnapshot {
+    func purchase(package: Package, entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
         purchases += 1
         return AuthBillingLifecycleTests.customer(active: true)
     }

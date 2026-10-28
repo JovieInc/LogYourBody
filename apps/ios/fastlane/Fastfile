@@ -442,7 +442,7 @@ platform :ios do
     end
     
     # Get the actual build and version numbers for logging
-    version = get_version_number(xcodeproj: project_path, target: "LogYourBody")
+    version = get_version_number(xcodeproj: project_path)
     build = get_build_number(xcodeproj: project_path)
     UI.message("Building version #{version} (#{build})")
     
@@ -521,9 +521,7 @@ platform :ios do
         build_options[:export_options][:signingStyle] = "manual"
         build_options[:export_options][:teamID] = ENV["APPLE_TEAM_ID"]
         build_options[:export_options][:provisioningProfiles] = {
-          app_id => sigh_uuid,
-          "#{app_id}.rest-timer" => ENV["REST_TIMER_PROVISIONING_PROFILE_SPECIFIER"].to_s.empty? ?
-            "match AppStore #{app_id}.rest-timer" : ENV["REST_TIMER_PROVISIONING_PROFILE_SPECIFIER"]
+          app_id => sigh_uuid
         }
       else
         UI.important("No sigh profile - skipping manual signing configuration")
@@ -545,7 +543,6 @@ platform :ios do
       UI.message("Updating code signing settings to use manual profile")
       update_code_signing_settings(
         path: build_options[:project],
-        targets: ["LogYourBody"],
         use_automatic_signing: false,
         team_id: ENV["APPLE_TEAM_ID"],
         bundle_identifier: app_id,
@@ -626,15 +623,6 @@ platform :ios do
     # so the gate survives Xcode/simulator image changes on runners.
     destination = options[:destination].to_s.strip
     device = destination.empty? ? (options[:device] || "iPhone 16") : nil
-    simulator_id = destination[/\Aplatform=iOS Simulator,id=([0-9A-Fa-f-]{36})\z/, 1]
-    if simulator_id
-      # A persistent Mac can report Booted with a stale testmanagerd socket.
-      # Restart only the selected simulator; never retry a failed Unit suite.
-      # Shutdown also fails for an already stopped device. Boot/readiness must pass.
-      sh("xcrun simctl shutdown #{simulator_id} || true")
-      sh("xcrun", "simctl", "boot", simulator_id)
-      sh("xcrun", "simctl", "bootstatus", simulator_id, "-b")
-    end
     run_tests(
       project: proj_path,
       scheme: "LogYourBodyTiers",

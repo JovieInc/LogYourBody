@@ -13,7 +13,6 @@ const contextSchema = revisionContextSchema.extend({
   dateOfBirth: z.unknown(),
   legacySetups: z.array(z.unknown()),
   headRevision: z.string().uuid().nullable(),
-  trainingFingerprint: z.string().optional(),
 });
 const conflictSchema = z.enum([
   'owner_missing',
@@ -23,16 +22,12 @@ const conflictSchema = z.enum([
   'already_decided',
   'proposal_not_found',
   'program_already_enrolled',
-  'unauthorized_actor',
-  'delayed_active_workout',
 ]);
 function ownedStored(value: unknown, subject: string) {
   const row = storedProposalSchema.parse(value);
   if (
-    (row.proposal.version === 1
-      ? row.proposal.actor.subject !== subject
-      : row.proposal.ownerSubject !== subject) ||
-    (row.receipt?.version === 1 && row.receipt.actor.subject !== subject)
+    row.proposal.actor.subject !== subject ||
+    (row.receipt && row.receipt.actor.subject !== subject)
   )
     throw new Error('training_revision_owner_mismatch');
   return row;
@@ -63,21 +58,10 @@ export function createNeonTrainingRevisions(
   }
   return {
     async readContext(subject) {
-      const rows = (await sql.query(
-        "select public.training_revision_context($1) as context, public.training_planning_fingerprint($1) as training_evidence, (select profile_data->'training_inputs' from public.app_users where identity_provider='jovie' and identity_subject=$1) as training_inputs",
-        [subject],
-      )) as Array<{ context: unknown; training_inputs?: unknown; training_evidence?: string }>;
-      return rows[0]?.context
-        ? {
-            ...contextSchema.parse(rows[0].context),
-            ...(rows[0].training_inputs
-              ? { canonicalTrainingInputs: rows[0].training_inputs }
-              : {}),
-            ...(rows[0].training_evidence
-              ? { evidenceFingerprint: rows[0].training_evidence }
-              : {}),
-          }
-        : null;
+      const rows = (await sql.query('select public.training_revision_context($1) as context', [
+        subject,
+      ])) as Array<{ context: unknown }>;
+      return rows[0]?.context ? contextSchema.parse(rows[0].context) : null;
     },
     async readProposal(subject, id) {
       const rows = (await sql.query(
@@ -97,7 +81,7 @@ export function createNeonTrainingRevisions(
       if (result.kind !== 'decided') return conflict(result.kind);
       const receipt = revisionReceiptSchema.parse(result.receipt);
       if (
-        receipt.actor.subject !== (input.actor?.subject ?? input.subject) ||
+        receipt.actor.subject !== input.subject ||
         receipt.proposalId !== input.proposalId ||
         receipt.requestId !== input.requestId ||
         receipt.decision !== input.decision

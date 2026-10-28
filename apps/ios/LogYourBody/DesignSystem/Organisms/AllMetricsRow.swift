@@ -64,10 +64,9 @@ struct AllMetricsRow: View {
     private var stepsCard: some View {
         Group {
             if let steps = steps {
-                Group {
-                    let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
-                        selectedMetric = .steps
-                    }
+                Button {
+                    selectedMetric = .steps
+                } label: {
                     MetricSummaryCard(
                         icon: "figure.walk",
                         accentColor: Color.metricAccentSteps,
@@ -84,7 +83,7 @@ struct AllMetricsRow: View {
                             trend: nil,
                             footnote: nil
                         )),
-                        detailAction: detailAction
+                        isButtonContext: true
                     )
                 }
                 .buttonStyle(MetricCardButtonStyle())
@@ -114,10 +113,9 @@ struct AllMetricsRow: View {
                 let latestWeightDescription = "Latest value "
                     + "\(formatWeight(displayWeight, useMetric: useMetricUnits)) \(unit)"
 
-                Group {
-                    let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
-                        selectedMetric = .weight
-                    }
+                Button {
+                    selectedMetric = .weight
+                } label: {
                     MetricSummaryCard(
                         icon: "figure.stand",
                         accentColor: Color.metricAccentWeight,
@@ -132,7 +130,7 @@ struct AllMetricsRow: View {
                             trend: nil,
                             footnote: nil
                         )),
-                        detailAction: detailAction
+                        isButtonContext: true
                     )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -149,10 +147,9 @@ struct AllMetricsRow: View {
     private var bodyFatCard: some View {
         Group {
             if let bodyFat = bodyFat {
-                Group {
-                    let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
-                        selectedMetric = .bodyFat
-                    }
+                Button {
+                    selectedMetric = .bodyFat
+                } label: {
                     MetricSummaryCard(
                         icon: "percent",
                         accentColor: Color.metricAccentBodyFat,
@@ -169,7 +166,7 @@ struct AllMetricsRow: View {
                             trend: nil,
                             footnote: nil
                         )),
-                        detailAction: detailAction
+                        isButtonContext: true
                     )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -186,10 +183,9 @@ struct AllMetricsRow: View {
     private var ffmiCard: some View {
         Group {
             if let ffmi = ffmi {
-                Group {
-                    let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
-                        selectedMetric = .ffmi
-                    }
+                Button {
+                    selectedMetric = .ffmi
+                } label: {
                     MetricSummaryCard(
                         icon: "figure.arms.open",
                         accentColor: Color.metricAccentFFMI,
@@ -206,7 +202,7 @@ struct AllMetricsRow: View {
                             trend: nil,
                             footnote: nil
                         )),
-                        detailAction: detailAction
+                        isButtonContext: true
                     )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -226,10 +222,9 @@ struct AllMetricsRow: View {
                 let displayWaist = useMetricUnits ? waist : waist / 2.54
                 let unit = useMetricUnits ? "cm" : "in"
 
-                Group {
-                    let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
-                        selectedMetric = .waist
-                    }
+                Button {
+                    selectedMetric = .waist
+                } label: {
                     MetricSummaryCard(
                         icon: "ruler",
                         accentColor: Color.metricAccentWaist,
@@ -246,7 +241,7 @@ struct AllMetricsRow: View {
                             trend: nil,
                             footnote: nil
                         )),
-                        detailAction: detailAction
+                        isButtonContext: true
                     )
                 }
                 .buttonStyle(PlainButtonStyle())

@@ -43,14 +43,7 @@ struct ContextualMetricSnapshot: Equatable, Identifiable {
     var id: ContextualMetricKind { kind }
     var isAvailable: Bool { !["", "–", "—", "-"].contains(value.trimmingCharacters(in: .whitespacesAndNewlines)) }
     var provenanceLabel: String? {
-        guard let provenance, !Self.omitsDerivationInputs(provenance) else { return nil }
-        return includesObservationContract ? "Observation source: \(provenance)" : provenance
-    }
-
-    /// Weight, body fat and height describe a derived estimate. They are not an observation source.
-    static func omitsDerivationInputs(_ provenance: String) -> Bool {
-        let compact = provenance.lowercased().filter { $0.isLetter || $0.isNumber }
-        return compact.contains("weightbodyfatandheight")
+        provenance.map { includesObservationContract ? "Observation source: \($0)" : $0 }
     }
 
     /// The same dated observation and comparison copy used by the Stats card and detail.

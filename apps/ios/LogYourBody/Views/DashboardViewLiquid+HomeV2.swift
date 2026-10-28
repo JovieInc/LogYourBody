@@ -89,9 +89,7 @@ extension DashboardViewLiquid {
         }
         // Chart caches refresh centrally when measurements change. Phase copy
         // must also follow edits to an existing day, not just added rows.
-        // The fingerprint omits source metadata so a timeline render does not
-        // compare every stored record on the main thread.
-        .task(id: HomeV2PhaseRefreshID(metrics: bodyMetrics)) {
+        .task(id: bodyMetrics) {
             let insight = PhaseInsightPolicy.insight(for: homeV2InsightMetrics)
             homeV2PhaseSentence = HomeV2Copy.phaseSentence(
                 kind: insight.kind,

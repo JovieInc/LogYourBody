@@ -24,7 +24,6 @@ type Dependencies = {
   reserveRequest: (subject: string) => Promise<ChatRateLimitResult>;
   now: () => Date;
   enabled: () => boolean;
-  canonicalProgramRequired?: (subject: string) => Promise<boolean>;
 };
 
 const writeToken = z.number().int().nonnegative().nullable();
@@ -83,8 +82,6 @@ export function createCanvasRouteHandlers(deps: Dependencies) {
       try {
         // Capture once before rate limiting or body reads; never adopt a recreated owner.
         const admission = requireNativeAccountAdmission(await deps.accounts.capture(owner.sub));
-        if (await deps.canonicalProgramRequired?.(owner.sub))
-          return json({ error: 'canonical_revision_required', applied: false }, 409);
         const ledger = deps.ledgerForAccount(admission);
         const limit = await deps.reserveRequest(owner.sub);
         if (!limit.allowed) {

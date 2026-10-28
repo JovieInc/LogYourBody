@@ -13,8 +13,7 @@ The metric reads `packages/shared-lib/corrections.json`, retaining the receipt
 contract and recurrence behavior from [LYB-209](correction-recurrence.md). Count
 one rule per normalized fingerprint, regardless of how many correction receipts
 it has. This ledger is also the LYB lesson inventory; do not copy Jovie's lesson
-ledger into it. The [capture guide](correction-ledger.md) covers chat/memory,
-review, Linear and revert sources. Each current receipt must include a reviewed classification
+ledger into it. Each current receipt must include a reviewed classification
 (LYB-205) and a retained guard or explicit prose-only reason (LYB-206):
 
 ```json
@@ -88,65 +87,14 @@ regression guard. These are
 reviewed source-linkage metrics, not proof that the guards executed or that every
 historical correction has been captured.
 
-`correctionGuardCoverage` (`packages/shared-lib/src/correction-guard-coverage.ts`)
-is the narrower guard-coverage count. Its denominator is distinct rules
-classified `codebase` or `static` (lint, typecheck, or CI). A codebase rule
-counts as covered. A static rule counts only when a mechanized check exists:
-`mechanized: true`, or, when that flag is omitted, a retained guard path and
-anchor. Prose and human review stay outside the denominator. An empty
-denominator is covered 0, total 0, and ratio null. The function only reads the
-classified corrections it is given.
-
-Each rule's JSON output also retains its `guard` (or `proseOnlyReason`), sorted
-`receipts` with source, lesson and mechanization, and derived `recurrence`:
-`receiptCount` counts distinct canonical source URLs and `repeatCount` excludes
-the first receipt. Duplicate replays count once, matching the recurrence intake.
-The existing owner report and CI summary show those sources, lessons, guard
-locations and counts alongside the enforcement level.
-
 Run from the repository root:
 
 ```sh
 node packages/shared-lib/scripts/correction-coverage.mjs
 node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
-node packages/shared-lib/scripts/correction-coverage.mjs --output coverage/corrections/coverage.json
-node packages/shared-lib/scripts/correction-coverage.mjs --base-ref <prior-head-sha> --base-ref <merged-main-sha> --output coverage/corrections/coverage.json
-node packages/shared-lib/scripts/guard-reference.mjs --base-ref origin/main
-node --test packages/shared-lib/scripts/guard-reference.behavior.mjs
 node packages/shared-lib/scripts/jovie-separation.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
-
-CI uploads `coverage.json` as `correction-coverage-<commit SHA>` on the existing
-every-diff change-detection path (LYB-253). The artifact retains the full report:
-`levels.<level>.total` counts distinct rules at each level, `mechanized` counts
-codebase/static rules with retained guards, and `mechanizedShare` is
-`mechanized / total` on a 0–1 scale. Empty ledgers have zero counts and a zero
-share; the existing human-readable percentage remains N/A. `commitSha` identifies
-the checked-out Git commit and `timestamp` is the report's UTC ISO 8601 generation
-time. With `--output`, the CLI writes the JSON file and prints one line with the
-counts and share; without it, stdout remains the full JSON report. This artifact
-adds no threshold enforcement and preserves the existing regression checks.
-
-The required behavioral suite runs ledger repair, artifact emission, and default
-and baseline reporting together against real Git snapshots. Repeat `--base-ref`
-to check every merge parent in that same run, including together with `--output`.
-This compatibility guard prevents concurrent CLI changes from dropping either
-repair or reporting.
-Invalid options must leave the ledger, existing artifact and job summary intact.
-Ledger repair checks raw staged bytes, rejecting newly staged conflict markers
-even with forced Git colors, binary diff attributes or text conversion,
-including markers shorter than seven characters when `conflict-marker-size` is
-reduced. An unstaged repair cannot hide markers still present in the index.
-The classifier's Git fixtures exercise binary attributes through ledger repair,
-staging, staged retries and merge verification, preserving the index and ledger
-when any mode refuses the unresolved source.
-One shared scenario list generates both repair modes; each presentation variant
-rejects the default marker forms and the shorter forms Git writes when
-`conflict-marker-size` is below 7, without repeating scenario-independent CLI probes.
-The same fixture follows a clean main prepend with a conflicting append, then
-repairs and verifies the next union while preserving unrelated worktree edits.
-External diff drivers are also covered in both repair modes.
 
 The existing required CI path checks coverage on **every diff**, including
 changes outside the ledger. It fetches the event's exact base revision (PR base,
@@ -158,10 +106,6 @@ CI rejects any decrease in the unrounded overall or nonempty per-level ratio,
 removal of a retained rule, loss of a mechanized guard, or movement of an already
 mechanized rule from codebase to static/prose/human. Moving all rules out of a
 level by promoting them is allowed; an empty level has no percentage to compare.
-It also rejects removal, replacement or reassignment of any retained source
-URL within its fingerprint, even when aggregate coverage and receipt counts
-stay equal. Clarifying lesson text, removing duplicate replays, adding new
-receipts and canonical URL spelling changes remain allowed.
 New unmechanized rules can lower coverage and must be addressed in the same PR.
 Empty baselines establish no percentage floor. Existing quality gates remain in
 place.
@@ -170,16 +114,6 @@ place.
 guards on this same every-diff path. Their existing violations warn against
 finding baselines that can only shrink; this is separate from, and does not
 relax, the coverage ratio or retained-guard requirements above.
-
-LYB-254 checks claimed guard paths on that same step. A receipt that names a
-guard fails when its test, lint-rule, or CI file is missing, and the failure
-names the ledger entry id and path. Receipts with no guard reference warn.
-Their ids are the sorted `unguarded` list in
-`packages/shared-lib/guard-reference-baseline.json`
-(`lyb.guard-reference/v1`). That list must match the ledger. Against the exact
-Git base it can only shrink; adding an id fails CI. A missing base file is an
-empty allowance, so the first baseline cannot grandfather unguarded entries.
-This is not a coverage-percentage baseline and does not relax retained anchors.
 
 The same required change-detection job runs the Jovie separation grep on every
 diff, including docs-only PRs. It scans tracked and new nonignored code under

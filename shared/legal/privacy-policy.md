@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: October 25, 2026**
+**Last Updated: October 14, 2026**
 
 ## Introduction
 
@@ -15,7 +15,7 @@ We collect personal information that you voluntarily provide when registering fo
 - **Account Information**: Name, email address, and sign-in identifiers
 - **Profile Information**: Date of birth, gender, height, weight
 - **Health Information**: Body measurements, weight logs, body fat percentage, progress photos
-- **Health Data**: Weight and body fat percentage (read and write, to sync body metrics); height and step count (read, for body metrics and activity context); date of birth and biological sex (read when available, to fill in profile details), when you grant permission to access Apple Health
+- **Health Data**: Step count, activity data (when you grant permission to access Apple Health or similar services)
 - **Waitlist Information**: Email address and non-identifying campaign attribution when you request early access
 
 ### Information Automatically Collected

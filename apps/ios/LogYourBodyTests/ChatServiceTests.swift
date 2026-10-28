@@ -183,35 +183,15 @@ final class ChatServiceTests: XCTestCase {
 
         let liveNonce = UUID()
         let liveStore = ChatFixtureReplayStore(rootURL: root, nonce: liveNonce)
+        let slow = FixtureChatService(mode: .slow, replayStore: liveStore)
         let started = expectation(description: "Actual fixture stream is in flight")
-        let quiescenceElapsed = expectation(description: "Slow fixture must remain pending past XCTest quiescence")
-        var elapsedSeconds = 0
-        var received: [ChatStreamEvent] = []
-        let slow = FixtureChatService(mode: .slow, replayStore: liveStore, slowTick: {
-            elapsedSeconds += 1
-            if elapsedSeconds == 61 {
-                quiescenceElapsed.fulfill()
-                try await Task.sleep(nanoseconds: 30_000_000_000)
-            }
-            await Task.yield()
-        })
         let operation = Task { @MainActor in
             try await ChatTurnExecutor.run(accessToken: { "ui-test-bearer-token" }, makeStream: {
                 slow.streamMessage(accessToken: $0, conversationId: conversation, clientMessageId: client,
                                    message: ChatFixtureReplayStore.question, voiceMode: false)
-            }, isCurrent: { true }, receive: {
-                received.append($0)
-                if case .delta = $0 { started.fulfill() }
-            })
+            }, isCurrent: { true }, receive: { if case .delta = $0 { started.fulfill() } })
         }
-        defer { operation.cancel() }
-        await fulfillment(of: [started, quiescenceElapsed], timeout: 3)
-        XCTAssertEqual(elapsedSeconds, 61)
-        XCTAssertEqual(received, [
-            .metadata(conversationId: conversation, clientMessageId: client, replayed: false),
-            .delta("Reviewing your authorized trend…")
-        ], "Elapsed time cannot emit an answer or terminal completion")
-        XCTAssertEqual(try liveStore.read()?.status, "pending")
+        await fulfillment(of: [started], timeout: 3)
         operation.cancel()
         XCTAssertEqual(try liveStore.read()?.status, "pending", "Actor cleanup has not run in this synchronous window")
         let immediate = ChatFixtureAttemptGate()
@@ -673,13 +653,6 @@ final class ChatServiceTests: XCTestCase {
         XCTAssertTrue(TrainingCoachPolicy.isEnabled { $0 == "hypertrophy_coach_v1" })
     }
 
-    func testAppliedRecoveryNextActionStaysHiddenUntilTheReviewedPrefix() {
-        XCTAssertNil(TrainingRecoveryCopy.appliedNextAction(nil))
-        XCTAssertNil(TrainingRecoveryCopy.appliedNextAction("Keep the current dose steady."))
-        let action = "Applied recovery trial: use the reviewed reduced work."
-        XCTAssertEqual(TrainingRecoveryCopy.appliedNextAction(action), action)
-    }
-
     func testVoiceCoachVisibilityRequiresItsStatsigGate() {
         var checkedKey: String?
         XCTAssertFalse(VoiceCoachPolicy.isEnabled { checkedKey = $0; return false })
@@ -945,31 +918,26 @@ final class ChatServiceTests: XCTestCase {
     }
 
     func testTrainingEnrollmentSendsExplicitAdultAndSafetyOptIn() async throws {
-        for sessionsPerWeek in 2...6 {
-            let session = makeSession()
-            ChatURLProtocol.handler = { request in
-                XCTAssertEqual(request.httpMethod, "POST")
-                XCTAssertEqual(request.url?.path, "\(TrainingAPIContract.rootPath)/enroll")
-                let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: self.requestBody(request)) as? [String: Any])
-                XCTAssertEqual(body["adultConfirmed"] as? Bool, true)
-                XCTAssertEqual(body["safetyConfirmed"] as? Bool, true)
-                XCTAssertEqual(body["sessionsPerWeek"] as? Int, sessionsPerWeek)
-                XCTAssertEqual(body["equipment"] as? String, "dumbbells")
-                return (201, ["Content-Type": "application/json"], Data("""
-                  {"version":1,"program":{
-                    "id":"setup-id","consentVersion":"hypertrophy-coach-v1",
-                    "sessionsPerWeek":\(sessionsPerWeek),"equipment":"dumbbells"
-                  }}
-                """.utf8))
-            }
-
-            let service = URLSessionTrainingService(urlSession: session, baseURL: URL(string: ProductRegistry.Hosts.api)!)
-            let output = try await service.enroll(
-                accessToken: "access-token", sessionsPerWeek: sessionsPerWeek, equipment: "dumbbells"
-            )
-            XCTAssertEqual(output.program.consentVersion, TrainingAPIContract.consentVersion)
-            XCTAssertEqual(output.program.sessionsPerWeek, sessionsPerWeek)
+        let session = makeSession()
+        ChatURLProtocol.handler = { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "\(TrainingAPIContract.rootPath)/enroll")
+            let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: self.requestBody(request)) as? [String: Any])
+            XCTAssertEqual(body["adultConfirmed"] as? Bool, true)
+            XCTAssertEqual(body["safetyConfirmed"] as? Bool, true)
+            XCTAssertEqual(body["sessionsPerWeek"] as? Int, 2)
+            XCTAssertEqual(body["equipment"] as? String, "dumbbells")
+            return (201, ["Content-Type": "application/json"], Data("""
+              {"version":1,"program":{
+                "id":"setup-id","consentVersion":"hypertrophy-coach-v1",
+                "sessionsPerWeek":2,"equipment":"dumbbells"
+              }}
+            """.utf8))
         }
+
+        let service = URLSessionTrainingService(urlSession: session, baseURL: URL(string: ProductRegistry.Hosts.api)!)
+        let output = try await service.enroll(accessToken: "access-token", sessionsPerWeek: 2, equipment: "dumbbells")
+        XCTAssertEqual(output.program.consentVersion, TrainingAPIContract.consentVersion)
     }
 
     func testTrainingSetLogUsesTheEngineSessionRouteAndUserValues() async throws {

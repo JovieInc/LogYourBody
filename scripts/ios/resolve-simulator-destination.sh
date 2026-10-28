@@ -99,30 +99,11 @@ fi
 # invocation. A stock simulator left for xcodebuild to boot made every hosted
 # test invocation spend 5-9 min launching the runner (run 38320479871); the
 # created-and-booted fallback simulator launched it in 24-60s (#1379 probe).
-testmanager_socket_ready() {
-  local socket_path
-  socket_path="$(xcrun simctl getenv "$SIMULATOR_ID" TESTMANAGERD_SIM_SOCK)" || return 1
-  [[ -n "$socket_path" && -S "$socket_path" ]]
-}
-
 if [[ -n "$SIMULATOR_ID" ]]; then
   boot_started="$(date +%s)"
-  # boot can report "already booted"; bootstatus must still succeed.
   xcrun simctl boot "$SIMULATOR_ID" >/dev/null 2>&1 || true
-  xcrun simctl bootstatus "$SIMULATOR_ID" -b >&2
-  # A persistent Mac can retain a booted device whose launchd socket vanished
-  # (run 40597923369). Repair only this device, once, before admitting tests.
-  if ! testmanager_socket_ready; then
-    echo "::warning::Simulator $SIMULATOR_ID has no testmanagerd socket; restarting it once before tests." >&2
-    xcrun simctl shutdown "$SIMULATOR_ID" >&2
-    xcrun simctl boot "$SIMULATOR_ID" >&2
-    xcrun simctl bootstatus "$SIMULATOR_ID" -b >&2
-    if ! testmanager_socket_ready; then
-      echo "::error::Simulator $SIMULATOR_ID still has no testmanagerd socket after restart." >&2
-      exit 70
-    fi
-  fi
-  echo "Simulator $SIMULATOR_ID ready in $(( $(date +%s) - boot_started ))s" >&2
+  xcrun simctl bootstatus "$SIMULATOR_ID" -b >/dev/null 2>&1 || true
+  echo "Simulator $SIMULATOR_ID booted in $(( $(date +%s) - boot_started ))s" >&2
 fi
 
 if [[ -z "$SIMULATOR_ID" ]]; then
