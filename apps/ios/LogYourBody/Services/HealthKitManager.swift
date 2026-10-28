@@ -13,6 +13,9 @@ enum HealthKitDefaultsKey: String {
     case fullSyncCompleted = "hasPerformedFullHealthKitSync"
     case smartScaleWeightAnchor = "healthKitSmartScaleWeightAnchor"
     case smartScaleBodyFatAnchor = "healthKitSmartScaleBodyFatAnchor"
+    case weightQueryAnchor = "healthKitWeightQueryAnchor"
+    case bodyFatQueryAnchor = "healthKitBodyFatQueryAnchor"
+    case stepQueryAnchor = "healthKitStepQueryAnchor"
 
     func scoped(with userId: String?) -> String {
         guard let userId = userId, !userId.isEmpty else {
@@ -245,6 +248,10 @@ class HealthKitManager: ObservableObject {
     /// Tests replace these. Production uses the Statsig gate and anchored HealthKit reads.
     var smartScaleSyncEnabled: @MainActor () -> Bool = { HealthKitSmartScaleSyncPolicy.isEnabled() }
     var smartScaleSampleQuery: ((HealthKitSmartScaleAnchors) async throws -> HealthKitSmartScaleQueryResult)?
+    /// Tests replace the weight, body-fat, and step anchored fetch. Nil uses HealthKit.
+    var anchoredSampleQuery: ((HealthAnchorSampleKind, Data?) async throws -> HealthAnchoredSamplePage)?
+    /// Tests replace the per-day step total used when an anchored step page names a day.
+    var stepDayTotalQuery: ((Date) async throws -> Int?)?
     var metricSourceSyncGuard: @MainActor () throws -> Void = {}
 
     init(

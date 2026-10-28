@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   assertLedgerMergeReady,
+  assertLedgerResolutionUnchanged,
   assertNoRegression,
   coverageReport,
   guardCoverageReport,
@@ -210,6 +211,11 @@ export function runClassifier(args) {
     // Verify the whole merge is conflict-free, including staged retries.
     assertLedgerMergeReady(root);
     if (checkingMerge || (stagingMerge && !git('ls-files', '--unmerged', '--', LEDGER_PATH))) {
+      assert.match(
+        git('--literal-pathspecs', 'ls-files', '--stage', '--', LEDGER_PATH),
+        /^100(?:644|755) /,
+        'staged source must be a regular file: correction ledger',
+      );
       verifyMerge(JSON.parse(git('show', `:0:${LEDGER_PATH}`)));
       assert.equal(
         readSource(LEDGER_PATH, { root }),
@@ -245,6 +251,13 @@ export function runClassifier(args) {
   }
   const original = readFileSync(path, 'utf8');
   const formatted = `${JSON.stringify(result, null, 2)}\n`;
+  if (resolvingMerge) {
+    assertLedgerResolutionUnchanged(
+      original,
+      result,
+      'resolve-merge refuses to overwrite a manually resolved ledger; review and stage it explicitly',
+    );
+  }
   // Validate the entire ledger before writing; a repeat run preserves bytes.
   if (
     resolvingMerge
