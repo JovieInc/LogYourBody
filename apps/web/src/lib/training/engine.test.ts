@@ -4,7 +4,6 @@ import {
   createMesoBlock,
   evaluateDeload,
   evaluateNextSetReadiness,
-  isProgramSetup,
   latestFeedbackPerSession,
   progressionForExercise,
   validateSetLog,
@@ -12,7 +11,6 @@ import {
 } from './engine';
 import {
   TRAINING_CONSENT_VERSION,
-  MUSCLE_GROUPS,
   type SetLog,
   type TrainingFeedback,
   type TrainingProgramSetup,
@@ -54,73 +52,6 @@ function permutations<T>(items: T[]): T[][] {
 }
 
 describe('deterministic training engine', () => {
-  it.each([2, 3, 4, 5, 6])('recognizes a %i-day stored program', (sessionsPerWeek) => {
-    expect(isProgramSetup({ ...setup, sessionsPerWeek })).toBe(true);
-  });
-
-  it.each([1, 7, 4.5, '4', null, undefined])(
-    'rejects an unsupported stored schedule: %s',
-    (sessionsPerWeek) => {
-      expect(isProgramSetup({ ...setup, sessionsPerWeek })).toBe(false);
-    },
-  );
-
-  it.each(['dumbbells', 'full_gym'] as const)(
-    'distributes a bounded weekly dose across 4–6 day splits with %s',
-    (equipment) => {
-      const titles = {
-        4: ['Upper body A', 'Lower body A', 'Upper body B', 'Lower body B'],
-        5: ['Push A', 'Pull A', 'Legs A', 'Upper body B', 'Lower body B'],
-        6: ['Push A', 'Pull A', 'Legs A', 'Push B', 'Pull B', 'Legs B'],
-      };
-      for (const sessionsPerWeek of [4, 5, 6] as const) {
-        const splitSetup = { ...setup, sessionsPerWeek, equipment };
-        for (let weekIndex = 0; weekIndex < 4; weekIndex++) {
-          const date = new Date(Date.parse(setup.startedAt) + weekIndex * 7 * 86_400_000);
-          const input = {
-            setup: splitSetup,
-            block: createMesoBlock(setup.startedAt, date.toISOString()),
-            sessionIds: Array.from({ length: sessionsPerWeek }, (_, slot) => `session-${slot}`),
-            logs: [],
-            feedback: [],
-          };
-          const week = buildMicrocycle(input);
-          expect(buildMicrocycle(input)).toEqual(week);
-          expect(week.sessions.map((session) => session.title)).toEqual(titles[sessionsPerWeek]);
-          for (const muscle of MUSCLE_GROUPS) {
-            const landmark = volume_landmarks[muscle];
-            const doses = week.sessions.map((session) =>
-              session.exercises.reduce(
-                (sum, exercise) => sum + exercise.sets * (exercise.muscleContribution[muscle] ?? 0),
-                0,
-              ),
-            );
-            // More training days distribute the baseline; they do not multiply it.
-            expect(week.plannedFractionalVolume[muscle]).toBe(landmark.detectableChangeReference);
-            expect(week.plannedFractionalVolume[muscle]).toBe(
-              doses.reduce((sum, dose) => sum + dose, 0),
-            );
-            expect(week.plannedFractionalVolume[muscle]).toBeLessThan(landmark.highVolumeCaution);
-            expect(doses.filter((dose) => dose > 0)).toHaveLength(2);
-          }
-          for (const session of week.sessions) {
-            expect(session.exercises.length).toBeGreaterThan(0);
-            const ids = session.exercises.map((exercise) => exercise.id);
-            expect(new Set(ids).size).toBe(ids.length);
-            for (const exercise of session.exercises) {
-              expect(exercise.sets).toBe(2);
-              expect(exercise.targetRir).toBe(input.block.targetRir);
-              expect(exercise.evidenceIds.length).toBeGreaterThan(0);
-              expect(exercise.substitutions.every((candidate) => !ids.includes(candidate.id))).toBe(
-                true,
-              );
-            }
-          }
-        }
-      }
-    },
-  );
-
   it('steps the RIR ladder across a four-week block and resets on the next block', () => {
     expect(createMesoBlock(setup.startedAt, setup.startedAt).targetRir).toBe(4);
     expect(createMesoBlock(setup.startedAt, '2026-01-12T00:00:00.000Z').targetRir).toBe(3);
@@ -131,53 +62,6 @@ describe('deterministic training engine', () => {
       targetRir: 4,
     });
   });
-
-  it.each([4, 5, 6] as const)(
-    'keeps progression, muscle deloads and pain stops in a %i-day split',
-    (sessionsPerWeek) => {
-      const input = {
-        setup: { ...setup, sessionsPerWeek },
-        block: createMesoBlock(setup.startedAt, setup.startedAt),
-        sessionIds: Array.from({ length: sessionsPerWeek }, (_, slot) => `session-${slot}`),
-        logs: [1, 2].map((setNumber): SetLog => ({
-          id: `hinge-log-${setNumber}`,
-          sessionId: 'previous-session',
-          exerciseId: 'dumbbell_romanian_deadlift',
-          setNumber,
-          reps: 12,
-          loadKg: 15,
-          rir: 4,
-          completedAt: '2026-01-04T12:00:00.000Z',
-        })),
-        feedback: [
-          feedback({
-            id: 'new',
-            muscles: { chest: { soreness: 8, performance: 'down', recovery: 'limited' } },
-          }),
-          feedback({
-            id: 'old',
-            sessionId: 'previous-session',
-            muscles: { chest: { soreness: 8, performance: 'down', recovery: 'limited' } },
-          }),
-        ],
-      };
-      const week = buildMicrocycle(input);
-      const exercises = week.sessions.flatMap((session) => session.exercises);
-      for (const exercise of exercises) {
-        expect(exercise.sets).toBe(exercise.primaryMuscle === 'chest' ? 1 : 2);
-      }
-      const hinges = exercises.filter((exercise) => exercise.id === 'dumbbell_romanian_deadlift');
-      expect(hinges).toHaveLength(2);
-      expect(hinges.every((exercise) => exercise.progression === 'increase_load')).toBe(true);
-      const paused = buildMicrocycle({ ...input, feedback: [feedback({ jointPain: 5 })] });
-      expect(
-        paused.sessions.every((session) => session.safetyStop && session.exercises.length === 0),
-      ).toBe(true);
-      expect(Object.values(paused.plannedFractionalVolume).every((volume) => volume === 0)).toBe(
-        true,
-      );
-    },
-  );
 
   it('builds stable, evidence-tagged sessions and counts compound work fractionally', () => {
     const block = createMesoBlock(setup.startedAt, setup.startedAt);
@@ -205,36 +89,6 @@ describe('deterministic training engine', () => {
     expect(week.sessions[0]?.evidenceIds).toContain('k:81c218db');
     expect(Object.keys(volume_landmarks)).toHaveLength(10);
   });
-
-  it.each(['dumbbells', 'full_gym'] as const)(
-    'preserves the three-day full-body dose with %s',
-    (equipment) => {
-      const week = buildMicrocycle({
-        setup: { ...setup, sessionsPerWeek: 3, equipment },
-        block: createMesoBlock(setup.startedAt, setup.startedAt),
-        sessionIds: ['session-a', 'session-b', 'session-c'],
-        logs: [],
-        feedback: [],
-      });
-      expect(week.sessions.map((session) => session.title)).toEqual([
-        'Full body A',
-        'Full body B',
-        'Full body A',
-      ]);
-      expect(week.plannedFractionalVolume).toEqual({
-        chest: 6,
-        back: 6,
-        shoulders: 7,
-        biceps: 7,
-        triceps: 5,
-        quads: 6,
-        hamstrings: 4.5,
-        glutes: 7,
-        calves: 6,
-        core: 6,
-      });
-    },
-  );
 
   it('uses double progression only after every logged set reaches the top with the target RIR', () => {
     const block = createMesoBlock(setup.startedAt, setup.startedAt);

@@ -12,24 +12,10 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const post = await getPostBySlug((await params).slug);
   if (!post) notFound();
-  const canonical = `/blog/${encodeURIComponent(post.slug)}`;
   return {
     title: post.title,
     description: post.excerpt,
-    alternates: { canonical },
-    openGraph: {
-      type: 'article',
-      title: post.title,
-      description: post.excerpt,
-      url: canonical,
-      authors: [post.author],
-      tags: post.tags,
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: post.title,
-      description: post.excerpt,
-    },
+    alternates: { canonical: `/blog/${encodeURIComponent(post.slug)}` },
   };
 }
 export default async function BlogPostPage({ params }: Props) {

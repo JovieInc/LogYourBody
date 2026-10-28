@@ -17,7 +17,6 @@ import {
   logTrainingSet,
   recordTrainingFeedback,
   swapExercise,
-  undoTrainingSet,
 } from '@/lib/training/commands';
 import {
   getOrCreateNextWorkout,
@@ -25,52 +24,16 @@ import {
   pullAllTrainingRecords,
   storeProgramSetup,
 } from '@/lib/training/service';
-import {
-  MUSCLE_GROUPS,
-  TRAINING_CONSENT_VERSION,
-  TRAINING_SESSIONS_PER_WEEK,
-} from '@/lib/training/types';
-import { catalogVariantById } from '@/lib/training/catalog';
-import type { Session } from '@/lib/training/types';
+import { MUSCLE_GROUPS, TRAINING_CONSENT_VERSION } from '@/lib/training/types';
 import { summarizeTrainingProgress } from '@/lib/training/progress';
 
 export const TRAINING_API_VERSION = 1;
-
-// Setup descriptions come from the reviewed catalog, independently of model text.
-function nativeSession<T extends Session>(session: T) {
-  const describe = (
-    exercise: Session['exercises'][number] | Session['exercises'][number]['substitutions'][number],
-  ) => {
-    const variant = catalogVariantById(exercise.id);
-    return {
-      ...exercise,
-      setup: variant
-        ? {
-            requires: variant.requires,
-            bodyPosition: variant.bodyPosition,
-            torsoSupport: variant.torsoSupport,
-            trunkDemand: variant.trunkDemand,
-            benchAngleDeg: variant.benchAngleDeg,
-            pulley: variant.pulley,
-            cues: variant.cues,
-          }
-        : null,
-    };
-  };
-  return {
-    ...session,
-    exercises: session.exercises.map((exercise) => ({
-      ...describe(exercise),
-      substitutions: (exercise.substitutions ?? []).map(describe),
-    })),
-  };
-}
 
 const EnrollBodySchema = z
   .object({
     adultConfirmed: z.boolean(),
     safetyConfirmed: z.boolean(),
-    sessionsPerWeek: z.literal(TRAINING_SESSIONS_PER_WEEK),
+    sessionsPerWeek: z.union([z.literal(2), z.literal(3)]),
     equipment: z.enum(['dumbbells', 'full_gym']),
   })
   .strict();
@@ -103,16 +66,6 @@ const CorrectSetBodySchema = LogSetBodySchema.extend({
   correctionId: z.string().uuid(),
   expectedRevision: z.number().int().min(0),
 }).strict();
-
-const UndoSetBodySchema = z
-  .object({
-    sessionId: z.string().uuid(),
-    exerciseId: z.string().trim().min(1).max(64),
-    setNumber: z.number().int().min(1).max(10),
-    undoId: z.string().uuid(),
-    expectedRevision: z.number().int().min(0),
-  })
-  .strict();
 
 const FeedbackBodySchema = z
   .object({
@@ -220,13 +173,6 @@ const WorkoutActionBodySchema = z
     eventId: z.string().uuid(),
     expectedRevision: z.number().int().min(0),
     action: z.discriminatedUnion('kind', [
-      z
-        .object({
-          kind: z.literal('swap'),
-          exerciseId: z.string().min(1).max(64),
-          replacementExerciseId: z.string().min(1).max(64),
-        })
-        .strict(),
       z
         .object({ kind: z.literal('equipment_unavailable'), exerciseId: z.string().min(1).max(64) })
         .strict(),
@@ -344,8 +290,6 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             withVersion({
               session: null,
               week: result.week,
-              weekCount: result.weekCount,
-              phase: result.phase,
               weeklyFractionalVolume: result.weeklyFractionalVolume,
               decision: result.decision,
             }),
@@ -353,10 +297,9 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
         }
         return json(
           withVersion({
-            session: nativeSession(result.session),
+            session: result.session,
             week: result.week,
             weekCount: result.weekCount,
-            phase: result.phase,
             weeklyFractionalVolume: result.weeklyFractionalVolume,
             decision: result.decision,
           }),
@@ -632,44 +575,6 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       }
     },
 
-    async undoSet(request: NextRequest) {
-      const identity = await authorized(request);
-      if (!identity) return apiError('unauthorized', 401);
-      if (!featureEnabled()) return apiError('not_found', 404);
-      const denied = await allowed(identity.sub);
-      if (denied) return denied;
-      const parsed = UndoSetBodySchema.safeParse(await request.json().catch(() => null));
-      if (!parsed.success) return apiError('invalid_request', 400);
-      try {
-        const result = await undoTrainingSet({
-          records: dependencies.records,
-          subject: identity.sub,
-          now: dependencies.now(),
-          set: parsed.data,
-        });
-        switch (result.kind) {
-          case 'undone':
-            return json(withVersion({ log: result.log }));
-          case 'program_not_enrolled':
-            return apiError('program_not_enrolled', 409);
-          case 'session_not_found':
-            return apiError('session_not_found', 404);
-          case 'set_not_found':
-            return apiError('set_not_found', 404);
-          case 'set_conflict':
-            return apiError('set_conflict', 409);
-          case 'undo_unavailable':
-            return apiError('undo_unavailable', 409);
-          case 'rejected':
-            return apiError('training_unavailable', 503);
-        }
-      } catch (error) {
-        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
-          return apiError(error.code, 409);
-        return apiError('training_unavailable', 503);
-      }
-    },
-
     async action(request: NextRequest) {
       const identity = await authorized(request);
       if (!identity) return apiError('unauthorized', 401);
@@ -687,9 +592,7 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
         });
         switch (result.kind) {
           case 'updated':
-            return json(
-              withVersion({ decision: result.decision, session: nativeSession(result.session) }),
-            );
+            return json(withVersion({ decision: result.decision, session: result.session }));
           case 'program_not_enrolled':
             return apiError('program_not_enrolled', 409);
           case 'session_not_found':

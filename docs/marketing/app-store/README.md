@@ -2,13 +2,6 @@
 
 This directory documents the closed-loop system that keeps the LogYourBody App Store listing truthful, current, and measurable.
 
-The current [production brief](launch-production-2026-10-26.md) records the
-validated [held listing proposal](listing-proposal-2026-10-26.json), concrete
-screenshot composition, capture-state requirements, and unresolved release
-evidence. The proposal is outside generator inputs: product validation does not
-publish it, and the active Fastlane metadata remains unchanged. The existing
-screenshot files are not a complete launch campaign.
-
 ## Source of truth
 
 The canonical storefront definition lives at:

@@ -100,18 +100,4 @@ module.exports = [
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
-  {
-    // Jest's CommonJS config sits outside the TypeScript project. Allow require
-    // there without turning the rule off for application source.
-    files: ['apps/web/jest.config.js'],
-    languageOptions: {
-      parserOptions: {
-        project: false,
-      },
-      sourceType: 'commonjs',
-    },
-    rules: {
-      '@typescript-eslint/no-require-imports': 'off',
-    },
-  },
 ];

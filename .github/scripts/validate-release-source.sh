@@ -7,11 +7,7 @@ REF_NAME="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required}"
 EVENT_NAME="${GITHUB_EVENT_NAME:?GITHUB_EVENT_NAME is required}"
 RELEASE_TYPE="${RELEASE_TYPE:-testflight}"
 REQUIRED_CHECKS="${REQUIRED_CHECKS:-CI Summary,JavaScript/TypeScript,iOS}"
-# Enclosing wait only. release-check-budget.test.mjs recomputes the floor from
-# the StoreKit and iOS Unit job caps plus the 4901s macos-15 queue measured
-# before StoreKit started on CI run 40169457705. Native test allowances stay
-# in the suites; a failed required run still rejects immediately.
-RELEASE_CHECK_TIMEOUT_SECONDS="${RELEASE_CHECK_TIMEOUT_SECONDS:-9101}"
+RELEASE_CHECK_TIMEOUT_SECONDS="${RELEASE_CHECK_TIMEOUT_SECONDS:-2700}"
 RELEASE_CHECK_POLL_SECONDS="${RELEASE_CHECK_POLL_SECONDS:-15}"
 
 fail() {

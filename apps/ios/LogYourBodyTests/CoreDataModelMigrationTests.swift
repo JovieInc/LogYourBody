@@ -616,19 +616,9 @@ private enum MigrationFixtureError: Error {
 extension CoreDataModelMigrationTests {
     @MainActor
     func testPopulatedV4StoreMigratesOverlayDefaultsAndRetainsImportAfterReopen() throws {
-        try assertOverlayMigrationPreservesStore(from: "LogYourBodyV4")
-    }
-
-    @MainActor
-    func testPopulatedV5StoreRetainsDatedOutcomeAndImportsWhenMigratingToV6() throws {
-        try assertOverlayMigrationPreservesStore(from: "LogYourBodyV5")
-    }
-
-    @MainActor
-    private func assertOverlayMigrationPreservesStore(from modelName: String) throws {
         let bundle = Bundle(for: CoreDataManager.self)
         let models = try XCTUnwrap(bundle.url(forResource: "LogYourBody", withExtension: "momd"))
-        let legacy = try XCTUnwrap(NSManagedObjectModel(contentsOf: models.appendingPathComponent("\(modelName).mom")))
+        let legacy = try XCTUnwrap(NSManagedObjectModel(contentsOf: models.appendingPathComponent("LogYourBodyV4.mom")))
         XCTAssertNil(legacy.entitiesByName["CachedBodyMetrics"]?.attributesByName["isExcluded"])
         let coordinator = NSPersistentStoreCoordinator(managedObjectModel: legacy)
         let store = try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL)
@@ -644,17 +634,6 @@ extension CoreDataModelMigrationTests {
         row.setValue(18.25, forKey: "bodyFatPercentage")
         row.setValue("bodyspec_dexa", forKey: "dataSource")
         row.setValue("{\"external_result_id\":\"original-report\"}", forKey: "sourceMetadataJSON")
-        let datedPayload = Data("retained dated outcome".utf8)
-        let datedRevision = UUID()
-        let hasDatedOutcome = legacy.entitiesByName["CachedDatedOutcome"] != nil
-        if hasDatedOutcome {
-            let outcome = NSEntityDescription.insertNewObject(forEntityName: "CachedDatedOutcome", into: context)
-            outcome.setValue("owner-243", forKey: "ownerId")
-            outcome.setValue(datedRevision, forKey: "revision")
-            outcome.setValue(Int64(7), forKey: "sequence")
-            outcome.setValue(datedPayload, forKey: "payload")
-            outcome.setValue(true, forKey: "pending")
-        }
         try context.save()
         try coordinator.remove(store)
 
@@ -690,16 +669,6 @@ extension CoreDataModelMigrationTests {
         XCTAssertEqual(retained.value(forKey: "weight") as? Double, 81.234567)
         XCTAssertEqual(retained.value(forKey: "isExcluded") as? Bool, true)
         XCTAssertEqual(retained.value(forKey: "correctedValueJSON") as? String, "{\"weight\":79.125}")
-        if hasDatedOutcome {
-            let outcomes = try reopenedContext.fetch(NSFetchRequest<NSManagedObject>(entityName: "CachedDatedOutcome"))
-            XCTAssertEqual(outcomes.count, 1)
-            let outcome = try XCTUnwrap(outcomes.first)
-            XCTAssertEqual(outcome.value(forKey: "ownerId") as? String, "owner-243")
-            XCTAssertEqual(outcome.value(forKey: "revision") as? UUID, datedRevision)
-            XCTAssertEqual(outcome.value(forKey: "sequence") as? Int64, 7)
-            XCTAssertEqual(outcome.value(forKey: "payload") as? Data, datedPayload)
-            XCTAssertEqual(outcome.value(forKey: "pending") as? Bool, true)
-        }
         try reopened.remove(reopenedStore)
     }
 }

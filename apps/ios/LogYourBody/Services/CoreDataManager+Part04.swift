@@ -43,13 +43,6 @@ enum BodyMetricSyncDateParser {
         }
         return stored > incoming
     }
-
-    /// A non-empty `deleted_at` is a server tombstone. Null and missing stay live.
-    static func remoteBodyMetricIsDeleted(_ data: [String: Any]) -> Bool {
-        guard let value = data["deleted_at"], !(value is NSNull) else { return false }
-        guard let stamp = value as? String else { return false }
-        return !stamp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
 }
 
 /// Test seam that runs inside the context queue immediately before each
@@ -110,25 +103,6 @@ extension CoreDataManager {
                 let metric = results.first ?? CachedBodyMetrics(context: context)
                 if results.first != nil,
                    BodyMetricSyncDateParser.storedVersionIsNewer(metric.updatedAt, than: data) {
-                    return
-                }
-
-                if BodyMetricSyncDateParser.remoteBodyMetricIsDeleted(data) {
-                    metric.id = id
-                    if metric.userId == nil || metric.userId?.isEmpty == true {
-                        metric.userId = payloadUserId
-                    }
-                    metric.isMarkedDeleted = true
-                    metric.isSynced = true
-                    metric.syncStatus = "synced"
-                    if let updatedString = data["updated_at"] as? String,
-                       let updatedAt = BodyMetricSyncDateParser.date(from: updatedString) {
-                        metric.updatedAt = updatedAt
-                    } else if metric.updatedAt == nil {
-                        metric.updatedAt = Date()
-                    }
-                    metric.lastModified = Date()
-                    self.save()
                     return
                 }
 

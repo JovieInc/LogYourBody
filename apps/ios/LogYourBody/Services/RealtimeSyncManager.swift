@@ -41,21 +41,6 @@ class RealtimeSyncManager: ObservableObject {
     var isProcessingQueue = false
     var pendingCountTask: Task<Void, Never>?
 
-    lazy var datedOutcomeStore = DatedOutcomeStore(
-        context: coreDataManager.persistentContainer.newBackgroundContext(),
-        currentOwner: { [weak self] in self?.authManager.captureRequestSession()?.subject },
-        enabled: { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: DatedOutcomeStore.featureGate) },
-        didSave: { [weak self] _ in
-            self?.updatePendingSyncCount()
-            self?.syncAll()
-        }
-    )
-
-    var pendingDatedOutcomeCount: Int {
-        guard AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: DatedOutcomeStore.featureGate) else { return 0 }
-        return (try? datedOutcomeStore.pendingEdits().count) ?? 0
-    }
-
     // Battery optimization settings
     var syncInterval: TimeInterval = 300 // 5 minutes default
     var lastSyncAttempt: Date?

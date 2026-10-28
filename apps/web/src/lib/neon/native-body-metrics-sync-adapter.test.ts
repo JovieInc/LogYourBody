@@ -98,13 +98,6 @@ describe('createNeonNativeBodyMetricsSync', () => {
     expect(firstSql).toContain('client_created_at');
     expect(firstSql).toContain('where public.body_metrics.user_subject = excluded.user_subject');
     expect(firstSql).not.toContain('on conflict (user_subject, date)');
-    const updateSql = firstSql.split('on conflict (id) do update')[1] ?? '';
-    expect(updateSql).not.toContain('deleted_at = null');
-    expect(updateSql).toContain('public.body_metrics.deleted_at is null');
-    expect(firstSql).toContain('tombstone');
-    expect(firstSql).toContain('stale_write');
-    expect(firstSql).toContain('payload_conflict');
-    expect(firstSql).toContain('revision');
     expect(query.mock.calls[0]?.[1]?.[0]).toBe(morning.id);
     expect(query.mock.calls[0]?.[1]?.[1]).toBe('owner-subject');
     expect(query.mock.calls[0]?.[1]?.[9]).toBe(3.11);
@@ -128,10 +121,10 @@ describe('createNeonNativeBodyMetricsSync', () => {
     });
     expect(query.mock.calls[0]?.[1]?.slice(19)).toEqual([true, '{"weight":79.123456}', true]);
     expect(normalized(query.mock.calls[0]?.[0])).toContain(
-      'then coalesce($20, public.body_metrics.is_excluded) else public.body_metrics.is_excluded end',
+      'is_excluded = coalesce($20, public.body_metrics.is_excluded)',
     );
     expect(normalized(query.mock.calls[0]?.[0])).toContain(
-      'corrected_value = case when excluded.client_updated_at > public.body_metrics.client_updated_at and $22::boolean then excluded.corrected_value',
+      'case when $22::boolean then excluded.corrected_value',
     );
     const pulled = await store.pull('owner-subject', { since: morning.date, after_id: null });
     expect(pulled.records[0]?.corrected_value).toEqual(corrected.corrected_value);
@@ -148,25 +141,7 @@ describe('createNeonNativeBodyMetricsSync', () => {
     await expect(store.push('owner-subject', [morning])).resolves.toEqual({
       records: [],
       rejected_ids: [morning.id],
-      conflicts: [],
     });
-  });
-
-  it('returns a tombstone conflict instead of accepting a resurrecting push', async () => {
-    const query = jest
-      .fn()
-      .mockResolvedValue([
-        row(morning, { deleted_at: '2026-10-13T16:00:00.000Z', push_outcome: 'tombstone' }),
-      ]);
-    const store = createNeonNativeBodyMetricsSync(databaseWith(query));
-
-    const result = await store.push('owner-subject', [morning]);
-
-    expect(result.records).toEqual([]);
-    expect(result.rejected_ids).toEqual([]);
-    expect(result.conflicts).toEqual([
-      expect.objectContaining({ id: morning.id, code: 'tombstone' }),
-    ]);
   });
 
   it('pulls incrementally for the authenticated subject including tombstones', async () => {

@@ -5,7 +5,6 @@
 import AppIntents
 import Foundation
 import SwiftUI
-import UIKit
 
 enum BodyMetricIntentWeightUnit: String, AppEnum {
     case pounds
@@ -44,27 +43,15 @@ struct LogWeightIntent: AppIntent {
     @Parameter(title: "Unit")
     var unit: BodyMetricIntentWeightUnit
 
-    /// Set once per intent instance. `perform()` is nonmutating, so a retry of
-    /// this invocation keeps the same record and operation. A new intent is a new log.
-    let recordId: String
-    let operationId: String
-
     init() {
-        recordId = UUID().uuidString
-        operationId = UUID().uuidString
         unit = MeasurementSystem.preferredFromDefaults == .metric ? .kilograms : .pounds
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let protectedDataAvailable = await MainActor.run {
-            UIApplication.shared.isProtectedDataAvailable
-        }
         let result = try await BodyMetricLoggingService.shared.log(
             weight: String(weight),
             bodyFat: nil,
-            unit: unit.storageUnit,
-            identity: BodyMetricLogIdentity(recordId: recordId, operationId: operationId),
-            protectedDataAvailable: protectedDataAvailable
+            unit: unit.storageUnit
         )
 
         return .result(dialog: IntentDialog(stringLiteral: result.dialog))

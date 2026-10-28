@@ -119,7 +119,12 @@ final class AuthManagerSessionTests: XCTestCase {
     private var defaults: UserDefaults!
 
     override func setUpWithError() throws {
-        try KeychainAvailability.requireAvailable()
+        try XCTSkipUnless(
+            KeychainAvailability.isAvailable(),
+            "Keychain unavailable on unsigned CI test host (errSecMissingEntitlement); "
+                + "runs fully on signed hosts and local dev. "
+                + "TODO(@itstimwhite): enable when CI signs the test host."
+        )
         try super.setUpWithError()
         suiteName = "AuthManagerSessionTests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)

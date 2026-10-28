@@ -5,32 +5,6 @@
 > rating, the smallest test layer that proves it, and its current coverage.
 > Update the status columns as batches land.
 
-## Launch verification update (2026-10-26)
-
-The historical runs below do not establish release readiness for the current
-commit. The canonical retained floors are in
-[`native-coverage-baseline.json`](../../../../scripts/ios/native-coverage-baseline.json):
-**25.47%** (26,397 / 103,629) for `quality-unit` and **20.33%**
-(21,069 / 103,629) for `unit-tier`. Keep the selectors separate and preserve
-their denominators and required behavior tests. Whole-app coverage is incomplete.
-
-Purchase outcome verification now has eight additional cases in the existing
-`RevenueCatPurchaseRestoreFlowTests` target. They cover missing/inactive
-entitlements, recovery through restore, SDK cancellation despite an existing
-entitlement, successful SDK responses, gate-on/off compatibility, and a gate
-change during a purchase. Each attempt snapshots its policy once for both the
-SDK response and entitlement verification.
-`billing_verified_purchase_outcome_v1` remains off when remote configuration is
-missing. Enable it only after the native tests and sandbox purchase, cancellation,
-and restore flows pass for the release candidate; adding the gate in source does
-not enable it in Statsig.
-
-This change was prepared on Linux without Xcode or Swift. Vendor-boundary and
-static launch-UI audits passed; the new XCTest cases, patch coverage, StoreKit,
-device performance, accessibility, and TestFlight acceptance remain **unverified**.
-Required evidence is a passing native run and coverage for the same candidate
-commit plus sandbox/device receipts. Do not count static audits as native tests.
-
 ## Standards (from Jovie company docs via gbrain)
 
 - `sources/jovie-product/docs/testing_guidelines` — risk-based effort;
@@ -199,8 +173,8 @@ candidate (propose deletion, not tests).
 | `DashboardSyncDetailsSheet`                                     | `Components/DashboardSyncComponents.swift`         | M    | unit            | ❌                                                                              |
 | `BackgroundTaskDetailsSheet`                                    | `Components/BackgroundTaskDetailsSheet.swift`      | L    | unit            | ❌ (also duplicated in Models/)                                                 |
 | `BodyScoreShareSheet`                                           | `Components/BodyScoreShareCard.swift`              | M    | unit + XCUITest | 🔶 `BodyScoreShareCardTests`, UI fixtures                                       |
-| `PhotoOptionsSheet`                                             | `Components/DashboardMetricCards.swift`            | L    | —               | 🗑 no caller found                                                               |
-| `DietPhaseHistoryView`                                          | `Views/DietPhaseHistoryView.swift`                 | L    | —               | 🗑 orphaned                                                                      |
+| `PhotoOptionsSheet`                                             | `Components/DashboardMetricCards.swift`            | L    | —               | 🗑 no caller found                                                              |
+| `DietPhaseHistoryView`                                          | `Views/DietPhaseHistoryView.swift`                 | L    | —               | 🗑 orphaned                                                                     |
 
 ### A.3 Photo timeline & progress photos
 
@@ -217,7 +191,7 @@ candidate (propose deletion, not tests).
 | `BodyScoreOnboardingFlowView` (17-step router)                                                                                                                                           | `Features/Onboarding/Views/BodyScoreOnboardingFlowView.swift`         | H              | unit (VM) + XCUITest                              | 🔶 `OnboardingFlowViewModelTests`, UI CTA tests                                                                                                                                                                                                                       |
 | 16 step views (hook, basics, height, health connect/confirm, manual weight, BF choice/numeric/visual, loading, reveal, home-mode, email, account creation, profile details, first photo) | `Features/Onboarding/Views/BodyScore*.swift`                          | H (activation) | unit (step policies in VM) + XCUITest golden path | 🔶 `OnboardingStepEntryPolicyTests`, `OnboardingScoreDisplayPolicyTests`, `OnboardingFlowValidationTests` + indirect via `OnboardingFlowViewModelTests`; reveal math via `BodyScoreEngineTests`; XCUITest golden path via `OnboardingGoldenPathUITests` (hook→reveal) |
 | `ProfileCompletionGateView`                                                                                                                                                              | `Features/Onboarding/Views/ProfileCompletionGateView.swift`           | H              | unit                                              | 🔶 `LaunchSurfacePolicyTests`, VM tests                                                                                                                                                                                                                               |
-| `PreAuthBodyScoreOnboardingContainer`                                                                                                                                                    | `Features/Onboarding/Views/PreAuthBodyScoreOnboardingContainer.swift` | L              | —                                                 | 🗑 orphaned                                                                                                                                                                                                                                                            |
+| `PreAuthBodyScoreOnboardingContainer`                                                                                                                                                    | `Features/Onboarding/Views/PreAuthBodyScoreOnboardingContainer.swift` | L              | —                                                 | 🗑 orphaned                                                                                                                                                                                                                                                           |
 
 ### A.5 Auth (LYB iOS auth — Sign in with Apple via Clerk REST)
 
@@ -225,9 +199,9 @@ candidate (propose deletion, not tests).
 | -------------------------------------- | ------------------------------- | ---- | --------------- | ------------------------------------------------------- |
 | `LoginView`                            | `Views/LoginView.swift`         | H    | unit + XCUITest | 🔶 `AuthSurfacePolicyTests`, UI signed-out fixture, GP2 |
 | `BiometricLockView`                    | `Views/BiometricLockView.swift` | H    | unit (policy)   | ❌                                                      |
-| `SignUpView`                           | `Views/SignUpView.swift`        | —    | —               | 🗑 orphaned                                              |
-| `OTPInputView`, `EnhancedOTPInputView` | `Views/`                        | —    | —               | 🗑 orphaned                                              |
-| `FaceIDEnableView.swift`               | `Views/`                        | —    | —               | 🗑 not in build target                                   |
+| `SignUpView`                           | `Views/SignUpView.swift`        | —    | —               | 🗑 orphaned                                             |
+| `OTPInputView`, `EnhancedOTPInputView` | `Views/`                        | —    | —               | 🗑 orphaned                                             |
+| `FaceIDEnableView.swift`               | `Views/`                        | —    | —               | 🗑 not in build target                                  |
 
 ### A.6 Paywall / subscription
 
@@ -244,7 +218,7 @@ candidate (propose deletion, not tests).
 | `PreferenceGoalEditorSheet`                                                   | `Views/PreferenceGoalEditing.swift`       | M    | unit            | 🔶 `PreferenceGoalValidatorTests`, UI goal-editor tests                                                                 |
 | `SecuritySessionsView`                                                        | `Views/SecuritySessionsView.swift`        | M    | unit            | 🔶 `SessionListOrderingTests` (view states declarative; no HTTP boundary — sessions synthesized locally)                |
 | `DeleteAccountView`                                                           | `Views/DeleteAccountView.swift`           | H    | integration     | 🔶 `AccountDeletionCleanupServiceTests` (service-level), `AccountDeletionConfirmationPolicyTests` (view gating)         |
-| `LegalView`, `WhatsNewView`, `SyncStatusView`/`SyncDetailsView`, `VersionRow` | `Views/`                                  | —    | —               | 🗑 all orphaned                                                                                                          |
+| `LegalView`, `WhatsNewView`, `SyncStatusView`/`SyncDetailsView`, `VersionRow` | `Views/`                                  | —    | —               | 🗑 all orphaned                                                                                                         |
 
 ### A.8 HealthKit / integrations
 
@@ -252,7 +226,7 @@ candidate (propose deletion, not tests).
 | ------------------------- | ------------------------------------- | ---- | -------------------------- | ------------------------------------------------------------------ |
 | `IntegrationsView`        | `Views/IntegrationsView.swift`        | M    | unit + XCUITest            | 🔶 HealthKit policy/pipeline tests, UI bulk-import fixtures        |
 | `BodySpecIntegrationView` | `Views/BodySpecIntegrationView.swift` | M    | integration (stubbed HTTP) | ❌ view; importer covered (`SyncIntegrationImportAndMappingTests`) |
-| `HealthKitPromptView`     | `Views/HealthKitPromptView.swift`     | —    | —                          | 🗑 orphaned                                                         |
+| `HealthKitPromptView`     | `Views/HealthKitPromptView.swift`     | —    | —                          | 🗑 orphaned                                                        |
 
 ### A.9 Data export / import
 
@@ -267,7 +241,7 @@ candidate (propose deletion, not tests).
 | ----------------------------------------- | ---------------------------------- | ---- | --------------- | ----------------- |
 | `LegalConsentView` (non-dismissible gate) | `Views/LegalConsentView.swift`     | H    | unit + XCUITest | ❌                |
 | `LegalDocumentView`                       | `Views/LegalDocumentView.swift`    | M    | unit            | ❌                |
-| `HealthDisclaimerView`                    | `Views/HealthDisclaimerView.swift` | —    | —               | 🗑 orphaned        |
+| `HealthDisclaimerView`                    | `Views/HealthDisclaimerView.swift` | —    | —               | 🗑 orphaned       |
 
 ### A.11 Reminders / notifications
 
@@ -288,10 +262,10 @@ candidate (propose deletion, not tests).
 | -------------------------------------------------- | -------------------------------------------- | ---- | ----------------------------- | ------------------------------------------------------------------- |
 | `AddEntrySheet` (Weight/BodyFat/Photos/GLP-1 tabs) | `Views/AddEntrySheet*.swift`                 | H    | unit + integration + XCUITest | 🔶 validators, GLP-1 policy, photo-batch policy, UI dose-flow tests |
 | `Glp1AddMedicationView`                            | `Views/AddEntrySheet.swift`                  | M    | unit                          | 🔶 `Glp1CardAndCatalogTests`, UI fixture                            |
-| `EditEntrySheet`                                   | `Views/EditEntrySheet.swift`                 | —    | —                             | 🗑 orphaned (GLP-1 dose editing lives in AddEntrySheet)              |
+| `EditEntrySheet`                                   | `Views/EditEntrySheet.swift`                 | —    | —                             | 🗑 orphaned (GLP-1 dose editing lives in AddEntrySheet)             |
 | `BugReportPromptSheet`/`BugReportFormView`         | `Views/BugReportViews.swift`                 | L    | unit                          | ❌                                                                  |
 | `LoadingScreen`                                    | `DesignSystem/Organisms/LoadingScreen.swift` | L    | unit                          | 🔶 manager-level only; launch overlay uses LoadingScreen directly   |
-| `ImageProcessingStatusView`                        | `Components/ImageProcessingStatusView.swift` | —    | —                             | 🗑 orphaned                                                          |
+| `ImageProcessingStatusView`                        | `Components/ImageProcessingStatusView.swift` | —    | —                             | 🗑 orphaned                                                         |
 
 ---
 

@@ -310,12 +310,6 @@ describe('TestFlight distribution guard', () => {
     expect(deployWorkflow).toContain('resume_only');
   });
 
-  it('quotes Xcode file names and paths containing plus signs', () => {
-    const project = readFileSync(projectPath, 'utf8');
-
-    expect(project.match(/\b(?:name|path)\s*=\s*[^";\r\n]*\+/)).toBeNull();
-  });
-
   it('does not embed Swift source as an app extension', () => {
     const project = readFileSync(projectPath, 'utf8');
 

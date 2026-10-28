@@ -69,10 +69,7 @@ export async function handleMcpRequest(input: {
           protocolVersion: negotiateVersion(message.params),
           capabilities: { tools: { listChanged: false } },
           serverInfo: LYB_MCP_SERVER_INFO,
-          instructions:
-            deps.metricsEnabled?.() === true
-              ? `${INSTRUCTIONS} Manual weight tools change only this user's weight entries. A receipt does not mean Apple Health was changed.`
-              : INSTRUCTIONS,
+          instructions: INSTRUCTIONS,
         }),
       };
     case 'ping':
@@ -80,9 +77,7 @@ export async function handleMcpRequest(input: {
     case 'tools/list':
       return {
         status: 200,
-        body: rpcOk(id, {
-          tools: listTools(deps.delegatedEnabled?.() === true, deps.metricsEnabled?.() === true),
-        }),
+        body: rpcOk(id, { tools: listTools(deps.delegatedEnabled?.() === true) }),
       };
     case 'tools/call':
       return { status: 200, body: rpcOk(id, await callTool(message.params, principal, deps)) };
@@ -98,9 +93,7 @@ async function callTool(
 ) {
   const { name, arguments: args } = (params ?? {}) as { name?: unknown; arguments?: unknown };
   const tool = findTool(name);
-  if (!tool || (tool.gate === 'metrics' && deps.metricsEnabled?.() !== true)) {
-    return { content: [{ type: 'text', text: 'Unknown tool.' }], isError: true };
-  }
+  if (!tool) return { content: [{ type: 'text', text: 'Unknown tool.' }], isError: true };
   if (!principal.scopes.has(tool.scope)) {
     return {
       content: [
@@ -141,14 +134,6 @@ async function callTool(
   try {
     return await tool.run(principal.subject, parsed.data as never, deps);
   } catch (error) {
-    if (tool.gate === 'metrics') {
-      return {
-        content: [
-          { type: 'text', text: 'LogYourBody weight is unavailable right now. Try again shortly.' },
-        ],
-        isError: true,
-      };
-    }
     if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
       return {
         isError: true,

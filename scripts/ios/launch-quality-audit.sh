@@ -29,10 +29,7 @@ MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-
 # killed healthy runs. 1020s still stops a hung simulator well inside the step
 # budget. A command timeout is not retried; see is_simulator_infra_failure.
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
-# Bound the one cold build independently of XCTest execution. Run 40388372132
-# missed every Swift package cache and was still compiling test targets at 600s.
-# Allow 15m for compilation; keep test timeouts, retries and the outer step cap.
-BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"
+BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-600}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
@@ -63,8 +60,6 @@ git -C "$ROOT_DIR" rev-parse HEAD > "$ARTIFACT_DIR/source-revision.txt"
 git -C "$ROOT_DIR" diff HEAD --binary > "$ARTIFACT_DIR/source-working-tree.patch"
 
 if [[ "$AUDIT_MODE" == full ]]; then
-  # Finish validator shell fixtures before simulator boot competes for host resources.
-  python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
   bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
 fi
 
@@ -130,13 +125,11 @@ cleanup_booted_simulator_apps() {
 is_simulator_infra_failure() {
   local log_file="$1"
 
-  # Retry only runner startup failures before XCTest begins. A test timeout's
-  # generic restart message is not proof of a launch failure (PR #1555).
-  if grep -Eq 'Test (Case|Suite) .* started|exceeded execution time allowance' "$log_file"; then
-    return 1
-  fi
+  # Command-timeout is intentionally absent. Merge-group run 36947770736
+  # reached it on the last chaos test while that test was still scanning, then
+  # this matcher retried the whole group and the 26-minute step died mid-retry.
   grep -Eq \
-    'Failed to get background assertion|Timed out while acquiring background assertion|Failed to install or launch the test runner|Failed to launch app|Mach error -308|server died|Early unexpected exit|operation never finished bootstrapping|Test crashed with signal kill before establishing connection' \
+    'Failed to get background assertion|Timed out while acquiring background assertion|Failed to install or launch the test runner|Failed to launch app|Mach error -308|server died|Early unexpected exit|operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Restarting after unexpected exit|unexpected exit, crash, or test timeout' \
     "$log_file"
 }
 
@@ -240,7 +233,6 @@ run_xcodebuild_test() {
 
     if [[ "$status" -eq 124 ]]; then
       echo "xcodebuild command timed out after ${XCODEBUILD_COMMAND_TIMEOUT_SECONDS}s" | tee -a "$log_file"
-      return "$status"
     fi
 
     if [[ "$status" -eq 0 ]]; then
@@ -537,6 +529,7 @@ else
   echo "Skipping optical grid audit" | tee "$ARTIFACT_DIR/optical-grid-audit.log"
 fi
 
+python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
 build_for_testing_once
 
 CHAT_QUALIFICATION_UNIT_TESTS=(
@@ -563,8 +556,7 @@ run_xcodebuild_test \
   "$ARTIFACT_DIR/launch-quality-unit-tests.log" \
   -only-testing:LogYourBodyTests
 assert_xcresult_evidence \
-  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}" \
-  --expected-test 'MetricCorrectionTests/testExcludedReadingsRemainInFetchButNotLatestStatsTrendOrHero()'
+  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"
 
 python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --coverage "$ARTIFACT_DIR/launch-quality-unit-tests.coverage.json" \

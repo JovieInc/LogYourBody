@@ -189,10 +189,6 @@ func syncAll(onCompletion: (() -> Void)? = nil) {
             )
             guard authManager.ownsRequestSession(requestOwner) else { return }
             guard failed.isEmpty else { throw PendingSyncError.failedOperations }
-            try await datedOutcomeStore.synchronize(remote: productAPIClient, token: authorization.token) {
-                self.authManager.ownsRequestSession(requestOwner)
-            }
-            guard authManager.ownsRequestSession(requestOwner) else { return }
             try await syncLocalChanges(for: requestOwner.subject, token: authorization.token)
             guard authManager.ownsRequestSession(requestOwner) else { return }
             try await pullLatestData(userId: requestOwner.subject, lastSync: lastSync, token: authorization.token)
@@ -364,10 +360,8 @@ nonisolated func syncBodyMetricsBatch(_ metrics: [PendingBodyMetricSyncItem], to
             }
 
             let response = try await productAPIClient.upsertBodyMetricsBatch(metricsData, token: token)
-            let conflictIds = Set(response.conflicts.map(\.id))
-            let syncedIds = Set(response.records.compactMap { $0["id"] as? String }).subtracting(conflictIds)
+            let syncedIds = Set(response.compactMap { $0["id"] as? String })
             await coreDataManager.markAsSynced(entityName: "CachedBodyMetrics", ids: syncedIds)
-            await coreDataManager.markBodyMetricsConflicted(ids: conflictIds)
         }
     }
 

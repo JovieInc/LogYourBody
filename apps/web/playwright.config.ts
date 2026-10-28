@@ -1,15 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Next.js and Playwright must agree on the same port in local and CI runs.
-const port = Number(process.env.PORT ?? 3000);
-if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  throw new Error('PORT must be an integer between 1 and 65535');
-}
-const baseURL = `http://127.0.0.1:${port}`;
-const chromiumLaunchOptions = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
-  ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
-  : undefined;
-
 /**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
@@ -34,7 +24,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL,
+    baseURL: process.env.CI ? 'http://localhost:3000' : 'http://localhost:5173',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -53,7 +43,6 @@ export default defineConfig({
       name: 'mobile-portrait',
       use: {
         ...devices['Pixel 5'],
-        launchOptions: chromiumLaunchOptions,
         viewport: { width: 360, height: 640 },
       },
     },
@@ -63,7 +52,6 @@ export default defineConfig({
       name: 'mobile-landscape',
       use: {
         ...devices['Pixel 5 landscape'],
-        launchOptions: chromiumLaunchOptions,
         viewport: { width: 640, height: 360 },
       },
     },
@@ -82,7 +70,6 @@ export default defineConfig({
       name: 'desktop',
       use: {
         ...devices['Desktop Chrome'],
-        launchOptions: chromiumLaunchOptions,
         viewport: { width: 1280, height: 800 },
       },
     },
@@ -90,18 +77,9 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: process.env.CI
-      ? `pnpm run build && pnpm run start --hostname 127.0.0.1 --port ${port}`
-      : `pnpm run dev --hostname 127.0.0.1 --port ${port}`,
-    url: baseURL,
-    // These are prelaunch fixtures. Ambient rollout flags or a reused server
-    // must not silently replace the waitlist with an App Store link.
-    env: {
-      NEXT_PUBLIC_LYB_APP_STORE_LIVE: '0',
-      NEXT_PUBLIC_LYB_LANDING_ART_DIRECTION_V2: '0',
-      NEXT_PUBLIC_LYB_WAITLIST_V2: '0',
-    },
-    reuseExistingServer: false,
+    command: process.env.CI ? 'pnpm run build && pnpm run start' : 'pnpm run dev',
+    url: process.env.CI ? 'http://localhost:3000' : 'http://localhost:5173',
+    reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },
 });

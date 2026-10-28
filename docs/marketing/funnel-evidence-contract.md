@@ -115,54 +115,6 @@ the report never certifies installed behavior or actual customer benefit. Its
 Node behavior suite runs through the existing shared-lib `pnpm test` discovery
 with production-code coverage; no CI gate or workflow is changed.
 
-### Measurement repair and iteration
-
-The private report now emits `iteration.next_actions` from the same qualification
-rules as its metrics. Actions identify the fixed source and metric IDs requiring
-missing aggregates, commissioning, reconciliation, source coverage refresh, or
-complete cohort evidence. `wait_for_cohort_maturity.not_before` is the latest
-required close across the affected cohorts; waiting alone does not replace a
-source watermark that covers that close. A stale report adds
-`refresh_report_snapshot`, even when its historical aggregates qualify.
-
-`repair_measurement` means resolve the listed evidence gaps before comparing
-results. `review_qualified_aggregates` means the supplied aggregates can be
-reviewed under this contract; it does not certify a release, live provider, or
-winning experiment. `experiment_decision` remains `not_evaluated` because this
-input contains no randomized assignments, comparison cohort, predeclared outcome
-or uncertainty calculation. Anonymous event occurrences must not become a
-user-conversion rate by dividing independent event totals.
-
-The operator closes the loop as follows:
-
-1. Verify installed-build behavior and source receipts for the assessed revision,
-   then obtain the bounded production aggregates using the source owner's query.
-2. Run `growth:report` privately. Resolve its actions, retaining corrected source
-   receipts; rerun until the relevant metric and snapshot are current and complete.
-3. Before an experiment, record one hypothesis, assigned population, primary
-   outcome, minimum observation window, decision rule and guardrails. Use the
-   existing Statsig gate/assignment path. Keep crashes, purchase errors, account
-   deletion and support complaints alongside the outcome; do not optimize a click
-   count at the expense of these safeguards.
-4. Evaluate the predeclared comparison only after both cohorts mature and source
-   coverage reconciles. Record the decision and evidence privately, ship through
-   the repository release gates, then verify the new installed build and repeat.
-
-No schedule, experiment, provider configuration or automatic gate change is
-created by this offline tool. LYB-265's separate coaching-benefit work owns its
-new qualification; this historical report does not substitute a proxy for it.
-
-Both existing waitlist forms now emit `web_waitlist_started` once per mounted
-form, `web_waitlist_submit_attempted` for a request, and
-`web_waitlist_submit_result` with closed `invalid`, `accepted`, `rate_limited`, or
-`server_error` outcomes. Result events preserve the same allowlisted landing
-attribution so failures can be inspected by rendering variant. Neither the
-email, raw error, nor server duplicate status is sent to analytics. Accepted
-requests, including duplicates and honeypots, retain one indistinguishable UI
-outcome; durable registration counts remain server-owned. SDK failures do not
-interrupt the form or prevent the other analytics adapter from receiving events.
-These source changes still require production delivery and consent receipts.
-
 ### Owners, offers and release evidence
 
 LYB-106/171 retain first-run/automatic ingestion ownership; LYB-134 retains

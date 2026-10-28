@@ -64,22 +64,13 @@ metadata as well as classification and guard anchors.
 Run from the repository root:
 
 ```sh
-# Resolve a corrections.json conflict from Git's base/ours/theirs index stages.
-# Retains incoming order, validates coverage, and leaves review/staging explicit.
-# Deletions or divergent edits fail without writing; resolve those manually.
-node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger
 # Seed a new baseline, or remove findings fixed in this PR (review the diff).
 node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main --update-baselines
 # Read-only verification, using the PR's exact base SHA in CI.
 node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main
-# After a merge conflict, preserve receipts from both immutable parents.
-node packages/shared-lib/scripts/correction-coverage.mjs --base-ref <prior-head-sha> --base-ref <merged-main-sha> --output coverage/corrections/coverage.json
 node --test packages/shared-lib/scripts/correction-ratchet.behavior.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
-
-Merge readiness inspects staged changes without external diff or text conversion
-drivers, so a presentation filter cannot hide unresolved conflict markers.
 
 Baselines have schema `lyb.correction-ratchet/v1` and a `findings` array. Seeding
 requires a readable immutable base: findings introduced by the PR cannot be
@@ -105,15 +96,3 @@ that automatic path on; all required checks, deployments and queue rules still
 apply. When the lanes harness owns pushing and PR creation, hand it the commits
 and validation evidence. Do not enable the retired Codex Auto-Fix workflow or
 start a second PR owner.
-
-For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
-merges and classifies the correction ledger after other conflicts are resolved.
-The shared readiness check also rejects newly added conflict markers in the index,
-including diff3 base markers, markers shorter than seven characters, and files
-marked binary by Git attributes, before
-writing or staging the ledger. When that ancestor stage contains conflict markers
-from a recursive merge, both resolver entrypoints rebuild it from the two real
-merge bases and their shared parent before applying the same union. The pre-commit
-`--check-merge` path and staged retries use the same check; cleaning only the working
-file cannot hide an unresolved staged source. Resolve and stage the source, then
-retry the same command. Unrelated unstaged edits remain untouched.

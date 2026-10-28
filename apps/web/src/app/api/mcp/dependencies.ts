@@ -1,8 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { neonTrainingRevisions } from '@/lib/neon/training-revisions-adapter';
 import { delegatedProgrammingEnabled } from '@/lib/flags/delegated-programming';
-import { delegatedMetricsEnabled } from '@/lib/flags/delegated-metrics';
-import { neonWeightLifecycle } from '@/lib/neon/weight-lifecycle-adapter';
 import { oauthIssuer } from '@/lib/auth/jovie-oauth';
 import { endpoints } from '@/lib/generated/endpoints.generated';
 import { createJwksSource } from '@/lib/mcp/access-token';
@@ -24,8 +22,6 @@ export const mcpHandlers = createMcpRouteHandlers({
   records: neonNativeProductRecords,
   revisions: neonTrainingRevisions,
   delegatedEnabled: delegatedProgrammingEnabled,
-  metricsEnabled: () => delegatedMetricsEnabled(),
-  weight: neonWeightLifecycle,
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
   now: () => new Date(),
   createId: randomUUID,

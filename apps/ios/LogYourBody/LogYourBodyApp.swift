@@ -5,7 +5,6 @@
 import SwiftUI
 import AppIntents
 import CoreData
-import UIKit
 
 enum LogYourBodyDeepLink {
     enum Destination: Equatable {
@@ -224,11 +223,6 @@ struct LogYourBodyApp: App {
         LaunchMetrics.begin()
         LogYourBodyAppShortcuts.updateAppShortcutParameters()
         #if DEBUG
-        // Replay fixtures verify terminal states and identity, independently of
-        // animation timing. iOS 26 can leave XCTest waiting 60s per transition.
-        if ProcessInfo.processInfo.arguments.contains("-lybUITestChatReplayFixture") {
-            UIView.setAnimationsEnabled(false)
-        }
         FrameHitchMonitor.shared.start()
         #endif
     }
@@ -240,12 +234,6 @@ struct LogYourBodyApp: App {
                 appContent
 #if DEBUG
                 .modifier(UITestViewportModifier())
-                .transaction { transaction in
-                    if ProcessInfo.processInfo.arguments.contains("-lybUITestChatReplayFixture") {
-                        transaction.animation = nil
-                        transaction.disablesAnimations = true
-                    }
-                }
 #endif
                 .environment(\.managedObjectContext, persistenceController.viewContext)
                 .environmentObject(authManager)
@@ -281,8 +269,7 @@ struct LogYourBodyApp: App {
                     guard !Self.isRunningUnitTests else { return }
 #if DEBUG
                     guard !ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture"),
-                          !ProcessInfo.processInfo.arguments.contains("-lybUITestCanvasFixture"),
-                          !ProcessInfo.processInfo.arguments.contains("-lybUITestMetricCardFixture") else { return }
+                          !ProcessInfo.processInfo.arguments.contains("-lybUITestCanvasFixture") else { return }
 #endif
                     await performStartupSequence()
                     resolvePendingEntryDeepLinkIfPossible()
@@ -332,9 +319,7 @@ struct LogYourBodyApp: App {
     @ViewBuilder
     private var appContent: some View {
 #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-lybUITestMetricCardFixture") {
-            MetricCardFixtureView()
-        } else if ProcessInfo.processInfo.arguments.contains("-lybUITestCanvasFixture") {
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestCanvasFixture") {
             MesocycleCanvasFixtureView()
         } else if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture") {
             TrainingLiveSessionFixtureView()
@@ -363,7 +348,6 @@ struct LogYourBodyApp: App {
         scheduleDeferredMaintenance()
 
         AppServicePorts.errorTracker.start()
-        ErrorTrackingService.shared.updateUserId(authManager.currentUser?.id)
 
         AppServicePorts.analyticsTracker.start()
         AppServicePorts.analyticsTracker.track(event: "app_open")

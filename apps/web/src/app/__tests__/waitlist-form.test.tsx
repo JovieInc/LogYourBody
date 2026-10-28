@@ -8,11 +8,6 @@ jest.mock('@/lib/analytics', () => ({
 }));
 
 const landing = { landingId: 'launch_waitlist_v1', variant: 'waitlist_launch' } as const;
-const outcomeAttribution = {
-  landing_id: 'launch_waitlist_v1',
-  variant: 'waitlist_launch',
-  campaign: 'other',
-};
 const track = analytics.track as jest.MockedFunction<typeof analytics.track>;
 const fetchMock = jest.fn();
 
@@ -61,7 +56,6 @@ describe('WaitlistForm', () => {
       'web_waitlist_started',
       'web_waitlist_submit_attempted',
       'web_waitlist_submitted',
-      'web_waitlist_submit_result',
     ]) {
       expect(track).toHaveBeenCalledWith(
         event,
@@ -84,10 +78,7 @@ describe('WaitlistForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid email address.');
     expect(fetchMock).not.toHaveBeenCalled();
     await waitFor(() =>
-      expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
-        ...outcomeAttribution,
-        outcome: 'invalid',
-      }),
+      expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', { outcome: 'invalid' }),
     );
   });
 
@@ -106,10 +97,7 @@ describe('WaitlistForm', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid email address.');
     expect(screen.getByRole('button', { name: 'Request early access' })).toBeEnabled();
-    expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
-      ...outcomeAttribution,
-      outcome: 'invalid',
-    });
+    expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', { outcome: 'invalid' });
   });
 
   it('announces a rate limit without exposing implementation details', async () => {
@@ -130,7 +118,6 @@ describe('WaitlistForm', () => {
       'status',
     );
     expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
-      ...outcomeAttribution,
       outcome: 'rate_limited',
     });
   });
@@ -149,7 +136,6 @@ describe('WaitlistForm', () => {
       'status',
     );
     expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
-      ...outcomeAttribution,
       outcome: 'server_error',
     });
   });

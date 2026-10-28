@@ -62,16 +62,16 @@ final class MetricCorrectionService {
     static let featureGate = "imported_metric_corrections"
 
     private let coreDataManager: CoreDataManager
-    private let isEnabled: @MainActor () -> Bool
-    private let admission: @MainActor (String) throws -> CoreDataManager.WriteAdmission
-    private let syncTrigger: @MainActor () -> Void
+    private let isEnabled: () -> Bool
+    private let admission: (String) throws -> CoreDataManager.WriteAdmission
+    private let syncTrigger: () -> Void
 
     init(
         coreDataManager: CoreDataManager = .shared,
-        isEnabled: @escaping @MainActor () -> Bool = {
+        isEnabled: @escaping () -> Bool = {
             AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: MetricCorrectionService.featureGate)
         },
-        admission: @escaping @MainActor (String) throws -> CoreDataManager.WriteAdmission = { userId in
+        admission: @escaping (String) throws -> CoreDataManager.WriteAdmission = { userId in
             guard let session = AuthManager.shared.captureAccountSession(), session.subject == userId else {
                 throw MetricCorrectionError.notAuthorized
             }
@@ -79,7 +79,7 @@ final class MetricCorrectionService {
                 guard AuthManager.shared.ownsAccountSession(session) else { throw MetricCorrectionError.notAuthorized }
             }
         },
-        syncTrigger: @escaping @MainActor () -> Void = {
+        syncTrigger: @escaping () -> Void = {
             RealtimeSyncManager.shared.updatePendingSyncCount()
             RealtimeSyncManager.shared.syncIfNeeded()
         }

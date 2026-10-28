@@ -13,8 +13,6 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "test:mutation": "turbo run test:mutation --filter=@logyourbody/shared-lib",
-    "test:launch-e2e": "pnpm --filter logyourbody exec playwright test tests/e2e/launch-funnel.spec.ts --project=desktop --project=mobile-portrait --workers=1",
     "test:ci": "turbo run test && pnpm eve:build && pnpm eve:smoke",
     "lint:knowledge": "node scripts/lint-no-specifics.mjs && node scripts/lint-claims.mjs",
     "growth:report": "node packages/shared-lib/scripts/growth-report.mjs",
@@ -59,7 +57,7 @@
     "lint-staged": "^15.5.2",
     "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.8.1",
-    "turbo": "^2.11.9",
+    "turbo": "^2.11.7",
     "typescript": "^5.9.3",
     "vitest": "^5.0.5"
   },
@@ -104,6 +102,6 @@
   "dependencies": {
     "ai": "^7.0.114",
     "eve": "0.27.13",
-    "zod": "^4.6.7"
+    "zod": "^4.6.6"
   }
 }

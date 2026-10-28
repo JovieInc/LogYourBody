@@ -5,19 +5,6 @@ import HealthKit
 extension CoreDataManager {
 // MARK: - Sync Operations
 
-    /// Conflict rows stay on device until a person resolves them. Null and
-    /// photo in-flight statuses remain pending so a delayed upload is not dropped.
-    static func pendingBodyMetricSyncPredicate(userId: String?) -> NSPredicate {
-        var predicates = [
-            NSPredicate(format: "isSynced == %@", NSNumber(value: false)),
-            NSPredicate(format: "syncStatus == nil OR syncStatus != %@", "conflict")
-        ]
-        if let userId {
-            predicates.append(NSPredicate(format: "userId == %@", userId))
-        }
-        return NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
-    }
-
     /// Async version - does NOT block the main thread
     func fetchUnsyncedEntries(for userId: String? = nil) async -> (
         bodyMetrics: [CachedBodyMetrics],
@@ -28,7 +15,11 @@ extension CoreDataManager {
 
         return await context.perform {
             let bodyMetricsFetch: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-            bodyMetricsFetch.predicate = Self.pendingBodyMetricSyncPredicate(userId: userId)
+            var bodyPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+            if let userId {
+                bodyPredicates.append(NSPredicate(format: "userId == %@", userId))
+            }
+            bodyMetricsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: bodyPredicates)
 
             let dailyMetricsFetch: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
             var dailyPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
@@ -131,7 +122,11 @@ func fetchPendingLocalSyncSnapshot(for userId: String? = nil) async throws -> Pe
         return try await context.perform {
             do {
                 let bodyMetricsFetch: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-                bodyMetricsFetch.predicate = Self.pendingBodyMetricSyncPredicate(userId: userId)
+                var bodyPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    bodyPredicates.append(NSPredicate(format: "userId == %@", userId))
+                }
+                bodyMetricsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: bodyPredicates)
 
                 let dailyMetricsFetch: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
                 var dailyPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
@@ -221,7 +216,11 @@ func fetchPendingLocalSyncCounts(for userId: String? = nil) async throws -> Pend
         return try await context.perform {
             do {
                 let bodyMetricsFetch: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-                bodyMetricsFetch.predicate = Self.pendingBodyMetricSyncPredicate(userId: userId)
+                var bodyPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
+                if let userId {
+                    bodyPredicates.append(NSPredicate(format: "userId == %@", userId))
+                }
+                bodyMetricsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: bodyPredicates)
 
                 let dailyMetricsFetch: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
                 var dailyPredicates = [NSPredicate(format: "isSynced == %@", NSNumber(value: false))]
@@ -373,35 +372,6 @@ func markAsSynced(entityName: String, id: String) {
                     row.syncStatus = state.1
                 }
                 throw error
-            }
-        }
-    }
-
-func markBodyMetricsConflicted(ids: Set<String>) async {
-        guard !ids.isEmpty else { return }
-        let context = viewContext
-        await context.perform {
-            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-            request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
-            do {
-                try context.fetch(request).forEach { row in
-                    row.isSynced = false
-                    row.syncStatus = "conflict"
-                }
-                if context.hasChanges {
-                    try context.save()
-                }
-            } catch {
-                let appError = AppError.coreData(operation: "markBodyMetricsConflicted", underlying: error)
-                ErrorReporter.shared.capture(
-                    appError,
-                    context: ErrorContext(
-                        feature: "coreData",
-                        operation: "markBodyMetricsConflicted",
-                        screen: nil,
-                        userId: nil
-                    )
-                )
             }
         }
     }
@@ -629,11 +599,6 @@ func fetchOrCreateSyncMetadata(entityName: String, entityId: String) -> SyncMeta
                 let profiles = try context.fetch(profileRequest)
                 for profile in profiles {
                     context.delete(profile)
-                }
-
-                let outcomeRequest = NSFetchRequest<NSManagedObject>(entityName: "CachedDatedOutcome")
-                for outcome in try context.fetch(outcomeRequest) {
-                    context.delete(outcome)
                 }
 
                 // Delete all sync metadata

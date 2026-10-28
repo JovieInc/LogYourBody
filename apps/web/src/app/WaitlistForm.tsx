@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@jovie/ui/atoms/button';
 import { Input } from '@jovie/ui/atoms/input';
-import { analytics, type AnalyticsProperties } from '@/lib/analytics';
+import { analytics } from '@/lib/analytics';
 import {
   waitlistCampaign,
   type WaitlistLandingId,
@@ -59,15 +59,6 @@ export function WaitlistForm({ landingId, variant }: WaitlistFormProps) {
     });
   }
 
-  function trackResult(outcome: NonNullable<AnalyticsProperties['outcome']>) {
-    analytics.track('web_waitlist_submit_result', {
-      landing_id: landingId,
-      variant,
-      campaign: landingAttribution().campaign,
-      outcome,
-    });
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFieldError(null);
@@ -75,7 +66,7 @@ export function WaitlistForm({ landingId, variant }: WaitlistFormProps) {
     const trimmed = email.trim();
     if (!trimmed) {
       setFieldError(waitlistLandingCopy.invalidEmailMessage);
-      trackResult('invalid');
+      analytics.track('web_waitlist_submit_result', { outcome: 'invalid' });
       return;
     }
 
@@ -102,11 +93,13 @@ export function WaitlistForm({ landingId, variant }: WaitlistFormProps) {
         if (response.status === 400) {
           setFieldError(waitlistLandingCopy.invalidEmailMessage);
           setSubmitState('idle');
-          trackResult('invalid');
+          analytics.track('web_waitlist_submit_result', { outcome: 'invalid' });
           return;
         }
         setSubmitState('error');
-        trackResult(response.status === 429 ? 'rate_limited' : 'server_error');
+        analytics.track('web_waitlist_submit_result', {
+          outcome: response.status === 429 ? 'rate_limited' : 'server_error',
+        });
         return;
       }
 
@@ -117,11 +110,11 @@ export function WaitlistForm({ landingId, variant }: WaitlistFormProps) {
         variant,
         campaign: attribution.campaign,
       });
-      trackResult('accepted');
+      analytics.track('web_waitlist_submit_result', { outcome: 'accepted' });
       setSubmitState('success');
     } catch {
       setSubmitState('error');
-      trackResult('server_error');
+      analytics.track('web_waitlist_submit_result', { outcome: 'server_error' });
     }
   }
 

@@ -11,7 +11,6 @@ type Result = {
   skipDocsCalls: number;
   buildNumbers: string[];
   versions: string[];
-  versionLookups: Record<string, unknown>[];
   metadataChanged: boolean;
   builds: Record<string, unknown>[];
   tests: Record<string, unknown>[];
@@ -62,7 +61,6 @@ $lanes = {}
 $skip_docs_calls = 0
 $build_numbers = []
 $versions = []
-$version_lookups = []
 $builds = []
 $tests = []
 $lint_calls = 0
@@ -88,12 +86,7 @@ def increment_version_number(version_number:, **)
   $versions << version_number
   File.write($metadata, "version #{version_number}")
 end
-def get_version_number(**options)
-  $version_lookups << options
-  versions = { "LogYourBody" => "1.0", "LogYourBodyRestTimer" => "0.0" }
-  raise "Could not retrieve target as fastlane runs in non-interactive mode" unless options[:target]
-  versions.fetch(options[:target])
-end
+def get_version_number(**); "1.0"; end
 def get_build_number(**); "123"; end
 def clean_build_artifacts; end
 def build_app(options)
@@ -115,7 +108,6 @@ rescue => exception
 end
 puts JSON.generate(error: error, skipDocsCalls: $skip_docs_calls,
   buildNumbers: $build_numbers, versions: $versions,
-  versionLookups: $version_lookups,
   metadataChanged: File.read($metadata) != "original version and build",
   builds: $builds, tests: $tests, lintCalls: $lint_calls)
 `,
@@ -145,36 +137,6 @@ function expectCleanValidation(result: Result) {
 }
 
 describe('Fastlane validation source preservation', () => {
-  it.each(['LogYourBody', 'LogYourBodyTiers'])(
-    'reads the app version without prompting when building scheme %s with an extension',
-    (scheme) => {
-      const result = runLane('build', { scheme, skip_build_number_increment: true });
-      expect(result.error).toBeNull();
-      expect(result.versionLookups).toEqual([
-        {
-          xcodeproj: expect.stringMatching(/\/LogYourBody\.xcodeproj$/),
-          target: 'LogYourBody',
-        },
-      ]);
-      expect(result.builds[0]).toMatchObject({ scheme });
-    },
-  );
-
-  it('builds and embeds the rest Live Activity through the app target', () => {
-    const script = fileURLToPath(
-      new URL('../../../scripts/ios/test_training_rest_project.py', import.meta.url),
-    );
-    expect(execFileSync('python3', [script], { encoding: 'utf8' })).toContain(
-      'project graph passed',
-    );
-  });
-  it('signs the rest Live Activity extension separately in the real release lane', () => {
-    const script = fileURLToPath(
-      new URL('../../../scripts/ios/test_training_rest_release.rb', import.meta.url),
-    );
-    const result = JSON.parse(execFileSync('ruby', [script], { encoding: 'utf8' }));
-    expect(result.cases).toBe(2);
-  });
   it.each(['ci_ios', 'build_check'])(
     '%s compiles without changing tracked metadata or docs',
     (lane) => {

@@ -225,7 +225,6 @@ func purchase(packageIdentifier: String) async -> Bool {
 /// Purchase a package
     func purchase(package: Package) async -> Bool {
         // print("💰 Attempting purchase: \(package.identifier)")
-        let verifiesOutcome = purchaseVerificationEnabled()
 
         await MainActor.run {
             self.isPurchasing = true
@@ -240,8 +239,7 @@ func purchase(packageIdentifier: String) async -> Bool {
         do {
             let customer = try await purchasesClient.purchase(
                 package: package,
-                entitlementID: proEntitlementID,
-                verifiesOutcome: verifiesOutcome
+                entitlementID: proEntitlementID
             )
 
             guard ownsBillingSession(ownership), !Task.isCancelled else {
@@ -251,12 +249,6 @@ func purchase(packageIdentifier: String) async -> Bool {
 
             updateSubscriptionStatus(customer: customer)
             isPurchasing = false
-
-            if verifiesOutcome && !isSubscribed {
-                errorMessage = "Your subscription is not active yet. "
-                    + "Try Restore Purchases, or contact support if you were charged."
-                return false
-            }
 
             // print("💰 Purchase successful!")
             return true
