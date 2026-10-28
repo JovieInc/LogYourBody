@@ -321,7 +321,7 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
   const { root } = fixtureRepo(t, [row('kept')]);
   const git = (args, input) => execFileSync('git', args, { cwd: root, encoding: 'utf8', input });
   const path = join(root, LEDGER_PATH);
-  const marker = 'unresolved conflict';
+  const marker = '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> incoming\n';
   writeFileSync(path, marker);
   const stages = [[], [row('ours')], [row('theirs')]].map((added) => [row('kept'), ...added]);
   const stage = () => {
@@ -342,6 +342,27 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
     row('ours'),
   ]);
   assert.equal(git(['ls-files', '-u']).trim().split('\n').length, 3, 'staging remains explicit');
+  const computed = readFileSync(path, 'utf8');
+  assert.equal(runCoverage(['--merge-ledger'], { root, env: {} }).mechanized, 3);
+  assert.equal(readFileSync(path, 'utf8'), computed, 'an unchanged computed result is retryable');
+  for (const manual of [
+    JSON.stringify([...JSON.parse(computed), row('manual-receipt')]),
+    '[]',
+    'null',
+    `${computed}\nmanual edit`,
+    '',
+    '< unfinished manual edit',
+  ]) {
+    writeFileSync(path, manual);
+    const index = git(['ls-files', '--stage']);
+    assert.throws(
+      () => runCoverage(['--merge-ledger'], { root, env: {} }),
+      /refuses to overwrite a manually resolved ledger/,
+    );
+    assert.equal(readFileSync(path, 'utf8'), manual, 'manual resolution must survive refusal');
+    assert.equal(git(['ls-files', '--stage']), index, 'refusal must preserve the conflict stages');
+  }
+  writeFileSync(path, computed);
   const before = readFileSync(path, 'utf8');
   const blob = git(['hash-object', '-w', '--stdin'], anchor).trim();
   git(['update-index', '--force-remove', guard.path]);
@@ -522,7 +543,7 @@ test('coverage CLI retains reporting and ledger repair modes after concurrent ch
       })
       .join(''),
   );
-  writeFileSync(join(root, LEDGER_PATH), 'unresolved conflict');
+  writeFileSync(join(root, LEDGER_PATH), '<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> incoming\n');
   assert.equal(runCoverage(['--merge-ledger'], { root, env: {} }).mechanized, 3);
   const merged = readFileSync(join(root, LEDGER_PATH), 'utf8');
   assert.deepEqual(JSON.parse(merged), [row('kept'), row('theirs'), row('ours')]);

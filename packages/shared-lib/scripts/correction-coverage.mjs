@@ -395,6 +395,18 @@ export function assertLedgerMergeReady(root) {
   );
 }
 
+export function assertLedgerResolutionUnchanged(original, merged, message) {
+  let workingReceipts;
+  try {
+    workingReceipts = JSON.parse(original);
+  } catch {
+    // Only conflict text may be replaced; preserve malformed manual edits too.
+    assert.match(original, /^<+ [^\r\n]*\r?\n[\s\S]*?^=+\r?\n[\s\S]*?^>+ /m, message);
+    return;
+  }
+  assert.equal(JSON.stringify(workingReceipts), JSON.stringify(merged), message);
+}
+
 export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
   if (argv.length === 1 && argv[0] === '--merge-ledger') {
     assertLedgerMergeReady(root);
@@ -402,7 +414,12 @@ export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
     const merged = mergeCorrectionLedgers(stages[0], stages[2], stages[1], (path) =>
       readSource(path, { root }),
     );
-    readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
+    const original = readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
+    assertLedgerResolutionUnchanged(
+      original,
+      merged,
+      'merge-ledger refuses to overwrite a manually resolved ledger; review and stage it explicitly',
+    );
     writeFileSync(resolve(root, LEDGER_PATH), `${JSON.stringify(merged, null, 2)}\n`);
     argv = [];
   }

@@ -130,3 +130,5 @@ the anchor and the working file is regular. Refusal preserves the ledger and ind
 Initial resolution also refuses to overwrite a valid JSON working ledger that differs
 from the parent union. Review and stage a manual resolution explicitly, then rerun
 `--resolve-merge . --stage` or `--check-merge .` to verify both parents and guards.
+Both merge resolvers also preserve malformed working ledgers without Git conflict
+markers, including empty files, so an incomplete manual edit cannot be discarded.

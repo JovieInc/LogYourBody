@@ -200,6 +200,12 @@ func syncWeightFromHealthKit() async throws {
             return
         }
 
+        if hasBodyMetricAnchors(userId: ownership.subject) {
+            defer { endWeightSync() }
+            try await importAnchoredBodyMetricsUnlocked(ownership)
+            return
+        }
+
         // print("📊 Starting comprehensive weight sync from HealthKit...")
         defer {
             endWeightSync()
@@ -239,7 +245,10 @@ func syncWeightFromHealthKit() async throws {
         try await requireImportOwnership(ownership)
         guard !batchFailed else { throw HealthKitError.syncFailed }
         await recordSuccessfulMetricSourceSync(for: ownership)
-        await triggerFullHealthKitSyncIfNeeded(imported: imported, ownership: ownership)
+        let fullHistory = await triggerFullHealthKitSyncIfNeeded(imported: imported, ownership: ownership)
+        if fullHistory == nil {
+            await seedBodyMetricAnchors(ownership: ownership)
+        }
     }
 
 func fetchRecentWeightAndBodyFatHistory(ownership: AuthManager.ProfileSessionOwnership? = nil) async throws
@@ -415,6 +424,9 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
                 return true
             }
             if !completed { await clearHistoricalImport(ownership, operation: operation) }
+            if completed {
+                await seedBodyMetricAnchors(ownership: ownership)
+            }
             return completed
         } catch {
             // Cancellation must release its own UI, but never an import that started later.
@@ -941,12 +953,17 @@ func syncStepsFromHealthKit() async throws {
         guard let ownership = await captureImportOwnership() else {
             throw HealthKitError.notAuthorized
         }
+        if let anchor = anchorStore().anchor(for: .steps, userId: ownership.subject) {
+            try await importAnchoredSteps(anchor, ownership: ownership)
+            return
+        }
         let stepHistory = try await fetchStepCountHistory(days: 365)
         try await requireImportOwnership(ownership)
 
         for (stepCount, date) in stepHistory {
             try await syncSingleStepFromHistory(stepCount: stepCount, date: date, ownership: ownership)
         }
+        await seedStepAnchor(ownership: ownership)
     }
 
 func syncSingleStepFromHistory(
@@ -1052,9 +1069,16 @@ func scheduleObservedBodyMetricSync() {
                     return
                 }
                 self?.userDefaults.set(Date(), forKey: lastSyncKey)
+                let anchored = MainActor.assumeIsolated {
+                    self?.hasBodyMetricAnchors(userId: currentUserId) ?? false
+                }
                 Task { [weak self] in
-                    // Weight sync imports both weight and body fat for the recent window.
-                    try? await self?.syncWeightFromHealthKitIncremental(days: 7)
+                    if anchored {
+                        try? await self?.importAnchoredBodyMetrics()
+                    } else {
+                        // No cursor yet, including after an anchor reset: the existing full import.
+                        try? await self?.syncWeightFromHealthKit()
+                    }
                 }
             }
         }
