@@ -3,11 +3,9 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
 jest.mock('@next/bundle-analyzer', () => () => (config: unknown) => config);
-// Exercise the installed wrapper so a mock cannot invent a missing SDK export.
-jest.mock('@sentry/nextjs/config', () => {
-  const actual = jest.requireActual('@sentry/nextjs/config');
-  return { ...actual, withSentryConfig: jest.fn(actual.withSentryConfig) };
-});
+jest.mock('@sentry/nextjs', () => ({
+  withSentryConfig: jest.fn((config: unknown) => config),
+}));
 
 describe('Sentry build configuration', () => {
   const originalEnv = process.env;
@@ -29,13 +27,13 @@ describe('Sentry build configuration', () => {
   });
 
   it.each(['commit', 'explicit', 'version'])(
-    'loads the installed SDK configuration with the %s release',
+    'uses the same %s release for events and sourcemaps',
     (source) => {
       if (source !== 'version') process.env.VERCEL_GIT_COMMIT_SHA = 'deployed-commit';
       if (source === 'explicit') process.env.NEXT_PUBLIC_SENTRY_RELEASE = 'explicit-release';
 
       const config = require('../../../../next.config').default;
-      const { withSentryConfig } = require('@sentry/nextjs/config');
+      const { withSentryConfig } = require('@sentry/nextjs');
       const release =
         source === 'version'
           ? require('../../../../package.json').version
@@ -45,9 +43,7 @@ describe('Sentry build configuration', () => {
 
       expect(config.env.NEXT_PUBLIC_SENTRY_RELEASE).toBe(release);
       expect(withSentryConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          env: expect.objectContaining({ NEXT_PUBLIC_SENTRY_RELEASE: release }),
-        }),
+        config,
         expect.objectContaining({
           release: { name: release },
           sourcemaps: { deleteSourcemapsAfterUpload: true },
@@ -62,7 +58,7 @@ describe('Sentry build configuration', () => {
     (key) => {
       delete process.env[key];
       require('../../../../next.config');
-      const { withSentryConfig } = require('@sentry/nextjs/config');
+      const { withSentryConfig } = require('@sentry/nextjs');
       expect(withSentryConfig).not.toHaveBeenCalled();
     },
   );

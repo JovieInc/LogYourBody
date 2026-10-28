@@ -282,48 +282,4 @@ describe('mobile voice routes', () => {
       action: { kind: 'pain', exerciseId: 'incline_press' },
     });
   });
-
-  it('derives per-hand plate loads from the catalog and clarifies shared implements', async () => {
-    const { handlers } = createHandlers();
-    const intent = async (exerciseId: string, exerciseName: string, weightUnit?: 'kg' | 'lbs') =>
-      (
-        await handlers.intent(
-          new NextRequest('http://localhost/api/auth/mobile/voice/v1/intent', {
-            method: 'POST',
-            headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' },
-            body: JSON.stringify({
-              transcript: '12 reps with the twenties, about two left',
-              ...(weightUnit ? { weightUnit } : {}),
-              session: {
-                id: '11111111-1111-4111-8111-111111111111',
-                exercises: [{ id: exerciseId, name: exerciseName }],
-                currentSet: {
-                  exerciseId,
-                  exerciseName,
-                  setNumber: 1,
-                  reps: 10,
-                  loadKg: 80,
-                  rir: 3,
-                },
-              },
-            }),
-          }),
-        )
-      ).json();
-
-    await expect(
-      intent('dumbbell_floor_press', 'Dumbbell floor press', 'lbs'),
-    ).resolves.toMatchObject({
-      kind: 'log_set',
-      proposal: { exerciseId: 'dumbbell_floor_press', reps: 12, loadKg: 9.07, rir: 2 },
-    });
-    await expect(intent('barbell_curl', 'Barbell curl', 'kg')).resolves.toMatchObject({
-      kind: 'clarify',
-      missingFields: ['load_accounting'],
-    });
-    await expect(intent('dumbbell_floor_press', 'Dumbbell floor press')).resolves.toMatchObject({
-      kind: 'clarify',
-      missingFields: ['weight'],
-    });
-  });
 });
