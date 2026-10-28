@@ -16,6 +16,13 @@ evidence = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(evidence)
 
 
+def run_shell_fixture(arguments, *, env=None):
+    # Bound fixture process overhead separately from the native execution caps.
+    # Hosted macOS run 40589668494 exhausted 10s before the fixture returned.
+    return subprocess.run(arguments, capture_output=True, text=True, timeout=60,
+                          env={**os.environ, **(env or {})})
+
+
 class EvidenceTests(unittest.TestCase):
     def test_fixed_diagnostic_selectors_have_native_test_implementations(self):
         root = Path(__file__).resolve().parents[2]
@@ -197,7 +204,9 @@ class EvidenceTests(unittest.TestCase):
         source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
         selectors = source[source.index('LAUNCH_QUALITY_UI_TESTS=('):source.index('UI_RESULT_BUNDLE=')]
         command = 'set -euo pipefail\n' + selectors + '\nprintf "%s\\n" "${UI_SELECTORS[@]}" "${UI_EVIDENCE_ARGS[@]}"'
-        output = subprocess.check_output(['bash', '-c', command], text=True).splitlines()
+        result = run_shell_fixture(['bash', '-c', command])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = result.stdout.splitlines()
         # Preserve each inherited case, while allowing newly merged regressions.
         inherited_cases = (
             'LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces',
@@ -408,11 +417,65 @@ class EvidenceTests(unittest.TestCase):
         artifact.mkdir()
         prior = artifact / 'summary.md'
         prior.write_text('prior proof must survive')
-        result = subprocess.run(['bash', str(script)], env={**os.environ, 'ARTIFACT_DIR': str(artifact)},
-                                capture_output=True, text=True, timeout=10)
+        result = run_shell_fixture(['bash', str(script)], env={'ARTIFACT_DIR': str(artifact)})
         self.assertEqual(result.returncode, 65)
         self.assertIn('Refusing to reuse', result.stderr)
         self.assertEqual(prior.read_text(), 'prior proof must survive')
+
+    def test_shell_cold_build_budget_preserves_build_failures_and_timeout(self):
+        source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
+        default = next(line for line in source.splitlines()
+                       if line.startswith('BUILD_FOR_TESTING_TIMEOUT_SECONDS='))
+        functions = source[source.index('build_for_testing_once() {'):
+                           source.index('# A diagnostic subset never emits')]
+        command = r"""
+set -euo pipefail
+COMMON_XCODEBUILD_ARGS=(-project fixture.xcodeproj -enableCodeCoverage YES)
+XCODEBUILD_SETTINGS_ARRAY=(CODE_SIGNING_REQUIRED=NO)
+cleanup_booted_simulator_apps() { :; }
+xcodebuild() {
+  printf '%s\n' "$@" > "$ARTIFACT_DIR/build-arguments"
+  echo 'compiler output'
+  return "$COMPILER_STATUS"
+}
+run_with_timeout() {
+  echo "$1" >> "$ARTIFACT_DIR/build-attempts"
+  # A virtual elapsed clock exercises the real budget without a 15-minute sleep.
+  if (( BUILD_DURATION > $1 )); then return 124; fi
+  shift
+  "$@"
+}
+""" + default + '\n' + functions + r"""
+build_for_testing_once
+echo 'ready for native tests'
+"""
+        cases = [
+            ('cold', '', 650, 0, 0),
+            ('hung', '', 901, 0, 124),
+            ('compiler-error', '', 100, 65, 65),
+            ('override-timeout', '20', 21, 0, 124),
+            ('override-success', '20', 19, 0, 0),
+        ]
+        for name, override, duration, compiler_status, expected in cases:
+            with self.subTest(name=name):
+                artifact = self.root / name
+                artifact.mkdir()
+                result = run_shell_fixture(
+                    ['bash', '-c', command], env={'ARTIFACT_DIR': str(artifact),
+                         'BUILD_FOR_TESTING_TIMEOUT_SECONDS': override,
+                         'BUILD_DURATION': str(duration), 'COMPILER_STATUS': str(compiler_status)})
+                self.assertEqual(result.returncode, expected, result.stderr)
+                self.assertEqual(len((artifact / 'build-attempts').read_text().splitlines()), 1)
+                self.assertEqual('ready for native tests' in result.stdout, expected == 0)
+                log = (artifact / 'launch-quality-build-for-testing.log').read_text()
+                if expected == 124:
+                    self.assertIn('build-for-testing timed out after', log)
+                else:
+                    self.assertIn('compiler output', log)
+                    self.assertEqual((artifact / 'build-arguments').read_text().splitlines(), [
+                        '-project', 'fixture.xcodeproj', '-enableCodeCoverage', 'YES',
+                        'CODE_SIGNING_REQUIRED=NO', 'build-for-testing',
+                    ])
 
     def test_shell_preserves_failed_attempt_and_stops_after_two(self):
         # Execute the real function definitions without running the product build.
@@ -442,8 +505,8 @@ start_launch_probe() { :; }
 stop_launch_probe() { :; }
 run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
 """
-        result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                                env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
+        result = run_shell_fixture(['bash', '-c', command],
+                                   env={'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
         self.assertEqual(result.returncode, 65, result.stderr)
         self.assertTrue(result_bundle.with_name('retry.attempt-1.xcresult').is_dir())
         self.assertTrue(result_bundle.is_dir())
@@ -489,14 +552,41 @@ run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
                 directory.mkdir()
                 result_bundle = directory / 'timeout.xcresult'
                 log = directory / 'timeout.log'
-                result = subprocess.run(
-                    ['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                    env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log),
+                result = run_shell_fixture(
+                    ['bash', '-c', command],
+                    env={'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log),
                          'FAILURE_STATUS': str(status), 'FAILURE_LOG': failure_log})
                 self.assertEqual(result.returncode, status, result.stderr)
                 self.assertFalse(result_bundle.with_name('timeout.attempt-1.xcresult').exists())
                 self.assertEqual(log.read_text().count('Running fixture (attempt '), 1)
                 self.assertNotIn('Retrying fixture', log.read_text())
+
+    def test_shell_fixture_allows_host_delay_but_preserves_failures_and_bounds_hangs(self):
+        # Advance subprocess's monotonic clock after it establishes the deadline.
+        # This models scheduling delay without sleeping on every CI invocation.
+        real_clock = subprocess._time
+        for delay, status in ((11, 0), (11, 65), (11, 124), (61, None)):
+            with self.subTest(delay=delay, status=status):
+                first_tick = True
+
+                def delayed_clock():
+                    nonlocal first_tick
+                    if first_tick:
+                        first_tick = False
+                        return real_clock()
+                    return real_clock() + delay
+
+                with patch.object(subprocess, '_time', side_effect=delayed_clock):
+                    if status is None:
+                        with self.assertRaises(subprocess.TimeoutExpired):
+                            run_shell_fixture(['bash', '-c', 'while :; do :; done'])
+                    else:
+                        result = run_shell_fixture(
+                            ['bash', '-c', 'printf fixture-output; printf fixture-error >&2; exit "$STATUS"'],
+                            env={'STATUS': str(status)})
+                        self.assertEqual(result.returncode, status)
+                        self.assertEqual(result.stdout, 'fixture-output')
+                        self.assertEqual(result.stderr, 'fixture-error')
 
 
 if __name__ == '__main__':

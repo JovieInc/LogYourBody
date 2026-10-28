@@ -11,6 +11,7 @@ import {
   LEDGER_PATH,
   LEVELS,
   mergeCorrectionLedgers,
+  readGitMergeLedgers,
   readSource,
   ROOT,
 } from '../packages/shared-lib/scripts/correction-coverage.mjs';
@@ -200,6 +201,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
           assertNoRegression(current, baseline);
         }
       };
+      // Verify the whole merge is conflict-free, including staged retries.
       assertLedgerMergeReady(root);
       if (checkingMerge || (stagingMerge && !git('ls-files', '--unmerged', '--', LEDGER_PATH))) {
         verifyMerge(JSON.parse(git('show', `:0:${LEDGER_PATH}`)));
@@ -213,9 +215,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       }
       // Reuse the coverage tool's three-way policy rather than a second resolver.
       // Classify snapshots first so derived metadata cannot look like concurrent edits.
-      const stages = [1, 2, 3].map((stage) =>
-        classifyLedger(JSON.parse(git('show', `:${stage}:${LEDGER_PATH}`))),
-      );
+      const stages = readGitMergeLedgers(root).map((rows) => classifyLedger(rows));
       result = classifyLedger(
         // Keep incoming order, then append branch-only receipts so future main
         // prepends do not collide with the same branch receipt on every repair.

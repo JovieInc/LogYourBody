@@ -81,7 +81,8 @@ def reviewed_project_pin(root, expected):
         snapshots[name] = repository_docs.local(root, name).read_bytes()
         if staged_bytes(root, name) != snapshots[name]:
             raise ValueError("stage reviewed project and workflow edits first: " + name)
-        if re.search(rb"(?m)^(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)", snapshots[name]):
+        # Git supports short markers; raw snapshots can also retain CRLF endings.
+        if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", snapshots[name]):
             raise ValueError("resolve staged conflict markers first: " + name)
     if repository_docs.digest(snapshots[project]) != expected:
         raise ValueError("reviewed project SHA-256 does not match merged source")
@@ -113,13 +114,21 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
         if errors and errors != ["source projection stale: " + output]:
             raise ValueError("; ".join(errors))
     if refresh_lockfile or verify_lockfile:
+        inputs = ["package.json", "**/package.json", "pnpm-workspace.yaml",
+                  "pnpm-lock.yaml", ".npmrc", output]
         dirty = subprocess.run(
-            ["git", "diff", "--name-only", "--", "package.json", "**/package.json",
-             "pnpm-workspace.yaml", "pnpm-lock.yaml", ".npmrc", output],
+            ["git", "diff", "--name-only", "--", *inputs],
             cwd=root, check=True, capture_output=True, text=True,
         ).stdout.strip()
         if dirty:
             raise ValueError("unstaged dependency edits: " + dirty.replace("\n", ", "))
+        # Local-only manifests must not enter a lockfile destined for CI.
+        untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard", "-z", "--", *inputs],
+            cwd=root, check=True, capture_output=True, text=True,
+        ).stdout.strip("\0")
+        if untracked:
+            raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
         # Refuse pinned-source drift before invoking the dependency resolver.
         errors = repository_docs.run(root)
         if errors and errors != ["source projection stale: " + output]:

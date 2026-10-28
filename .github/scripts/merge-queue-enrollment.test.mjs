@@ -189,6 +189,135 @@ test('other pull request actions stay outside the enrollment contract', async ()
   assert.equal(calls.length, 0);
 });
 
+async function draftWithdrawalScenario({ mutate = () => {}, dequeueError, after } = {}) {
+  const queued = {
+    id: 'PR_draft', number: 1284, state: 'OPEN', isDraft: true,
+    baseRefName: 'main', headRefOid: head,
+    headRepository: { nameWithOwner: repository },
+    mergeQueueEntry: { id: 'MQ_draft', position: 1 },
+  };
+  const context = {
+    repo: { owner: 'JovieInc', repo: 'LogYourBody' },
+    eventName: 'pull_request_target',
+    payload: {
+      action: 'converted_to_draft',
+      pull_request: { number: 1284, draft: true, head: { sha: head } },
+    },
+  };
+  mutate({ queued, context });
+  const calls = [];
+  const core = recordingCore();
+  let removed = false;
+  const github = {
+    rest: {
+      actions: { async listWorkflowRuns() { assert.fail('withdrawing a draft must not wait for CI'); } },
+    },
+    async graphql(query, variables) {
+      calls.push({ query, variables });
+      if (query.includes('mutation WithdrawDraft')) {
+        if (dequeueError) throw dequeueError;
+        removed = true;
+        return { dequeuePullRequest: { mergeQueueEntry: queued.mergeQueueEntry } };
+      }
+      assert.match(query, /query DraftQueueEntry/);
+      return { repository: { pullRequest: removed ? (after ?? { ...queued, mergeQueueEntry: null }) : queued } };
+    },
+  };
+  await inlineScript(nativeWorkflow)(github, context, core);
+  return { calls, core };
+}
+
+test('converting an already queued exact head to draft withdraws it and proves absence without CI', async () => {
+  const { calls, core } = await draftWithdrawalScenario();
+  assert.equal(calls.length, 3);
+  assert.match(calls[0].query, /query DraftQueueEntry/);
+  assert.match(calls[1].query, /mutation WithdrawDraft/);
+  assert.deepEqual(calls[1].variables, { id: 'PR_draft' });
+  assert.match(calls[2].query, /query DraftQueueEntry/);
+  assert.ok(core.messages.some(message => message.startsWith('WITHDRAWN:')));
+  assert.ok(!calls.some(call => /enqueuePullRequest/.test(call.query)));
+});
+
+test('draft withdrawal is idempotent when fresh queue evidence is already absent', async () => {
+  const { calls, core } = await draftWithdrawalScenario({ mutate: ({ queued }) => { queued.mergeQueueEntry = null; } });
+  assert.equal(calls.length, 1);
+  assert.ok(core.messages.some(message => message.startsWith('WITHDRAWN:')));
+});
+
+test('missing or malformed initial queue membership cannot be claimed as a withdrawal', async () => {
+  for (const mutate of [
+    ({ queued }) => { delete queued.mergeQueueEntry; },
+    ({ queued }) => { queued.mergeQueueEntry = undefined; },
+    ({ queued }) => { queued.mergeQueueEntry = {}; },
+    ({ queued }) => { queued.mergeQueueEntry = false; },
+  ]) {
+    await assert.rejects(draftWithdrawalScenario({ mutate }), /queue membership is unknown/);
+  }
+});
+
+for (const [name, mutate] of [
+  ['ready again', ({ queued }) => { queued.isDraft = false; }],
+  ['merged', ({ queued }) => { queued.state = 'MERGED'; }],
+  ['closed', ({ queued }) => { queued.state = 'CLOSED'; }],
+  ['moved head', ({ queued }) => { queued.headRefOid = 'b'.repeat(40); }],
+  ['foreign head', ({ queued }) => { queued.headRepository.nameWithOwner = 'someone/fork'; }],
+  ['wrong base', ({ queued }) => { queued.baseRefName = 'release'; }],
+]) {
+  test(`draft event cannot withdraw a ${name} pull request`, async () => {
+    const { calls, core } = await draftWithdrawalScenario({ mutate });
+    assert.equal(calls.length, 1);
+    assert.ok(!core.messages.some(message => message.startsWith('WITHDRAWN:')));
+  });
+}
+
+test('draft withdrawal rejects invalid event identity before querying', async () => {
+  for (const mutate of [
+    ({ context }) => { context.repo.repo = 'Jovie'; },
+    ({ context }) => { context.payload.pull_request.draft = false; },
+    ({ context }) => { context.payload.pull_request.number = null; },
+    ({ context }) => { context.payload.pull_request.head.sha = null; },
+  ]) {
+    const { calls } = await draftWithdrawalScenario({ mutate });
+    assert.equal(calls.length, 0);
+  }
+});
+
+test('draft withdrawal propagates a denied dequeue and never claims a verified hold', async () => {
+  const error = new Error('Resource not accessible by integration');
+  await assert.rejects(draftWithdrawalScenario({ dequeueError: error }), error);
+});
+
+test('draft withdrawal fails if fresh readback still has an entry or no longer proves the same draft', async () => {
+  for (const after of [
+    { mergeQueueEntry: { id: 'MQ_still_present' } },
+    { state: 'MERGED', mergeQueueEntry: null },
+    { isDraft: false, mergeQueueEntry: null },
+    { headRefOid: 'b'.repeat(40), mergeQueueEntry: null },
+    { headRepository: { nameWithOwner: 'someone/fork' }, mergeQueueEntry: null },
+    { mergeQueueEntry: undefined },
+    {},
+  ]) {
+    await assert.rejects(draftWithdrawalScenario({ after: {
+      state: 'OPEN', isDraft: true, headRefOid: head, baseRefName: 'main',
+      headRepository: { nameWithOwner: repository }, ...after,
+    } }), /Could not verify draft withdrawal/);
+  }
+});
+
+test('native controller subscribes to draft transitions', () => {
+  assert.match(nativeWorkflow, /types: \[ready_for_review, dequeued, converted_to_draft\]/);
+});
+
+test('same-head concurrency retains pending draft withdrawals instead of replacing them with later CI', () => {
+  // GitHub queue:max preserves up to 100 pending runs, with one running job:
+  // With the default queue:single, CI completion replaces a pending draft event.
+  const concurrency = nativeWorkflow.match(/^concurrency:\n((?:[ \t].*\n|\n)+)/m)?.[1];
+  assert.ok(concurrency);
+  assert.match(concurrency, /group: native-merge-queue-\$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.event\.pull_request\.head\.sha \}\}/);
+  assert.match(concurrency, /cancel-in-progress: false/);
+  assert.match(concurrency, /queue: max/);
+});
+
 function alreadyQueuedError(type = 'UNPROCESSABLE') {
   return Object.assign(new Error('GraphQL enrollment failed'), {
     errors: [{ type, message: 'Pull request is already in the queue' }],
