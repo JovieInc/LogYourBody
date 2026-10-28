@@ -378,28 +378,49 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     const repository = join(directory, `repository with spaces ${scenario} ${stageMerge}`);
     const ledger = join(repository, 'packages/shared-lib/corrections.json');
     mkdirSync(join(repository, 'packages/shared-lib'), { recursive: true });
-    const git = (...args) => {
-      const result = spawnSync('git', args, {
-        cwd: repository,
-        encoding: 'utf8',
-        timeout: 5_000,
+    const git = async (...args) => {
+      const result = await new Promise((resolve, reject) => {
+        execFile(
+          'git',
+          args,
+          {
+            cwd: repository,
+            encoding: 'utf8',
+            timeout: 5_000,
+          },
+          (error, stdout, stderr) => {
+            if (error && typeof error.code !== 'number') reject(error);
+            else resolve({ status: error?.code ?? 0, stdout, stderr });
+          },
+        );
       });
-      assert.ifError(result.error);
-      assert.equal(result.status, ['merge', 'cherry-pick'].includes(args[0]) ? 1 : 0, result.stderr);
+      assert.equal(
+        result.status,
+        ['merge', 'cherry-pick'].includes(args[0]) ? 1 : 0,
+        result.stderr,
+      );
       return result.stdout;
     };
     // Exercise the real CLI once per scenario; reuse its command runner for retries.
+    const commands = [];
     const run = (...args) => {
       let stdout = '';
       let stderr = '';
-      const status = runClassifier(args, {
-        log: (message) => {
-          stdout += `${message}\n`;
+      const status = runClassifier(
+        args,
+        {
+          log: (message) => {
+            stdout += `${message}\n`;
+          },
+          error: (message) => {
+            stderr += `${message}\n`;
+          },
         },
-        error: (message) => {
-          stderr += `${message}\n`;
+        (command, args, options) => {
+          commands.push(args);
+          return execFileSync(command, args, options);
         },
-      });
+      );
       return { status, stdout, stderr };
     };
     const runCLI = (...args) =>
@@ -415,9 +436,9 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       });
     const writeLedger = (receipts) =>
       writeFileSync(ledger, `${JSON.stringify(receipts, null, 2)}\n`);
-    git('init', '--initial-branch=left');
-    git('config', 'user.name', 'Ledger fixture');
-    git('config', 'user.email', 'fixture@example.test');
+    await git('init', '--initial-branch=left');
+    await git('config', 'user.name', 'Ledger fixture');
+    await git('config', 'user.email', 'fixture@example.test');
     if (['short-ledger-markers', 'minimum-ledger-markers'].includes(scenario)) {
       const markerSize = scenario === 'minimum-ledger-markers' ? 1 : 2;
       writeFileSync(join(repository, '.gitattributes'),
@@ -440,8 +461,8 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     }
     writeLedger(scenario === 'duplicate-parent' ? [rows[0], rows[0]] : [rows[0]]);
     writeFileSync(join(repository, 'unrelated.txt'), 'committed\n');
-    git('add', '.');
-    git('commit', '-m', 'test: base ledger');
+    await git('add', '.');
+    await git('commit', '-m', 'test: base ledger');
     if (scenario === 'additions' && !stageMerge) {
       assert.equal(run('--check-merge', repository).status, 1, 'a merge must be active');
       assert.equal(
@@ -450,7 +471,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         'staging requires an active merge',
       );
     }
-    git('branch', 'right');
+    await git('branch', 'right');
     const ours = ['ours-edit', 'concurrent'].includes(scenario)
       ? { ...rows[0], correction: 'Clarified evidence on the feature branch.' }
       : rows[0];
@@ -464,8 +485,8 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     if (scenario === 'unrelated-conflict') {
       writeFileSync(join(repository, 'unrelated.txt'), 'left\n');
     }
-    git('commit', '-am', 'test: left receipt');
-    git('switch', 'right');
+    await git('commit', '-am', 'test: left receipt');
+    await git('switch', 'right');
     const shared = ['theirs-edit', 'concurrent'].includes(scenario)
       ? { ...rows[0], correction: 'Clarified evidence on main.' }
       : rows[0];
@@ -478,16 +499,16 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     if (scenario === 'unrelated-conflict') {
       writeFileSync(join(repository, 'unrelated.txt'), 'right\n');
     }
-    git('commit', '-am', 'test: right receipts');
-    git('switch', 'left');
-    git(scenario === 'cherry-pick' ? 'cherry-pick' : 'merge', '--no-commit', 'right');
+    await git('commit', '-am', 'test: right receipts');
+    await git('switch', 'left');
+    await git(scenario === 'cherry-pick' ? 'cherry-pick' : 'merge', '--no-commit', 'right');
     let before = readFileSync(ledger, 'utf8');
     assert.match(before, /^<+ HEAD/m);
     if (scenario === 'unrelated-conflict') {
       writeLedger(classifyLedger([...rows.slice(2), shared, rows[1]]));
-      git('add', 'packages/shared-lib/corrections.json');
+      await git('add', 'packages/shared-lib/corrections.json');
       const resolved = readFileSync(ledger, 'utf8');
-      const index = git('ls-files', '--stage');
+      const index = await git('ls-files', '--stage');
       const unrelated = readFileSync(join(repository, 'unrelated.txt'), 'utf8');
       assert.match(unrelated, /<<<<<<< HEAD/);
       for (const args of [
@@ -497,7 +518,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         const result = await runCLI(...args);
         assert.equal(result.status, 1, 'a staged ledger cannot hide another merge conflict');
         assert.match(result.stderr, /resolve other conflicts first: unrelated.txt/);
-        assert.equal(git('ls-files', '--stage'), index);
+        assert.equal(await git('ls-files', '--stage'), index);
         assert.equal(readFileSync(ledger, 'utf8'), resolved);
         assert.equal(readFileSync(join(repository, 'unrelated.txt'), 'utf8'), unrelated);
       }
@@ -506,10 +527,10 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     if (scenario === 'guard-conflict') {
       assert.match(readFileSync(join(repository, rows[0].guard.path), 'utf8'), /<<<<<<< HEAD/);
     }
-    const stages = git('ls-files', '-u');
+    const stages = await git('ls-files', '-u');
     assert.equal((await run('--check-merge', repository)).status, 1, 'the ledger must be staged');
     const operationHead = scenario === 'cherry-pick' ? 'right' : 'MERGE_HEAD';
-    const parents = git('rev-parse', 'HEAD', operationHead);
+    const parents = await git('rev-parse', 'HEAD', operationHead);
     const unrelated = join(repository, 'unrelated.txt');
     writeFileSync(unrelated, 'uncommitted user edit\n');
     if (['missing-guard', 'unstaged-guard'].includes(scenario)) {
@@ -517,11 +538,11 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     }
     if (scenario === 'missing-index-guard') {
       writeFileSync(join(repository, rows[0].guard.path), 'missing guard');
-      git('add', rows[0].guard.path);
+      await git('add', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
     if (scenario === 'missing-index-source') {
-      git('rm', rows[0].guard.path);
+      await git('rm', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
     if (scenario === 'symlink-index-guard') {
@@ -529,14 +550,14 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       rmSync(path);
       // A symlink target can contain the anchor without supplying executable guard source.
       symlinkSync(rows[0].guard.anchor, path);
-      git('add', rows[0].guard.path);
+      await git('add', rows[0].guard.path);
       rmSync(path);
       writeFileSync(path, rows[0].guard.anchor);
     }
     if (scenario === 'symlink-index-blob') {
       // Matching blob text is not evidence when the staged guard is a symlink.
-      const blob = git('rev-parse', `:0:${rows[0].guard.path}`).trim();
-      git('update-index', '--cacheinfo', `120000,${blob},${rows[0].guard.path}`);
+      const blob = (await git('rev-parse', `:0:${rows[0].guard.path}`)).trim();
+      await git('update-index', '--cacheinfo', `120000,${blob},${rows[0].guard.path}`);
     }
     if (scenario === 'unstaged-symlink-guard') {
       // A staged repair must ignore the unrelated working file's type as well as its text.
@@ -547,40 +568,40 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     if (scenario === 'binary-marker') {
       // Binary attributes must not hide markers from either resolver mode.
       writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
-      git('add', '.gitattributes');
+      await git('add', '.gitattributes');
     }
     if (scenario === 'textconv-marker') {
       // A diff driver must not conceal the actual staged merge contents.
       writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} diff=hidden\n`);
-      git('config', 'diff.hidden.textconv', 'echo filtered-source');
-      git('add', '.gitattributes');
+      await git('config', 'diff.hidden.textconv', 'echo filtered-source');
+      await git('add', '.gitattributes');
     }
     if (scenario === 'external-marker') {
       // An external diff driver must not hide markers from either repair mode.
-      git('config', 'diff.external', 'echo filtered-source');
+      await git('config', 'diff.external', 'echo filtered-source');
     }
     if (scenario === 'color-marker') {
       // User presentation settings cannot hide conflict markers from the resolver.
-      git('config', 'color.ui', 'always');
+      await git('config', 'color.ui', 'always');
     }
     if (scenario === 'single-marker') {
       writeFileSync(
         join(repository, '.gitattributes'),
         `${rows[0].guard.path} conflict-marker-size=1\n`,
       );
-      git('add', '.gitattributes');
+      await git('add', '.gitattributes');
     }
     if (markerScenarios.includes(scenario)) {
       // Every presentation variant must reject every marker in both repair modes.
       for (const marker of scenarioMarkers) {
         writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
-        git('add', rows[0].guard.path);
+        await git('add', rows[0].guard.path);
         writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
-        const index = git('ls-files', '--stage');
+        const index = await git('ls-files', '--stage');
         const rejected = run('--resolve-merge', repository, ...(stageMerge ? ['--stage'] : []));
         assert.equal(rejected.status, 1, `${scenario} ${marker}: ${rejected.stderr}`);
         assert.match(rejected.stderr, /staged conflict markers/);
-        assert.equal(git('ls-files', '--stage'), index, 'refused repair preserves the index');
+        assert.equal(await git('ls-files', '--stage'), index, 'refused repair preserves the index');
         assert.equal(readFileSync(ledger, 'utf8'), before, 'refused repair preserves the ledger');
       }
     }
@@ -593,17 +614,17 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     if (scenario === 'manual-missing-receipt') writeLedger(rows.slice(0, -1));
     if (scenario === 'manual-invalid') writeFileSync(ledger, '{invalid json');
     before = readFileSync(ledger, 'utf8');
-    const indexBefore = git('ls-files', '--stage');
+    const indexBefore = await git('ls-files', '--stage');
     const result = await runCLI('--resolve-merge', repository, ...(stageMerge ? ['--stage'] : []));
     assert.equal(result.status, refused ? 1 : 0, `${scenario}: ${result.stderr}`);
     if (stageMerge && !refused) {
       const expected = classifyLedger(expectedRows);
       assert.deepEqual(JSON.parse(readFileSync(ledger, 'utf8')), expected);
       assert.deepEqual(
-        JSON.parse(git('show', ':0:packages/shared-lib/corrections.json')),
+        JSON.parse(await git('show', ':0:packages/shared-lib/corrections.json')),
         expected,
       );
-      assert.equal(git('ls-files', '-u'), '');
+      assert.equal(await git('ls-files', '-u'), '');
       if (scenario === 'unstaged-symlink-guard') {
         const path = join(repository, rows[0].guard.path);
         assert.equal(readlinkSync(path), 'unrelated.txt', 'repair preserves the working symlink');
@@ -616,22 +637,22 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
           'missing guard',
           'staged resolution preserves unrelated working guard edits',
         );
-        assert.ok(git('diff', '--name-only').split('\n').includes(rows[0].guard.path));
+        assert.ok((await git('diff', '--name-only')).split('\n').includes(rows[0].guard.path));
         writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
       }
-      assert.equal(git('diff', '--name-only').trim(), 'unrelated.txt');
+      assert.equal((await git('diff', '--name-only')).trim(), 'unrelated.txt');
       assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
-      assert.equal(git('rev-parse', 'HEAD', 'MERGE_HEAD'), parents);
+      assert.equal(await git('rev-parse', 'HEAD', 'MERGE_HEAD'), parents);
       const resolved = readFileSync(ledger, 'utf8');
-      const index = git('ls-files', '--stage');
+      const index = await git('ls-files', '--stage');
       if (scenario === 'additions') {
         const path = join(repository, rows[0].guard.path);
         rmSync(path);
         symlinkSync(rows[0].guard.anchor, path);
-        git('add', rows[0].guard.path);
+        await git('add', rows[0].guard.path);
         rmSync(path);
         writeFileSync(path, rows[0].guard.anchor);
-        const symlinkIndex = git('ls-files', '--stage');
+        const symlinkIndex = await git('ls-files', '--stage');
         for (const args of [
           ['--check-merge', repository],
           ['--resolve-merge', repository],
@@ -640,13 +661,13 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
           const rejected = run(...args);
           assert.equal(rejected.status, 1, 'a symlink cannot establish staged guard coverage');
           assert.match(rejected.stderr, /missing guard anchor/);
-          assert.equal(git('ls-files', '--stage'), symlinkIndex);
+          assert.equal(await git('ls-files', '--stage'), symlinkIndex);
           assert.equal(readFileSync(ledger, 'utf8'), resolved);
           assert.equal(readFileSync(path, 'utf8'), rows[0].guard.anchor);
         }
-        git('add', rows[0].guard.path);
+        await git('add', rows[0].guard.path);
         assert.equal(run('--check-merge', repository).status, 0);
-        assert.equal(git('ls-files', '--stage'), index);
+        assert.equal(await git('ls-files', '--stage'), index);
         for (const args of [
           ['--check-merge', repository],
           ['--resolve-merge', repository, '--stage'],
@@ -684,6 +705,14 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         assert.equal(
           commands.filter(
             (args) =>
+              args.includes('show') && args.at(-1) === `:0:packages/shared-lib/corrections.json`,
+          ).length,
+          1,
+          'validate and compare the same staged ledger snapshot',
+        );
+        assert.equal(
+          commands.filter(
+            (args) =>
               args.includes('show') &&
               rows.some(({ guard }) => args.at(-1).endsWith(`:${guard.path}`)),
           ).length,
@@ -696,7 +725,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         0,
         'staged retry is read-only',
       );
-      assert.equal(git('ls-files', '--stage'), index);
+      assert.equal(await git('ls-files', '--stage'), index);
       assert.equal(readFileSync(ledger, 'utf8'), resolved);
       const edited = JSON.parse(resolved);
       edited.push({ ...rows[1], source: `${rows[1].source}#unstaged-receipt` });
@@ -714,7 +743,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
           'merge verification must not silently ignore unstaged receipts',
         );
         assert.match(retry.stderr, /staged retry refuses unstaged ledger edits/);
-        assert.equal(git('ls-files', '--stage'), index, 'refused verification preserves the index');
+        assert.equal(await git('ls-files', '--stage'), index, 'refused verification preserves the index');
         assert.equal(
           readFileSync(ledger, 'utf8'),
           unstaged,
@@ -723,9 +752,9 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       }
       writeFileSync(ledger, resolved);
       assert.equal((await run('--resolve-merge', repository, '--stage')).status, 0);
-      const blob = git('rev-parse', `:0:${rows[0].guard.path}`).trim();
-      git('update-index', '--cacheinfo', `120000,${blob},${rows[0].guard.path}`);
-      const symlinkIndex = git('ls-files', '--stage');
+      const blob = (await git('rev-parse', `:0:${rows[0].guard.path}`)).trim();
+      await git('update-index', '--cacheinfo', `120000,${blob},${rows[0].guard.path}`);
+      const symlinkIndex = await git('ls-files', '--stage');
       for (const args of [
         ['--check-merge', repository],
         ['--resolve-merge', repository, '--stage'],
@@ -733,18 +762,18 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         const rejected = run(...args);
         assert.equal(rejected.status, 1, 'a symlink blob cannot count as a staged guard');
         assert.match(rejected.stderr, /missing guard anchor/);
-        assert.equal(git('ls-files', '--stage'), symlinkIndex);
+        assert.equal(await git('ls-files', '--stage'), symlinkIndex);
         assert.equal(readFileSync(ledger, 'utf8'), resolved);
       }
-      git('add', rows[0].guard.path);
+      await git('add', rows[0].guard.path);
       assert.equal(run('--check-merge', repository).status, 0);
-      git('update-index', '--chmod=+x', rows[0].guard.path);
+      await git('update-index', '--chmod=+x', rows[0].guard.path);
       assert.equal(run('--check-merge', repository).status, 0, 'executable guards remain valid');
-      git('add', rows[0].guard.path);
+      await git('add', rows[0].guard.path);
       if (scenario === 'additions') {
         // Removing a guard between retries must fail on the index, even with a valid working file.
-        git('update-index', '--force-remove', '--', rows[0].guard.path);
-        const missingIndex = git('ls-files', '--stage');
+        await git('update-index', '--force-remove', '--', rows[0].guard.path);
+        const missingIndex = await git('ls-files', '--stage');
         for (const args of [
           ['--check-merge', repository],
           ['--resolve-merge', repository],
@@ -753,22 +782,22 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
           const rejected = run(...args);
           assert.equal(rejected.status, 1, 'a working file cannot replace a missing indexed guard');
           assert.match(rejected.stderr, /missing guard anchor/);
-          assert.equal(git('ls-files', '--stage'), missingIndex);
+          assert.equal(await git('ls-files', '--stage'), missingIndex);
           assert.equal(readFileSync(ledger, 'utf8'), resolved);
           assert.equal(readFileSync(join(repository, rows[0].guard.path), 'utf8'), rows[0].guard.anchor);
         }
-        git('add', rows[0].guard.path);
+        await git('add', rows[0].guard.path);
         assert.equal(run('--check-merge', repository).status, 0);
       }
       // A clean worktree cannot hide conflict markers already staged as resolved.
-      git('config', 'color.ui', 'always');
+      await git('config', 'color.ui', 'always');
       writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
-      git('add', '.gitattributes');
+      await git('add', '.gitattributes');
       for (const marker of scenarioMarkers) {
         writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
-        git('add', rows[0].guard.path);
+        await git('add', rows[0].guard.path);
         writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
-        const staged = git('ls-files', '--stage');
+        const staged = await git('ls-files', '--stage');
         for (const args of [
           ['--check-merge', repository],
           ['--resolve-merge', repository, '--stage'],
@@ -776,28 +805,28 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
           const rejected = await run(...args);
           assert.equal(rejected.status, 1);
           assert.match(rejected.stderr, /staged conflict markers/);
-          assert.equal(git('ls-files', '--stage'), staged);
+          assert.equal(await git('ls-files', '--stage'), staged);
           assert.equal(readFileSync(ledger, 'utf8'), resolved);
         }
       }
-      git('add', rows[0].guard.path);
+      await git('add', rows[0].guard.path);
       assert.equal((await run('--check-merge', repository)).status, 0);
       return;
     }
-    assert.equal(git('ls-files', '-u'), stages, 'resolution does not stage files');
+    assert.equal(await git('ls-files', '-u'), stages, 'resolution does not stage files');
     if (refused) {
-      assert.equal(git('ls-files', '--stage'), indexBefore, 'failed repair preserves the index');
+      assert.equal(await git('ls-files', '--stage'), indexBefore, 'failed repair preserves the index');
       assert.match(
         result.stderr,
         /concurrent receipt edits|removed receipt|missing guard anchor|resolve other conflicts first|staged conflict markers|Expected property name|MERGE_HEAD/,
       );
       assert.equal(readFileSync(ledger, 'utf8'), before);
       if (scenario === 'binary-marker') {
-        git('add', rows[0].guard.path);
+        await git('add', rows[0].guard.path);
         const repaired = run('--resolve-merge', repository, '--stage');
         assert.equal(repaired.status, 0, repaired.stderr);
         assert.deepEqual(
-          JSON.parse(git('show', ':0:packages/shared-lib/corrections.json')),
+          JSON.parse(await git('show', ':0:packages/shared-lib/corrections.json')),
           classifyLedger(expectedRows),
         );
         assert.equal(
@@ -811,17 +840,17 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       const resolved = readFileSync(ledger, 'utf8');
       assert.equal((await run('--resolve-merge', repository)).status, 0);
       assert.equal(readFileSync(ledger, 'utf8'), resolved);
-      git('add', 'packages/shared-lib/corrections.json');
+      await git('add', 'packages/shared-lib/corrections.json');
       assert.equal(
         (await run('--resolve-merge', repository)).status,
         0,
         'retry verifies a ledger staged separately after resolution',
       );
       assert.equal(readFileSync(ledger, 'utf8'), resolved);
-      const index = git('ls-files', '--stage');
+      const index = await git('ls-files', '--stage');
       const checked = await run('--check-merge', repository);
       assert.equal(checked.status, 0, checked.stderr);
-      assert.equal(git('ls-files', '--stage'), index, 'verification never stages files');
+      assert.equal(await git('ls-files', '--stage'), index, 'verification never stages files');
       assert.equal(readFileSync(ledger, 'utf8'), resolved);
 
       writeFileSync(ledger, `${resolved}\n`);
@@ -833,7 +862,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         const retry = await run(...args);
         assert.equal(retry.status, 1, 'retry must refuse even whitespace edits without staging');
         assert.match(retry.stderr, /staged retry refuses unstaged ledger edits/);
-        assert.equal(git('ls-files', '--stage'), index, 'retry never restages files');
+        assert.equal(await git('ls-files', '--stage'), index, 'retry never restages files');
         assert.equal(readFileSync(ledger, 'utf8'), `${resolved}\n`, 'retry preserves local edits');
       }
       writeFileSync(ledger, resolved);
@@ -847,9 +876,9 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         ['{invalid json', /correction-classifier:/],
       ]) {
         writeFileSync(ledger, contents);
-        git('add', 'packages/shared-lib/corrections.json');
+        await git('add', 'packages/shared-lib/corrections.json');
         writeFileSync(ledger, resolved);
-        const staged = git('show', ':0:packages/shared-lib/corrections.json');
+        const staged = await git('show', ':0:packages/shared-lib/corrections.json');
         for (const args of [
           ['--check-merge', repository],
           ['--resolve-merge', repository],
@@ -858,26 +887,26 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
           const refused = await run(...args);
           assert.equal(refused.status, 1);
           assert.match(refused.stderr, diagnostic);
-          assert.equal(git('show', ':0:packages/shared-lib/corrections.json'), staged);
+          assert.equal(await git('show', ':0:packages/shared-lib/corrections.json'), staged);
           assert.equal(readFileSync(ledger, 'utf8'), resolved);
         }
       }
-      git('add', 'packages/shared-lib/corrections.json');
+      await git('add', 'packages/shared-lib/corrections.json');
       writeFileSync(join(repository, rows[0].guard.path), 'missing guard');
-      git('add', rows[0].guard.path);
+      await git('add', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
       assert.match((await run('--check-merge', repository)).stderr, /missing guard anchor/);
-      git('add', rows[0].guard.path);
+      await git('add', rows[0].guard.path);
       assert.equal((await run('--check-merge', repository)).status, 0);
     }
     assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
-    assert.equal(git('rev-parse', 'HEAD', operationHead), parents);
-    assert.match(git('diff', '--name-only'), /unrelated.txt/);
+    assert.equal(await git('rev-parse', 'HEAD', operationHead), parents);
+    assert.match(await git('diff', '--name-only'), /unrelated.txt/);
     if (scenario === 'additions') {
       // Future main receipts may arrive at either end of the ledger.
       for (const placement of ['prepend', 'append']) {
-        git('commit', '-m', 'test: resolved ledger');
-        git('switch', 'right');
+        await git('commit', '-m', 'test: resolved ledger');
+        await git('switch', 'right');
         const incoming = JSON.parse(readFileSync(ledger, 'utf8'));
         const nextReceipt = {
           ...rows[2],
@@ -887,8 +916,8 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         const next =
           placement === 'prepend' ? [nextReceipt, ...incoming] : [...incoming, nextReceipt];
         writeLedger(classifyLedger(next));
-        git('commit', '-am', 'test: next main receipt');
-        git('switch', 'left');
+        await git('commit', '-am', 'test: next main receipt');
+        await git('switch', 'left');
         const nextMerge = spawnSync('git', ['merge', '--no-commit', 'right'], {
           cwd: repository,
           encoding: 'utf8',
@@ -898,8 +927,18 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         assert.equal(nextMerge.status, placement === 'prepend' ? 0 : 1, nextMerge.stderr);
         if (placement === 'append') {
           assert.match(readFileSync(ledger, 'utf8'), /<<<<<<< HEAD/);
+          commands.length = 0;
           const repaired = run('--resolve-merge', repository, '--stage');
           assert.equal(repaired.status, 0, repaired.stderr);
+          assert.equal(
+            commands.filter(
+              (args) =>
+                args.includes('show') &&
+                rows.some(({ guard }) => args.at(-1).endsWith(`:${guard.path}`)),
+            ).length,
+            0,
+            'staged conflict resolution must batch guard reads, including repeated receipts',
+          );
         }
         assert.deepEqual(
           JSON.parse(readFileSync(ledger, 'utf8')),
@@ -911,7 +950,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       }
     }
   };
-  // Each scenario owns a separate repository; overlap CLI waits within the existing deadline.
+  // Each scenario owns a separate repository; overlap real Git and CLI I/O within the deadline.
   await Promise.all(
     scenarios.map((args) => t.test(`${args[0]} (stage=${args[1]})`, () => runScenario(args))),
   );

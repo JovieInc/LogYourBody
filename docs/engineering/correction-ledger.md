@@ -90,6 +90,9 @@ and reuse this runner for repeated checks, retaining the complete assertion matr
 within the existing 30-second deadline and 100% classifier coverage gates.
 Each verification batches staged and immutable parent guard blobs in one Git
 process, parsing byte lengths and retaining fresh index reads on every retry.
+Staged conflict resolution also batches the union's guards, including repeated
+receipts, and verification reads each staged ledger snapshot only once. The
+fixture generator awaits Git I/O under its existing concurrency limit.
 The real Git matrix checks the process count, Unicode paths, multibyte and binary
 contents, aggregate output over 1 MiB, and missing staged sources.
 Verification also checks staged file modes: a symlink target containing a guard

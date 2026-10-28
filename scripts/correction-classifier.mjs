@@ -264,10 +264,11 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
       assertLedgerMergeReady(root);
       // A retry after explicit staging verifies the index without overwriting local edits.
       if (checkingMerge || !git('ls-files', '--unmerged', '--', LEDGER_PATH)) {
-        verifyMerge(JSON.parse(git('show', `:0:${LEDGER_PATH}`)));
+        const staged = git('show', `:0:${LEDGER_PATH}`);
+        verifyMerge(JSON.parse(staged));
         assert.equal(
           readSource(LEDGER_PATH, { root }),
-          git('show', `:0:${LEDGER_PATH}`),
+          staged,
           'staged retry refuses unstaged ledger edits; review and stage them explicitly',
         );
         logger.log('correction-classifier: verified staged ledger against both merge parents');
@@ -277,17 +278,32 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
       if (!/^(?:<+|\|+|=+|>+)(?: |$)/m.test(working)) {
         // Preserve manually resolved receipts instead of rebuilding from the parents.
         result = classifyLedger(JSON.parse(working));
-        verifyMerge(result);
+        if (!stagingMerge) verifyMerge(result);
       } else {
         // Reuse the coverage tool's three-way policy rather than a second resolver.
         // Classify snapshots first so derived metadata cannot look like concurrent edits.
         // Normalize identical parent replays with the existing union policy.
         const stages = readGitMergeLedgers(root).map((rows) => mergeLedgers(rows, []));
+        // Batch the staged union's guards too; repeated receipts must not spawn Git.
+        const sources = stagingMerge
+          ? readGitSources(
+              root,
+              [
+                ...new Set(
+                  stages
+                    .flat()
+                    .filter(({ guard }) => guard)
+                    .map(({ guard }) => `:0:${guard.path}`),
+                ),
+              ],
+              execute,
+            )
+          : null;
         result = classifyLedger(
           // Keep incoming order, then append branch-only receipts so future main
           // prepends do not collide with the same branch receipt on every repair.
           mergeCorrectionLedgers(stages[0], stages[2], stages[1], (guard) =>
-            stagingMerge ? git('show', `:0:${guard}`) : readSource(guard, { root }),
+            stagingMerge ? sources.get(`:0:${guard}`) : readSource(guard, { root }),
           ),
         );
       }

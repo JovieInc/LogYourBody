@@ -3219,7 +3219,7 @@
     },
     "guard": {
       "path": "scripts/correction-classifier.mjs",
-      "anchor": "stagingMerge ? git('show', `:0:${guard}`) : readSource(guard, { root })"
+      "anchor": "stagingMerge ? sources.get(`:0:${guard}`) : readSource(guard, { root })"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -3506,6 +3506,24 @@
     "guard": {
       "path": "scripts/correction-classifier.mjs",
       "anchor": "object.startsWith(':0:') && !regularGuards.has(object.slice(3)) ? '' : source"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40",
+    "correction": "PR #1551: JavaScript/TypeScript job 122892261804 still times out at the unchanged 30-second classifier deadline. Staged conflict resolution starts Git once per guard even though final verification already batches those reads; synchronous fixture Git also prevents the existing concurrency limit from overlapping I/O.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40709868203/job/122892261804",
+    "mechanization": "Extend the existing batch reader to load the staged union guards once before three-way resolution, deduplicating repeated receipts and enforcing regular indexed files. Read the staged ledger once per verification and validate manual staged resolutions once. Extend the existing real-Git fixture generator to await Git I/O under its unchanged concurrency limit. The new command-count regression failed before the repair with 24 per-guard Git show calls and passes afterward with zero; verification also requires one staged ledger read. Every CLI scenario, assertion, 30-second wrapper deadline and 100% line, branch and function coverage gate is retained. Use the extended classifier for this repair and record the failed run as a classified receipt. origin/main was already merged; the lanes harness owns pushing and the PR body Machine line supplied in the handoff.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The reusable classifier batches staged and immutable parent guard reads per verification, removing per-guard Git startup by construction while retaining fresh index reads and the same repair semantics."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "// Batch guard blobs per verification; never cache the mutable index across retries."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
