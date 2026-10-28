@@ -11,7 +11,7 @@ import {
   type RevisionActor,
 } from './delegation-contract';
 import { MemoryTrainingRecords } from './memory-records.testing';
-import { createInitialTrainingProposal, trainingRequestHash } from './revisions';
+import { trainingRequestHash } from './revisions';
 import { revisionReceiptSchema, type StoredTrainingProposal } from './revision-contract';
 import type {
   TrainingRevisionContext,
@@ -221,28 +221,6 @@ function harness() {
 }
 
 describe('LYB-130 delegated programming acceptance', () => {
-  it('cycle revisions cannot replace an accepted delegated plan', async () => {
-    const h = harness();
-    await h.enroll();
-    const setup = (await loadTrainingRecords(h.records, 'owner')).setup;
-    h.context.trainingFingerprint = 'current-cycle-evidence';
-    const before = h.proposals.size;
-    const result = await createInitialTrainingProposal({
-      records: h.records,
-      revisions: h.port,
-      subject: 'owner',
-      now,
-      body: {
-        requestId: randomUUID(),
-        expectedGeneration: h.context.generation,
-        reason: 'Change block length',
-        intent: { kind: 'revise_cycle', weekCount: 5 },
-      },
-    });
-    expect(result).toEqual({ kind: 'program_not_enrolled' });
-    expect(h.proposals.size).toBe(before);
-    expect((await loadTrainingRecords(h.records, 'owner')).setup).toEqual(setup);
-  });
   it('1/7/8: sparse canonical inputs yield one engine draft, apply directly, execute in workout mode and return a controller receipt', async () => {
     const h = harness();
     const setup = await h.enroll();

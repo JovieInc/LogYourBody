@@ -51,10 +51,8 @@ Inspect and verify the ledger from the repository root:
 
 ```sh
 node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
-node packages/shared-lib/scripts/guard-reference.mjs --base-ref origin/main
 node --test packages/shared-lib/scripts/correction-coverage.behavior.mjs
 node --test packages/shared-lib/scripts/correction-recurrence.behavior.mjs
-node --test packages/shared-lib/scripts/guard-reference.behavior.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
 

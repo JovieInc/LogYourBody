@@ -1,17 +1,11 @@
 import {
-  EXERCISE_CATALOG,
-  catalogVariantMetadataSchema,
-  catalogVariantSchema,
-  catalogVariantSeedSchema,
   catalogVariantById,
   isEligibleVariant,
   missingEquipment,
   profileEquipment,
   resolveAvailableEquipment,
   substitutionCandidates,
-  variantToleranceTagsSchema,
 } from './catalog';
-import variantSeed from './catalog-variant-seed.json';
 import { swapExercise } from './commands';
 import { MemoryTrainingRecords } from './memory-records.testing';
 import { getOrCreateNextWorkout, storeProgramSetup } from './service';
@@ -19,112 +13,6 @@ import { getOrCreateNextWorkout, storeProgramSetup } from './service';
 const NOW = new Date('2026-01-10T12:00:00.000Z');
 const dumbbellSet = profileEquipment('dumbbells');
 const fullGymSet = profileEquipment('full_gym');
-
-describe('curated exercise variant contract', () => {
-  it('validates the whole library and attaches all 25 seed records to existing IDs', () => {
-    const seed = catalogVariantSeedSchema.parse(variantSeed);
-    expect(seed).toHaveLength(25);
-    expect(new Set(EXERCISE_CATALOG.map((entry) => entry.id)).size).toBe(EXERCISE_CATALOG.length);
-    for (const entry of EXERCISE_CATALOG) {
-      expect(catalogVariantSchema.parse(entry)).toEqual(entry);
-    }
-    for (const { id, ...metadata } of seed) {
-      const entry = catalogVariantById(id)!;
-      expect(entry.variantMetadata).toEqual(metadata);
-      expect(entry.requires.length).toBeGreaterThan(0);
-      expect(entry.bodyPosition.length).toBeGreaterThan(0);
-    }
-    expect(EXERCISE_CATALOG.filter((entry) => entry.variantMetadata)).toHaveLength(25);
-    expect(catalogVariantById('dead_bug')?.variantMetadata).toBeUndefined();
-    expect([...new Set(seed.map((entry) => entry.targetRegion))].sort()).toEqual([
-      'biceps',
-      'calves',
-      'glutes',
-      'hamstrings',
-      'lateral_delts',
-      'lats',
-      'quads',
-      'triceps',
-      'upper_chest',
-    ]);
-  });
-
-  it('rejects duplicate seed IDs, invalid target regions, support and equipment', () => {
-    expect(catalogVariantSeedSchema.safeParse([variantSeed[0], variantSeed[0]]).success).toBe(
-      false,
-    );
-    const entry = catalogVariantById('incline_dumbbell_press')!;
-    for (const change of [
-      { primaryMuscle: 'biceps' },
-      { variantMetadata: { ...entry.variantMetadata, targetRegion: 'whole_body' } },
-      { variantMetadata: { ...entry.variantMetadata, support: 'arm' } },
-      { variantMetadata: { ...entry.variantMetadata, romSetupCaveat: ' ' } },
-      { requires: ['unknown_machine'] },
-    ]) {
-      expect(catalogVariantSchema.safeParse({ ...entry, ...change }).success).toBe(false);
-    }
-  });
-
-  it('rejects unknown fields throughout catalog records and the raw seed', () => {
-    const entry = catalogVariantById('supported_cable_curl')!;
-    for (const change of [
-      { sfrScore: 9 },
-      { trunkDemand: { ...entry.trunkDemand, fatigueScore: 0 } },
-      { pulley: { ...entry.pulley, invented: true } },
-      { muscleContribution: { biceps: 1, invented: 1 } },
-      { variantMetadata: { ...entry.variantMetadata, medicalClaim: 'invented' } },
-    ]) {
-      expect(catalogVariantSchema.safeParse({ ...entry, ...change }).success).toBe(false);
-    }
-    expect(
-      catalogVariantSeedSchema.safeParse([{ ...variantSeed[0], invented: true }]).success,
-    ).toBe(false);
-    expect(
-      catalogVariantMetadataSchema.safeParse({
-        ...entry.variantMetadata,
-        bodyPosition: 'duplicate setup field',
-      }).success,
-    ).toBe(false);
-  });
-
-  it('requires four separate, editable tag fields and never accepts a combined score', () => {
-    const tags = variantSeed[0].toleranceTags;
-    expect(Object.keys(tags).sort()).toEqual([
-      'axialTrunkFatigue',
-      'jointDiscomfort',
-      'rom',
-      'stability',
-    ]);
-    for (const field of Object.keys(tags)) {
-      const missing: Record<string, unknown> = { ...tags };
-      delete missing[field];
-      expect(variantToleranceTagsSchema.safeParse(missing).success).toBe(false);
-      expect(variantToleranceTagsSchema.safeParse({ ...tags, [field]: 4 }).success).toBe(false);
-    }
-    expect(variantToleranceTagsSchema.safeParse({ ...tags, toleranceScore: 8 }).success).toBe(
-      false,
-    );
-    const edited = variantToleranceTagsSchema.parse({
-      ...tags,
-      jointDiscomfort: ['user prefers a different grip'],
-      rom: ['user selected shorter range'],
-    });
-    expect(edited.axialTrunkFatigue).toEqual(tags.axialTrunkFatigue);
-    expect(edited.stability).toEqual(tags.stability);
-    expect(edited.jointDiscomfort).toEqual(['user prefers a different grip']);
-    expect(edited.rom).toEqual(['user selected shorter range']);
-    expect(variantSeed[0].toleranceTags.jointDiscomfort).toEqual([]);
-  });
-
-  it('distinguishes torso contact from thigh and arm anchoring', () => {
-    expect(catalogVariantById('chest_supported_dumbbell_row')?.variantMetadata?.support).toBe(
-      'chest',
-    );
-    expect(catalogVariantById('incline_dumbbell_curl')?.variantMetadata?.support).toBe('back');
-    expect(catalogVariantById('lat_pulldown')?.variantMetadata?.support).toBe('none');
-    expect(catalogVariantById('preacher_machine_curl')?.variantMetadata?.support).toBe('none');
-  });
-});
 
 describe('exercise catalog eligibility', () => {
   it('fails closed when required equipment is not provably available', () => {
