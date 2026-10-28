@@ -22,6 +22,31 @@ SPEC.loader.exec_module(AUDIT)
 
 
 class StatsCardCompositionTests(unittest.TestCase):
+    def test_behavior_runner_requires_complete_unskipped_execution(self):
+        class IncompleteSuite(unittest.TestSuite):
+            def countTestCases(self):
+                return 2
+
+        def passing():
+            pass
+
+        def failing():
+            self.fail("behavior regression")
+
+        cases = [
+            ("complete", unittest.TestSuite([unittest.FunctionTestCase(passing)]), 0),
+            ("empty", unittest.TestSuite(), 1),
+            ("failed", unittest.TestSuite([unittest.FunctionTestCase(failing)]), 1),
+            ("skipped", unittest.TestSuite([
+                unittest.FunctionTestCase(unittest.skip("missing evidence")(passing))
+            ]), 1),
+            ("incomplete", IncompleteSuite([unittest.FunctionTestCase(passing)]), 1),
+        ]
+        for name, suite, expected in cases:
+            with self.subTest(name=name), contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(run_behavior_suite(suite), expected)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -119,6 +144,28 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         path.write_text(path.read_text() + "\nlet legacyColor = Color.white\n")
         self.assert_rejected("dashboard.system_b_theme_tokens")
 
+    def test_provenance_sheet_requires_presenting_binding(self):
+        self.replace("Views/HomeV2/HomeV2MetricEditorial.swift", "@Binding var isPresented: Bool",
+                     "var isPresented: Bool")
+        self.assert_rejected("provenance.presenting_binding_dismissal")
+
+    def test_provenance_done_cannot_use_ambient_dismiss(self):
+        self.replace("Views/HomeV2/HomeV2MetricEditorial.swift",
+                     "Button(action: { isPresented = false }, label: {",
+                     "Button(action: { dismiss() }, label: {")
+        self.assert_rejected("provenance.presenting_binding_dismissal")
+
+    def test_progress_provenance_must_pass_its_presenting_binding(self):
+        self.replace("Views/HomeV2/HomeV2MetricEditorial.swift",
+                     "HomeV2ProvenanceSheet(detail: provenance, isPresented: $showsProvenance)",
+                     "HomeV2ProvenanceSheet(detail: provenance, isPresented: .constant(true))")
+        self.assert_rejected("provenance.presenting_binding_dismissal")
+
+    def test_today_provenance_must_pass_its_presenting_binding(self):
+        self.replace("Views/HomeV2/HomeV2Surface.swift",
+                     "HomeV2ProvenanceSheet(detail: detail, isPresented: $showsProvenance)",
+                     "HomeV2ProvenanceSheet(detail: detail, isPresented: .constant(true))")
+        self.assert_rejected("provenance.presenting_binding_dismissal")
     def test_card_cannot_assign_success_to_direction_alone(self):
         self.replace("DesignSystem/Organisms/MetricSummaryCard.swift",
                      "return secondaryTextColor\n        }\n        switch direction",
@@ -196,7 +243,13 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 path.write_text(source)
 
 
+def run_behavior_suite(suite):
+    expected = suite.countTestCases()
+    result = unittest.TextTestRunner().run(suite)
+    print(f"Launch UI audit behavior tests executed: {result.testsRun}/{expected}")
+    complete = expected > 0 and result.testsRun == expected and not result.skipped
+    return 0 if complete and result.wasSuccessful() else 1
+
+
 if __name__ == "__main__":
-    result = unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(StatsCardCompositionTests))
-    print(f"Launch UI audit behavior tests executed: {result.testsRun}")
-    sys.exit(0 if result.wasSuccessful() else 1)
+    sys.exit(run_behavior_suite(unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__])))

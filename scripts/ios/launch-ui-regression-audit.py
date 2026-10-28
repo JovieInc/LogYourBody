@@ -130,6 +130,7 @@ def write_outputs(artifact_dir: Path, violations: list[AuditViolation]) -> None:
                 "- Body Score share cards expose layout anchors for UI assertions.",
                 "- Body Score share cards preserve actual photo aspect defaults instead of forcing one crop.",
                 "- Body Score sharing resolves the actual progress photo before presenting the sheet.",
+                "- Today and Progress provenance sheets dismiss through their presenting state binding.",
                 "- The dashboard avatar visual fills a full-width black stage while preserving each transparent asset's native aspect ratio.",
                 "- Dashboard/HUD launch surfaces stay on theme-backed glass or flat surface treatments.",
                 "- Timeline/Stats swipe navigation changes page on release, not during drag updates.",
@@ -209,6 +210,24 @@ def main() -> int:
             token=token,
             check="share_card.required_layout_anchor",
             detail=f"Missing share-card layout anchor `{token}`.",
+            violations=violations,
+        )
+
+    # Done must clear the presenting state even inside another sheet modifier.
+    for relative_path, token in [
+        ("Views/HomeV2/HomeV2MetricEditorial.swift", "@Binding var isPresented: Bool"),
+        ("Views/HomeV2/HomeV2MetricEditorial.swift", "Button(action: { isPresented = false }, label: {"),
+        ("Views/HomeV2/HomeV2MetricEditorial.swift",
+         "HomeV2ProvenanceSheet(detail: provenance, isPresented: $showsProvenance)"),
+        ("Views/HomeV2/HomeV2Surface.swift",
+         "HomeV2ProvenanceSheet(detail: detail, isPresented: $showsProvenance)"),
+    ]:
+        require_token(
+            root=root,
+            path=app_dir / relative_path,
+            token=token,
+            check="provenance.presenting_binding_dismissal",
+            detail=f"Provenance Done must clear its presenting binding: missing `{token}`.",
             violations=violations,
         )
 

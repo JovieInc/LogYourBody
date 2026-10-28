@@ -1,5 +1,43 @@
 import Foundation
 
+/// Stable persistence keys only; hint copy belongs to the presenting surface.
+enum ContextualHintID: String, CaseIterable {
+    case firstImport = "first_import"
+    case firstPhoto = "first_photo"
+    case firstWorkout = "first_workout"
+    case planRevision = "plan_revision"
+
+    fileprivate func defaultsKey(scopedWith userId: String?) -> String {
+        let key = "contextualHint.\(rawValue)"
+        guard let userId, !userId.isEmpty else { return key }
+        return "\(key)_\(userId)"
+    }
+}
+
+enum ContextualHintState: String {
+    case seen
+    case skipped
+}
+
+struct ContextualHintContext: Equatable {
+    let eligibleHints: Set<ContextualHintID>
+    var isPrimaryActionInFocus = false
+}
+
+/// An immutable snapshot. Reload from the manager after recording a presentation or skip.
+struct ContextualHintRegistry: Equatable {
+    let states: [ContextualHintID: ContextualHintState]
+
+    /// Pure selection in registry order. Record `markHintSeen` when actually presenting
+    /// the result, or `skipHint` when skipping it, before selecting again.
+    func nextHint(context: ContextualHintContext) -> ContextualHintID? {
+        guard !context.isPrimaryActionInFocus else { return nil }
+        return ContextualHintID.allCases.first { hint in
+            context.eligibleHints.contains(hint) && states[hint] == nil
+        }
+    }
+}
+
 /// Centralized manager for tracking whether the user has completed the current onboarding version.
 @MainActor
 final class OnboardingStateManager {
@@ -31,6 +69,28 @@ final class OnboardingStateManager {
         self.defaults = defaults
         self.currentOnboardingVersion = currentVersion
         ensureVersionConsistency()
+    }
+
+    func contextualHintRegistry(for userId: String?) -> ContextualHintRegistry {
+        var states: [ContextualHintID: ContextualHintState] = [:]
+        for hint in ContextualHintID.allCases {
+            if let rawState = defaults.string(forKey: hint.defaultsKey(scopedWith: userId)),
+               let state = ContextualHintState(rawValue: rawState) {
+                states[hint] = state
+            }
+        }
+        return ContextualHintRegistry(states: states)
+    }
+
+    func markHintSeen(_ hint: ContextualHintID, for userId: String?) {
+        let key = hint.defaultsKey(scopedWith: userId)
+        // Preserve an explicit skip if a delayed presentation callback arrives.
+        guard defaults.string(forKey: key) != ContextualHintState.skipped.rawValue else { return }
+        defaults.set(ContextualHintState.seen.rawValue, forKey: key)
+    }
+
+    func skipHint(_ hint: ContextualHintID, for userId: String?) {
+        defaults.set(ContextualHintState.skipped.rawValue, forKey: hint.defaultsKey(scopedWith: userId))
     }
 
     func markCompleted(version: Int? = nil, userId: String? = nil) {
