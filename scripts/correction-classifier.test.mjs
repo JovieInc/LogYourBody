@@ -748,22 +748,24 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         );
         assert.equal(status, 0);
         assert.equal(
+          commands.filter((args) => args.includes('ls-files')).length,
+          1,
+          'read ledger and guard index modes once per verification',
+        );
+        assert.equal(
           commands.filter((args) => args.includes('rev-parse')).length,
           1,
           'resolve the repository and both merge parents in one Git call',
         );
         assert.equal(
           commands.filter((args) => args.includes('cat-file')).length,
-          1,
-          'read all staged and immutable parent guards in one Git batch',
+          2,
+          'read ledgers then all staged and immutable parent guards in two Git batches',
         );
         assert.equal(
-          commands.filter(
-            (args) =>
-              args.includes('show') && args.at(-1) === `:0:packages/shared-lib/corrections.json`,
-          ).length,
-          1,
-          'validate and compare the same staged ledger snapshot',
+          commands.filter((args) => args.includes('show')).length,
+          0,
+          'batch the staged ledger and both parent ledgers instead of reading each separately',
         );
         assert.equal(
           commands.filter(

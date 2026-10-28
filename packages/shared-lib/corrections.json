@@ -3745,5 +3745,23 @@
     },
     "level": "static",
     "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40",
+    "correction": "PR #1621 recurrence 5: JavaScript/TypeScript job 123073336381 exhausted the correction-classifier wrapper deadline with ETIMEDOUT while native Launch Quality and static audits passed. Reduce repeated Git work without changing the weekly mirror selfie intent or weakening checks.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40761126054/job/123073336381",
+    "mechanization": "Extend the existing classifier batch reader to read index modes once per invocation and batch the staged ledger with both immutable parent ledgers. Reuse the same regular-file evidence for ledger and guard validation, refresh it on every retry, and retain all missing-source, symlink, executable-file, Unicode, binary, marker, parent-retention and worktree-preservation scenarios. The new real-Git command-count regression fails before the repair (two index reads instead of one) and passes afterward. Verification now uses four injected Git calls instead of seven; all 57 tests pass in 11.65 seconds with the existing 100% line, branch and function coverage gates. The 30-second wrapper and every child deadline remain unchanged. Run the extended classifier on this receipt. The required origin/main merge reported already up to date. The lanes harness owns pushing and PR-body updates and must include exactly one Machine line: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The reusable classifier batches staged and immutable parent guard reads per verification, removing per-guard Git startup by construction while retaining fresh index reads and the same repair semantics."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "// Batch guard blobs per verification; never cache the mutable index across retries."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
