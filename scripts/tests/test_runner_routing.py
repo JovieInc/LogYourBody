@@ -1806,7 +1806,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
+        'd47eb54b41a556ff0025ae4ba057030d2b881ef71e46d72fad36736bb528acd9'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -2028,7 +2028,7 @@ def test_focused_diagnostic_one_ui_command_even_for_infrastructure_failure_and_d
 
 def test_full_launch_cold_build_budget_reaches_the_complete_unit_target(tmp_path: Path) -> None:
     for name, overrides, expected in [
-            ('default', {'BUILD_DURATION_SECONDS': '750'}, '900s'),
+            ('default', {'BUILD_DURATION_SECONDS': '1050'}, '1200s'),
             ('override', {'BUILD_FOR_TESTING_TIMEOUT_SECONDS': '37', 'BUILD_DURATION_SECONDS': '25'}, '37s')]:
         result, calls, receipt = _run_diagnostic_dispatch(tmp_path / name, mode='', **overrides)
         assert result.returncode == 88 and receipt is None, result.stdout + result.stderr
@@ -2043,15 +2043,23 @@ def test_full_launch_cold_build_budget_reaches_the_complete_unit_target(tmp_path
 
 
 def test_full_launch_build_failure_or_timeout_stops_without_retry_or_qualification(tmp_path: Path) -> None:
-    for status in ('65', '124'):
-        result, calls, receipt = _run_diagnostic_dispatch(tmp_path / status, mode='', BUILD_EXIT=status)
-        assert result.returncode == int(status) and receipt is None, result.stdout + result.stderr
+    for name, overrides, status in [
+            ('compiler-error', {'BUILD_EXIT': '65'}, 65),
+            ('timeout-exit', {'BUILD_EXIT': '124'}, 124),
+            ('elapsed-timeout', {'BUILD_DURATION_SECONDS': '1201'}, 124)]:
+        result, calls, receipt = _run_diagnostic_dispatch(tmp_path / name, mode='', **overrides)
+        assert result.returncode == status and receipt is None, result.stdout + result.stderr
+        timed = [json.loads(c) for c in calls if c.startswith('["fake-timeout"')]
+        assert len(timed) == 1 and 'build-for-testing' in timed[0]
         commands = [json.loads(c) for c in calls if c.startswith('["xcodebuild"')]
-        assert len(commands) == 1 and 'build-for-testing' in commands[0]
-        artifacts = tmp_path / status / 'artifacts'
+        if name == 'elapsed-timeout':
+            assert not commands  # The virtual clock expires inside the timeout fixture.
+        else:
+            assert len(commands) == 1 and 'build-for-testing' in commands[0]
+        artifacts = tmp_path / name / 'artifacts'
         log = (artifacts / 'launch-quality-build-for-testing.log').read_text()
-        if status == '124':
-            assert 'build-for-testing timed out after 900s' in log
+        if status == 124:
+            assert 'build-for-testing timed out after 1200s' in log
         assert not list(artifacts.glob('*.xcresult'))
         assert not list(artifacts.glob('*.evidence.json'))
         assert not list(artifacts.glob('*.coverage.json'))
@@ -2070,7 +2078,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'" in source
+    assert "REVIEWED_AUDIT_SHA256 = 'd47eb54b41a556ff0025ae4ba057030d2b881ef71e46d72fad36736bb528acd9'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -2307,7 +2315,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
+    expected = 'd47eb54b41a556ff0025ae4ba057030d2b881ef71e46d72fad36736bb528acd9'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
@@ -2329,6 +2337,9 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     frozen_branch = gzip.decompress(
         (_REPO_ROOT / 'scripts/tests/fixtures/diagnostic-audit-ffdea3b6fb51.sh.gz').read_bytes())
     assert hashlib.sha256(frozen_branch).hexdigest() == 'ffdea3b6fb517caf8e47ff9ffcc2d348840d59b57c150842b5253dfdb0f16fea'
+    previous_build_budget = gzip.decompress(
+        (_REPO_ROOT / 'scripts/tests/fixtures/diagnostic-audit-c4269ae00513.sh.gz').read_bytes())
+    assert hashlib.sha256(previous_build_budget).hexdigest() == 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
     previous_main = frozen_main.replace(
         b'  "LogYourBodyUITests/testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance"\n',
         b'', 1)
@@ -2391,7 +2402,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'frozen-main-audit', 'frozen-branch-audit', 'previous-main-audit', 'previous-branch-audit', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'frozen-main-audit', 'frozen-branch-audit', 'previous-build-budget-audit', 'previous-main-audit', 'previous-branch-audit', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
                 'dependency-symlink', 'changed-project', 'wrong-resolver']
     for scenario in fixtures:
@@ -2412,6 +2423,8 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
             audit.write_bytes(frozen_main)
         elif scenario == 'frozen-branch-audit':
             audit.write_bytes(frozen_branch)
+        elif scenario == 'previous-build-budget-audit':
+            audit.write_bytes(previous_build_budget)
         elif scenario == 'previous-main-audit':
             audit.write_bytes(previous_main)
         elif scenario == 'previous-branch-audit':

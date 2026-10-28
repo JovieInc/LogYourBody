@@ -87,7 +87,10 @@ There is no implicit prose or human fallback for missing or malformed assessment
 The CLI delegates to `runClassifier(args, logger)`, which returns status without
 changing process exit state. Git fixtures invoke the CLI for each merge scenario
 and reuse this runner for repeated checks, retaining the complete assertion matrix
-within the existing 30-second deadline and 100% classifier coverage gates.
+within a bounded 120-second process deadline and 100% classifier coverage gates.
+The expanded matrix covers dozens of isolated Git scenarios; each Git or CLI child
+retains its five-second deadline, and the Vitest wrapper allows five seconds
+to report a process timeout before its own deadline.
 Each verification batches staged and immutable parent guard blobs in one Git
 process, parsing byte lengths and retaining fresh index reads on every retry.
 Staged conflict resolution also batches the union's guards, including repeated

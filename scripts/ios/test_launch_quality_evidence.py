@@ -541,7 +541,7 @@ xcodebuild() {
 }
 run_with_timeout() {
   echo "$1" >> "$ARTIFACT_DIR/build-attempts"
-  # A virtual elapsed clock exercises the real budget without a 15-minute sleep.
+  # A virtual elapsed clock exercises the real budget without a 20-minute sleep.
   if (( BUILD_DURATION > $1 )); then return 124; fi
   shift
   "$@"
@@ -551,8 +551,8 @@ build_for_testing_once
 echo 'ready for native tests'
 """
         cases = [
-            ('cold', '', 650, 0, 0),
-            ('hung', '', 901, 0, 124),
+            ('cold', '', 1050, 0, 0),
+            ('hung', '', 1201, 0, 124),
             ('compiler-error', '', 100, 65, 65),
             ('override-timeout', '20', 21, 0, 124),
             ('override-success', '20', 19, 0, 0),
