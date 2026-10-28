@@ -626,6 +626,15 @@ platform :ios do
     # so the gate survives Xcode/simulator image changes on runners.
     destination = options[:destination].to_s.strip
     device = destination.empty? ? (options[:device] || "iPhone 16") : nil
+    simulator_id = destination[/\Aplatform=iOS Simulator,id=([0-9A-Fa-f-]{36})\z/, 1]
+    if simulator_id
+      # A persistent Mac can report Booted with a stale testmanagerd socket.
+      # Restart only the selected simulator; never retry a failed Unit suite.
+      # Shutdown also fails for an already stopped device. Boot/readiness must pass.
+      sh("xcrun simctl shutdown #{simulator_id} || true")
+      sh("xcrun", "simctl", "boot", simulator_id)
+      sh("xcrun", "simctl", "bootstatus", simulator_id, "-b")
+    end
     run_tests(
       project: proj_path,
       scheme: "LogYourBodyTiers",

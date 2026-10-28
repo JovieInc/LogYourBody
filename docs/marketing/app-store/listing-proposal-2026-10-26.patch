@@ -1,0 +1,157 @@
+diff --git a/apps/ios/fastlane/metadata/en-US/description.txt b/apps/ios/fastlane/metadata/en-US/description.txt
+index 0c0b5630e..1dfd42b43 100644
+--- a/apps/ios/fastlane/metadata/en-US/description.txt
++++ b/apps/ios/fastlane/metadata/en-US/description.txt
+@@ -1 +1 @@
+-LogYourBody is a focused body-composition tracker for people who want a private progress-photo timeline with weight, body-fat, and Apple Health context.
++Know if the work is working. Track your weight, body-fat percentage, and progress photos in one private iPhone timeline.
+@@ -3 +3,2 @@ LogYourBody is a focused body-composition tracker for people who want a private
+-Start with the essentials:
++SEE YOUR PROGRESS IN CONTEXT
++Keep photos and measurements together. Move through your timeline to review how your body has changed, and use Stats to see weight, body fat, FFMI, and steps over time.
+@@ -5,7 +6,2 @@ Start with the essentials:
+-- Add progress photos to a private, time-weighted body timeline
+-- Log weight and body-fat context in pounds or kilograms
+-- Review Stats for weight, body fat, FFMI, and steps
+-- Optionally connect Apple Health for weight, body-fat, height, and step context
+-- Sync entries to your account
+-- Export your account data
+-- Keep access managed through LogYourBody Pro
++KEEP LOGGING SIMPLE
++Add a progress photo, log weight in pounds or kilograms, or record a body-fat percentage. Optionally connect Apple Health for supported weight, body-fat, height, and step data. You choose which data to share.
+@@ -13 +9,10 @@ Start with the essentials:
+-LogYourBody is built for consistent body-composition tracking without noisy coaching. Your photos and entries stay available on device and sync to your account when you are signed in.
++A PRIVATE PLACE FOR YOUR PROGRESS
++Track without a public feed or social comparison. Entries sync to your account when you are signed in. Export your account data from Settings.
++
++LOGYOURBODY PRO
++Pro is available as a monthly or annual subscription. Eligible new subscribers can start a 3-day free trial. Your localized price and any available trial are shown before you confirm with Apple.
++
++Subscriptions automatically renew unless canceled at least 24 hours before the current period ends. If you start a free trial, cancel at least 24 hours before it ends to avoid being charged. Payment is charged to your Apple Account, and renewal is charged within 24 hours before the current period ends. You can manage or cancel your subscription in your Apple Account settings. Deleting the app or your LogYourBody account does not cancel your subscription.
++
++Privacy Policy: https://www.logyourbody.com/privacy
++Terms of Use: https://www.logyourbody.com/terms
+diff --git a/apps/ios/fastlane/metadata/en-US/keywords.txt b/apps/ios/fastlane/metadata/en-US/keywords.txt
+index d4d316dca..9ea33c918 100644
+--- a/apps/ios/fastlane/metadata/en-US/keywords.txt
++++ b/apps/ios/fastlane/metadata/en-US/keywords.txt
+@@ -1 +1 @@
+-progress,photos,composition,fat,lean,mass,private,timeline,ffmi,tracker,measurements,recomposition
++progress,photos,composition,fat,lean,mass,weight,timeline,ffmi,tracker,measurements,recomposition
+diff --git a/apps/ios/fastlane/storefront-manifest.generated.json b/apps/ios/fastlane/storefront-manifest.generated.json
+index 04b729f26..274515db0 100644
+--- a/apps/ios/fastlane/storefront-manifest.generated.json
++++ b/apps/ios/fastlane/storefront-manifest.generated.json
+@@ -21 +21 @@
+-        "keywords": "progress,photos,composition,fat,lean,mass,private,timeline,ffmi,tracker,measurements,recomposition",
++        "keywords": "progress,photos,composition,fat,lean,mass,weight,timeline,ffmi,tracker,measurements,recomposition",
+@@ -23 +23 @@
+-        "description": "LogYourBody is a focused body-composition tracker for people who want a private progress-photo timeline with weight, body-fat, and Apple Health context.\n\nStart with the essentials:\n\n- Add progress photos to a private, time-weighted body timeline\n- Log weight and body-fat context in pounds or kilograms\n- Review Stats for weight, body fat, FFMI, and steps\n- Optionally connect Apple Health for weight, body-fat, height, and step context\n- Sync entries to your account\n- Export your account data\n- Keep access managed through LogYourBody Pro\n\nLogYourBody is built for consistent body-composition tracking without noisy coaching. Your photos and entries stay available on device and sync to your account when you are signed in.\n\nLogYourBody is not a medical device and does not provide medical advice. Use it for personal fitness tracking and consult a qualified professional for medical decisions.",
++        "description": "Know if the work is working. Track your weight, body-fat percentage, and progress photos in one private iPhone timeline.\n\nSEE YOUR PROGRESS IN CONTEXT\nKeep photos and measurements together. Move through your timeline to review how your body has changed, and use Stats to see weight, body fat, FFMI, and steps over time.\n\nKEEP LOGGING SIMPLE\nAdd a progress photo, log weight in pounds or kilograms, or record a body-fat percentage. Optionally connect Apple Health for supported weight, body-fat, height, and step data. You choose which data to share.\n\nA PRIVATE PLACE FOR YOUR PROGRESS\nTrack without a public feed or social comparison. Entries sync to your account when you are signed in. Export your account data from Settings.\n\nLOGYOURBODY PRO\nPro is available as a monthly or annual subscription. Eligible new subscribers can start a 3-day free trial. Your localized price and any available trial are shown before you confirm with Apple.\n\nSubscriptions automatically renew unless canceled at least 24 hours before the current period ends. If you start a free trial, cancel at least 24 hours before it ends to avoid being charged. Payment is charged to your Apple Account, and renewal is charged within 24 hours before the current period ends. You can manage or cancel your subscription in your Apple Account settings. Deleting the app or your LogYourBody account does not cancel your subscription.\n\nPrivacy Policy: https://www.logyourbody.com/privacy\nTerms of Use: https://www.logyourbody.com/terms\n\nLogYourBody is not a medical device and does not provide medical advice. Use it for personal fitness tracking and consult a qualified professional for medical decisions.",
+diff --git a/packages/product-registry/scripts/storefront.test.mjs b/packages/product-registry/scripts/storefront.test.mjs
+index 87b8982dc..167a47987 100644
+--- a/packages/product-registry/scripts/storefront.test.mjs
++++ b/packages/product-registry/scripts/storefront.test.mjs
+@@ -125,0 +126,28 @@ for (const locale of storefront.locales) {
++  assert(
++    metadata.description.includes(logYourBody.links.terms),
++    `${locale.id} description needs the canonical Terms of Use link`,
++  );
++  assert(
++    metadata.description.includes(logYourBody.links.privacy),
++    `${locale.id} description needs the canonical Privacy Policy link`,
++  );
++  assert.match(
++    metadata.description,
++    /monthly.*annual/iu,
++    `${locale.id} must disclose subscription periods`,
++  );
++  assert.match(
++    metadata.description,
++    /eligible.*free trial/iu,
++    `${locale.id} must qualify trial eligibility`,
++  );
++  assert.match(
++    metadata.description,
++    /automatically renew/iu,
++    `${locale.id} must disclose automatic renewal`,
++  );
++  assert.match(
++    metadata.description,
++    /manage or cancel/iu,
++    `${locale.id} must explain subscription management`,
++  );
+@@ -151 +179,4 @@ for (const screenshotSet of storefront.screenshotSets) {
+-  assert(localeIds.includes(screenshotSet.locale), `${screenshotSet.id} references an unknown locale`);
++  assert(
++    localeIds.includes(screenshotSet.locale),
++    `${screenshotSet.id} references an unknown locale`,
++  );
+@@ -190,2 +221,8 @@ for (const experiment of storefront.experiments) {
+-assert(storefront.measurement.primaryMetric.trim(), 'storefront measurement needs a primary metric');
+-assert(storefront.measurement.guardrailMetrics.length > 0, 'storefront measurement needs guardrails');
++assert(
++  storefront.measurement.primaryMetric.trim(),
++  'storefront measurement needs a primary metric',
++);
++assert(
++  storefront.measurement.guardrailMetrics.length > 0,
++  'storefront measurement needs guardrails',
++);
+@@ -206 +243,3 @@ const acceptedSizes = new Set(
+-  storefront.screenshotPolicy.acceptedPortraitSizes.map(({ width, height }) => `${width}x${height}`),
++  storefront.screenshotPolicy.acceptedPortraitSizes.map(
++    ({ width, height }) => `${width}x${height}`,
++  ),
+@@ -225 +264,4 @@ for (const locale of storefront.locales) {
+-    assert(acceptedSizes.has(size), `${screenshot.filename} uses unsupported portrait size ${size}`);
++    assert(
++      acceptedSizes.has(size),
++      `${screenshot.filename} uses unsupported portrait size ${size}`,
++    );
+@@ -231 +273,5 @@ for (const locale of storefront.locales) {
+-    assert.match(screenshot.gitBlobSha, /^[a-f0-9]{40}$/u, `${screenshot.filename} needs provenance`);
++    assert.match(
++      screenshot.gitBlobSha,
++      /^[a-f0-9]{40}$/u,
++      `${screenshot.filename} needs provenance`,
++    );
+diff --git a/packages/product-registry/src/storefronts/logyourbody.mjs b/packages/product-registry/src/storefronts/logyourbody.mjs
+index fe6d26fae..c331c86fb 100644
+--- a/packages/product-registry/src/storefronts/logyourbody.mjs
++++ b/packages/product-registry/src/storefronts/logyourbody.mjs
+@@ -0,0 +1,2 @@
++import { logYourBody } from '../products/logyourbody.mjs';
++
+@@ -22 +24 @@ export const logYourBodyStorefront = {
+-          'progress,photos,composition,fat,lean,mass,private,timeline,ffmi,tracker,measurements,recomposition',
++          'progress,photos,composition,fat,lean,mass,weight,timeline,ffmi,tracker,measurements,recomposition',
+@@ -25 +27,10 @@ export const logYourBodyStorefront = {
+-        description: `LogYourBody is a focused body-composition tracker for people who want a private progress-photo timeline with weight, body-fat, and Apple Health context.
++        description: `Know if the work is working. Track your weight, body-fat percentage, and progress photos in one private iPhone timeline.
++
++SEE YOUR PROGRESS IN CONTEXT
++Keep photos and measurements together. Move through your timeline to review how your body has changed, and use Stats to see weight, body fat, FFMI, and steps over time.
++
++KEEP LOGGING SIMPLE
++Add a progress photo, log weight in pounds or kilograms, or record a body-fat percentage. Optionally connect Apple Health for supported weight, body-fat, height, and step data. You choose which data to share.
++
++A PRIVATE PLACE FOR YOUR PROGRESS
++Track without a public feed or social comparison. Entries sync to your account when you are signed in. Export your account data from Settings.
+@@ -27 +38,2 @@ export const logYourBodyStorefront = {
+-Start with the essentials:
++LOGYOURBODY PRO
++Pro is available as a monthly or annual subscription. Eligible new subscribers can start a ${logYourBody.plans[0].trialDays}-day free trial. Your localized price and any available trial are shown before you confirm with Apple.
+@@ -29,7 +41 @@ Start with the essentials:
+-- Add progress photos to a private, time-weighted body timeline
+-- Log weight and body-fat context in pounds or kilograms
+-- Review Stats for weight, body fat, FFMI, and steps
+-- Optionally connect Apple Health for weight, body-fat, height, and step context
+-- Sync entries to your account
+-- Export your account data
+-- Keep access managed through LogYourBody Pro
++Subscriptions automatically renew unless canceled at least 24 hours before the current period ends. If you start a free trial, cancel at least 24 hours before it ends to avoid being charged. Payment is charged to your Apple Account, and renewal is charged within 24 hours before the current period ends. You can manage or cancel your subscription in your Apple Account settings. Deleting the app or your LogYourBody account does not cancel your subscription.
+@@ -37 +43,2 @@ Start with the essentials:
+-LogYourBody is built for consistent body-composition tracking without noisy coaching. Your photos and entries stay available on device and sync to your account when you are signed in.
++Privacy Policy: ${logYourBody.links.privacy}
++Terms of Use: ${logYourBody.links.terms}
