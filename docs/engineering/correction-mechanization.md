@@ -120,3 +120,9 @@ retry the same command. Unrelated unstaged edits remain untouched.
 
 The readiness check forces text inspection even when Git attributes mark a staged
 file as binary, so those attributes cannot conceal unresolved conflict markers.
+
+The classifier regression suite caps CLI launches at 150 per full run to prevent
+process fan-out from exhausting its unchanged 30-second CI deadline. The complete
+marker/presentation matrix exercises the shared readiness scanner against real Git
+indexes; CLI cases retain both resolution modes for every presentation variant and
+every marker on staged retries. Keep the 100% classifier coverage gates intact.

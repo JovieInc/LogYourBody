@@ -3,13 +3,20 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { after } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { assertLedgerMergeReady } from '../packages/shared-lib/scripts/correction-coverage.mjs';
 import { classifyLedger } from './correction-classifier.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const script = fileURLToPath(new URL('./correction-classifier.mjs', import.meta.url));
+let cliLaunches = 0;
+after(() => {
+  // Bound process fan-out independently of host speed; retain the 30s CI deadline.
+  assert.ok(cliLaunches <= 150, `classifier CLI launch budget exceeded: ${cliLaunches} > 150`);
+});
 function runCli(args, cwd) {
+  cliLaunches++;
   const result = spawnSync(process.execPath, [script, ...args], {
     cwd,
     encoding: 'utf8',
@@ -439,15 +446,18 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       git('config', 'color.ui', 'always');
     }
     if (markerScenarios.includes(scenario)) {
-      // Every presentation variant must reject every marker in both repair modes.
+      // Exercise every marker on the shared scanner using the real Git index.
+      // The CLI call below still verifies each presentation variant in both modes.
       for (const marker of markers) {
         writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
         git('add', rows[0].guard.path);
         writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
         const index = git('ls-files', '--stage');
-        const rejected = run('--resolve-merge', repository, ...(stageMerge ? ['--stage'] : []));
-        assert.equal(rejected.status, 1, `${scenario} ${marker}: ${rejected.stderr}`);
-        assert.match(rejected.stderr, /staged conflict markers/);
+        assert.throws(
+          () => assertLedgerMergeReady(repository),
+          /staged conflict markers/,
+          `${scenario} ${marker}`,
+        );
         assert.equal(git('ls-files', '--stage'), index, 'refused repair preserves the index');
         assert.equal(readFileSync(ledger, 'utf8'), before, 'refused repair preserves the ledger');
       }

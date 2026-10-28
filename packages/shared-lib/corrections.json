@@ -2539,5 +2539,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40",
+    "correction": "PR #1534 recurring merge and red-check repair: preserve every correction receipt and training-sequencing behavior while preventing repeated classifier CLI launches from exhausting the existing 30-second shared-lib test deadline.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40433832050/job/121957826513",
+    "mechanization": "Extend the existing classifier regression machine with a deterministic 150-launch budget. Exercise the complete conflict-marker and presentation matrix through the shared readiness scanner against real Git indexes, retaining CLI coverage for both resolution modes per presentation and all markers on staged retries. The budget regression rejects the former 206-launch suite and passes with 126 launches; the required normal shared-lib test still enforces the unchanged deadline and 100% classifier line, branch and function coverage. Use the existing ledger resolver for this merge. The harness owns push and PR edits; add Machine: built scripts/correction-classifier.test.mjs to the PR body.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "This correction governs integration-test process fan-out under the existing CI deadline; application runtime changes cannot prevent redundant test-driver CLI launches."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required classifier suite can count CLI launches deterministically and reject excess process fan-out while executing the complete marker matrix and retaining all coverage thresholds."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "classifier CLI launch budget exceeded"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
