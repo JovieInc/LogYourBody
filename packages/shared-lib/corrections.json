@@ -2560,5 +2560,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "share-png-truth-independent-visibility",
+    "correction": "PR #1535 (fix-red-5df69c1e5f) Launch Quality failed testStatsTruthFFMIUsesCanonicalJOV3331ValueAndExportsDerivedEvidence: the fixture enabled date, range and provenance but its PNG truth expectation treated range and source as hidden. The oracle also coupled range visibility to date visibility.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1535",
+    "mechanization": "Extend the existing SharePNGTruth template with required independent range and source fields, then use it for every existing PNG expectation and the failing Stats FFMI fixture. The validator checks the explicit range independently of the observation date. A new eight-combination calibration exercises date/range/source visibility and rejects missing or leaked fields plus missing mandatory evidence. The existing required launch-quality runner executes the complete native unit target, including this suite. Run 40434998769 supplies the original native failure (privacy and source); the updated Swift regression and PNG/OCR execution remain unverified on this Linux host without Swift or Xcode. Preserve all privacy, unrelated-data, evidence and nonfinite checks. The lanes harness owns pushes and PR edits.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing typed PNG expectation schema can require separate optional date, range and source arguments for every fixture, preventing implicit source defaults and date-driven range expectations by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/BodyScoreShareCardTests.swift",
+      "anchor": "// Require each privacy control explicitly; date visibility does not own range or source."
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   }
 ]

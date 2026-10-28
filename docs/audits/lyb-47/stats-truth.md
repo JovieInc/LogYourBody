@@ -136,9 +136,8 @@ before the change, then verify refusal in initial resolution, staged resolution,
 merge verification and staged retries. Clean retries pass. Used the same resolver
 to retain both parents' classified correction receipts on this instance.
 
-The harness owns pushes and PR updates. Add this single machine line to the PR body:
-
-Machine: built packages/shared-lib/scripts/correction-coverage.mjs
+The harness owned pushes and PR updates. That repair extended
+`packages/shared-lib/scripts/correction-coverage.mjs`.
 
 Repair validation (Node 22.23.2, pinned pnpm 10.34.1 via Corepack):
 
@@ -174,3 +173,73 @@ GBrain write `put lyb-47-stats-truth-merge-repair` and readback
 `get_page lyb-47-stats-truth-merge-repair` both failed with curl error 7 at
 localhost:7801. The unsandboxed query also timed out after 30 seconds; neither
 write persistence nor readback was established. This document retains the findings.
+
+## PR #1535 launch-quality repair (2026-10-28)
+
+Merged `origin/main` at `e3fffe422` without rebasing in `030145c7e` before
+repairing the failed check. Main's correction-readiness implementation and expanded
+marker fixtures supersede the branch's earlier versions; all 129 correction
+receipts survived the repository resolver. The composed launch audit retains
+main's early shell-fixture preflight, the existing cold-build limit and every
+native selector, including Stats truth. Its digest is
+`ad4098afa11c60dededb52592a74de1c3374d84f87da891f754b4b47f6aba2aa`.
+Routing tests admit only the composed audit and reject both merge parents and all
+retained historical/invalid-tooling fixtures. The diagnostic workflow conflict
+resolution updates only that audit pin relative to main.
+
+`gh run view 40434998769 --repo JovieInc/LogYourBody --log-failed` identified
+one native failure: `testStatsTruthFFMIUsesCanonicalJOV3331ValueAndExportsDerivedEvidence`
+reported `privacy` and `source` mismatches. The fixture enabled observation date,
+range and provenance while its expectation hid them. The PNG oracle also assumed
+range visibility followed date visibility. Extend the existing `SharePNGTruth`
+template with required independent range and source fields; update every existing
+expectation and the failing fixture. An eight-combination calibration covers all
+date/range/source states, rejects missing/leaked fields, and requires derived
+evidence in every state. Product output and privacy controls retain their behavior.
+
+Validation on Node 22.23.2 and Corepack's pinned pnpm 10.34.1:
+
+- `bash scripts/codex-setup.sh` passed with the frozen lockfile.
+- `corepack pnpm lint`, `corepack pnpm typecheck`, and `corepack pnpm test`
+  passed: four, four and eight Turbo tasks respectively, including the web
+  production build, 192 shared-lib cases and 1,411 web Jest cases.
+- `python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q`
+  passed all 52 cases. Its first sandboxed attempt passed 50 cases but could not
+  bind the two Unix-socket fixtures; the complete unsandboxed run passed.
+- `node --test --experimental-test-coverage
+--test-coverage-include=scripts/correction-classifier.mjs
+--test-coverage-lines=100 --test-coverage-branches=100
+--test-coverage-functions=100 scripts/correction-classifier.test.mjs` passed
+  all 11 cases with 100% line, branch and function coverage outside the sandbox.
+- `python3 scripts/ios/test_launch_ui_regression_audit.py` passed all 12 cases;
+  `python3 scripts/ios/launch-ui-regression-audit.py --artifact-dir
+/tmp/pr1535-ui-audit`, `bash -n scripts/ios/launch-quality-audit.sh`, and
+  `git diff --check` passed.
+- From `apps/ios`, `XDG_CACHE_HOME=/tmp/pr1535-swiftlint-cache swiftlint lint
+--strict --config .swiftlint.yml --cache-path /tmp/pr1535-swiftlint-cache/lint`
+  passed with zero violations in 493 files. SourceKit-dependent rules are
+  unavailable on Linux. The initial root SwiftLint attempt changed Corepack's
+  cache via `XDG_CACHE_HOME` and could not download pnpm in the sandbox; the direct
+  SwiftLint invocation above used the existing binary and a writable cache.
+- `bash scripts/codex-setup.sh --run product:check` passed. The earlier
+  `corepack pnpm product:check` attempt delegated to the system pnpm 9.15.4;
+  the bootstrap wrapper supplied the pinned pnpm for the successful run.
+- Correction coverage, ratchet and guard-reference commands with
+  `--base-ref origin/main` passed: 90 guarded rules and the same 11 retained
+  public-copy baseline findings. Their Git child processes required an
+  unsandboxed run. No baseline or threshold was lowered.
+
+The original failed native run proves the old expectation failure. This host
+has neither a Swift compiler nor Xcode; `xcodebuild ... build-for-testing` exits 127. The new calibration, fixed PNG/OCR test, complete native suite, UI execution
+and exact-head coverage remain unverified until the harness-pushed CI run.
+Bashcov shell coverage also remains a CI receipt. Local source and JS checks
+cannot substitute for either native execution or shell coverage.
+
+GBrain `put lyb-47-png-truth-repair-20261028` and
+`get lyb-47-png-truth-repair-20261028` both failed with curl error 7 at
+localhost:7801. Neither persistence nor readback could be established. This
+document retains the findings for the harness.
+
+The harness owns pushes and PR edits. Use exactly this machine line in the PR body:
+
+Machine: built apps/ios/LogYourBodyTests/BodyScoreShareCardTests.swift

@@ -91,7 +91,9 @@ final class BodyScoreShareCardTests: XCTestCase {
         options.includeProvenance = true
         let text = try renderPNGText(snapshot, aspect: .square, options: options, name: "lyb47-ffmi-truth.png")
         XCTAssertEqual(pngTruthMismatches(text, expected: SharePNGTruth(
-            kind: .ffmi, value: snapshot.value, unit: "", date: nil, evidence: "Derived estimate")), [])
+            kind: .ffmi, value: snapshot.value, unit: "", date: date.formatted(date: .abbreviated, time: .omitted),
+            range: "Past 30 days",
+            evidence: "Derived estimate", source: "Derived from smoothed weight, body fat and height")), [], text)
     }
 
     func testProgressCalendarDayFocusRecoversOriginalTimestampAndSourceAcrossDST() throws {
@@ -134,10 +136,38 @@ final class BodyScoreShareCardTests: XCTestCase {
         XCTAssertTrue(detail.contains("Mean of 2 observations"))
         let text = try renderPNGText(snapshot, aspect: .square, options: options, name: "lyb47-share-hidden-dates.png")
         let expected = SharePNGTruth(
-            kind: .weight, value: "82.0", unit: "kg", date: nil, evidence: nil,
+            kind: .weight, value: "82.0", unit: "kg", date: nil, range: nil, evidence: nil, source: nil,
             hiddenDate: now.formatted(date: .abbreviated, time: .omitted))
         XCTAssertEqual(pngTruthMismatches(text, expected: expected), [])
         XCTAssertFalse(text.contains(first.formatted(date: .abbreviated, time: .omitted)))
+    }
+
+    func testPNGTruthValidatorTreatsDateRangeAndSourceIndependently() {
+        let date = "Oct 14, 2026"
+        let range = "Past 30 days"
+        let source = "Derived from smoothed weight, body fat and height"
+        let headline = "FFMI 19.8 Derived estimate"
+        for showDate in [false, true] {
+            for showRange in [false, true] {
+                for showSource in [false, true] {
+                    let expected = SharePNGTruth(
+                        kind: .ffmi, value: "19.8", unit: "", date: showDate ? date : nil,
+                        range: showRange ? range : nil, evidence: "Derived estimate",
+                        source: showSource ? source : nil, hiddenDate: showDate ? nil : date)
+                    let fields = [headline, showDate ? date : "", showRange ? range : "", showSource ? source : ""]
+                    let text = fields.joined(separator: " ")
+                    XCTAssertEqual(pngTruthMismatches(text, expected: expected), [], text)
+                    let wrongDate = showDate ? text.replacingOccurrences(of: date, with: "") : text + " " + date
+                    let wrongRange = showRange ? text.replacingOccurrences(of: range, with: "") : text + " " + range
+                    let wrongSource = showSource ? text.replacingOccurrences(of: source, with: "") : text + " " + source
+                    XCTAssertEqual(pngTruthMismatches(wrongDate, expected: expected), [showDate ? "date" : "privacy"])
+                    XCTAssertEqual(pngTruthMismatches(wrongRange, expected: expected), [showRange ? "range" : "privacy"])
+                    XCTAssertEqual(pngTruthMismatches(wrongSource, expected: expected), ["source"])
+                    XCTAssertEqual(pngTruthMismatches(
+                        text.replacingOccurrences(of: "Derived estimate", with: ""), expected: expected), ["evidence"])
+                }
+            }
+        }
     }
 
     private func truthDetail(points: [MetricChartDataPoint], entries: [MetricHistoryEntry], selected: Date,
@@ -749,10 +779,14 @@ final class BodyScoreShareCardTests: XCTestCase {
         let selectedDate = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-14T12:00:00Z"))
         let expectedDate = selectedDate.formatted(date: .abbreviated, time: .omitted)
         let expectations = [
-            SharePNGTruth(kind: .steps, value: "7,544", unit: "steps", date: expectedDate, evidence: nil),
-            SharePNGTruth(kind: .weight, value: "83.2", unit: "kg", date: expectedDate, evidence: nil),
-            SharePNGTruth(kind: .bodyFat, value: "17.4", unit: "%", date: expectedDate, evidence: "Estimated"),
-            SharePNGTruth(kind: .ffmi, value: "19.8", unit: "", date: expectedDate, evidence: "Derived estimate")
+            SharePNGTruth(kind: .steps, value: "7,544", unit: "steps", date: expectedDate,
+                          range: "30 days", evidence: nil, source: nil),
+            SharePNGTruth(kind: .weight, value: "83.2", unit: "kg", date: expectedDate,
+                          range: "30 days", evidence: nil, source: nil),
+            SharePNGTruth(kind: .bodyFat, value: "17.4", unit: "%", date: expectedDate,
+                          range: "30 days", evidence: "Estimated", source: nil),
+            SharePNGTruth(kind: .ffmi, value: "19.8", unit: "", date: expectedDate,
+                          range: "30 days", evidence: "Derived estimate", source: nil)
         ]
         for expectation in expectations {
             let kind = expectation.kind
@@ -841,11 +875,14 @@ final class BodyScoreShareCardTests: XCTestCase {
             range: "PRIVATE RANGE", trend: "PRIVATE TREND", provenance: "PRIVATE SOURCE")
         let snapshots = [try renderingSnapshot(kind: .bodyFat), try renderingSnapshot(kind: .ffmi), smoothed]
         let expectations = [
-            SharePNGTruth(kind: .bodyFat, value: "17.4", unit: "%", date: nil, evidence: "Estimated",
+            SharePNGTruth(kind: .bodyFat, value: "17.4", unit: "%", date: nil,
+                          range: nil, evidence: "Estimated", source: nil,
                           hiddenDate: date.formatted(date: .abbreviated, time: .omitted)),
-            SharePNGTruth(kind: .ffmi, value: "19.8", unit: "", date: nil, evidence: "Derived estimate",
+            SharePNGTruth(kind: .ffmi, value: "19.8", unit: "", date: nil,
+                          range: nil, evidence: "Derived estimate", source: nil,
                           hiddenDate: date.formatted(date: .abbreviated, time: .omitted)),
-            SharePNGTruth(kind: .weight, value: "81.0", unit: "kg", date: nil, evidence: "Smoothed",
+            SharePNGTruth(kind: .weight, value: "81.0", unit: "kg", date: nil,
+                          range: nil, evidence: "Smoothed", source: nil,
                           hiddenDate: date.formatted(date: .abbreviated, time: .omitted))
         ]
         for (selected, expected) in zip(snapshots, expectations) {
@@ -997,9 +1034,11 @@ final class BodyScoreShareCardTests: XCTestCase {
             id: "raw", date: date, primaryValue: 82, secondaryValue: nil, source: .healthKit)
         for (name, selection, expectation) in [
             ("raw", latest, SharePNGTruth(
-                kind: .weight, value: "82.0", unit: "kg", date: expectedDate, evidence: nil, source: "Apple Health")),
+                kind: .weight, value: "82.0", unit: "kg", date: expectedDate,
+                range: "30 days", evidence: nil, source: "Apple Health")),
             ("average", selected, SharePNGTruth(
-                kind: .weight, value: "81.0", unit: "kg", date: expectedDate, evidence: "Smoothed"))
+                kind: .weight, value: "81.0", unit: "kg", date: expectedDate,
+                range: "30 days", evidence: "Smoothed", source: nil))
         ] {
             let snapshot = ContextualMetricSnapshot(
                 kind: .weight, value: String(format: "%.1f", selection.point.value), unit: "kg",
@@ -1025,7 +1064,8 @@ final class BodyScoreShareCardTests: XCTestCase {
             substituted, aspect: .portrait, options: sourceVisible,
             name: "calibration-average-borrowed-raw-source.png")
         let rejected = pngTruthMismatches(text, expected: SharePNGTruth(
-            kind: .weight, value: "81.0", unit: "kg", date: expectedDate, evidence: "Smoothed"))
+            kind: .weight, value: "81.0", unit: "kg", date: expectedDate,
+            range: "30 days", evidence: "Smoothed", source: nil))
         XCTAssertTrue(rejected.contains("value"))
         XCTAssertTrue(rejected.contains("source"))
     }
@@ -1306,8 +1346,10 @@ final class BodyScoreShareCardTests: XCTestCase {
         let value: String
         let unit: String
         let date: String?
+        // Require each privacy control explicitly; date visibility does not own range or source.
+        let range: String?
         let evidence: String?
-        var source: String?
+        let source: String?
         var hiddenDate: String?
     }
 
@@ -1407,10 +1449,15 @@ final class BodyScoreShareCardTests: XCTestCase {
             if !compact.contains(date.lowercased().filter { $0.isLetter || $0.isNumber }) {
                 mismatches.insert("date")
             }
-            if !compact.contains("30days") { mismatches.insert("range") }
-        } else if compact.contains("30days") || compact.contains("privatetrend") {
+        }
+        if let range = expected.range {
+            if !compact.contains(range.lowercased().filter { $0.isLetter || $0.isNumber }) {
+                mismatches.insert("range")
+            }
+        } else if compact.contains("30days") {
             mismatches.insert("privacy")
         }
+        if compact.contains("privatetrend") { mismatches.insert("privacy") }
         if let hiddenDate = expected.hiddenDate,
            compact.contains(hiddenDate.lowercased().filter { $0.isLetter || $0.isNumber }) {
             mismatches.insert("privacy")
