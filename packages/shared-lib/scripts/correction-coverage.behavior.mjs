@@ -593,6 +593,54 @@ test('ledger CI retains each source against Git even when rule coverage and rece
   assert.deepEqual(value.rules[0].recurrence, { receiptCount: 3, repeatCount: 2 });
 });
 
+test('merge verification retains receipts from every supplied parent', (t) => {
+  const first = receipt('retained', 'static', {
+    guard,
+    classification: classification('static'),
+  });
+  const second = { ...first, source: 'https://example.com/incoming-receipt' };
+  const { root, ref } = fixtureRepo(t, [first]);
+  const ledger = join(root, LEDGER_PATH);
+  const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  writeFileSync(ledger, JSON.stringify([second]));
+  git(['add', '.']);
+  git([
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.com',
+    'commit',
+    '-qm',
+    'incoming',
+  ]);
+  const incoming = git(['rev-parse', 'HEAD']);
+  const args = ['--base-ref', ref, '--base-ref', incoming];
+  writeFileSync(ledger, JSON.stringify([first, second]));
+  const output = 'coverage/corrections/parents.json';
+  const value = runCoverage(['--output', output, ...args], { root, env: {} });
+  assert.deepEqual(JSON.parse(readFileSync(join(root, output), 'utf8')), value);
+  assert.deepEqual(value.rules[0].recurrence, { receiptCount: 2, repeatCount: 1 });
+
+  for (const [kept, parent] of [
+    [first, ref],
+    [second, incoming],
+  ]) {
+    writeFileSync(ledger, JSON.stringify([kept]));
+    // Checking only one parent permits silently losing the other's receipt.
+    assert.equal(runCoverage(['--base-ref', parent], { root, env: {} }).percent, 100);
+    assert.throws(() => runCoverage(args, { root, env: {} }), /removed receipt/);
+  }
+  for (const invalid of [
+    [...args, '--base-ref'],
+    [...args, '--unknown', ref],
+    [...args, '--base-ref', ''],
+  ]) {
+    assert.throws(() => runCoverage(invalid, { root, env: {} }), /usage/);
+  }
+  writeFileSync(ledger, JSON.stringify([first, second]));
+  assert.throws(() => runCoverage([...args, '--base-ref', 'f'.repeat(40)], { root, env: {} }));
+});
+
 test('empty ledger is N/A and proposed or absent guards earn no credit', () => {
   assert.equal(report([]).percent, null);
   assert.match(renderCoverage(report([])), /N\/A \(no rules\)/);

@@ -371,26 +371,29 @@ export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
     writeFileSync(resolve(root, LEDGER_PATH), `${JSON.stringify(merged, null, 2)}\n`);
     argv = [];
   }
-  const options = new Map();
+  const usage =
+    'usage: correction-coverage.mjs [--base-ref <sha|origin/main>]... [--output <path>] | --merge-ledger';
+  const baseRefs = [];
+  let output;
+  assert.equal(argv.length % 2, 0, usage);
   for (let index = 0; index < argv.length; index += 2) {
     const option = argv[index];
     const value = argv[index + 1];
     assert.ok(
-      ['--base-ref', '--output'].includes(option) &&
-        value?.trim() &&
-        !value.startsWith('--') &&
-        !options.has(option),
-      'usage: correction-coverage.mjs [--base-ref <sha|origin/main>] [--output <path>] | --merge-ledger',
+      ['--base-ref', '--output'].includes(option) && value?.trim() && !value.startsWith('--'),
+      usage,
     );
-    options.set(option, value);
+    if (option === '--output') {
+      assert.equal(output, undefined, usage);
+      output = value;
+    } else baseRefs.push(value);
   }
   const current = guardCoverageReport(
     JSON.parse(readSource(LEDGER_PATH, { root })),
     (path) => readSource(path, { root }),
     { requireClassification: true },
   );
-  if (options.has('--base-ref')) {
-    const ref = options.get('--base-ref');
+  for (const ref of baseRefs) {
     const baseline = coverageReport(JSON.parse(readSource(LEDGER_PATH, { root, ref })), (path) =>
       readSource(path, { root, ref }),
     );
@@ -402,10 +405,10 @@ export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
     encoding: 'utf8',
   }).trim();
   current.timestamp = new Date().toISOString();
-  if (options.has('--output')) {
-    const output = resolve(root, options.get('--output'));
-    mkdirSync(dirname(output), { recursive: true });
-    writeFileSync(output, `${JSON.stringify(current, null, 2)}\n`);
+  if (output) {
+    const outputPath = resolve(root, output);
+    mkdirSync(dirname(outputPath), { recursive: true });
+    writeFileSync(outputPath, `${JSON.stringify(current, null, 2)}\n`);
   }
   return current;
 }

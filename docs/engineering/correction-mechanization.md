@@ -72,6 +72,8 @@ node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger
 node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main --update-baselines
 # Read-only verification, using the PR's exact base SHA in CI.
 node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main
+# After a merge conflict, preserve receipts from both immutable parents.
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref <prior-head-sha> --base-ref <merged-main-sha> --output coverage/corrections/coverage.json
 node --test packages/shared-lib/scripts/correction-ratchet.behavior.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```

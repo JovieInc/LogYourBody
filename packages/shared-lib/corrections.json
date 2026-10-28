@@ -2321,5 +2321,169 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "storekit-lifecycles-isolate-simulator-state",
+    "correction": "PR #1593 merge-group run 40300882343: the fourth StoreKit lifecycle purchased successfully but restore returned no entitlement. The shared session and scoped cleanup still allowed cases to share the same StoreKit test server.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40300882343",
+    "mechanization": "Extend the existing StoreKit runner to create a fresh compatible simulator and process for every required lifecycle and delete its owned devices on success or failure. Keep all four native assertions, source checks, coverage exports and exact-case evidence validation. The required runner-routing suite executes the runner with fake native tools and the real evidence validator, rejecting shared devices, skipped/duplicate cases, failed tests or coverage, dirty source and missing cleanup. The isolation regression fails against the prior runner and passes after the change. Native behavior remains subject to macOS merge-group CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner can construct independent simulator test environments for every lifecycle, preventing earlier expiration, refund and cleanup operations from affecting a later case by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/storekit-purchase-restore.sh",
+      "anchor": "SIMULATOR_ID=$(xcrun simctl create"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "ruby-native-cache-matches-runtime-build",
+    "correction": "PR #1593: Resolve the Ruby setup merge conflict without losing executable/shared-library cache fingerprints, persistent bundle cleanup, or post-Bundler checks for date, psych, json and ffi.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1593",
+    "mechanization": "Combine both parents in the existing shared Ruby setup action and extend its offline real-Bundler regression to load all four locked gems and reject each individual load failure. The existing runner-routing suite checks byte-level runtime rebuilds, runner/cache isolation and persistent bundle cleanup; running the combined regressions against either unmerged parent fails. Validate the merged correction ledger against both immutable parents with the existing multi-parent coverage guard.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared setup action constructs cache identities from the active interpreter build and runner identity, preventing incompatible native cache reuse by construction. Clearing leftover bundles ensures a cache miss cannot inherit stale native artifacts."
+      }
+    },
+    "guard": {
+      "path": ".github/actions/setup-ruby-bundler/action.yml",
+      "anchor": "identity = [RUBY_DESCRIPTION, RUBY_PLATFORM, File.realpath(RbConfig.ruby), RbConfig::CONFIG.sort]"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1593: Resolve the origin/main correction-ledger conflict without losing the Ruby runtime cache and Bundler load-order receipts or the incoming Sentry and StoreKit receipts.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1593",
+    "mechanization": "Extend the existing required correction coverage guard to accept repeated immutable --base-ref arguments. Its normal shared-lib behavior suite proves that checking one parent can silently lose the other parent's source, while checking both rejects the loss and preserves recurrence. The new regression fails before the extension and passes afterward. Validate this merged ledger against both actual merge-parent SHAs in one invocation.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "ruby-native-verification-loads-after-bundler",
+    "correction": "PR #1593: Launch Quality failed in Verify Ruby setup because command-line -rdate activated Ruby's default date 3.2.2 before Bundler selected the locked date 3.6.0.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40266780512/job/121390909536",
+    "mechanization": "Require date and psych inside the bundled Ruby script after Bundler setup. The existing required Mac Runner Routing Tests execute the action command against an offline vendor bundle using the real Bundler and gem loader, reproduce the runner's preload order, and verify that default-gem conflicts are avoided while individual date and psych load failures remain fatal. The regression fails with the old command and passes with the fix.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot control native gem verification in the CI setup action before the application builds."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing suite can execute the actual verification command with real Bundler setup, isolated locked gems, the failing preload order and individual load failures."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_ruby_setup_loads_locked_native_gems_after_bundler_setup"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "ruby-native-gem-cache-runtime-isolation",
+    "correction": "LYB-295: Post-merge Launch Quality failed during self-hosted Ruby setup after restoring cached date/psych native extensions with a missing _rb_cFalseClass symbol. Ruby version alone does not identify a compatible native gem cache.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40261816170/job/121375622829",
+    "mechanization": "Version the Ruby cache namespace and bind exact and fallback keys to runner OS, architecture, environment and the Ruby configuration/executable/shared-library fingerprint. The existing required Mac Runner Routing Tests execute the action's runtime probe and native-load verification and reject legacy or foreign cache restores. All three regressions fail on the previous action and pass with the fix; date/psych load failures remain fatal.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot prevent the CI setup action from restoring native gems compiled for another Ruby build before the app is built."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing suite can evaluate both cache lookup paths and execute the actual action commands with changed Ruby build bytes and native-load failures."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_ruby_gem_cache_rejects_foreign_native_extensions_and_legacy_keys"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "slow-chat-fixtures-wait-for-explicit-cancellation",
+    "correction": "PR #1593: Launch Quality cancellation UI test lost its partial answer because the slow fixture completed after 30 seconds while XCTest waited 60 seconds for animations after Send.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40316118527/job/121550248994",
+    "mechanization": "Both DEBUG slow fixture paths use the same cancellable suspension loop, so elapsed time cannot emit a terminal success. Extend the already-required native cancellation case with an injected tick advancing past 60 seconds, then verify the partial stream, pending journal, cancellation and immediate same-ID retry fencing. The existing required Mac Runner Routing Tests reject a finite delay in either path; that guard fails against the prior source and passes with the repair. Native XCTest execution remains unverified on this Linux host.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A shared cancellation-only loop prevents both ephemeral and replay slow fixtures from reaching completion merely because wall-clock time elapsed. The injected main-actor tick makes the former 30-second boundary testable without adding real-time waits."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/ChatService.swift",
+      "anchor": "private func waitForCancellation() async throws {"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-validator-preflight-before-simulator-boot",
+    "correction": "PR #1593 / LYB-295: Launch Quality failed before native execution when the retry-preservation shell fixture exceeded its 10-second limit. The validator suite ran after a cold simulator boot and took 74 seconds on the hosted Mac despite simulator calls already being stubbed in the shell fixtures.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40575938406/job/122442566436",
+    "mechanization": "Run the existing validator preflight once before bootstrap and simulator destination resolution. Extend the existing required Mac Runner Routing Tests to execute the real audit dispatcher, prove successful validation precedes simulator boot and native build/test work, and prove failed or timed-out preflight stops all native work with its original status. Keep diagnostic-only dispatch separate, retain every validator assertion and timeout, and refresh only the exact audit digest while rejecting its previous bytes through the real trusted CLI. The ordering regression fails before the move and passes after it; hosted Mac execution remains required to verify whether isolating simulator startup resolves the observed timeout. The harness owns push and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot order CI validator preflight ahead of simulator startup; the failure occurs before native application execution."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing suite executes the actual audit dispatcher with controlled preflight statuses and records bootstrap, simulator and native-tool ordering without needing Xcode."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_launch_quality_validator_preflight_finishes_before_simulator_boot_and_failure_stops_native_work"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "simulator-testmanager-socket-readiness",
+    "correction": "PR #1593 / LYB-295: merge-group run 40597849156 failed in Mac Unit run 40597923369 after compilation because the booted simulator advertised a missing testmanagerd Unix socket. The destination resolver ignored bootstatus failure and admitted the device without checking that socket.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40597923369",
+    "mechanization": "Extend the existing shared simulator resolver to require successful bootstatus and a real TESTMANAGERD_SIM_SOCK socket. Restart only the selected device once before tests when the socket is stale, recheck it, and fail closed without a destination on unresolved readiness or restart errors. The existing required runner-routing suite executes the real resolver across eleven healthy, stale, malformed and command-failure scenarios using a real Unix socket. Its stale-persistent regression rejects the original resolver. Keep StoreKit isolation coverage, refresh only the reviewed resolver digest among the seven trusted dependency pins, and reject modified resolver bytes through the real trusted diagnostic CLI. Native Mac execution remains required; the harness owns publication.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot repair the simulator test service before XCTest launches the app; this invariant belongs to the native CI destination preflight."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required routing suite executes the actual destination resolver with controlled simctl responses and a real Unix socket, rejecting stale socket admission and verifying bounded recovery and failure propagation before native tests."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_destination"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
