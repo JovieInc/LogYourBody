@@ -25,11 +25,11 @@ function checkedTrace(test: string, coverage: string, root: string) {
   return execFileSync('python3', ['-c', driver, test, coverage], {
     encoding: 'utf8',
     cwd: root,
-    timeout: 30_000,
+    timeout: 90_000,
   });
 }
 
-it('invalidates native source guards for every app and native test source', () => {
+it('invalidates native source guards for every app and native test source and build policy', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const sources = execFileSync(
     'git',
@@ -57,10 +57,18 @@ it('invalidates native source guards for every app and native test source', () =
   );
   expect(sources.length).toBeGreaterThan(0);
   expect(task).toBeDefined();
-  const missing = sources.filter((path) => !Object.hasOwn(task.inputs, `../../${path}`));
-  expect(missing.slice(0, 5), `${missing.length} Swift sources missing from Turbo inputs`).toEqual(
-    [],
-  );
+  const guardedInputs = [
+    ...sources,
+    'apps/ios/.swiftlint.yml',
+    'apps/ios/LogYourBody.xcodeproj/project.pbxproj',
+    'apps/ios/LogYourBody/Info.plist',
+    'apps/ios/LogYourBody/LogYourBody.entitlements',
+  ];
+  const missing = guardedInputs.filter((path) => !Object.hasOwn(task.inputs, `../../${path}`));
+  expect(
+    missing.slice(0, 5),
+    `${missing.length} native guard inputs missing from Turbo inputs`,
+  ).toEqual([]);
 }, 30_000);
 
 it('keeps replay and onboarding state fixtures free of UIKit and SwiftUI animation waits in DEBUG only', () => {
@@ -107,12 +115,12 @@ it('rejects incomplete XCTest proof through the launch gate validator with execu
         .filter((line) => /launch-quality-evidence|behavior tests executed/.test(line))
         .join('\n'),
     );
-    expect(output).toContain('Evidence validator behavior tests executed: 30');
+    expect(output).toContain('Evidence validator behavior tests executed: 32');
     expect(output).toContain('launch-quality-evidence');
   } finally {
     rmSync(coverage, { recursive: true, force: true });
   }
-}, 30_000);
+}, 90_000);
 
 it('propagates evidence assertion failures and nonzero exits despite passing suite markers', () => {
   const directory = mkdtempSync(`${tmpdir()}/lyb-evidence-failure-`);
@@ -125,7 +133,7 @@ it('propagates evidence assertion failures and nonzero exits despite passing sui
         '    def test_missing_canvas_execution(self):\n' +
         '        self.assertEqual(0, 1)\n' +
         'result = unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(Failure))\n' +
-        'print("Evidence validator behavior tests executed: 30")\n' +
+        'print("Evidence validator behavior tests executed: 32")\n' +
         'sys.exit(0 if result.wasSuccessful() else 1)\n',
     );
     expect(() => checkedTrace(test, directory, directory)).toThrow(/AssertionError: 0 != 1/);

@@ -40,6 +40,7 @@ const eventProperties = {
   web_waitlist_started: landingProperties,
   web_waitlist_submit_attempted: landingProperties,
   web_waitlist_submit_result: {
+    ...landingProperties,
     outcome: ['invalid', 'accepted', 'rate_limited', 'server_error'],
   },
   // Legacy name means browser acceptance, including duplicates/honeypots.
