@@ -368,6 +368,21 @@ def main() -> int:
         violations=violations,
     )
 
+    checkin_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
+    checkin_card = checkin_path.read_text().split("var hudGlp1WeeklyCheckIn:", 1)[-1].split(
+        "var isPhaseInsightEnabled:", 1
+    )[0]
+    if not re.search(
+        r"\.padding\(16\)\s*\.contentShape\(Rectangle\(\)\)\s*\.dashboardContentSurface\(",
+        checkin_card,
+    ):
+        violations.append(AuditViolation(
+            check="dashboard.checkin_card_hit_region",
+            file=str(checkin_path.relative_to(root)),
+            line=1,
+            detail="The plain check-in button must define its full padded label as the hit region.",
+        ))
+
     write_outputs(args.artifact_dir, violations)
     if violations:
         print(f"Launch UI regression audit failed with {len(violations)} violation(s).")

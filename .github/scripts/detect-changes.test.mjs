@@ -195,6 +195,13 @@ test('every input the iOS jobs read selects iOS; JS-only roots do not', () => {
   }
 });
 
+test('iOS release and diagnostic workflows are not inputs of the PR iOS jobs', () => {
+  for (const file of ['.github/workflows/ios-ui-diagnostics.yml', '.github/workflows/ios-release-loop.yml', '.github/workflows/ios-testflight-deploy.yml', '.github/workflows/ios-post-merge-quality.yml']) {
+    const fx = queueFixture({ [file]: 'changed' });
+    assert.equal(detect(fx.workspace, mergeGroup(fx), noHold).outputs.ios_unit, 'false', file);
+  }
+});
+
 test('an unfetchable base selects every surface', () => {
   const fx = queueFixture({ 'README.md': 'v2' });
   const { outputs } = detect(fx.workspace, { ...mergeGroup(fx), BASE_SHA: 'f'.repeat(40) }, noHold);
@@ -593,6 +600,27 @@ test("daily-step verifier rejects execution without explicit disposable opt-in",
     result.stderr,
     /Pass --run to create an isolated socket-only cluster/,
   );
+});
+
+test('Launch Quality leaves StoreKit lifecycle tests to the dedicated StoreKit job', () => {
+  const audit = fs.readFileSync(new URL('../../scripts/ios/launch-quality-audit.sh', import.meta.url), 'utf8');
+  assert.match(audit, /-only-testing:LogYourBodyTests \\\n\s+-skip-testing:LogYourBodyTests\/StoreKitPurchaseRestoreTests/);
+  assert.match(audit, /general unit target \(StoreKit lifecycle tests run in the required dedicated job\)/);
+  assert.doesNotMatch(audit, /the complete unit target/);
+  // The skip is only safe while the dedicated job still runs the suite in the queue and on main.
+  assert.match(jobBlock('ios_storekit'), /storekit-purchase-restore\.sh/);
+});
+
+test('UI tests are hermetic: no localhost, and fixed sleeps only shrink', () => {
+  const dir = new URL('../../apps/ios/LogYourBodyUITests/', import.meta.url);
+  let sleeps = 0;
+  for (const name of fs.readdirSync(dir).filter((f) => f.endsWith('.swift'))) {
+    const source = fs.readFileSync(new URL(name, dir), 'utf8');
+    assert.doesNotMatch(source, /localhost|127\.0\.0\.1/, `${name} reaches a local server; use a launch-argument fixture or URLProtocol stub`);
+    sleeps += (source.match(/Thread\.sleep|[^a-zA-Z.]u?sleep\(/g) ?? []).length;
+  }
+  // Ratchet (1 on 2026-10-26, the reduced-motion observation): wait on state for transitions.
+  assert.ok(sleeps <= 1, `UI tests use ${sleeps} fixed sleeps; replace with waitForExistence or an XCTNSPredicateExpectation`);
 });
 
 test('CI Summary does not require StoreKit on a native pull_request (the merge group runs it)', () => {

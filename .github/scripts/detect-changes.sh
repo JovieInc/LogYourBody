@@ -14,9 +14,11 @@ set -euo pipefail
 
 web_pattern='^(agent/|evals/|apps/web/|packages/|\.github/actions/|\.github/scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|scripts/|turbo\.json$)'
 # Everything the iOS and iOS Launch Quality Gate jobs read: the app, its scripts, the setup
-# actions, the Mac routing that runs them, and the workflows that call them. Root package.json
+# actions, the Mac routing that runs them, and the workflows that call them (ios-unit, ios-quality;
+# the release, TestFlight, App Store and UI diagnostics workflows run on main/dispatch only and are not
+# inputs, so editing them no longer spends ~45 hosted macOS minutes on the PR). Root package.json
 # and the JS workspace are not inputs: those jobs run xcodebuild, fastlane and python only.
-ios_pattern='^(apps/ios/|scripts/ios/|\.github/actions/(setup-ios-build|setup-ruby-bundler)/|\.github/scripts/(mac-lane\.sh|detect-changes\.sh)$|\.github/workflows/(ci|mac-lane|mac-lane-route)\.yml$|\.github/workflows/ios[^/]*\.yml$)'
+ios_pattern='^(apps/ios/|scripts/ios/|\.github/actions/(setup-ios-build|setup-ruby-bundler)/|\.github/scripts/(mac-lane\.sh|detect-changes\.sh)$|\.github/workflows/(ci|mac-lane|mac-lane-route)\.yml$|\.github/workflows/ios-(unit|quality)\.yml$)'
 
 have_commit() { git cat-file -e "$1^{commit}" 2>/dev/null; }
 

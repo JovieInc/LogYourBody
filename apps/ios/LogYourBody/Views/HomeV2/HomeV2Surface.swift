@@ -133,6 +133,7 @@ struct HomeV2Surface: View {
             onSelect: { position in
                 if let next = timeline.id(atChronologicalPosition: position) { userSelection.wrappedValue = next }
             },
+            photoURLs: timeline.metrics.reversed().map(\.photoUrl),
             allowsVerticalScrolling: true,
             accessibilityId: "home_v2_timeline_scrubber",
             accessibilityName: "Body timeline"
@@ -624,60 +625,73 @@ struct HomeV2TableRow: View {
     }
 }
 
-/// Thumbnails of every day with a photo. Tapping one selects that day.
+/// The existing ruler supplies gestures and selection. This layer only draws
+/// bounded thumbnails, including the exact selected moment above dense samples.
 struct HomeV2Filmstrip: View {
-    let bodyMetrics: [BodyMetrics]
-    @Binding var selectedIndex: Int
-
-    private var photoIndices: [Int] {
-        bodyMetrics.indices.filter { PhotoTimelineHUDPolicy.hasUsablePhoto(bodyMetrics[$0]) }
-    }
+    let photoURLs: [String?]
+    let selected: Int
+    @Environment(\.layoutDirection) private var layoutDirection
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: HomeV2Tokens.Space.tight) {
-                    ForEach(photoIndices, id: \.self) { index in
-                        thumb(at: index)
+        GeometryReader { geometry in
+            if let layout = HomeV2FilmstripPolicy.Layout(count: photoURLs.count, width: geometry.size.width) {
+                ZStack {
+                    Color.clear
+                        .frame(width: layout.stripWidth, height: 40)
+                        .systemBGlassSurface(cornerRadius: 8)
+                        .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                    ForEach(layout.indices.filter { $0 != selected }, id: \.self) { index in
+                        thumb(at: index, width: layout.cellWidth - 2)
+                            .position(x: layout.center(for: index, rightToLeft: isRTL), y: geometry.size.height / 2)
+                    }
+                    if photoURLs.indices.contains(selected) {
+                        thumb(at: selected, width: layout.cellWidth - 2)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .strokeBorder(HomeV2Tokens.Colors.ink, lineWidth: 2)
+                            }
+                            .position(x: layout.center(for: selected, rightToLeft: isRTL), y: geometry.size.height / 2)
                     }
                 }
-                .padding(.horizontal, HomeV2Tokens.Space.inset)
-                .padding(.top, HomeV2Tokens.Space.row)
-                .padding(.bottom, HomeV2Tokens.Space.tight)
-            }
-            .onAppear { proxy.scrollTo(selectedIndex, anchor: .center) }
-            .onChange(of: selectedIndex) { _, index in
-                withAnimation(.easeInOut(duration: JovieTokens.subtleDuration)) {
-                    proxy.scrollTo(index, anchor: .center)
-                }
             }
         }
-        .frame(height: HomeV2Tokens.thumbSize.height + HomeV2Tokens.Space.row + HomeV2Tokens.Space.tight)
-        .accessibilityIdentifier("home_v2_filmstrip")
+        .accessibilityHidden(true)
+        .task(id: adjacentURLs) {
+            for url in adjacentURLs {
+                guard !Task.isCancelled else { return }
+                _ = await ImageCacheService.shared.loadThumbnail(from: url)
+            }
+        }
     }
 
-    private func thumb(at index: Int) -> some View {
-        let isSelected = index == selectedIndex
-        let shape = RoundedRectangle(cornerRadius: HomeV2Tokens.thumbRadius, style: .continuous)
+    private var isRTL: Bool { layoutDirection == .rightToLeft }
 
-        return Button {
-            selectedIndex = index
-        } label: {
-            CachedAsyncImage(urlString: bodyMetrics[index].photoUrl ?? "") { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-            } placeholder: {
+    private var adjacentURLs: [String] {
+        guard photoURLs.indices.contains(selected) else { return [] }
+        return (max(0, selected - 1)...min(photoURLs.count - 1, selected + 1))
+            .compactMap { photoURLs[$0] }.filter { !$0.isEmpty }
+    }
+
+    private func thumb(at index: Int, width: CGFloat) -> some View {
+        CachedAsyncImage(urlString: photoURLs[index], usesThumbnail: true) { image in
+            image.resizable().scaledToFill()
+        } placeholder: {
+            ZStack {
                 HomeV2Tokens.Colors.card
+                Image(systemName: "photo")
+                    .font(.system(size: 10))
+                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
             }
-            .frame(width: HomeV2Tokens.thumbSize.width, height: HomeV2Tokens.thumbSize.height)
-            .clipShape(shape)
-            .overlay(shape.stroke(isSelected ? HomeV2Tokens.Colors.ink : .clear, lineWidth: 1.5))
-            .opacity(isSelected ? 1 : 0.7)
         }
-        .buttonStyle(.plain)
-        .id(index)
-        .accessibilityLabel(isSelected ? "Selected photo" : "Photo")
+        .id(thumbIdentity(at: index))
+        .frame(width: max(1, width), height: 36)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .opacity(index == selected ? 1 : 0.7)
+    }
+
+    /// Index plus URL, so days that share or lack a photo do not collapse into one view.
+    private func thumbIdentity(at index: Int) -> String {
+        "\(index)|\(photoURLs[index] ?? "")"
     }
 }
 

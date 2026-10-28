@@ -79,7 +79,7 @@ sys.exit(status)
         .filter((line) => /launch-ui-regression-audit|behavior tests executed/.test(line))
         .join('\n'),
     );
-    expect(output).toContain('Launch UI audit behavior tests executed: 15');
+    expect(output).toContain('Launch UI audit behavior tests executed: 17');
     expect(output).toContain('launch-ui-regression-audit');
   } finally {
     rmSync(coverage, { recursive: true, force: true });

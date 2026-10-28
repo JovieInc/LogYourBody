@@ -7,6 +7,59 @@ import XCTest
 @testable import LogYourBody
 
 final class HomeV2PhotoJourneyPolicyTests: XCTestCase {
+    @MainActor
+    func testGlassFilmstripDefaultsOffAndFixtureCannotEnableOutsideUITests() {
+        var checked: [String] = []
+        XCTAssertFalse(HomeV2FilmstripPolicy.isEnabled(
+            arguments: [HomeV2FilmstripPolicy.fixtureArgument], environment: [:], checkGate: {
+                checked.append($0)
+                return false
+            }
+        ))
+        XCTAssertEqual(checked, ["home_v2_glass_filmstrip_v1"])
+        XCTAssertTrue(HomeV2FilmstripPolicy.isEnabled(arguments: [], environment: [:], checkGate: { _ in true }))
+    }
+
+    func testFilmstripLeavesEmptyOrMismatchedPhotoHistoryOnTheExistingRuler() {
+        XCTAssertFalse(HomeV2FilmstripPolicy.canRender(photoURLs: [], dateCount: 0))
+        XCTAssertFalse(HomeV2FilmstripPolicy.canRender(photoURLs: [nil, "", " \n"], dateCount: 3))
+        XCTAssertFalse(HomeV2FilmstripPolicy.canRender(photoURLs: ["file:///photo.jpg"], dateCount: 2))
+        XCTAssertTrue(HomeV2FilmstripPolicy.canRender(photoURLs: [nil, "file:///photo.jpg"], dateCount: 2))
+    }
+
+    func testFilmstripScrubsFourFiveAndDenseHistoriesToTheSameSelectedIndexInBothDirections() throws {
+        for count in [1, 4, 5, 1_000] {
+            let layout = try XCTUnwrap(HomeV2FilmstripPolicy.Layout(count: count, width: 350))
+            XCTAssertLessThanOrEqual(layout.indices.count, 14)
+            XCTAssertEqual(layout.indices.first, 0)
+            XCTAssertEqual(layout.indices.last, count - 1)
+            XCTAssertEqual(Set(layout.indices).count, layout.indices.count)
+            for rightToLeft in [false, true] {
+                for index in 0..<count {
+                    let center = layout.center(for: index, rightToLeft: rightToLeft)
+                    XCTAssertTrue((0...350).contains(center))
+                    XCTAssertEqual(layout.index(at: center, rightToLeft: rightToLeft), index)
+                }
+                XCTAssertEqual(layout.index(at: -100, rightToLeft: rightToLeft), rightToLeft ? count - 1 : 0)
+                XCTAssertEqual(layout.index(at: 450, rightToLeft: rightToLeft), rightToLeft ? 0 : count - 1)
+            }
+        }
+    }
+
+    func testFilmstripRejectsEmptyHistoryAndInvalidGeometryAndDoesNotAnimateSelection() throws {
+        XCTAssertNil(HomeV2FilmstripPolicy.Layout(count: 0, width: 350))
+        XCTAssertNil(HomeV2FilmstripPolicy.Layout(count: -1, width: 350))
+        for width: CGFloat in [0, -1, .nan, .infinity] {
+            XCTAssertNil(HomeV2FilmstripPolicy.Layout(count: 5, width: width))
+        }
+        let layout = try XCTUnwrap(HomeV2FilmstripPolicy.Layout(count: 5, width: 350))
+        for position: CGFloat in [.nan, .infinity, -.infinity] {
+            XCTAssertNil(layout.index(at: position, rightToLeft: false))
+        }
+        // Selection is a pure positional lookup; Reduce Motion needs no alternate motion state.
+        XCTAssertEqual(layout.index(at: 175, rightToLeft: false), 2)
+    }
+
     func testPhotoScrubRequiresMoreThanASecondAndMapsBothDirectionsWithoutAnInitialJump() {
         XCTAssertGreaterThan(HomeV2PhotoScrubPolicy.holdDuration, 1)
         XCTAssertEqual(HomeV2PhotoScrubPolicy.position(start: 4, translation: 0, width: 400, count: 5), 4)
