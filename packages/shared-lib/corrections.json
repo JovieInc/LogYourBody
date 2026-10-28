@@ -3145,7 +3145,7 @@
     "fingerprint": "fix-red-e3b0c44298",
     "correction": "PR #1551 recurring conflict repair: merge origin/main while retaining the filmstrip, both parents correction receipts, reviewed native audit bytes, and the combined resolver safeguards.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1551",
-    "mechanization": "Extend the existing classifier merge resolver to recognize custom short Git conflict markers and reuse the coverage resolver recursive-ancestor reader while preserving manual resolutions and identical parent replays. The real Git conflict-marker-size=2 fixtures fail in both staging modes before the marker change and pass afterward. Use --resolve-merge . --stage and --check-merge . for this instance. Retain incoming annotation diagnostics, every marker/presentation fixture, both future prepend/append cases, the 30-second classifier deadline and 100 percent coverage gates. The lanes harness owns pushing and PR-body edits; its single machine line is supplied in the handoff. On occurrence 32, retain both parents generated fixture scenarios and extend the existing ledger marker detector to the minimum Git conflict-marker-size=1. Both new real-Git repair modes fail before the detector change with JSON parse errors and pass after it, preserving the complete 30-second and 100 percent coverage gates. Reconcile the independent fixture-runner receipts to main's codebase-level reusable-command guard, while retaining the status-returning runner and its failure/success test. Use the extended resolver and read-only check on this merge; the harness retains push and PR-body ownership.",
+    "mechanization": "Extend the existing classifier merge resolver to recognize custom short Git conflict markers and reuse the coverage resolver recursive-ancestor reader while preserving manual resolutions and identical parent replays. The real Git conflict-marker-size=2 fixtures fail in both staging modes before the marker change and pass afterward. Use --resolve-merge . --stage and --check-merge . for this instance. Retain incoming annotation diagnostics, every marker/presentation fixture, both future prepend/append cases, the 30-second classifier deadline and 100 percent coverage gates. The lanes harness owns pushing and PR-body edits; its single machine line is supplied in the handoff. On occurrence 32, retain both parents generated fixture scenarios and extend the existing ledger marker detector to the minimum Git conflict-marker-size=1. Both new real-Git repair modes fail before the detector change with JSON parse errors and pass after it, preserving the complete 30-second and 100 percent coverage gates. Reconcile the independent fixture-runner receipts to main's codebase-level reusable-command guard, while retaining the status-returning runner and its failure/success test. Use the extended resolver and read-only check on this merge; the harness retains push and PR-body ownership. On occurrence 33, resolve the documentation wording conflict in favor of main and extend the same merge verifier to require regular staged guard files. A symlink blob containing the anchor passed initial staged resolution and retries before the change; both real-Git regressions now refuse it without changing the index or working files and accept the restored source. Preserve every fixture, the 30-second deadline and 100 percent classifier coverage. Use --resolve-merge . --stage and --check-merge . for this cleanly merged ledger; the harness owns push and PR-body updates.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -3176,5 +3176,164 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "generated-product-registry-conflict-repair",
+    "correction": "PR #1565: Recurring main merges conflict in generated endpoints alongside independent registry receipts. Preserve both source additions and regenerate the projection instead of selecting a parent output.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1565",
+    "mechanization": "Extend the existing product generator with --resolve-merge: require an active merge, refuse unresolved sources, regenerate and stage only conflicted outputs, and preserve other edits. Real Git merge fixtures failed before the change and pass afterward in the required product-registry test task. Use this mode for the endpoints conflict in this repair.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The generator constructs conflicted projections from merged registry sources and stages only those outputs, preventing stale parent selection and preserving unrelated edits."
+      }
+    },
+    "guard": {
+      "path": "packages/product-registry/scripts/generate.mjs",
+      "anchor": "resolve source conflicts first: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "storekit-cleanup-deletes-only-captured-history",
+    "correction": "PR #1565 / LYB-240: Launch Quality lost the annual subscription during restore despite a shared SKTestSession (one transaction before restore, no entitlement or latest transaction afterward). Cleanup must not issue global clears that can affect later purchases, or treat missing active entitlements as proof that expired/refunded history has been removed.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40200942917/job/121191870429",
+    "mechanization": "Reuse PR #1537's cleanup: setup, teardown and warm-up delete only captured existing transaction IDs, poll both StoreKit history views without further mutation, and throw on timeout. The shared-lib regression rejects global clears and entitlement-only readiness; it fails against the original fixture. All four native lifecycle cases and required gates remain intact. Exact-head native execution remains required.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Deleting only captured transaction IDs prevents delayed cleanup from targeting a transaction created by a later test. A bounded full-history barrier prevents setup from proceeding while old expired/refunded transactions remain visible."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift",
+      "anchor": "try session.deleteTransaction(identifier: transaction.identifier)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "imported-weight-uses-effective-date-and-provenance",
+    "correction": "LYB-240: A historical reading imported today must keep its measurement date and source, and must not displace a newer reading or become current outside the existing recency window.",
+    "source": "https://linear.app/jovie/issue/LYB-240",
+    "mechanization": "BodyMetrics and HKRawSample expose required provenance independent of import time. DashboardMetricFormatting centralizes date labels and selects current weight only by eligible effective dates. Existing Unit XCTest suites cover historical, same-day, future, missing-source and manual entries; native CI execution remains required.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One shared date formatter and a current-weight selector enforce measurement-date labeling and the existing 30-day recency window in the dashboard, while typed provenance prevents UI consumers from falling back to import time."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Helpers/DashboardMetricFormatting.swift",
+      "anchor": "return metric.effectiveDate >= start && metric.effectiveDate <= now"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "healthkit-sync-identifier-requires-version",
+    "correction": "PR #1565: Launch Quality crashed testHealthKitDeclaresObserverDeliveryAndUsesSampleUUID because the provenance sample set HKMetadataKeySyncIdentifier without HKMetadataKeySyncVersion.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40399735171/job/121842307951",
+    "mechanization": "The existing correction ratchet runs healthkit-sync-metadata.mjs on every diff. It rejects a Swift metadata dictionary that names HKMetadataKeySyncIdentifier without HKMetadataKeySyncVersion. Its repair inserts NSNumber(value: 1) and a [String: Any] cast. The original launch-quality fixture fails that scan and passes after repair. The empty baseline makes the rule strict. Use --fix for this sample.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "HealthKit validates metadata inside Apple's HKQuantitySample initializer. Application types cannot reject a dictionary literal that calls that initializer directly."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "healthkit-sync-metadata.mjs can require HKMetadataKeySyncVersion in the same Swift dictionary as HKMetadataKeySyncIdentifier and insert the missing NSNumber version."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/healthkit-sync-metadata.mjs",
+      "anchor": "reject HKMetadataKeySyncIdentifier without HKMetadataKeySyncVersion",
+      "ratchet": {
+        "baseline": "packages/shared-lib/healthkit-sync-metadata-baseline.json"
+      }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "correction": "PR #1565 / LYB-240: Launch Quality compared normalized sourceBundleId to an unsaved HealthKit sample's empty bundle identifier and failed nil versus Optional(\"\"). Native provenance fixtures must respect blank-to-nil metadata normalization while preserving real source identifiers.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40408213055/job/121871680195",
+    "mechanization": "Extend the existing healthkit-sync-metadata scanner and its required correction ratchet to reject direct XCTest equality between normalized source fields and raw HealthKit source fields, in either operand order. Run it on the original assertion to reproduce the finding, normalize the fixture expectation, and run it again cleanly. Shared-lib exercises violating and permitted source snapshots; native cases cover nil, empty, whitespace, real bundle IDs and serialization. The existing empty baseline stays strict. Native execution remains required in CI; the lanes harness owns push and PR updates. During the main merge, retain the generic red-check fingerprint with main’s shell-fixture guard; preserve the specific HealthKit rule and its static guard separately under healthkit-source-assertions-normalize-empty-identifiers.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture launcher owns deadlines, diagnostics and descendant lifetime for every shell contract case, preventing opaque timeouts and orphan pipelines by construction without changing product behavior or native qualification gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "os.killpg(process.pid, signal.SIGKILL)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "correction": "PR #1565: Recurring main merge repairs must preserve both parents' correction receipts and reject staged conflict markers even when Git attributes classify the affected file as binary.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1565",
+    "mechanization": "Extend the existing assertLedgerMergeReady diff with --text so binary presentation cannot hide unresolved staged source. The required shared-lib classifier suite uses real Git repositories with a -diff attribute: the regression accepts a broken index before the fix and refuses it afterward, preserving the ledger and index. Cover initial resolution, explicit staging, verification, staged retries, all four conflict marker forms and clean retries. Use --resolve-merge . --stage and --check-merge . for this instance; the lanes harness retains push and PR ownership. On the next merge, preserve main’s generated marker matrix and bounded child processes. Extend both existing conflict diagnostics to identify the existing and incoming guard paths as well as their sources. The required coverage behavior regression fails before this extension and passes afterward, and the resolver identifies the actual HealthKit-versus-shell guard collision. Resolve that semantic collision explicitly while retaining its specific HealthKit rule, then verify the staged union against both immutable parents.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "healthkit-source-assertions-normalize-empty-identifiers",
+    "correction": "PR #1565 / LYB-240: Launch Quality compared normalized sourceBundleId to an unsaved HealthKit sample's empty bundle identifier and failed nil versus Optional(\"\"). Native provenance fixtures must respect blank-to-nil metadata normalization while preserving real source identifiers.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40408213055/job/121871680195",
+    "mechanization": "Extend the existing healthkit-sync-metadata scanner and its required correction ratchet to reject direct XCTest equality between normalized source fields and raw HealthKit source fields, in either operand order. Run it on the original assertion to reproduce the finding, normalize the fixture expectation, and run it again cleanly. Shared-lib exercises violating and permitted source snapshots; native cases cover nil, empty, whitespace, real bundle IDs and serialization. The existing empty baseline stays strict. Native execution remains required in CI; the lanes harness owns push and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Production metadata already normalizes blank source identifiers correctly. HealthKit owns sourceRevision for unsaved samples, so app types cannot require a nonempty SDK-provided source or prevent a test from comparing the raw string directly."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing HealthKit source scanner can reject direct XCTAssertEqual comparisons of normalized sourceBundleId/sourceName with raw sourceRevision fields before native execution, using the strict existing correction ratchet."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/healthkit-sync-metadata.mjs",
+      "anchor": "HealthKit's unsaved source can be empty; metadata normalizes blanks to nil."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "metric-history-merge-retains-field-provenance",
+    "correction": "PR #1565 recurring conflict repair: merging LYB-240 provenance with LYB-47 Stats truth must retain per-field weight/body-fat source selection as well as source names, effective-date helpers and both native test suites.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1565",
+    "mechanization": "Extend the existing healthkit-sync-metadata scanner, strict empty-baseline correction ratchet and required shared-lib test wrapper to reject row-level dataSource in weight/body-fat history source conversion. The new regression fails before the scanner extension and passes afterward. The scanner rejects both calls in the prior branch source and accepts the combined merge resolution; derived FFMI sources and comment/string examples remain allowed. Use the existing ledger resolver to retain all 156 parent receipts. Native execution remains required in CI; the lanes harness owns pushing and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The generic Git merge cannot compose these independent source edits safely by construction; a parent-only resolution can restore row-level source selection while retaining valid Swift types."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing source scanner can reject metricEntrySourceType calls that use row-level dataSource inside weight/body-fat history providers on every required correction-ratchet run."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/healthkit-sync-metadata.mjs",
+      "anchor": "per-field provenance required for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

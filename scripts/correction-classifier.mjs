@@ -229,9 +229,21 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
           ),
         ];
         const sources = readGitSources(root, objects, execute);
-        const current = guardCoverageReport(receipts, (guard) => sources.get(`:0:${guard}`), {
-          requireClassification: true,
-        });
+        // Guard evidence must be a regular staged file, never a symlink target string.
+        const regularGuards = new Set(
+          git(
+            'ls-files', '--stage', '-z', '--',
+            ...new Set(receipts.filter(({ guard }) => guard).map(({ guard }) => guard.path)),
+          )
+            .split('\0')
+            .filter((entry) => /^100(?:644|755) [a-f0-9]+ 0\t/u.test(entry))
+            .map((entry) => entry.slice(entry.indexOf('\t') + 1)),
+        );
+        const current = guardCoverageReport(
+          receipts,
+          (guard) => (regularGuards.has(guard) ? sources.get(`:0:${guard}`) : ''),
+          { requireClassification: true },
+        );
         for (const { ref, receipts } of baselines) {
           const baseline = coverageReport(receipts, (guard) => sources.get(`${ref}:${guard}`));
           assertNoRegression(current, baseline);

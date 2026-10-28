@@ -257,6 +257,10 @@ export const endpoints = {
       reason: 'Fastlane Match certificates repository.',
     },
     {
+      value: 'https://github.com/JovieInc/LogYourBody/pull/1565',
+      reason: 'PR #1565 source evidence for generated product-registry merge repair.',
+    },
+    {
       value: 'https://github.com/clerk/clerk-ios',
       reason: 'Historical audit/docs remnants; Clerk is not a runtime dependency.',
     },
@@ -459,6 +463,10 @@ export const endpoints = {
     {
       value: 'https://linear.app/jovie/issue/LYB-239',
       reason: 'LYB-239 source evidence for HealthKit import identity and the correction ledger.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-240',
+      reason: 'LYB-240 source evidence for per-reading provenance and effective-date labels.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-252',

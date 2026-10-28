@@ -229,7 +229,103 @@ final class DashboardMetricFormattingTests: XCTestCase {
         }
     }
 
-    // MARK: - Fixture
+    // MARK: - Effective date and current weight (LYB-240)
+
+    private var readingCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    private func readingDate(_ year: Int, _ month: Int, _ day: Int) -> Date {
+        readingCalendar.date(from: DateComponents(year: year, month: month, day: day, hour: 12))!
+    }
+
+    private func dateLabel(_ metric: BodyMetrics, now: Date) -> String {
+        DashboardMetricFormatting.readingDateLabel(
+            effectiveDate: metric.effectiveDate, now: now, calendar: readingCalendar,
+            locale: Locale(identifier: "en_US")
+        )
+    }
+
+    func testHistoricalSampleImportedTodayKeepsItsFullEffectiveDateLabel() {
+        let now = readingDate(2_026, 10, 25)
+        let imported = makeMetric(
+            id: "historical", date: readingDate(2_018, 3, 3), weight: 80, bodyFat: nil, importedAt: now
+        )
+        XCTAssertEqual(imported.provenance.importedAt, now)
+        XCTAssertEqual(dateLabel(imported, now: now), "Mar 3, 2018")
+    }
+
+    func testSameDayAndSameYearLabelsUseEffectiveDate() {
+        let now = readingDate(2_026, 10, 25)
+        let today = makeMetric(id: "today", date: now, weight: 80, bodyFat: nil, importedAt: now)
+        let earlier = makeMetric(id: "earlier", date: readingDate(2_026, 3, 3), weight: 82, bodyFat: nil)
+        let yesterday = makeMetric(id: "yesterday", date: readingDate(2_026, 10, 24), weight: 81, bodyFat: nil)
+        XCTAssertEqual(dateLabel(today, now: now), "Today")
+        XCTAssertEqual(dateLabel(earlier, now: now), "Mar 3")
+        XCTAssertEqual(dateLabel(yesterday, now: now), "Oct 24")
+    }
+
+    func testDateLabelUsesSuppliedCalendarAcrossMidnightAndYearBoundary() {
+        var calendar = readingCalendar
+        calendar.timeZone = TimeZone(secondsFromGMT: -8 * 3_600)!
+        let now = ISO8601DateFormatter().date(from: "2026-01-01T08:30:00Z")!
+        let measurement = now.addingTimeInterval(-3_600)
+        XCTAssertEqual(DashboardMetricFormatting.readingDateLabel(
+            effectiveDate: measurement, now: now, calendar: calendar, locale: Locale(identifier: "en_US")
+        ), "Dec 31, 2025")
+    }
+
+    func testHistoricalImportCannotDisplaceNewerWeightOrBecomeCurrentByItself() {
+        let now = readingDate(2_026, 10, 25)
+        let historical = makeMetric(
+            id: "late-import", date: readingDate(2_018, 3, 3), weight: 90, bodyFat: nil, importedAt: now
+        )
+        let recent = makeMetric(
+            id: "recent", date: now.addingTimeInterval(-86_400), weight: 80, bodyFat: nil
+        )
+        for metrics in [[historical, recent], [recent, historical]] {
+            XCTAssertEqual(DashboardMetricFormatting.currentWeight(
+                in: metrics, now: now, calendar: readingCalendar
+            )?.id, "recent")
+        }
+        XCTAssertNil(DashboardMetricFormatting.currentWeight(in: [historical], now: now, calendar: readingCalendar))
+    }
+
+    func testCurrentWeightRespectsExistingThirtyDayWindowBoundary() {
+        let now = readingDate(2_026, 10, 25)
+        let boundary = readingCalendar.date(byAdding: .day, value: -30, to: now)!
+        let eligible = makeMetric(id: "boundary", date: boundary, weight: 80, bodyFat: nil, importedAt: now)
+        let stale = makeMetric(
+            id: "stale", date: boundary.addingTimeInterval(-1), weight: 81, bodyFat: nil, importedAt: now
+        )
+        XCTAssertEqual(DashboardMetricFormatting.currentWeight(
+            in: [eligible, stale], now: now, calendar: readingCalendar
+        )?.id, "boundary")
+        XCTAssertNil(DashboardMetricFormatting.currentWeight(in: [stale], now: now, calendar: readingCalendar))
+    }
+
+    func testFutureSampleKeepsItsDateAndCannotBecomeCurrentWeight() {
+        let now = readingDate(2_026, 10, 25)
+        let future = makeMetric(
+            id: "future", date: readingDate(2_027, 3, 3), weight: 90, bodyFat: nil, importedAt: now
+        )
+        let laterToday = makeMetric(id: "later", date: now.addingTimeInterval(60), weight: 89, bodyFat: nil)
+        let today = makeMetric(id: "today", date: now, weight: 80, bodyFat: nil, importedAt: now)
+        XCTAssertEqual(dateLabel(future, now: now), "Mar 3, 2027")
+        XCTAssertNil(DashboardMetricFormatting.currentWeight(in: [future, laterToday], now: now))
+        XCTAssertEqual(DashboardMetricFormatting.currentWeight(in: [future, laterToday, today], now: now)?.id, "today")
+    }
+
+    func testMissingAndInvalidWeightsDoNotHideLatestValidReading() {
+        let now = readingDate(2_026, 10, 25)
+        let valid = makeMetric(id: "valid", date: now.addingTimeInterval(-60), weight: 80, bodyFat: nil)
+        let invalid = [nil, Double.nan, Double.infinity, -1, 0].enumerated().map { index, weight in
+            makeMetric(id: "invalid-\(index)", date: now, weight: weight, bodyFat: nil)
+        }
+        XCTAssertEqual(DashboardMetricFormatting.currentWeight(in: invalid + [valid], now: now)?.id, "valid")
+    }
 
     // LYB-47 extends the existing truth calculator fixtures; dates are deliberately unequal.
     func testObservationSummaryUsesEndpointsAndObservationMeanAcrossUnequalDates() throws {
@@ -353,7 +449,11 @@ final class DashboardMetricFormattingTests: XCTestCase {
         MetricChartDataPoint(date: base.addingTimeInterval(Double(days) * 86_400), value: value, presence: presence)
     }
 
-    private func makeMetric(id: String, date: Date, weight: Double?, bodyFat: Double?) -> BodyMetrics {
+    // MARK: - Fixture
+
+    private func makeMetric(
+        id: String, date: Date, weight: Double?, bodyFat: Double?, importedAt: Date? = nil
+    ) -> BodyMetrics {
         BodyMetrics(
             id: id,
             userId: "dashboard-metric-format-user",
@@ -367,9 +467,15 @@ final class DashboardMetricFormattingTests: XCTestCase {
             boneMass: nil,
             notes: nil,
             photoUrl: nil,
-            dataSource: BodyMetricSource.manual.rawValue,
-            createdAt: date,
-            updatedAt: date
+            dataSource: importedAt == nil ? "manual" : "healthkit",
+            sourceMetadata: importedAt.map {
+                BodyMetricSourceMetadata(
+                    sourceName: "Test scale", sourceBundleId: "com.example.scale",
+                    importedAt: ISO8601DateFormatter().string(from: $0)
+                )
+            },
+            createdAt: importedAt ?? date,
+            updatedAt: importedAt ?? date
         )
     }
 }

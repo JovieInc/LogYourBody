@@ -73,6 +73,21 @@ final class BodyMetricSourceContractTests: XCTestCase {
         XCTAssertEqual(decoded.jsonObject["vendor"] as? String, "BodySpec")
     }
 
+    func testSourceBundleIdentifierNormalizationAndRoundTrip() throws {
+        let cases: [(String?, String?)] = [
+            (nil, nil), ("", nil), (" \t\n ", nil),
+            ("com.example.scale", "com.example.scale"),
+            (" com.example.scale\n", "com.example.scale")
+        ]
+        for (raw, expected) in cases {
+            let metadata = BodyMetricSourceMetadata(vendor: "apple_health", sourceBundleId: raw)
+            XCTAssertEqual(metadata.sourceBundleId, expected)
+            XCTAssertEqual(metadata.jsonObject["source_bundle_id"] as? String, expected)
+            let decoded = try XCTUnwrap(BodyMetricSourceMetadata(jsonString: metadata.jsonString))
+            XCTAssertEqual(decoded.sourceBundleId, expected)
+        }
+    }
+
     @MainActor
     func testHistoryMetadataConversionServicesMainQueueBeforeFinishing() async throws {
         let (context, cached) = try cachedHistory(count: 151)
@@ -245,5 +260,156 @@ extension BodyMetricSourceContractTests {
         XCTAssertEqual(restored.entrySource(for: .bodyFat), .manual)
         XCTAssertNotNil(restored.jsonObject["future"])
         XCTAssertEqual(restored.vendor, "apple_health")
+    }
+}
+
+extension BodyMetricSourceContractTests {
+    func testImportedProvenanceRoundTripsEffectiveAndImportDatesIndependently() throws {
+        let measured = Date(timeIntervalSince1970: 1_520_078_400) // March 3, 2018
+        let imported = Date(timeIntervalSince1970: 1_792_929_600)
+        let metadata = BodyMetricSourceMetadata(
+            sourceName: " Test scale ", sourceBundleId: "com.example.scale",
+            importedAt: ISO8601DateFormatter().string(from: imported)
+        )
+        let original = try provenanceMetric(source: "healthkit", date: measured, createdAt: imported, metadata: metadata)
+        let decoded = try JSONDecoder().decode(BodyMetrics.self, from: JSONEncoder().encode(original))
+        XCTAssertEqual(decoded.provenance, original.provenance)
+        XCTAssertEqual(decoded.provenance.sourceName, "Test scale")
+        XCTAssertEqual(decoded.provenance.sourceBundleId, "com.example.scale")
+        XCTAssertEqual(decoded.provenance.effectiveDate, measured)
+        XCTAssertEqual(decoded.provenance.importedAt, imported)
+        XCTAssertEqual(decoded.effectiveDate, measured)
+    }
+
+    func testMissingImportSourceStillExposesHonestRequiredProvenance() throws {
+        let measured = Date(timeIntervalSince1970: 1_520_078_400)
+        let imported = measured.addingTimeInterval(86_400)
+        for source in ["healthkit", "smart_scale", "bodyspec_dexa", "dexa_pdf", "inbody_pdf", "pdf_import", "photo"] {
+            for metadata in [nil, BodyMetricSourceMetadata(sourceName: " \n", sourceBundleId: " ")] {
+                let metric = try provenanceMetric(source: source, date: measured, createdAt: imported, metadata: metadata)
+                XCTAssertFalse(metric.provenance.sourceName.isEmpty)
+                XCTAssertNotEqual(metric.provenance.sourceName, "Manual")
+                XCTAssertEqual(metric.provenance.effectiveDate, measured)
+                XCTAssertEqual(metric.provenance.importedAt, imported)
+                XCTAssertNil(metric.provenance.sourceBundleId, "Do not invent an upstream bundle ID")
+                XCTAssertEqual(metric.metricSource.rawValue, source)
+            }
+        }
+    }
+
+    func testInvalidImportTimestampFallsBackToCreationNeverMeasurementDate() throws {
+        let measured = Date(timeIntervalSince1970: 1_520_078_400)
+        let imported = measured.addingTimeInterval(86_400)
+        let invalid = try provenanceMetric(
+            source: "healthkit", date: measured, createdAt: imported,
+            metadata: BodyMetricSourceMetadata(importedAt: "invalid")
+        )
+        XCTAssertEqual(invalid.provenance.importedAt, imported)
+        XCTAssertEqual(invalid.provenance.effectiveDate, measured)
+        let fractional = try provenanceMetric(
+            source: "healthkit", date: measured, createdAt: imported,
+            metadata: BodyMetricSourceMetadata(importedAt: "2026-10-25T12:00:00.125Z")
+        )
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions.insert(.withFractionalSeconds)
+        XCTAssertEqual(fractional.provenance.importedAt, formatter.date(from: "2026-10-25T12:00:00.125Z"))
+    }
+
+    func testLegacyManualEntriesRetainManualSourceAndEffectiveDate() throws {
+        let date = Date(timeIntervalSince1970: 1_520_078_400)
+        let manual = try provenanceMetric(source: nil, date: date, createdAt: date, metadata: nil)
+        XCTAssertEqual(manual.metricSource, .manual)
+        XCTAssertEqual(manual.measurementSource(for: .weight), .manual)
+        XCTAssertEqual(manual.provenance.sourceName, "Manual")
+        XCTAssertEqual(manual.provenance.effectiveDate, date)
+        XCTAssertNil(manual.provenance.sourceBundleId)
+    }
+
+    func testRawHealthSampleKeepsHistoricalEffectiveDateAndImportProvenance() {
+        let measured = Date(timeIntervalSince1970: 1_520_078_400)
+        let imported = Date(timeIntervalSince1970: 1_792_929_600)
+        let sample = HKRawSample(
+            id: "raw", userId: "owner", hkUUID: "sample", quantityType: "bodyMass", value: 80, unit: "kg",
+            startDate: measured, endDate: measured, sourceName: "Test scale", sourceBundleId: "com.example.scale",
+            deviceManufacturer: nil, deviceModel: nil, deviceHardwareVersion: nil, deviceFirmwareVersion: nil,
+            deviceSoftwareVersion: nil, deviceLocalIdentifier: nil, deviceUDI: nil, metadata: nil,
+            createdAt: imported, updatedAt: imported
+        )
+        XCTAssertEqual(sample.effectiveDate, measured)
+        XCTAssertEqual(sample.provenance.effectiveDate, measured)
+        XCTAssertEqual(sample.provenance.importedAt, imported)
+        XCTAssertEqual(sample.provenance.sourceName, "Test scale")
+        XCTAssertEqual(sample.provenance.sourceBundleId, "com.example.scale")
+        let missing = BodyMetricProvenance(
+            sourceName: " ", sourceBundleId: nil, effectiveDate: measured, importedAt: imported
+        )
+        XCTAssertEqual(missing.sourceName, "Unknown source")
+    }
+
+    func testSmartScaleImportRetainsUpstreamBundleIdentifier() throws {
+        let sample = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: "sample", kind: .weight, value: 80, date: Date(),
+            sourceName: "Test scale", sourceBundleId: "com.example.scale"
+        ))
+        XCTAssertEqual(sample.sourceBundleId, "com.example.scale")
+        XCTAssertEqual(sample.sourceName, "Test scale")
+    }
+
+    func testCombinedHealthKitImportKeepsSourceAndImportDate() throws {
+        let imported = Date(timeIntervalSince1970: 1_792_929_600)
+        let metadata = BodyMetricSourceMetadata(
+            sourceName: "Test scale", sourceBundleId: "com.example.scale", sampleId: "weight",
+            importedAt: ISO8601DateFormatter().string(from: imported)
+        ).recordingHealthKitContext(["time_zone": "America/Los_Angeles", "sync_identifier": "weight-edit"])
+        let bodyFat = BodyMetricSourceMetadata(
+            sourceBundleId: "com.example.body-fat", sampleId: "body-fat",
+            importedAt: ISO8601DateFormatter().string(from: imported.addingTimeInterval(60))
+        ).recordingHealthKitContext(["sync_identifier": "body-fat-edit", "sync_version": "2"])
+        let combined = try XCTUnwrap(HealthKitManager.shared.combinedHealthKitMetadata(
+            weightMetadata: metadata, bodyFatMetadata: bodyFat
+        ))
+        XCTAssertEqual(combined.sourceName, metadata.sourceName)
+        XCTAssertEqual(combined.sourceBundleId, metadata.sourceBundleId)
+        XCTAssertEqual(combined.importedAt, metadata.importedAt)
+        XCTAssertEqual(combined.bodyFatSampleId, "body-fat")
+        XCTAssertEqual(combined.healthKitContext, metadata.healthKitContext)
+        XCTAssertEqual(combined.pairedHealthKitBodyFat, bodyFat)
+        let bodyFatOnly = try XCTUnwrap(HealthKitManager.shared.combinedHealthKitMetadata(
+            weightMetadata: nil, bodyFatMetadata: bodyFat
+        ))
+        XCTAssertEqual(bodyFatOnly.importedAt, bodyFat.importedAt)
+        XCTAssertEqual(bodyFatOnly.healthKitContext, bodyFat.healthKitContext)
+    }
+
+    @MainActor
+    func testCachedImportKeepsProvenanceAfterCoreDataConversion() throws {
+        let (context, cached) = try cachedHistory(count: 1)
+        defer { context.reset() }
+        let measured = Date(timeIntervalSince1970: 1_520_078_400)
+        let imported = Date(timeIntervalSince1970: 1_792_929_600)
+        cached[0].date = measured
+        cached[0].createdAt = imported
+        cached[0].sourceMetadataJSON = BodyMetricSourceMetadata(
+            sourceName: "Test scale", sourceBundleId: "com.example.scale",
+            importedAt: ISO8601DateFormatter().string(from: imported)
+        ).jsonString
+        let metric = try XCTUnwrap(cached[0].toBodyMetrics())
+        XCTAssertEqual(metric.provenance.sourceName, "Test scale")
+        XCTAssertEqual(metric.provenance.sourceBundleId, "com.example.scale")
+        XCTAssertEqual(metric.provenance.effectiveDate, measured)
+        XCTAssertEqual(metric.provenance.importedAt, imported)
+    }
+
+    private func provenanceMetric(
+        source: String?, date: Date, createdAt: Date, metadata: BodyMetricSourceMetadata?
+    ) throws -> BodyMetrics {
+        var payload: [String: Any] = [
+            "id": "provenance", "user_id": "owner", "date": date.timeIntervalSinceReferenceDate,
+            "created_at": createdAt.timeIntervalSinceReferenceDate,
+            "updated_at": createdAt.timeIntervalSinceReferenceDate, "weight": 80
+        ]
+        payload["data_source"] = source
+        payload["source_metadata"] = metadata?.jsonObject
+        return try JSONDecoder().decode(BodyMetrics.self, from: JSONSerialization.data(withJSONObject: payload))
     }
 }

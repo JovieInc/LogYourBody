@@ -570,7 +570,56 @@ struct BodyMetricLocalDate: Equatable {
     }
 }
 
+/// Required UI provenance, including for legacy imports with incomplete metadata.
+/// A nil bundle ID means the upstream source did not supply an application ID.
+struct BodyMetricProvenance: Equatable, Sendable {
+    let sourceName: String
+    let sourceBundleId: String?
+    let effectiveDate: Date
+    let importedAt: Date
+
+    init(sourceName: String?, sourceBundleId: String?, effectiveDate: Date, importedAt: Date) {
+        let name = sourceName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let bundle = sourceBundleId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.sourceName = name.flatMap { $0.isEmpty ? nil : $0 } ?? "Unknown source"
+        self.sourceBundleId = bundle.flatMap { $0.isEmpty ? nil : $0 }
+        self.effectiveDate = effectiveDate
+        self.importedAt = importedAt
+    }
+}
+
 struct BodyMetrics: Identifiable, Codable, Equatable {
+    /// `date` is always the measurement date; creation/import time cannot replace it.
+    var effectiveDate: Date { date }
+
+    var provenance: BodyMetricProvenance {
+        let formatter = ISO8601DateFormatter()
+        let recordedImportDate = sourceMetadata?.importedAt.flatMap { value -> Date? in
+            if let date = formatter.date(from: value) { return date }
+            formatter.formatOptions.insert(.withFractionalSeconds)
+            return formatter.date(from: value)
+        }
+        let name = sourceMetadata?.sourceName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallback: String
+        switch metricSource {
+        case .manual: fallback = "Manual"
+        case .healthKit: fallback = "Apple Health"
+        case .smartScale: fallback = "Smart scale"
+        case .bodySpecDexa: fallback = "BodySpec DEXA"
+        case .dexaPDF: fallback = "DEXA PDF"
+        case .inbodyPDF: fallback = "InBody PDF"
+        case .pdfImport: fallback = "PDF import"
+        case .caliper: fallback = "Calipers"
+        case .photo: fallback = "Photo"
+        default: fallback = "Unknown source"
+        }
+        return BodyMetricProvenance(
+            sourceName: name?.isEmpty == false ? name : fallback,
+            sourceBundleId: sourceMetadata?.sourceBundleId,
+            effectiveDate: effectiveDate, importedAt: recordedImportDate ?? createdAt
+        )
+    }
+
     func measurementSource(for field: BodyMetricField) -> BodyMetricSource {
         sourceMetadata?.entrySource(for: field) ?? metricSource
     }

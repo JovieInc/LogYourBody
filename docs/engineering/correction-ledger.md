@@ -92,6 +92,8 @@ Each verification batches staged and immutable parent guard blobs in one Git
 process, parsing byte lengths and retaining fresh index reads on every retry.
 The real Git matrix checks the process count, Unicode paths, multibyte and binary
 contents, aggregate output over 1 MiB, and missing staged sources.
+Verification also checks staged file modes: a symlink target containing a guard
+anchor cannot establish coverage, even when the working file is regular source.
 
 For additive ledger conflicts during a merge, run
 `node scripts/correction-classifier.mjs --resolve-merge .` from the repository

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -340,6 +340,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     ['concurrent', true],
     ['missing-index-guard', true],
     ['missing-index-source', true],
+    ['symlink-index-guard', true],
     ['guard-conflict', true],
     ['unrelated-conflict', true],
     ...markerScenarios.map((scenario) => [scenario, true]),
@@ -355,6 +356,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       'missing-guard',
       'missing-index-guard',
       'missing-index-source',
+      'symlink-index-guard',
       'guard-conflict',
       ...markerScenarios,
       'manual-missing-receipt',
@@ -510,6 +512,15 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       git('rm', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
+    if (scenario === 'symlink-index-guard') {
+      const path = join(repository, rows[0].guard.path);
+      rmSync(path);
+      // A symlink target can contain the anchor without supplying executable guard source.
+      symlinkSync(rows[0].guard.anchor, path);
+      git('add', rows[0].guard.path);
+      rmSync(path);
+      writeFileSync(path, rows[0].guard.anchor);
+    }
     if (scenario === 'binary-marker') {
       // Binary attributes must not hide markers from either resolver mode.
       writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
@@ -576,6 +587,28 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       const resolved = readFileSync(ledger, 'utf8');
       const index = git('ls-files', '--stage');
       if (scenario === 'additions') {
+        const path = join(repository, rows[0].guard.path);
+        rmSync(path);
+        symlinkSync(rows[0].guard.anchor, path);
+        git('add', rows[0].guard.path);
+        rmSync(path);
+        writeFileSync(path, rows[0].guard.anchor);
+        const symlinkIndex = git('ls-files', '--stage');
+        for (const args of [
+          ['--check-merge', repository],
+          ['--resolve-merge', repository],
+          ['--resolve-merge', repository, '--stage'],
+        ]) {
+          const rejected = run(...args);
+          assert.equal(rejected.status, 1, 'a symlink cannot establish staged guard coverage');
+          assert.match(rejected.stderr, /missing guard anchor/);
+          assert.equal(git('ls-files', '--stage'), symlinkIndex);
+          assert.equal(readFileSync(ledger, 'utf8'), resolved);
+          assert.equal(readFileSync(path, 'utf8'), rows[0].guard.anchor);
+        }
+        git('add', rows[0].guard.path);
+        assert.equal(run('--check-merge', repository).status, 0);
+        assert.equal(git('ls-files', '--stage'), index);
         for (const args of [
           ['--check-merge', repository],
           ['--resolve-merge', repository, '--stage'],
