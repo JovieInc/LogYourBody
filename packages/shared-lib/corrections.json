@@ -3807,5 +3807,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "storekit-build-once-preserves-isolated-lifecycle-evidence",
+    "correction": "PR #1585 merge group40764937933 cancelled StoreKit qualification at the unchanged45-minute job boundary after all four method passes but before the fourth XCTest completion and evidence export. Repeated build planning consumed finalization margin.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40764937933/job/123086793219",
+    "mechanization": "Prepare the exact StoreKit test plan once with build-for-testing and reject source changes before any lifecycle. Execute all four unchanged selectors with test-without-building on four separately created, booted and deleted simulators. Preserve per-case XCTest validation, coverage export, source binding and partial failure artifacts. The existing required routing suite executes this runner and the real evidence validator for success and ten failure scenarios. It rejects repeated builds, missing lifecycles, shared devices, skipped validation and swallowed fourth-case failures. The original runner fails the new regression; hosted timing and complete native qualification remain required. No deadline, retry, workflow, signing or permission changes.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing StoreKit controller can eliminate repeated build preparation by construction without sharing mutable simulator or transaction state. Required executable orchestration regressions retain complete per-lifecycle evidence and fail closed on preparation, source, XCTest and coverage errors."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_storekit_lifecycles_use_fresh_devices_and_preserve_failure_evidence"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

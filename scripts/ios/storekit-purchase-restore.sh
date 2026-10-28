@@ -65,6 +65,17 @@ trap finish EXIT
     fi
   }
   trap cleanup_simulator EXIT
+  # Compile this exact source/test plan once. The four clean devices below
+  # still own independent StoreKit state and XCTest processes. Re-running
+  # build planning per lifecycle consumed the final evidence-export margin in
+  # merge group 40764937933; keep the job deadline and every receipt check.
+  xcodebuild -project LogYourBody.xcodeproj -scheme LogYourBodyTiers \
+    -testPlan StoreKit -configuration Debug -destination "$SEED_DESTINATION" \
+    -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 \
+    -enableCodeCoverage YES \
+    CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO build-for-testing
+  git -C "$ROOT_DIR" diff HEAD --binary > "$RESULTS/source-working-tree.patch"
+  [[ ! -s "$RESULTS/source-working-tree.patch" ]] || { echo "StoreKit build modified source" >&2; exit 65; }
   # StoreKit has one test server per simulator. A serial test plan still lets
   # expiration/refund and cleanup from earlier cases affect a later restore.
   # Give every lifecycle a fresh device and process; never retry a failed case.
@@ -81,7 +92,7 @@ trap finish EXIT
       -only-testing:"LogYourBodyTests/StoreKitPurchaseRestoreTests/$TEST" \
       -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 \
       -enableCodeCoverage YES -resultBundlePath "$RESULTS/$TEST.xcresult" \
-      CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO test
+      CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO test-without-building
     git -C "$ROOT_DIR" diff HEAD --binary > "$RESULTS/source-working-tree.patch"
     [[ ! -s "$RESULTS/source-working-tree.patch" ]] || { echo "StoreKit build modified source" >&2; exit 65; }
     python3 ../../scripts/ios/launch-quality-evidence.py --bundle "$RESULTS/$TEST.xcresult" \
