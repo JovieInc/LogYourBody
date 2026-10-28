@@ -28,6 +28,9 @@ export type TrunkDemand = {
 
 export type CatalogVariant = {
   id: string;
+  /** Explicit setup relationship; otherwise this ID identifies a distinct exercise.
+   * Do not infer exercise identity from names, support or target muscle. */
+  setupForExerciseId?: string;
   name: string;
   primaryMuscle: MuscleGroup;
   muscleContribution: MuscleContribution;
@@ -470,6 +473,7 @@ export const EXERCISE_CATALOG: CatalogVariant[] = [
   // Reviewed additions: alternatives the catalog did not previously offer.
   {
     id: 'lying_dumbbell_curl',
+    setupForExerciseId: 'dumbbell_curl',
     name: 'Lying dumbbell curl',
     primaryMuscle: 'biceps',
     muscleContribution: { biceps: 1 },
@@ -500,6 +504,7 @@ export const EXERCISE_CATALOG: CatalogVariant[] = [
   },
   {
     id: 'supported_cable_curl',
+    setupForExerciseId: 'cable_curl',
     name: 'Incline cable curl',
     primaryMuscle: 'biceps',
     muscleContribution: { biceps: 1 },
