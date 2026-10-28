@@ -3335,5 +3335,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1613: The separator 1.2.0 manifest update retained a 1.1.15 workspace lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Extend the dependency-repair machine in the same PR and use it for this repair.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1613",
+    "mechanization": "Extend the existing source resolver to restore the original lockfile when dependency resolution or frozen verification fails. Four behavioral regressions in the existing required Detect Changes suite fail before rollback and pass afterward, proving restoration of existing or absent lockfiles, preservation of the index and projection, and successful retry. Run the extended --refresh-lockfile helper on this dependency update while retaining frozen install and parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
