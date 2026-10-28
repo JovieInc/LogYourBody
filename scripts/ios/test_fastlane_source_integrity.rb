@@ -45,6 +45,16 @@ module LaneHarness
       STATE[:actions] << name
       STATE[:build_options] = kwargs.empty? ? args.fetch(0) : kwargs
       raise 'instrumented build failure' if STATE[:fail_build]
+    when :sh
+      output, status = Open3.capture2e(*args)
+      raise "simulator preparation failed: #{output}" unless status.success?
+    when :run_tests
+      STATE[:actions] << name
+      STATE[:test_options] = kwargs
+      if ENV['SIMULATOR_STATE']
+        raise 'stale testmanagerd socket reached XCTest' unless File.read(ENV.fetch('SIMULATOR_STATE')) == 'ready'
+      end
+      raise 'instrumented native test failure' if STATE[:fail_tests]
     else
       raise NoMethodError, "Uninstrumented Fastlane action: #{name}"
     end
@@ -98,6 +108,83 @@ Dir.mktmpdir('lyb-fastlane-version-') do |dir|
   end
   check(File.read(STATE[:version_file]) == '100', 'failed compile mutated build identity')
   checks += 1
+end
+
+# Execute the real Unit lane with a stale persistent simulator. Only simctl and
+# XCTest are instrumented; no Xcode installation is needed for these controls.
+Dir.mktmpdir('lyb-unit-simulator-') do |dir|
+  simulator = 'E3A9DBBC-8049-4A68-B9BD-ED1478D20883'
+  destination = "platform=iOS Simulator,id=#{simulator}"
+  executable = File.join(dir, 'xcrun')
+  File.write(executable, <<~SH)
+    #!/bin/bash
+    set -euo pipefail
+    printf '%s\\n' "$*" >> "$SIMULATOR_CALLS"
+    [[ "$1" == simctl && "$3" == "$SIMULATOR_ID" ]] || exit 90
+    if [[ "$2" == "$SIMULATOR_FAIL" ]]; then exit 19; fi
+    case "$2" in
+      shutdown)
+        [[ "$(cat "$SIMULATOR_STATE")" != off ]] || exit 1
+        printf off > "$SIMULATOR_STATE" ;;
+      boot)
+        [[ "$(cat "$SIMULATOR_STATE")" == off ]] || exit 20
+        printf booting > "$SIMULATOR_STATE" ;;
+      bootstatus)
+        [[ "$4" == -b && "$(cat "$SIMULATOR_STATE")" == booting ]] || exit 21
+        printf ready > "$SIMULATOR_STATE" ;;
+      *) exit 91 ;;
+    esac
+  SH
+  FileUtils.chmod(0o755, executable)
+  saved_env = ENV.to_h
+  begin
+    ENV.update('PATH' => "#{dir}:#{ENV.fetch('PATH')}",
+               'SIMULATOR_STATE' => File.join(dir, 'state'),
+               'SIMULATOR_CALLS' => File.join(dir, 'calls'),
+               'SIMULATOR_ID' => simulator)
+    %w[stale off shutdown boot bootstatus native].each do |scenario|
+      File.write(ENV.fetch('SIMULATOR_STATE'), scenario == 'off' ? 'off' : 'stale')
+      File.write(ENV.fetch('SIMULATOR_CALLS'), '')
+      ENV['SIMULATOR_FAIL'] = %w[shutdown boot bootstatus].include?(scenario) ? scenario : ''
+      STATE[:actions] = []
+      STATE[:fail_tests] = scenario == 'native'
+      failure = nil
+      begin
+        ci_test_unit(destination: destination, output_directory: File.join(dir, 'results'))
+      rescue RuntimeError => e
+        failure = e.message
+      end
+      if %w[shutdown boot bootstatus].include?(scenario)
+        check(failure&.include?('simulator preparation failed'), "#{scenario}: preparation failure was ignored")
+        check(!STATE[:actions].include?(:run_tests), "#{scenario}: unhealthy simulator reached XCTest")
+      else
+        expected_failure = scenario == 'native' ? 'instrumented native test failure' : nil
+        check(failure == expected_failure, "#{scenario}: #{failure || 'native failure was swallowed'}")
+        check(STATE[:actions].count(:run_tests) == 1, "#{scenario}: Unit suite was skipped or retried")
+        options = STATE.fetch(:test_options)
+        check(options[:scheme] == 'LogYourBodyTiers' && options[:testplan] == 'Unit' && options[:code_coverage] == true,
+              'Unit selector or coverage changed')
+        check(options[:destination] == destination && options[:output_directory] == File.join(dir, 'results') &&
+              options[:result_bundle] == true && options[:disable_concurrent_testing] == true,
+              'Unit destination, evidence or concurrency controls changed')
+      end
+      calls = File.readlines(ENV.fetch('SIMULATOR_CALLS'), chomp: true)
+      expected = ["simctl shutdown #{simulator}", "simctl boot #{simulator}"]
+      expected << "simctl bootstatus #{simulator} -b" unless %w[shutdown boot].include?(scenario)
+      check(calls == expected, "#{scenario}: unexpected simulator preparation or retry: #{calls}")
+      checks += 1
+    end
+    ENV.delete('SIMULATOR_STATE')
+    STATE[:actions] = []
+    STATE[:fail_tests] = false
+    File.write(ENV.fetch('SIMULATOR_CALLS'), '')
+    ci_test_unit(device: 'iPhone 16')
+    check(STATE.fetch(:test_options)[:device] == 'iPhone 16', 'named-device fallback changed')
+    check(File.read(ENV.fetch('SIMULATOR_CALLS')).empty?, 'preparation touched an unselected simulator')
+    checks += 1
+  ensure
+    ENV.replace(saved_env)
+  end
 end
 
 workflow = YAML.safe_load(File.read(WORKFLOW), aliases: true)
