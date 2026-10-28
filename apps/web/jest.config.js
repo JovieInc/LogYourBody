@@ -1,3 +1,5 @@
+// next/jest loads this async config through CommonJS module.exports.
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS config required by next/jest */
 const nextJest = require('next/jest');
 
 const createJestConfig = nextJest({

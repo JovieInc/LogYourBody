@@ -285,7 +285,16 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     'external-marker',
     'color-marker',
   ];
-  const markers = ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming'];
+  const markers = [
+    '<<<<<<< HEAD',
+    '||||||| base',
+    '=======',
+    '>>>>>>> incoming',
+    '<< HEAD',
+    '|| base',
+    '==',
+    '>> incoming',
+  ];
   const scenarios = [
     'additions',
     'ours-edit',

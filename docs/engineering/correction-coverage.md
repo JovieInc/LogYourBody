@@ -132,13 +132,15 @@ and baseline reporting together against real Git snapshots. This compatibility
 guard prevents concurrent CLI changes from dropping either repair or reporting.
 Invalid options must leave the ledger, existing artifact and job summary intact.
 Ledger repair checks raw staged bytes, rejecting newly staged conflict markers
-even with forced Git colors, binary diff attributes or text conversion;
-an unstaged repair cannot hide markers still present in the index.
+even with forced Git colors, binary diff attributes or text conversion,
+including markers shorter than seven characters when `conflict-marker-size` is
+reduced. An unstaged repair cannot hide markers still present in the index.
 The classifier's Git fixtures exercise binary attributes through ledger repair,
 staging, staged retries and merge verification, preserving the index and ledger
 when any mode refuses the unresolved source.
 One shared scenario list generates both repair modes; each presentation variant
-rejects all four marker forms without repeating scenario-independent CLI probes.
+rejects the default marker forms and the shorter forms Git writes when
+`conflict-marker-size` is below 7, without repeating scenario-independent CLI probes.
 The same fixture follows a clean main prepend with a conflicting append, then
 repairs and verifies the next union while preserving unrelated worktree edits.
 External diff drivers are also covered in both repair modes.

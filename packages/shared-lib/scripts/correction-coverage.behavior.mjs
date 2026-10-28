@@ -330,7 +330,16 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
   writeFileSync(join(root, guard.path), anchor);
   git(['add', guard.path]);
   git(['config', 'color.ui', 'always']);
-  for (const marker of ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming']) {
+  for (const marker of [
+    '<<<<<<< HEAD',
+    '||||||| base',
+    '=======',
+    '>>>>>>> incoming',
+    '<< HEAD',
+    '|| base',
+    '==',
+    '>> incoming',
+  ]) {
     writeFileSync(join(root, guard.path), `${anchor}\n${marker}\n`);
     git(['add', guard.path]);
     writeFileSync(join(root, guard.path), anchor);
@@ -360,7 +369,16 @@ test('ledger merge readiness checks raw staged bytes despite Git diff attributes
   for (const attributes of [`${guard.path} -diff\n`, `${guard.path} diff=masked\n`]) {
     writeFileSync(join(root, '.gitattributes'), attributes);
     git('add', '.gitattributes');
-    for (const marker of ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming']) {
+    for (const marker of [
+      '<<<<<<< HEAD',
+      '||||||| base',
+      '=======',
+      '>>>>>>> incoming',
+      '<< HEAD',
+      '|| base',
+      '==',
+      '>> incoming',
+    ]) {
       writeFileSync(join(root, guard.path), `${anchor}\n${marker}\n`);
       git('add', guard.path);
       writeFileSync(join(root, guard.path), anchor);
@@ -376,6 +394,59 @@ test('ledger merge readiness checks raw staged bytes despite Git diff attributes
     git('add', guard.path);
     assertLedgerMergeReady(root);
   }
+});
+
+test('ledger merge rebuilds a conflicted recursive ancestor from both merge bases', (t) => {
+  const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
+  const { root } = fixtureRepo(t, [row('base')]);
+  const git = (args) =>
+    execFileSync(
+      'git',
+      ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', ...args],
+      { cwd: root, encoding: 'utf8' },
+    );
+  const branch = git(['branch', '--show-current']).trim();
+  const write = (rows) =>
+    writeFileSync(join(root, LEDGER_PATH), `${JSON.stringify([row('base'), ...rows], null, 2)}\n`);
+  const commit = (message) => {
+    git(['add', LEDGER_PATH]);
+    git(['commit', '-qm', message]);
+  };
+  const merge = (revision) => {
+    const result = spawnSync(
+      'git',
+      ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', 'merge', '--no-commit', revision],
+      { cwd: root, encoding: 'utf8' },
+    );
+    assert.equal(result.status, 1, result.stderr);
+  };
+  git(['branch', 'right']);
+  write([row('left')]);
+  commit('left receipt');
+  const left = git(['rev-parse', 'HEAD']).trim();
+  git(['switch', 'right']);
+  write([row('right')]);
+  commit('right receipt');
+  const right = git(['rev-parse', 'HEAD']).trim();
+  git(['switch', branch]);
+  merge(right);
+  write([row('left'), row('right')]);
+  commit('merge right into left');
+  git(['switch', 'right']);
+  merge(left);
+  write([row('right'), row('left')]);
+  commit('merge left into right');
+  git(['switch', branch]);
+  merge('right');
+  const ancestor = git(['show', `:1:${LEDGER_PATH}`]);
+  assert.throws(() => JSON.parse(ancestor));
+  assert.match(ancestor, /^<{7,} /m);
+  const report = runCoverage(['--merge-ledger'], { root, env: {} });
+  assert.deepEqual(
+    JSON.parse(readFileSync(join(root, LEDGER_PATH), 'utf8')).map((item) => item.fingerprint),
+    ['base', 'right', 'left'],
+  );
+  assert.equal(report.mechanized, 3);
 });
 
 test('coverage CLI retains reporting and ledger repair modes after concurrent changes', (t) => {

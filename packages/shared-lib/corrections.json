@@ -1,5 +1,45 @@
 [
   {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "correction": "PR #1568 / LYB-247: Launch Quality run 40589668494 failed before XCTest because a shell behavior fixture exhausted its 10-second child-process deadline on hosted macOS. Repair the recurring red-check class without relaxing native qualification.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40589668494/job/122490587152",
+    "mechanization": "Extend the existing launch-quality evidence behavior suite with one shared, bounded 60-second shell fixture executor and route every shell scenario through it. A virtual monotonic-clock regression executes real Bash children with eleven seconds of simulated host delay, preserves success, failure and timeout exit statuses plus both output streams, and rejects a hung fixture after sixty-one virtual seconds. All three delayed status cases fail with the former ten-second budget and pass after the repair. The existing required shared-lib wrapper and both native/static audit entrypoints execute the expanded 31-case suite; retain their existing outer deadlines and all native selectors, retry rules, assertions, evidence and coverage gates. The lanes harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Product runtime logic cannot control hosted process scheduling or the independent shell fixture watchdog."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required evidence suite can share a bounded host-process executor and deterministically verify delayed completion, original failure statuses and hung-process rejection with a virtual clock."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "def test_shell_fixture_allows_host_delay_but_preserves_failures_and_bounds_hangs"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "unit-tier-stale-simulator-testmanagerd-socket",
+    "correction": "PR #1568 (fix-red-e3b0c44298): Merge-group run 40573016311 failed its Mac Unit lane because an already booted persistent simulator advertised a missing testmanagerd socket. Compilation passed; no test cases executed.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40573138074",
+    "mechanization": "Extend the existing ci_test_unit Fastlane lane to restart only the explicit simulator UUID selected by the existing resolver and require boot/readiness success before invoking the unchanged Unit suite once. Extend the existing required Fastlane source integrity controls with stale and stopped simulator recovery, shutdown, boot and readiness failure propagation, native failure without retries, and named-device isolation. The stale-socket regression fails before the lane repair and all 17 controls pass afterward. Native execution and exact-head coverage remain required in merge-group CI; this Linux host cannot establish simulator recovery. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing Unit lane owns the selected CI simulator and can recreate its boot session before every test invocation, preventing reuse of stale daemon state without erasing simulator data, retrying tests or changing selectors, assertions, coverage and evidence gates."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/fastlane/Fastfile",
+      "anchor": "# Restart only the selected simulator; never retry a failed Unit suite."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "xctskip-diagnostics-use-public-message",
     "correction": "PR #1618 (fix-red-5df69c1e5f): Launch Quality run 40454867112 failed six assertions in the injected Keychain capability tests because String(describing: error) did not expose XCTSkip's supplied diagnostic message.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40454867112/job/122025900952",
@@ -2185,6 +2225,90 @@
     "correction": "PR #1558: Recurring conflict repairs must preserve correction receipts from both merge parents and reject staged conflict markers even when Git colors or diff attributes hide their raw bytes.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1558",
     "mechanization": "Extend the existing merge readiness check with --no-color, --no-textconv and --text so Git styling, text conversion and binary diff attributes cannot hide staged conflict markers. The required correction-coverage Git fixtures cover all four marker forms, a clean worktree hiding a broken index, and unchanged index and ledger bytes on refusal. The raw-byte regression fails against the previous guard and passes after this extension for both binary and textconv attributes. Use the extended --resolve-merge . --stage resolver for this conflict and verify both parents with --check-merge; retain reporting and artifact modes and the harness as the sole push/PR owner. Extend the existing classifier Git-fixture guard with binary-attribute cases for both repair modes and all four marker forms during staged retries and verification. The new integration regression fails without --text and passes with the retained protection, proving the classifier routes share the same raw-byte check. Generate presentation variants from one shared scenario list so both repair modes retain every variant during future merges. Extend initial conflict repair to reject all four marker forms per variant while preserving index and ledger bytes; removing --text makes the binary-marker case fail. Retain main's bounded child processes, one-time global CLI probes and unchanged outer deadlines. Extend the same generated Git fixture with consecutive main prepends and appends, repairing the second conflict through --resolve-merge --stage and verifying the classified union against both parents without changing unrelated edits. Use that resolver and the existing documentation generator for this merge. Extend the shared marker scenario generator with an external diff driver that masks staged content in both repair modes. An isolated mutation removing --no-ext-diff is rejected by the new external-marker fixture; the retained implementation passes both modes and all four markers while preserving both parents, the index and ledger bytes. The required covered classifier suite passes in 12.5 seconds at 100 percent line, branch and function coverage within its unchanged 30-second deadline. Use the existing resolver for the 97-receipt merge; retain every CI deadline and gate.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1568 / LYB-247: The previous main merge discarded three existing correction receipts even though their fingerprints still had other sources. Restore the original source receipts and retain the attendance-specific receipts.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1568",
+    "mechanization": "Restore the three exact origin/main receipts. The existing required correction coverage check reproduced the removed-receipt failure before the restoration; verify it against origin/main and the incoming PR head afterward. Its behavioral regressions reject deleted, replaced and reassigned source identities.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "PR #1568 / LYB-247: Adding the workout attendance policy and its regression tests to their Xcode targets changed the project manifest without refreshing its diagnostic dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40202994986/job/121197934876",
+    "mechanization": "Review the eight added Xcode file, group and source entries, then refresh only the exact project manifest hash. Retain all seven dependency pins and trusted CLI rejection cases. The existing required routing regression reproduces the digest mismatch before the change and passes afterward.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1568 / LYB-247: Adding workout attendance Xcode target membership left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary and documentation parity. Regenerate the source projection after reviewing the manifest diff.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40202994986/job/121197935013",
+    "mechanization": "The existing required projection checker reproduces the stale Xcode manifest fingerprint before regeneration and passes afterward. Retain Detect Changes, CI Summary and the regression rejecting a missing or skippable parity step.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "correction": "PR #1568 recurring conflict repair: merge origin/main without losing the attendance policy, bounded classifier fixtures or correction receipts, and reject staged conflict markers even when Git attributes mark the source as binary.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1568",
+    "mechanization": "Extend the existing ledger merge readiness guard with --text so binary attributes cannot hide staged conflict markers. The same guard rejects conflict markers shorter than seven characters, which Git writes when conflict-marker-size is below the default, and rebuilds a conflicted recursive merge ancestor from the two real merge bases before the outer union. The required shared-lib classifier suite uses real Git repositories with a -diff attribute and a clean worktree hiding a broken index. Short markers were invisible to the previous regex and are rejected after it. The recursive-ancestor fixture cannot parse the virtual base before the rebuild and passes after it. Initial resolution, staging, verification and staged retries preserve the ledger and index on refusal, and clean retries pass. Reuse --resolve-merge . --stage and --check-merge . on this merge. Preserve all parent receipts, the attendance policy, the existing test deadlines and 100 percent classifier coverage. The lanes harness retains push and PR ownership.",
     "classification": {
       "codebase": {
         "feasible": true,
