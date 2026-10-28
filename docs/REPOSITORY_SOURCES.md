@@ -352,7 +352,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c39ce2c9cad6bc69043562b674c80607520a06972f0bd1019a207e7c82c20315`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1dfcf39a3f9238fee5ccc5f956495de15d5871264f82c47c1d0366ecb1ddff3e`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -360,7 +360,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 {
   "build": "tsc -p tsconfig.json",
   "lint": "eslint --ext .js,.jsx,.ts,.tsx src",
-  "test": "vitest run --maxWorkers=2 --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs ../../.github/scripts/web-production-smoke.test.mjs ../../.github/scripts/verify-public-build-env.test.mjs ../../.github/scripts/signing-expiry.test.mjs",
+  "test": "vitest run --maxWorkers=1 --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs ../../.github/scripts/web-production-smoke.test.mjs ../../.github/scripts/verify-public-build-env.test.mjs ../../.github/scripts/signing-expiry.test.mjs",
   "test:mutation": "node ../../scripts/mutation/run.mjs",
   "typecheck": "tsc --noEmit -p tsconfig.json"
 }
