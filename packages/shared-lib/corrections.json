@@ -3353,5 +3353,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "plain-checkin-card-full-label-hit-region",
+    "correction": "PR #1551 (fix-red-5df69c1e5f): Launch Quality run 40690979079 failed testAddEntryAccepts300CharacterNote before text entry. XCTest tapped the weekly check-in card at (196.5, 611.3), but the retained accessibility hierarchy and screen recording still showed Stats without the GLP-1 sheet. The plain-style card did not define an explicit hit region for its padded label.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40690979079/job/122825709846",
+    "mechanization": "Define the padded check-in label as a rectangular content shape so its entire card accepts taps. Extend the existing launch UI regression audit and its required shared-lib behavior suite to reject removal of the hit shape, moving it before padding, or shrinking it to a circle. The new regression fails before the audit extension, the extended audit rejects the original source, and all 17 audit behavior cases pass with the product fix. Retain the native single-tap assertion and full 300-character note readback, existing GLP-1 feature gate, native selectors, timeouts and coverage floors. Native execution requires the hosted macOS runner. The lanes harness owns pushing and PR updates, including the Machine line.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "An explicit rectangular content shape on the padded Button label makes the full card a hit target by construction instead of depending on the individual text, icon and spacer regions. The existing launch audit prevents regression without relaxing the native single-tap behavior assertion."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Views/DashboardViewLiquid+PhotoTimelineInsights.swift",
+      "anchor": ".contentShape(Rectangle())"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

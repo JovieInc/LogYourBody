@@ -134,6 +134,30 @@ class StatsCardCompositionTests(unittest.TestCase):
                      '.accessibilityIdentifier("metric_detail_chart")\n        .accessibilityElement(children: .contain)')
         self.assert_rejected("dashboard.chart_accessibility_containment")
 
+    def test_checkin_card_cannot_lose_its_full_label_hit_region(self):
+        path = self.app / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
+        source = path.read_text()
+        start = source.index("    var hudGlp1WeeklyCheckIn:")
+        end = source.index("    var isPhaseInsightEnabled:", start)
+        card = source[start:end]
+        # Run against the original source as well as the repaired card.
+        card = card.replace(".contentShape(Rectangle())", "")
+        path.write_text(source[:start] + card + source[end:])
+        self.assert_rejected("dashboard.checkin_card_hit_region")
+
+    def test_checkin_hit_region_must_include_padding_inside_the_button_label(self):
+        for before, after in (
+            (".padding(16)\n            .contentShape(Rectangle())",
+             ".contentShape(Rectangle())\n            .padding(16)"),
+            (".contentShape(Rectangle())", ".contentShape(Circle())"),
+        ):
+            with self.subTest(replacement=after):
+                path = self.app / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
+                source = path.read_text()
+                self.replace("Views/DashboardViewLiquid+PhotoTimelineInsights.swift", before, after)
+                self.assert_rejected("dashboard.checkin_card_hit_region")
+                path.write_text(source)
+
 
 if __name__ == "__main__":
     result = unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(StatsCardCompositionTests))
