@@ -12,6 +12,7 @@
 		A24420261025000000000002 /* MetricSourceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000001 /* MetricSourceAdapter.swift */; };
 		A24420261025000000000004 /* HealthKitManager+MetricSourceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000003 /* HealthKitManager+MetricSourceAdapter.swift */; };
 		A24420261025000000000006 /* MetricSourceAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000005 /* MetricSourceAdapterTests.swift */; };
+		A26400000000000000000001 /* ContextualHintRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26400000000000000000002 /* ContextualHintRegistryTests.swift */; };
 		A26100000000000000000001 /* QuickPillRanker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26100000000000000000002 /* QuickPillRanker.swift */; };
 		A26100000000000000000003 /* SignalFreshness.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26100000000000000000004 /* SignalFreshness.swift */; };
 		A26100000000000000000005 /* QuickPillRankerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26100000000000000000006 /* QuickPillRankerTests.swift */; };
@@ -580,6 +581,7 @@
 		A24420261025000000000001 /* MetricSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSourceAdapter.swift; sourceTree = "<group>"; };
 		A24420261025000000000003 /* HealthKitManager+MetricSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitManager+MetricSourceAdapter.swift"; sourceTree = "<group>"; };
 		A24420261025000000000005 /* MetricSourceAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSourceAdapterTests.swift; sourceTree = "<group>"; };
+		A26400000000000000000002 /* ContextualHintRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextualHintRegistryTests.swift; sourceTree = "<group>"; };
 		A26100000000000000000002 /* QuickPillRanker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickPillRanker.swift; sourceTree = "<group>"; };
 		A26100000000000000000004 /* SignalFreshness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalFreshness.swift; sourceTree = "<group>"; };
 		A26100000000000000000006 /* QuickPillRankerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickPillRankerTests.swift; sourceTree = "<group>"; };
@@ -1472,6 +1474,7 @@
 				0B3ECAB100575E759C5A3D7A /* LogWeightFormValidatorTests.swift */,
 				EECB82E4C8977D7158475EFB /* MetricChartDataPointPresenceTests.swift */,
 				ED6868B1C7F6167E2A9AE0A1 /* OnboardingFlowViewModelTests.swift */,
+				A26400000000000000000002 /* ContextualHintRegistryTests.swift */,
 				4C87F359CE5509C2457AB583 /* PaywallSavingsPolicyTests.swift */,
 				76E40D3BC9C969629954E803 /* PhaseInsightPolicyTests.swift */,
 				C7E0D5025A2839599F4E281D /* PhotoMetadataAndImportPolicyTests.swift */,
@@ -2444,6 +2447,7 @@
 				FCE2872B32CFB9AD2CE87012 /* MetricChartDataPointPresenceTests.swift in Sources */,
 				E1A2630100000000000000B2 /* EarnedWinDetectorTests.swift in Sources */,
 				327C8C9174FEC7C23E350270 /* OnboardingFlowViewModelTests.swift in Sources */,
+				A26400000000000000000001 /* ContextualHintRegistryTests.swift in Sources */,
 				CCCD701F26CEB5C9F56AA8FB /* PaywallSavingsPolicyTests.swift in Sources */,
 				948778D2A40C5957E42E40CF /* PhaseInsightPolicyTests.swift in Sources */,
 				099DD9F0055C4CFBF7190F4B /* PhotoMetadataAndImportPolicyTests.swift in Sources */,

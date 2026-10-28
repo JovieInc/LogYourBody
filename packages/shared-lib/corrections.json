@@ -3723,5 +3723,63 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "provenance-sheet-presenting-binding-dismissal",
+    "correction": "PR #1576: Launch Quality run 40423455852 failed testProgressShareKeepsSelectedMetricAndVisibleValue because the FFMI provenance sheet remained visible after tapping Done.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40423455852/job/121923457975",
+    "mechanization": "Bind the shared provenance sheet to the same showsProvenance state used by its Today and Progress presenters, and clear that binding from Done. Extend the existing launch UI regression audit with presenting-binding checks and four mutation regressions, executed by the existing required shared-lib suite and static launch audit. The new audit failed with four violations against the original sources and passes after repair; all 11 audit behavior tests pass. Retain the native single-tap dismissal and restored Share/range/value assertions. This Linux host cannot execute XCTest; exact-head native execution and coverage remain required hosted-CI evidence. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Done directly clears its presenter-owned binding in both callers, so dismissal no longer depends on resolving an ambient SwiftUI dismiss action through nested presentation modifiers."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "provenance.presenting_binding_dismissal"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "correction": "PR #1576 recurring conflict repair: merge origin/main without losing the contextual onboarding hint registry, provenance dismissal guard or verified keyboard-input regression; binary Git attributes must not hide staged conflict markers.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1576",
+    "mechanization": "Extend the existing ledger merge readiness guard with --text so binary diff attributes cannot suppress staged source inspection. The existing required shared-lib classifier suite uses a real -diff attribute to reproduce accepted conflict markers before the fix and refusal after it, covering initial resolution, staging, read-only verification and staged retries, all four marker forms, preserved ledger/index on refusal and a clean retry. Use --resolve-merge . --stage and --check-merge . for this instance. Keep both parents and all correction receipts; the lanes harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-test-source-membership",
+    "correction": "PR #1576 recurring conflict repair: retain the contextual onboarding tests and every native unit-test source exactly once in the Xcode test target when merging independent source registrations.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1576",
+    "mechanization": "Extend the existing parsed Xcode graph checker to resolve group-relative and SOURCE_ROOT references, enumerate every Swift unit-test source, and require each to compile exactly once in LogYourBodyTests. The existing required shared-lib Fastlane test runs the checker and deletes each of the four contextual test registration links or duplicates its source-phase entry; the regression failed before the checker extension and all five mutations are rejected after it. Add the checker to the existing Turbo task inputs, run it on the composed project, and retain all main objects and source registrations. The lanes harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The checked-in Xcode project permits independent source registrations to be lost during a merge. Replacing project ownership with generated targets exceeds this focused repair; the existing parsed graph checker can enforce source membership deterministically."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required project graph check can compare every native unit-test source with the resolved test target and reject missing, unreachable or duplicate registrations before native compilation."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_training_rest_project.py",
+      "anchor": "Native test source membership must compile exactly once:"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
