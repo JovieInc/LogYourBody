@@ -128,17 +128,20 @@ read-only merge check; it does not restage files or overwrite unrelated edits.
 Both the merge check and staged retry refuse any other unresolved Git path,
 even when the staged ledger and all of its guard sources are valid.
 Conflict-marker scanning disables Git color output as well as text conversion
-and external diff drivers so presentation settings cannot conceal staged markers.
+and external diff drivers, and forces text output so binary attributes or NUL bytes
+cannot conceal staged markers.
 It also rejects markers shorter than seven characters.
 A staged retry, with or without `--stage`, and `--check-merge` refuse any
 unstaged ledger edits, including formatting changes. Review and stage those
 edits explicitly before retrying; refusal preserves both the index and working
 file.
 If the working ledger is already resolved JSON while the index is still
-unmerged, the resolver classifies that resolution and validates it against both
-parents, preserving newly added receipts. Invalid JSON or missing parent
-receipts fail without writing or staging; the parent union is generated only
-while conflict markers remain, including a custom Git conflict-marker-size.
+unmerged, both resolver entrypoints use the coverage resolver's shared guard
+to refuse overwriting it when it differs from the computed union. Review,
+classify and stage that manual resolution, then retry either resolver mode or
+`--check-merge` to verify retention against both parents. Newly added receipts
+remain intact. Invalid JSON fails without writing or staging. Repeating an
+unstaged run with the unchanged computed union remains safe.
 The generated Git fixtures cover ledger marker sizes 1 and 2 in both staging
 modes, alongside the staged-source marker matrix and real CLI verification.
 The classifier shares the coverage resolver's recursive-ancestor reader and
@@ -152,6 +155,9 @@ policy. It rejects a lost rule or source, a missing guard, or unclassified
 metadata even when the working tree is correct. Pre-commit runs this check for
 every merge, including merges whose staged ledger has no diff against `HEAD`.
 An absent merge or an unstaged ledger conflict fails without writing files.
+The staged ledger must be a regular file; a symlink blob containing valid JSON
+cannot pass verification or either resolver retry mode, including a retry
+without `--stage`. Executable regular files remain valid.
 
 For exported parent snapshots, `node scripts/correction-classifier.mjs left.json
 --merge right.json` writes the validated union to `left.json` without changing
