@@ -3923,5 +3923,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "launch-quality-chat-completion-nested-remote-wait",
+    "correction": "PR #1556 / LYB-241: Launch Quality run 40752594817 failed the cancelled-turn retry completion assertion after its first remote answer query consumed the eight-second block-predicate waiter. The XCTest trace reports Interrupted by waiter; the retained cancel-retry screenshot shows the complete answer and no recovery UI.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40752594817/job/123043345069",
+    "mechanization": "Extend the existing shared synthetic-chat completion helper to observe the exact full answer with the native existence waiter before a label predicate observes Send message on the send button. Keep the eight-second waits, the complete-answer requirement, thinking/recovery/retry absence, reachable composer, cancellation and same-ID assertions, native selectors and outer execution caps. Extend the existing required Mac Runner Routing Tests chat-corpus guard to reject nested remote queries in completion predicates and require the full-answer and terminal-state checks. The extended guard fails against the prior helper and passes after this change. Use the helper for the current cancelled-turn retry and every synthetic completion/relaunch assertion. Native XCTest and exact-head coverage remain unverified on Linux and must pass in macOS CI. origin/main f4ee9ab0b was already an ancestor; git merge origin/main --no-edit returned Already up to date. The harness owns pushing and PR updates; supply exactly Machine: built scripts/tests/test_runner_routing.py in the PR body.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared UI-test helper can separate remote answer observation from the terminal label predicate, preventing a nested accessibility query from consuming and being interrupted by its own predicate waiter across all synthetic chat recovery and relaunch paths."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "let rendered = answer.waitForExistence(timeout: 8)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
