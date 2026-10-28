@@ -256,6 +256,71 @@ export function renderCoverage(report) {
   ].join('\n');
 }
 
+function gitText(root, args) {
+  return execFileSync('git', args, {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+function ledgerAtRevision(root, revision) {
+  return JSON.parse(gitText(root, ['show', `${revision}:${LEDGER_PATH}`]));
+}
+
+function readGuardFromRevisions(root, revisions) {
+  return (path) => {
+    const chunks = [];
+    for (const revision of revisions) {
+      try {
+        chunks.push(gitText(root, ['show', `${revision}:${path}`]));
+      } catch {
+        // A one-sided guard does not exist in every ancestor revision.
+      }
+    }
+    return chunks.join('\n');
+  };
+}
+
+// A recursive merge can leave conflict markers in the ancestor stage. Rebuild that
+// stage from the two real merge bases so the outer union still has a JSON ancestor.
+export function readGitMergeLedgers(root) {
+  const ours = JSON.parse(gitText(root, ['show', `:2:${LEDGER_PATH}`]));
+  const theirs = JSON.parse(gitText(root, ['show', `:3:${LEDGER_PATH}`]));
+  const baseText = gitText(root, ['show', `:1:${LEDGER_PATH}`]);
+  try {
+    return [JSON.parse(baseText), ours, theirs];
+  } catch (error) {
+    if (!/^<{2,} /m.test(baseText)) throw error;
+    const bases = gitText(root, ['merge-base', '--all', 'HEAD', 'MERGE_HEAD'])
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.equal(
+      bases.length,
+      2,
+      'ledger merge: conflicted ancestor needs two recursive merge bases',
+    );
+    const parents = gitText(root, ['merge-base', '--all', bases[0], bases[1]])
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    assert.equal(
+      parents.length,
+      1,
+      'ledger merge: recursive merge bases need one shared ancestor',
+    );
+    const revisions = [parents[0], bases[0], bases[1]];
+    const base = mergeCorrectionLedgers(
+      ledgerAtRevision(root, parents[0]),
+      ledgerAtRevision(root, bases[0]),
+      ledgerAtRevision(root, bases[1]),
+      readGuardFromRevisions(root, revisions),
+    );
+    return [base, ours, theirs];
+  }
+}
+
 export function assertLedgerMergeReady(root) {
   const otherConflicts = execFileSync('git', ['diff', '--name-only', '--diff-filter=U', '-z'], {
     cwd: root,
@@ -287,9 +352,10 @@ export function assertLedgerMergeReady(root) {
   );
   // Staging a file does not prove its conflict markers were resolved.
   // Inspect raw staged bytes; Git attributes must not hide unresolved markers.
+  // conflict-marker-size can emit markers shorter than the default seven characters.
   assert.doesNotMatch(
     staged,
-    /^\+(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m,
+    /^\+(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |$)/m,
     'ledger merge: resolve staged conflict markers first',
   );
 }
@@ -297,15 +363,7 @@ export function assertLedgerMergeReady(root) {
 export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
   if (argv.length === 1 && argv[0] === '--merge-ledger') {
     assertLedgerMergeReady(root);
-    const stages = [1, 2, 3].map((stage) =>
-      JSON.parse(
-        execFileSync('git', ['show', `:${stage}:${LEDGER_PATH}`], {
-          cwd: root,
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'pipe'],
-        }),
-      ),
-    );
+    const stages = readGitMergeLedgers(root);
     const merged = mergeCorrectionLedgers(stages[0], stages[2], stages[1], (path) =>
       readSource(path, { root }),
     );

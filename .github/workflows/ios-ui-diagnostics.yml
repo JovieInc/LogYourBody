@@ -105,7 +105,7 @@ jobs:
               'scripts/ios/resolve-simulator-destination.sh': 'd7c8e3a881c8fa4196270c7e8f9c90ad79f74f7c495de0b22f86246b042ce060',
               'apps/ios/Scripts/import-joviekit.mjs': '35555f9ad251a0976a0bd0ee4ebf4293a4b8634ea61e60db254e53b9c196aa4b',
               'apps/ios/Vendor/JovieKit.source.json': 'aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2',
-              'apps/ios/LogYourBody.xcodeproj/project.pbxproj': '763a6084e1084b929baf69931e498e89bae5bab92c74b712ceb9850dd59dd299',
+              'apps/ios/LogYourBody.xcodeproj/project.pbxproj': '5c4f7e214a1e3e979f9f65a6cefdbd4f715b21c73503d70b3f30a1e78f162c2c',
               'apps/ios/LogYourBody.xcodeproj/xcshareddata/xcschemes/LogYourBody.xcscheme': 'f8bd5d22beb90e7a04360b0a6c68d19bddc2a6ae5b076ac347f087540c870d64',
               'apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved': '7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138',
           }
