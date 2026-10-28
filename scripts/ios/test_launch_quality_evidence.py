@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 import re
+import select
+import signal
 import subprocess
 import sys
 import tempfile
@@ -16,7 +18,54 @@ evidence = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(evidence)
 
 
+def run_shell(arguments, *, env=None, timeout=60):
+    # Contract fixtures need system tools, not CI's cold SDK/toolchain shims or BASH_ENV.
+    # Hosted macOS exhausted shorter fixture caps (runs 40433475651, 40589668494).
+    # Trace fixture-only commands so another stall identifies the last operation.
+    command = ['/bin/bash', '-x', *arguments]
+    with subprocess.Popen(command, env={'PATH': os.defpath, 'PS4': '+ fixture:${LINENO}: ', **(env or {})},
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                          start_new_session=True) as process:
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # Killing only Bash leaves pipeline children holding the capture pipes open.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            stdout, stderr = process.communicate(timeout=5)
+            raise AssertionError(f'Shell fixture exceeded {timeout}s\nstdout:\n{stdout}\nstderr:\n{stderr}') from None
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
 class EvidenceTests(unittest.TestCase):
+    def test_shell_fixture_timeout_reports_trace_and_closes_descendant_pipes(self):
+        # The background child retains both pipes after Bash exits. A parent-only
+        # kill cannot drain them; the helper must terminate its whole process group.
+        # Inject expiry after startup instead of racing the hosted scheduler.
+        communicate = subprocess.Popen.communicate
+        expired = False
+        startup = None
+
+        def expire_after_start(process, *args, **kwargs):
+            nonlocal expired, startup
+            if not expired:
+                expired = True
+                if select.select([process.stdout], [], [], 30)[0]:
+                    startup = process.stdout.readline()
+                raise subprocess.TimeoutExpired(process.args, kwargs['timeout'])
+            return communicate(process, *args, **kwargs)
+
+        with patch.object(subprocess.Popen, 'communicate', expire_after_start), \
+             self.assertRaisesRegex(AssertionError, r'(?s)Shell fixture exceeded 60s.*fixture:.*fixture-child'):
+            run_shell(['-c', "/bin/sleep 120 & echo fixture-child; wait"])
+        self.assertEqual(startup, 'fixture-child\n')
+        result = run_shell(['-c', "echo fixture-output; echo fixture-error >&2; exit 65"])
+        self.assertEqual(result.returncode, 65)
+        self.assertEqual(result.stdout, 'fixture-output\n')
+        self.assertIn('fixture-error', result.stderr)
+
     def test_fixed_diagnostic_selectors_have_native_test_implementations(self):
         root = Path(__file__).resolve().parents[2]
         source = (root / 'scripts/ios/launch-quality-audit.sh').read_text()
@@ -197,7 +246,9 @@ class EvidenceTests(unittest.TestCase):
         source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
         selectors = source[source.index('LAUNCH_QUALITY_UI_TESTS=('):source.index('UI_RESULT_BUNDLE=')]
         command = 'set -euo pipefail\n' + selectors + '\nprintf "%s\\n" "${UI_SELECTORS[@]}" "${UI_EVIDENCE_ARGS[@]}"'
-        output = subprocess.check_output(['bash', '-c', command], text=True).splitlines()
+        result = run_shell(['-c', command])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = result.stdout.splitlines()
         # Preserve each inherited case, while allowing newly merged regressions.
         inherited_cases = (
             'LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces',
@@ -402,17 +453,75 @@ class EvidenceTests(unittest.TestCase):
             self.assertEqual(evidence.run_json('get', 'test-results', 'tests'), {})
         self.assertEqual(command.call_args.args[0], ['xcrun', 'xcresulttool', 'get', 'test-results', 'tests'])
 
+    def test_shell_evidence_preflight_runs_before_bootstrap_or_simulator(self):
+        # Exercise the real dispatcher with inert provider boundaries. A failed
+        # fixture check must stop before starting expensive native infrastructure.
+        script = Path(__file__).with_name('launch-quality-audit.sh').resolve()
+        calls = self.root / 'preflight-calls'
+        command = r'''
+set -euo pipefail
+git() { :; }
+bash() {
+  printf 'native:%s\n' "$*" >> "$CALLS"
+  if [[ "$1" == */resolve-simulator-destination.sh ]]; then return 73; fi
+}
+python3() {
+  printf 'python:%s\n' "$*" >> "$CALLS"
+  return "$PREFLIGHT_STATUS"
+}
+source "$AUDIT_SCRIPT"
+'''
+        for status in (37, 65, 0):
+            with self.subTest(status=status):
+                calls.write_text('')
+                result = subprocess.run(
+                    ['bash', '-c', command], capture_output=True, text=True, timeout=10,
+                    env={**os.environ, 'AUDIT_SCRIPT': str(script), 'CALLS': str(calls),
+                         'ARTIFACT_DIR': str(self.root / f'preflight-{status}'), 'DESTINATION': 'auto',
+                         'RUN_SWIFTLINT': 'false', 'RUN_STATIC_UI_REGRESSION_AUDIT': 'false',
+                         'RUN_OPTICAL_GRID_AUDIT': 'false', 'PREFLIGHT_STATUS': str(status)})
+                self.assertEqual(result.returncode, status or 73, result.stderr)
+                expected = [f'python:{script.with_name("test_launch_quality_evidence.py")}']
+                if status == 0:
+                    expected += [f'native:{script.with_name(name)}' for name in (
+                        'bootstrap-local-config.sh', 'resolve-simulator-destination.sh')]
+                self.assertEqual(calls.read_text().splitlines(), expected)
+
     def test_shell_rejects_nonempty_artifact_directory(self):
         script = Path(__file__).with_name('launch-quality-audit.sh')
-        artifact = self.root / 'previous-proof'
-        artifact.mkdir()
-        prior = artifact / 'summary.md'
-        prior.write_text('prior proof must survive')
-        result = subprocess.run(['bash', str(script)], env={**os.environ, 'ARTIFACT_DIR': str(artifact)},
-                                capture_output=True, text=True, timeout=10)
-        self.assertEqual(result.returncode, 65)
-        self.assertIn('Refusing to reuse', result.stderr)
-        self.assertEqual(prior.read_text(), 'prior proof must survive')
+        tools = self.root / 'tools'
+        tools.mkdir()
+        calls = self.root / 'tool-calls'
+        # Model a cold toolchain shim and inherited shell startup hooks.
+        poison = 'printf "unexpected toolchain startup\\n" >> "$TOOL_CALLS"\nexit 86\n'
+        for name in ('bash', 'dirname', 'date', 'ls'):
+            tool = tools / name
+            tool.write_text('#!/bin/bash\n' + poison)
+            tool.chmod(0o755)
+        startup = self.root / 'startup.sh'
+        startup.write_text(poison)
+        for name in ('summary.md', '.prior-proof', '..prior-proof', 'dangling-link'):
+            with self.subTest(name=name):
+                artifact = self.root / name
+                artifact.mkdir()
+                prior = artifact / name
+                if name == 'dangling-link':
+                    prior.symlink_to('absent-target')
+                else:
+                    prior.write_text('prior proof must survive')
+                with patch.dict(os.environ, {
+                    'PATH': str(tools), 'BASH_ENV': str(startup), 'ENV': str(startup),
+                    'TOOL_CALLS': str(calls),
+                }):
+                    result = run_shell([str(script)], env={'ARTIFACT_DIR': str(artifact)})
+                self.assertEqual(result.returncode, 65, result.stderr)
+                self.assertIn('Refusing to reuse', result.stderr)
+                self.assertFalse(calls.exists())
+                self.assertEqual(list(artifact.iterdir()), [prior])
+                if name == 'dangling-link':
+                    self.assertEqual(os.readlink(prior), 'absent-target')
+                else:
+                    self.assertEqual(prior.read_text(), 'prior proof must survive')
 
     def test_shell_cold_build_budget_preserves_build_failures_and_timeout(self):
         source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
@@ -452,9 +561,8 @@ echo 'ready for native tests'
             with self.subTest(name=name):
                 artifact = self.root / name
                 artifact.mkdir()
-                result = subprocess.run(
-                    ['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                    env={**os.environ, 'ARTIFACT_DIR': str(artifact),
+                result = run_shell(
+                    ['-c', command], env={'ARTIFACT_DIR': str(artifact),
                          'BUILD_FOR_TESTING_TIMEOUT_SECONDS': override,
                          'BUILD_DURATION': str(duration), 'COMPILER_STATUS': str(compiler_status)})
                 self.assertEqual(result.returncode, expected, result.stderr)
@@ -498,8 +606,8 @@ start_launch_probe() { :; }
 stop_launch_probe() { :; }
 run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
 """
-        result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                                env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
+        result = run_shell(['-c', command],
+                           env={'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
         self.assertEqual(result.returncode, 65, result.stderr)
         self.assertTrue(result_bundle.with_name('retry.attempt-1.xcresult').is_dir())
         self.assertTrue(result_bundle.is_dir())
@@ -545,14 +653,40 @@ run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
                 directory.mkdir()
                 result_bundle = directory / 'timeout.xcresult'
                 log = directory / 'timeout.log'
-                result = subprocess.run(
-                    ['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                    env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log),
+                result = run_shell(
+                    ['-c', command], env={'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log),
                          'FAILURE_STATUS': str(status), 'FAILURE_LOG': failure_log})
                 self.assertEqual(result.returncode, status, result.stderr)
                 self.assertFalse(result_bundle.with_name('timeout.attempt-1.xcresult').exists())
                 self.assertEqual(log.read_text().count('Running fixture (attempt '), 1)
                 self.assertNotIn('Retrying fixture', log.read_text())
+
+    def test_shell_fixture_allows_host_delay_but_preserves_failures_and_bounds_hangs(self):
+        # Advance subprocess's monotonic clock after it establishes the deadline.
+        # This models scheduling delay without sleeping on every CI invocation.
+        real_clock = subprocess._time
+        for delay, status in ((11, 0), (11, 65), (11, 124), (31, 0), (31, 65), (31, 124), (61, None)):
+            with self.subTest(delay=delay, status=status):
+                first_tick = True
+
+                def delayed_clock():
+                    nonlocal first_tick
+                    if first_tick:
+                        first_tick = False
+                        return real_clock()
+                    return real_clock() + delay
+
+                with patch.object(subprocess, '_time', side_effect=delayed_clock):
+                    if status is None:
+                        with self.assertRaisesRegex(AssertionError, 'Shell fixture exceeded 60s'):
+                            run_shell(['-c', 'while :; do :; done'])
+                    else:
+                        result = run_shell(
+                            ['-c', 'printf fixture-output; printf fixture-error >&2; exit "$STATUS"'],
+                            env={'STATUS': str(status)})
+                        self.assertEqual(result.returncode, status)
+                        self.assertEqual(result.stdout, 'fixture-output')
+                        self.assertIn('fixture-error', result.stderr)
 
 
 if __name__ == '__main__':

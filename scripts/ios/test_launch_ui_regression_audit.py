@@ -104,6 +104,81 @@ class StatsCardCompositionTests(unittest.TestCase):
                      "HomeV2ProvenanceSheet(detail: detail, isPresented: $showsProvenance)",
                      "HomeV2ProvenanceSheet(detail: detail, isPresented: .constant(true))")
         self.assert_rejected("provenance.presenting_binding_dismissal")
+    def test_card_cannot_assign_success_to_direction_alone(self):
+        self.replace("DesignSystem/Organisms/MetricSummaryCard.swift",
+                     "return secondaryTextColor\n        }\n        switch direction",
+                     "return theme.colors.success\n        }\n        switch direction")
+        self.assert_rejected("dashboard.neutral_trend_direction")
+
+    def test_detail_cannot_assign_success_to_direction_alone(self):
+        self.replace("Components/FullMetricChartView+Part02.swift",
+                     "return Color.metricTextSecondary\n        }",
+                     "return Color.metricDeltaPositive\n        }")
+        self.assert_rejected("dashboard.neutral_trend_direction")
+
+    def test_observation_plot_cannot_erase_elapsed_time(self):
+        self.replace("DesignSystem/Organisms/MetricSummaryCard.swift",
+                     'PointMark(x: .value("Observation date", date)',
+                     'PointMark(x: .value("Observation index", point.index)')
+        self.assert_rejected("dashboard.observation_plot")
+
+    def test_observation_plot_cannot_claim_continuous_measured_history(self):
+        self.replace("DesignSystem/Organisms/MetricSummaryCard.swift",
+                     'PointMark(x: .value("Observation date", date)',
+                     'LineMark(x: .value("Observation date", date)')
+        self.assert_rejected("dashboard.observation_plot")
+
+    def test_single_timestamp_cannot_establish_no_change(self):
+        self.replace("Helpers/DashboardMetricFormatting.swift",
+                     "if requiresComparison && first.date == last.date { return nil }", "")
+        self.assert_rejected("dashboard.minimum_comparison_samples")
+
+    def test_chart_container_cannot_overwrite_plot_identity(self):
+        self.replace("Components/FullMetricChartView+Part01.swift",
+                     '.accessibilityElement(children: .contain)\n        .accessibilityIdentifier("metric_detail_chart")',
+                     '.accessibilityIdentifier("metric_detail_chart")')
+        self.assert_rejected("dashboard.chart_accessibility_containment")
+
+    def test_chart_container_cannot_flatten_interactive_children(self):
+        for behavior in ("ignore", "combine"):
+            with self.subTest(behavior=behavior):
+                path = self.app / "Components/FullMetricChartView+Part01.swift"
+                source = path.read_text()
+                self.replace("Components/FullMetricChartView+Part01.swift",
+                             '.accessibilityElement(children: .contain)\n        .accessibilityIdentifier("metric_detail_chart")',
+                             f'.accessibilityElement(children: .{behavior})\n        .accessibilityIdentifier("metric_detail_chart")')
+                self.assert_rejected("dashboard.chart_accessibility_containment")
+                path.write_text(source)
+
+    def test_chart_containment_must_precede_identifier(self):
+        self.replace("Components/FullMetricChartView+Part01.swift",
+                     '.accessibilityElement(children: .contain)\n        .accessibilityIdentifier("metric_detail_chart")',
+                     '.accessibilityIdentifier("metric_detail_chart")\n        .accessibilityElement(children: .contain)')
+        self.assert_rejected("dashboard.chart_accessibility_containment")
+
+    def test_checkin_card_cannot_lose_its_full_label_hit_region(self):
+        path = self.app / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
+        source = path.read_text()
+        start = source.index("    var hudGlp1WeeklyCheckIn:")
+        end = source.index("    var isPhaseInsightEnabled:", start)
+        card = source[start:end]
+        # Run against the original source as well as the repaired card.
+        card = card.replace(".contentShape(Rectangle())", "")
+        path.write_text(source[:start] + card + source[end:])
+        self.assert_rejected("dashboard.checkin_card_hit_region")
+
+    def test_checkin_hit_region_must_include_padding_inside_the_button_label(self):
+        for before, after in (
+            (".padding(16)\n            .contentShape(Rectangle())",
+             ".contentShape(Rectangle())\n            .padding(16)"),
+            (".contentShape(Rectangle())", ".contentShape(Circle())"),
+        ):
+            with self.subTest(replacement=after):
+                path = self.app / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
+                source = path.read_text()
+                self.replace("Views/DashboardViewLiquid+PhotoTimelineInsights.swift", before, after)
+                self.assert_rejected("dashboard.checkin_card_hit_region")
+                path.write_text(source)
 
 
 if __name__ == "__main__":

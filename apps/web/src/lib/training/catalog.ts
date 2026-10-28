@@ -777,6 +777,16 @@ export function missingEquipment(
   return variant.requires.filter((item) => !available.has(item));
 }
 
+/** `equipment === null` means no gym is confirmed, so every variant stays available.
+ * A set is the active gym's saved equipment. An empty set matches nothing that requires an item.
+ * Specialty equipment is included only when the user saved it on that gym. */
+export function queryExerciseLibrary(
+  equipment: ReadonlySet<CatalogEquipment> | null,
+): CatalogVariant[] {
+  if (equipment === null) return [...EXERCISE_CATALOG];
+  return EXERCISE_CATALOG.filter((variant) => missingEquipment(variant, equipment).length === 0);
+}
+
 export function isEligibleVariant(
   variant: CatalogVariant,
   input: { available: ReadonlySet<CatalogEquipment>; excludedConcerns?: readonly string[] },

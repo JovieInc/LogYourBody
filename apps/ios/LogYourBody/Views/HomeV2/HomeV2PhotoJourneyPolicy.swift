@@ -223,6 +223,75 @@ enum HomeV2PhotoRulerPolicy {
     }
 }
 
+/// Appearance and hit geometry only; the ruler owns all selection callbacks.
+enum HomeV2FilmstripPolicy {
+    static let gateKey = "home_v2_glass_filmstrip_v1"
+    static let fixtureArgument = "-lybUITestGlassFilmstrip"
+
+    static func canRender(photoURLs: [String?], dateCount: Int) -> Bool {
+        photoURLs.count == dateCount && photoURLs.contains {
+            !($0?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        }
+    }
+
+    @MainActor
+    static func isEnabled(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        checkGate: ((String) -> Bool)? = nil
+    ) -> Bool {
+        #if DEBUG
+        if arguments.contains(fixtureArgument),
+           arguments.contains("-lybUITestPhotoTimelineHUDFixture"),
+           UUID(uuidString: environment["XCTestSessionIdentifier"] ?? "") != nil,
+           environment["XCTestBundlePath"]?.hasSuffix("/LogYourBodyUITests.xctest") == true {
+            return true
+        }
+        #endif
+        let check = checkGate ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return check(gateKey)
+    }
+
+    struct Layout {
+        let count: Int
+        let width: CGFloat
+        let visibleCount: Int
+        let stripWidth: CGFloat
+
+        init?(count: Int, width: CGFloat) {
+            guard count > 0, width.isFinite, width > 0 else { return nil }
+            self.count = count
+            self.width = width
+            visibleCount = min(count, Int(min(14, max(1, width / 20))))
+            stripWidth = min(width, CGFloat(count) * 28)
+        }
+
+        var cellWidth: CGFloat { stripWidth / CGFloat(visibleCount) }
+        private var travel: CGFloat { stripWidth - cellWidth }
+
+        /// Bound image work for long histories, retaining both endpoints.
+        var indices: [Int] {
+            guard visibleCount > 1 else { return [0] }
+            return (0..<visibleCount).map {
+                Int((Double($0) * Double(count - 1) / Double(visibleCount - 1)).rounded())
+            }
+        }
+
+        func center(for index: Int, rightToLeft: Bool) -> CGFloat {
+            guard count > 1 else { return width / 2 }
+            let fraction = CGFloat(min(max(index, 0), count - 1)) / CGFloat(count - 1)
+            return (width - travel) / 2 + (rightToLeft ? 1 - fraction : fraction) * travel
+        }
+
+        func index(at position: CGFloat, rightToLeft: Bool) -> Int? {
+            guard position.isFinite else { return nil }
+            guard travel > 0 else { return 0 }
+            let fraction = min(max((position - (width - travel) / 2) / travel, 0), 1)
+            return Int(((rightToLeft ? 1 - fraction : fraction) * CGFloat(count - 1)).rounded())
+        }
+    }
+}
+
 enum HomeV2TimelapsePolicy {
     static let speeds: [Double] = [0.5, 1, 2]
     static let baseFrameSeconds = 0.6

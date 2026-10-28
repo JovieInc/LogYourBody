@@ -249,6 +249,49 @@ def main() -> int:
             violations=violations,
         )
 
+    # LYB-47: direction alone cannot establish safe goal progress.
+    for relative_path, token in [
+        ("DesignSystem/Organisms/MetricSummaryCard.swift",
+         "if MetricStatsTruthPolicy.isEnabled() {\n            return secondaryTextColor\n        }"),
+        ("Components/FullMetricChartView+Part02.swift",
+         "if usesStatsTruth {\n            return Color.metricTextSecondary"),
+    ]:
+        require_token(
+            root=root, path=app_dir / relative_path, token=token,
+            check="dashboard.neutral_trend_direction",
+            detail="Stats truth must keep direction neutral without a validated safe goal comparison.",
+            violations=violations,
+        )
+
+    card_path = app_dir / "DesignSystem/Organisms/MetricSummaryCard.swift"
+    card_source = card_path.read_text()
+    observation_chart = card_source.split("private func observationChart", 1)[-1].split("private func legacyChart", 1)[0]
+    if ("PointMark(x: .value(\"Observation date\", date)" not in observation_chart
+            or re.search(r"\b(?:LineMark|AreaMark)\s*\(|\.interpolationMethod", observation_chart)):
+        violations.append(AuditViolation(
+            check="dashboard.observation_plot", file=str(card_path.relative_to(root)), line=1,
+            detail="Stats truth must plot dated observations without interpolated continuous history.",
+        ))
+    require_token(
+        root=root, path=app_dir / "Helpers/DashboardMetricFormatting.swift",
+        token="if requiresComparison && first.date == last.date { return nil }",
+        check="dashboard.minimum_comparison_samples",
+        detail="One timestamp cannot establish no change.", violations=violations,
+    )
+
+    # Identified chart containers must not overwrite their interactive plot's identity.
+    detail_path = app_dir / "Components/FullMetricChartView+Part01.swift"
+    detail_source = detail_path.read_text()
+    chart_card = detail_source.split("var chartCard: some View {", 1)[-1].split("@ViewBuilder", 1)[0]
+    if not re.search(
+        r'\.accessibilityElement\(children:\s*\.contain\)\s*'
+        r'\.accessibilityIdentifier\("metric_detail_chart"\)', chart_card
+    ):
+        violations.append(AuditViolation(
+            check="dashboard.chart_accessibility_containment", file=str(detail_path.relative_to(root)), line=1,
+            detail="The chart container must contain its children before assigning its identifier, preserving the adjustable plot.",
+        ))
+
     system_b_surface_files = [
         app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift",
         app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift",
@@ -343,6 +386,21 @@ def main() -> int:
         detail="Timeline/Stats swipe should settle on release, not mutate root page mid-drag.",
         violations=violations,
     )
+
+    checkin_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
+    checkin_card = checkin_path.read_text().split("var hudGlp1WeeklyCheckIn:", 1)[-1].split(
+        "var isPhaseInsightEnabled:", 1
+    )[0]
+    if not re.search(
+        r"\.padding\(16\)\s*\.contentShape\(Rectangle\(\)\)\s*\.dashboardContentSurface\(",
+        checkin_card,
+    ):
+        violations.append(AuditViolation(
+            check="dashboard.checkin_card_hit_region",
+            file=str(checkin_path.relative_to(root)),
+            line=1,
+            detail="The plain check-in button must define its full padded label as the hit region.",
+        ))
 
     write_outputs(args.artifact_dir, violations)
     if violations:
