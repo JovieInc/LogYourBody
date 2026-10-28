@@ -2249,6 +2249,7 @@ def _reviewed_diagnostic_candidate_bytes() -> bytes:
 
 
 def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins(tmp_path: Path) -> None:
+    import gzip
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
@@ -2256,6 +2257,13 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
+    project_name = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj'
+    # Frozen reviewed bytes from main at e3fffe422; the existing policy digest is unchanged.
+    # Ordinary target additions may change the live project without authorizing new diagnostic tooling.
+    # Keep this offline fixture so shallow CI checkouts can still exercise the real trusted CLI.
+    reviewed_project = gzip.decompress(
+        (_REPO_ROOT / 'scripts/tests/fixtures/reviewed-diagnostic-project.pbxproj.gz').read_bytes())
+    assert hashlib.sha256(reviewed_project).hexdigest() == dependencies[project_name]
     # The previous pin was the unlanded candidate. It stays a rejected fixture.
     unlanded = _reviewed_diagnostic_candidate_bytes()
     reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
@@ -2313,13 +2321,13 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
 
     fixtures = ['positive', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
-                'dependency-symlink', 'wrong-resolver']
+                'dependency-symlink', 'changed-project', 'wrong-resolver']
     for scenario in fixtures:
         root = (tmp_path / scenario / 'repo').resolve()
         root.mkdir(parents=True)
         for name, digest in dependencies.items():
             source = _REPO_ROOT / name
-            data = source.read_bytes()
+            data = reviewed_project if name == project_name else source.read_bytes()
             assert source.is_file() and not source.is_symlink()
             assert hashlib.sha256(data).hexdigest() == digest
             target = root / name
@@ -2355,6 +2363,8 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         elif scenario == 'dependency-symlink':
             helper.unlink()
             helper.symlink_to(audit)
+        elif scenario == 'changed-project':
+            (root / project_name).write_bytes(reviewed_project + b'\n')
         _diagnostic_git(root, 'init', '-q')
         _diagnostic_git(root, 'add', '.')
         _diagnostic_git(root, '-c', 'user.name=Diagnostic Test', '-c', 'user.email=diagnostic@example.invalid',

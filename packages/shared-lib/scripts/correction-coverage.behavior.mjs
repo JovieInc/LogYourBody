@@ -108,6 +108,29 @@ test('classifier rejects missing assessments, unsupported fallbacks and conflict
   );
 });
 
+test('annotation conflicts identify both source receipts for an explicit merge repair', () => {
+  const existing = receipt('same-rule', undefined, {
+    source: 'https://example.com/corrections/existing',
+    classification: classification('codebase'),
+    guard,
+  });
+  const revised = classification('codebase');
+  revised.codebase.rationale = 'A different reviewed rationale';
+  for (const assessed of [classification('static'), revised]) {
+    const incoming = receipt('same-rule', undefined, {
+      source: 'https://example.com/corrections/incoming',
+      classification: assessed,
+      guard,
+    });
+    assert.throws(() => report([existing, incoming]), (error) => {
+      assert.match(error.message, /conflicting coverage annotations: same-rule/);
+      assert.ok(error.message.includes(existing.source), error.message);
+      assert.ok(error.message.includes(incoming.source), error.message);
+      return true;
+    });
+  }
+});
+
 test('current ledger requires classification while historical baselines remain readable', (t) => {
   const legacy = receipt('retained', 'static', { guard });
   const { root, ref } = fixtureRepo(t, [legacy]);

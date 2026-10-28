@@ -6,20 +6,16 @@
     "mechanization": "Extend the existing launch-quality evidence behavior suite with one shared, bounded 60-second shell fixture executor and route every shell scenario through it. A virtual monotonic-clock regression executes real Bash children with eleven seconds of simulated host delay, preserves success, failure and timeout exit statuses plus both output streams, and rejects a hung fixture after sixty-one virtual seconds. All three delayed status cases fail with the former ten-second budget and pass after the repair. The existing required shared-lib wrapper and both native/static audit entrypoints execute the expanded 31-case suite; retain their existing outer deadlines and all native selectors, retry rules, assertions, evidence and coverage gates. The lanes harness retains push and PR ownership.",
     "classification": {
       "codebase": {
-        "feasible": false,
-        "rationale": "Product runtime logic cannot control hosted process scheduling or the independent shell fixture watchdog."
-      },
-      "static": {
         "feasible": true,
-        "rationale": "The existing required evidence suite can share a bounded host-process executor and deterministically verify delayed completion, original failure statuses and hung-process rejection with a virtual clock."
+        "rationale": "The existing fixture launcher owns deadlines, diagnostics and descendant lifetime for every shell contract case, preventing opaque timeouts and orphan pipelines by construction without changing product behavior or native qualification gates."
       }
     },
     "guard": {
       "path": "scripts/ios/test_launch_quality_evidence.py",
-      "anchor": "def test_shell_fixture_allows_host_delay_but_preserves_failures_and_bounds_hangs"
+      "anchor": "os.killpg(process.pid, signal.SIGKILL)"
     },
-    "level": "static",
-    "ruleId": "ci-invariant"
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "unit-tier-stale-simulator-testmanagerd-socket",
@@ -2482,6 +2478,202 @@
     "guard": {
       "path": "scripts/tests/test_runner_routing.py",
       "anchor": "def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_destination"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "merge-repair-retains-correction-receipts",
+    "correction": "PR #1532 conflicts with main in the append-only correction ledger. Preserve both source histories and reviewed upstream metadata instead of choosing one side.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1532",
+    "mechanization": "Use the landed canonical three-stage ledger resolver and classifier, preserving the original source receipts and rejecting missing guards, deletions and divergent metadata. The earlier parallel CLI implementation depended on ambient Git identity in its fixture; its failing immutable-snapshot test is replaced by main's direct Git-index behavioral tests with explicit fixture identity. The current required suite covers retained source identities, safe refusal and staging.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot resolve Git ledger conflicts or preserve source-control history."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing deterministic coverage tool can merge receipt identities and reject ambiguity before emitting a candidate ledger, with regressions in its required test suite."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "export function mergeCorrectionLedgers(base, ours, theirs, readGuard = readSource)"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-pin-tests-use-frozen-project-fixture",
+    "correction": "PR #1532 conflict repair: main updated the reviewed project pin, so refresh the frozen diagnostic fixture to those exact approved bytes while retaining changed-project refusal.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1532",
+    "mechanization": "The required routing suite reproduced one digest mismatch with the old frozen fixture and then passed all 41 cases using the reviewed main project bytes. The unchanged trusted workflow digest remains authoritative; candidate project edits still fail the actual CLI refusal case.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "This is a test-fixture lifetime mismatch; product code cannot make a mutable project remain byte-identical to a frozen diagnostic policy."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required routing suite can exercise frozen accepted bytes and changed rejected bytes through the actual trusted CLI without repinning or changing CI policy."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "assert hashlib.sha256(reviewed_project).hexdigest() == dependencies[project_name]"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "share-export-thumbnail-fits-both-pixel-bounds",
+    "correction": "PR #1532 Launch Quality still returned a 1280x1920 story thumbnail for a 1080x1920 export after point conversion. Request the source image's aspect-fitted dimensions rather than the export rectangle.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40154055343/job/121051559437",
+    "mechanization": "The worker computes an explicit minimum-ratio fit before the UIKit call. The retained failing native Unit test now covers portrait and landscape photos at 1x/2x/3x for every export aspect without weakening its backing-pixel or exact-fit assertions. Empty opted-in images have a named render-failure regression. CI supplies the original failing receipt; native pass execution remains unavailable on this Linux repair host.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Passing a size with the photo's own aspect ratio bounds both dimensions by construction while preserving background preparation, source-scale conversion, and export geometry."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/BodyScoreShareExport.swift",
+      "anchor": "let fit = min(points.width / photo.size.width, points.height / photo.size.height)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "share-export-thumbnail-bounds-use-pixels",
+    "correction": "PR #1532 Launch Quality found a 2700x4050 opted-in thumbnail exceeding the 1080x1350 export bounds on a 3x image. Convert export pixels to source-image points before thumbnail preparation.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151321879/job/121043485541",
+    "mechanization": "The image worker divides the target pixel bounds by UIImage.scale before calling UIKit. The existing required native Unit target retains the failing real-file regression and adds explicit 1x/2x/3x source coverage across every export aspect, checking CGImage dimensions and aspect-fit resolution. Native fail/pass execution remains unavailable on the Linux repair host.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Converting units at the worker boundary prevents image scale from multiplying the requested pixel budget without changing export geometry or privacy behavior."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/BodyScoreShareExport.swift",
+      "anchor": "let points = CGSize(width: pixels.width / photo.scale, height: pixels.height / photo.scale)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "diagnostic-pin-tests-use-frozen-project-fixture",
+    "correction": "PR #1532 Mac Runner Routing Tests treated an ordinary Xcode target addition as an invalid positive fixture because the test copied the current project into a diagnostic policy pinned to historical bytes.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151321879/job/121043291797",
+    "mechanization": "The required routing suite uses a compressed offline copy of the exact project from the policy-pinning commit, verifies its digest against the unchanged trusted workflow, and retains all refusal cases plus an explicit changed-project refusal. The real CLI still rejects mismatched project bytes before any helper or native tool executes.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "This is a test-fixture lifetime mismatch; product code cannot make a mutable project remain byte-identical to a frozen diagnostic policy."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required routing suite can exercise frozen accepted bytes and changed rejected bytes through the actual trusted CLI without repinning or changing CI policy."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "assert hashlib.sha256(reviewed_project).hexdigest() == dependencies[project_name]"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "share-export-stale-inputs-and-unconfirmed-photo-save",
+    "correction": "LYB-40: A synchronous MainActor renderer cannot display its transient busy state, cached pixels survive payload refresh, and submitting a Photos write is not confirmed success. Freeze all export inputs, serialize work, suppress invalidated completions, and await the Photos transaction.",
+    "source": "https://linear.app/jovie/issue/LYB-40",
+    "mechanization": "BodyScoreShareExport owns one task and one file, snapshots payload/aspect/options/renderer revision, checks operation and account ownership around suspensions, and retains bounded successful-save receipts. Native BodyScoreShareExportTests is included in the existing required Unit test plan through the normal test target. Linux cannot execute its fail/pass regression or native coverage; those receipts remain required from the real runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A single export coordinator prevents concurrent submissions and stale cache reuse by construction, while the Photos adapter returns success only after a confirmed transaction. Existing native Unit CI executes delayed/failing-adapter and privacy regressions without changing gates."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/BodyScoreShareExport.swift",
+      "anchor": "guard !isBusy, isCurrent() else { return }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-fixture-shell-isolation",
+    "correction": "PR #1532: Launch Quality stopped before native tests because test_shell_rejects_nonempty_artifact_directory exceeded its 10-second subprocess timeout. Keep shell contract fixtures independent of inherited CI toolchain lookup and startup hooks.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40418914586",
+    "mechanization": "Extend the existing evidence-validator behavior suite with a shared system-Bash launcher using an explicit system PATH and fixture-only environment. Route every shell fixture through it. The stale-artifact regression injects failing bash/dirname/date/ls shims and BASH_ENV/ENV hooks, verifies visible/hidden/dangling proof is refused without mutation, and fails all four subcases with the previous inherited launcher. All 30 cases pass with isolation. The existing Launch Quality and shared-lib coverage wrapper already execute this suite. Preserve the 10-second timeout, reviewed audit digest, native selectors and coverage gates; fresh Mac CI remains required because the failed run did not identify the specific stalled process.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Constructing shell fixture invocations from the system interpreter, system tool path and explicit fixture variables prevents inherited toolchain shims and shell startup hooks from owning contract-test execution."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "env={'PATH': os.defpath, 'PS4':"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "correction": "PR #1532: the isolated retry shell fixture still exceeded ten seconds on hosted macOS in run 40433475651, aborting Launch Quality before native tests without reporting the stalled command.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40433475651/job/121956669370",
+    "mechanization": "Extend the existing shared shell-fixture launcher with a bounded 30-second host allowance, fixture command traces, and an owned process group killed on timeout before capture pipes are drained. The existing required shared-lib wrapper allows 90 seconds for the full traced suite and still rejects every nonzero suite exit. A real background-child regression requires timeout output and traces and fails when cleanup kills only Bash; all 31 validator cases pass with group cleanup. Native build/test deadlines, selectors, reviewed audit bytes, workflows and coverage floors are unchanged. Linux cannot confirm that the host allowance resolves the macOS scheduling stall; fresh Mac CI remains required.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture launcher owns deadlines, diagnostics and descendant lifetime for every shell contract case, preventing opaque timeouts and orphan pipelines by construction without changing product behavior or native qualification gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "os.killpg(process.pid, signal.SIGKILL)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "correction": "PR #1532 recurring conflict repair: merge origin/main, preserve both shell-fixture safeguards and all correction sources, and identify the sources of incompatible guard annotations without automatically selecting a weaker guard.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1532",
+    "mechanization": "Reuse the existing correction classifier and coverage merge policy, explicitly align the two hosted-fixture receipts to the combined isolated, supervised 60-second executor, and verify nonregression against both immutable parents. Extend the existing recurrence and coverage conflict diagnostics to name every existing source and the incoming source before refusing the merge; a required shared-lib regression fails with the old opaque error and passes with the actionable diagnostic. Extend the existing virtual-clock fixture loop with 31-second scheduling delays for success and failure statuses: the former 30-second executor fails them, and the merged executor passes while retaining process-group timeout cleanup and native qualification gates. Retain both diagnostic-routing cases and regenerate the source map. The lanes harness owns push and PR edits; supply its required Machine line in the handoff.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "storekit-job-cap-cancels-fourth-lifecycle",
+    "correction": "Merge-group CI cancelled the 30-minute StoreKit job after three lifecycles passed and the fourth xcodebuild had started. The job cap must cover all four serial lifecycles, and the release wait must enclose that cap. All four cases still have to pass.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40627001572",
+    "mechanization": "The existing release-budget test rejects a StoreKit job cap under 45 minutes and requires the release-source wait and its Linux job timeout to enclose StoreKit plus Unit plus the measured macOS queue. The same four purchase and restore cases remain required.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A hosted Actions job timeout is outside the app runtime, so purchase and restore code cannot keep the fourth lifecycle from being cancelled."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing release-budget test reads the StoreKit job cap and fails when it is below the four-lifecycle floor or when the release wait no longer encloses it."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/release-check-budget.test.mjs",
+      "anchor": "StoreKit cap ${storekitMinutes}m cancels the fourth lifecycle"
     },
     "level": "static",
     "ruleId": "ci-invariant"
