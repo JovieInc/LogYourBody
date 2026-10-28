@@ -130,6 +130,8 @@ unmerged, the resolver classifies that resolution and validates it against both
 parents, preserving newly added receipts. Invalid JSON or missing parent
 receipts fail without writing or staging; the parent union is generated only
 while conflict markers remain, including a custom Git conflict-marker-size.
+The generated Git fixtures cover ledger marker sizes 1 and 2 in both staging
+modes, alongside the staged-source marker matrix and real CLI verification.
 The classifier shares the coverage resolver's recursive-ancestor reader and
 normalizes identical parent replays before applying the three-way merge policy.
 

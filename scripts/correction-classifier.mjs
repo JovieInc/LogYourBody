@@ -156,6 +156,7 @@ function mergeLedgers(left, right) {
   return [...merged.values()];
 }
 
+// Keep the repair command reusable without starting Node or exiting its caller.
 export function runClassifier(args, logger = console) {
   try {
     const resolvingMerge = args[0] === '--resolve-merge';
@@ -215,7 +216,7 @@ export function runClassifier(args, logger = console) {
         return 0;
       }
       const working = readSource(LEDGER_PATH, { root }); // Refuse symlinked output.
-      if (!/^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |$)/m.test(working)) {
+      if (!/^(?:<+|\|+|=+|>+)(?: |$)/m.test(working)) {
         // Preserve manually resolved receipts instead of rebuilding from the parents.
         result = classifyLedger(JSON.parse(working));
         verifyMerge(result);

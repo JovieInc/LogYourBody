@@ -586,6 +586,7 @@ LAUNCH_QUALITY_UI_TESTS=(
   "HomeV2TimelineIntegrationUITests/testHorizontalPhotoDragPagesPixelsAndMetricsWithoutOpeningViewer"
   "HomeV2PhotoViewerLayoutUITests/testPhotoViewerHoldScrubsAndResetsAfterToolsNavigation"
   "LogYourBodyUITests/testProgressShareKeepsSelectedMetricAndVisibleValue"
+  "LogYourBodyUITests/testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance"
   "LogYourBodyUITests/testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch"
   "LogYourBodyUITests/testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity"
   "LogYourBodyUITests/testHomeV2AskSyntheticCancelledTurnRecovers"

@@ -419,6 +419,32 @@ test('ledger merge readiness checks raw staged bytes despite Git diff attributes
   }
 });
 
+test('ledger merge readiness rejects Git single-character conflict markers', (t) => {
+  const { root } = fixtureRepo(t, []);
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+  writeFileSync(join(root, '.gitattributes'), `${guard.path} conflict-marker-size=1\n`);
+  git('add', '.gitattributes');
+  for (const marker of ['< HEAD', '| base', '=', '> incoming']) {
+    writeFileSync(join(root, guard.path), `${anchor}\n${marker}\n`);
+    git('add', guard.path);
+    writeFileSync(join(root, guard.path), anchor);
+    const index = git('ls-files', '--stage');
+    assert.throws(
+      () => assertLedgerMergeReady(root),
+      /ledger merge: resolve staged conflict markers first/,
+    );
+    assert.equal(git('ls-files', '--stage'), index, 'refusal preserves the index');
+    assert.equal(readFileSync(join(root, guard.path), 'utf8'), anchor);
+  }
+  git('add', guard.path);
+  assertLedgerMergeReady(root);
+  writeFileSync(join(root, '.gitattributes'), `${guard.path} conflict-marker-size=7\n`);
+  writeFileSync(join(root, guard.path), `${anchor}\n> Ordinary Markdown quote.  \n`);
+  git('config', 'core.whitespace', 'blank-at-eol');
+  git('add', '.gitattributes', guard.path);
+  assertLedgerMergeReady(root);
+});
+
 test('ledger merge rebuilds a conflicted recursive ancestor from both merge bases', (t) => {
   const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
   const { root } = fixtureRepo(t, [row('base')]);
@@ -443,6 +469,9 @@ test('ledger merge rebuilds a conflicted recursive ancestor from both merge base
     );
     assert.equal(result.status, 1, result.stderr);
   };
+  writeFileSync(join(root, '.gitattributes'), `${LEDGER_PATH} conflict-marker-size=1\n`);
+  git(['add', '.gitattributes']);
+  git(['commit', '-qm', 'single-character conflict markers']);
   git(['branch', 'right']);
   write([row('left')]);
   commit('left receipt');
@@ -453,6 +482,7 @@ test('ledger merge rebuilds a conflicted recursive ancestor from both merge base
   const right = git(['rev-parse', 'HEAD']).trim();
   git(['switch', branch]);
   merge(right);
+  assert.match(readFileSync(join(root, LEDGER_PATH), 'utf8'), /^< /m);
   write([row('left'), row('right')]);
   commit('merge right into left');
   git(['switch', 'right']);
@@ -463,7 +493,7 @@ test('ledger merge rebuilds a conflicted recursive ancestor from both merge base
   merge('right');
   const ancestor = git(['show', `:1:${LEDGER_PATH}`]);
   assert.throws(() => JSON.parse(ancestor));
-  assert.match(ancestor, /^<{7,} /m);
+  assert.match(ancestor, /^<{3} /m);
   const report = runCoverage(['--merge-ledger'], { root, env: {} });
   assert.deepEqual(
     JSON.parse(readFileSync(join(root, LEDGER_PATH), 'utf8')).map((item) => item.fingerprint),

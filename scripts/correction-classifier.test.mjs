@@ -305,6 +305,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     'textconv-marker',
     'external-marker',
     'color-marker',
+    'single-marker',
   ];
   const markers = [
     '<<<<<<< HEAD',
@@ -331,6 +332,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     'cherry-pick',
     'duplicate-parent',
     'short-ledger-markers',
+    'minimum-ledger-markers',
   ].map((scenario) => [scenario, false]);
   scenarios.push(
     ['additions', true],
@@ -340,9 +342,11 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     ['unrelated-conflict', true],
     ...markerScenarios.map((scenario) => [scenario, true]),
     ...['manual-resolution', 'manual-missing-receipt', 'manual-invalid',
-      'cherry-pick', 'duplicate-parent', 'short-ledger-markers'].map((scenario) => [scenario, true]),
+      'cherry-pick', 'duplicate-parent', 'short-ledger-markers', 'minimum-ledger-markers'].map((scenario) => [scenario, true]),
   );
   const runScenario = async ([scenario, stageMerge]) => {
+    const scenarioMarkers =
+      scenario === 'single-marker' ? ['< HEAD', '| base', '=', '> incoming'] : markers;
     const refused = [
       'concurrent',
       'deleted',
@@ -397,9 +401,10 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     git('init', '--initial-branch=left');
     git('config', 'user.name', 'Ledger fixture');
     git('config', 'user.email', 'fixture@example.test');
-    if (scenario === 'short-ledger-markers') {
+    if (['short-ledger-markers', 'minimum-ledger-markers'].includes(scenario)) {
+      const markerSize = scenario === 'minimum-ledger-markers' ? 1 : 2;
       writeFileSync(join(repository, '.gitattributes'),
-        'packages/shared-lib/corrections.json conflict-marker-size=2\n');
+        `packages/shared-lib/corrections.json conflict-marker-size=${markerSize}\n`);
     }
     for (const { guard } of rows.filter(({ guard }) => guard)) {
       writeFileSync(join(repository, guard.path), guard.anchor);
@@ -448,7 +453,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     git('switch', 'left');
     git(scenario === 'cherry-pick' ? 'cherry-pick' : 'merge', '--no-commit', 'right');
     let before = readFileSync(ledger, 'utf8');
-    assert.match(before, /^<{2,} HEAD/m);
+    assert.match(before, /^<+ HEAD/m);
     if (scenario === 'unrelated-conflict') {
       writeLedger(classifyLedger([...rows.slice(2), shared, rows[1]]));
       git('add', 'packages/shared-lib/corrections.json');
@@ -505,9 +510,16 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       // User presentation settings cannot hide conflict markers from the resolver.
       git('config', 'color.ui', 'always');
     }
+    if (scenario === 'single-marker') {
+      writeFileSync(
+        join(repository, '.gitattributes'),
+        `${rows[0].guard.path} conflict-marker-size=1\n`,
+      );
+      git('add', '.gitattributes');
+    }
     if (markerScenarios.includes(scenario)) {
       // Every presentation variant must reject every marker in both repair modes.
-      for (const marker of markers) {
+      for (const marker of scenarioMarkers) {
         writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
         git('add', rows[0].guard.path);
         writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
@@ -544,6 +556,15 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       assert.equal(git('rev-parse', 'HEAD', 'MERGE_HEAD'), parents);
       const resolved = readFileSync(ledger, 'utf8');
       const index = git('ls-files', '--stage');
+      if (scenario === 'additions') {
+        for (const args of [
+          ['--check-merge', repository],
+          ['--resolve-merge', repository, '--stage'],
+        ]) {
+          const checked = await runCLI(...args);
+          assert.equal(checked.status, 0, checked.stderr);
+        }
+      }
       const checked = await run('--check-merge', repository);
       assert.equal(checked.status, 0, checked.stderr);
       assert.equal(
@@ -582,7 +603,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       git('config', 'color.ui', 'always');
       writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
       git('add', '.gitattributes');
-      for (const marker of markers) {
+      for (const marker of scenarioMarkers) {
         writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
         git('add', rows[0].guard.path);
         writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
