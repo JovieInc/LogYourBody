@@ -122,3 +122,6 @@ retry the same command. Unrelated unstaged edits remain untouched.
 With `--stage`, guard validation reads the Git index throughout resolution, so
 unrelated working edits cannot invalidate the reviewed staged snapshot. The
 unstaged resolver continues to validate guards from the working tree.
+Staged verification accepts only regular indexed guard files (including executable
+files); a symlink blob cannot supply guard evidence, even when its text matches
+the anchor and the working file is regular. Refusal preserves the ledger and index.

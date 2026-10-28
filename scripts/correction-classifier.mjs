@@ -187,9 +187,19 @@ export function runClassifier(args) {
         classifyLedger(receipts),
         'staged merge ledger must be classified',
       );
-      const current = guardCoverageReport(receipts, (guard) => git('show', `:0:${guard}`), {
-        requireClassification: true,
-      });
+      const current = guardCoverageReport(
+        receipts,
+        (guard) => {
+          // Only regular indexed files can provide staged guard evidence.
+          assert.match(
+            git('--literal-pathspecs', 'ls-files', '--stage', '--', guard),
+            /^100(?:644|755) /,
+            'staged guard must be a regular file',
+          );
+          return git('show', `:0:${guard}`);
+        },
+        { requireClassification: true },
+      );
       for (const ref of parents) {
         const baseline = coverageReport(JSON.parse(git('show', `${ref}:${LEDGER_PATH}`)), (guard) =>
           git('show', `${ref}:${guard}`),

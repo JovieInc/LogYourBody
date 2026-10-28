@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a9865698e8b84fac33f67c5eb1303683a478d356745fd71c6ba4704f64756772`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `97183dde1bd829add9dbedeec0387b0c18ca1f32fc9b51c6d3aa2fdf0148d3bf`)
 
 ### `apps/web/package.json`: engines
 
@@ -97,7 +97,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-radio-group": "^1.4.7",
   "@radix-ui/react-scroll-area": "^1.2.18",
   "@radix-ui/react-select": "^2.3.8",
-  "@radix-ui/react-separator": "^1.1.15",
+  "@radix-ui/react-separator": "^1.2.0",
   "@radix-ui/react-slider": "^1.4.7",
   "@radix-ui/react-slot": "^1.3.3",
   "@radix-ui/react-switch": "^1.4.1",

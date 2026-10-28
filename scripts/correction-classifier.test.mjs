@@ -319,6 +319,7 @@ test('repair command resolves Git ledger conflicts from three stages without sta
     ['unstaged-guard', true],
     ['concurrent', true],
     ['missing-index-guard', true],
+    ['symlink-index-guard', true],
     ['guard-conflict', true],
     ['unrelated-conflict', true],
     ...markerScenarios.map((scenario) => [scenario, true]),
@@ -331,6 +332,7 @@ test('repair command resolves Git ledger conflicts from three stages without sta
       'deleted',
       'missing-guard',
       'missing-index-guard',
+      'symlink-index-guard',
       'guard-conflict',
       ...markerScenarios,
     ].includes(scenario);
@@ -437,6 +439,11 @@ test('repair command resolves Git ledger conflicts from three stages without sta
       git('add', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
+    if (scenario === 'symlink-index-guard') {
+      // Matching blob text is not evidence when the staged guard is a symlink.
+      const blob = git('rev-parse', `:0:${rows[0].guard.path}`).trim();
+      git('update-index', '--cacheinfo', `120000,${blob},${rows[0].guard.path}`);
+    }
     if (scenario === 'binary-marker') {
       // Binary attributes must not hide markers from either resolver mode.
       writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
@@ -542,6 +549,24 @@ test('repair command resolves Git ledger conflicts from three stages without sta
       }
       writeFileSync(ledger, resolved);
       assert.equal(run('--resolve-merge', repository, '--stage').status, 0);
+      const blob = git('rev-parse', `:0:${rows[0].guard.path}`).trim();
+      git('update-index', '--cacheinfo', `120000,${blob},${rows[0].guard.path}`);
+      const symlinkIndex = git('ls-files', '--stage');
+      for (const args of [
+        ['--check-merge', repository],
+        ['--resolve-merge', repository, '--stage'],
+      ]) {
+        const rejected = run(...args);
+        assert.equal(rejected.status, 1, 'a symlink blob cannot count as a staged guard');
+        assert.match(rejected.stderr, /missing guard anchor/);
+        assert.equal(git('ls-files', '--stage'), symlinkIndex);
+        assert.equal(readFileSync(ledger, 'utf8'), resolved);
+      }
+      git('add', rows[0].guard.path);
+      assert.equal(run('--check-merge', repository).status, 0);
+      git('update-index', '--chmod=+x', rows[0].guard.path);
+      assert.equal(run('--check-merge', repository).status, 0, 'executable guards remain valid');
+      git('add', rows[0].guard.path);
       // A clean worktree cannot hide conflict markers already staged as resolved.
       git('config', 'color.ui', 'always');
       writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
