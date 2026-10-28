@@ -15,8 +15,9 @@ on:
     workflows: [CI]
     types: [completed]
   # Draft-first PRs often go green while still drafts; enroll them when marked ready.
+  # Converting an existing queue entry to draft does not itself remove that entry.
   pull_request_target:
-    types: [ready_for_review, dequeued]
+    types: [ready_for_review, dequeued, converted_to_draft]
     branches: [main]
 
 permissions:
@@ -27,6 +28,9 @@ permissions:
 concurrency:
   group: native-merge-queue-${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
   cancel-in-progress: false
+  # Keep draft withdrawal events instead of replacing the single pending run.
+  # GitHub bounds this at 100 pending runs; admission failures remain visible.
+  queue: max
 
 jobs:
   enroll:
@@ -42,8 +46,56 @@ jobs:
             if (`${context.repo.owner}/${context.repo.repo}` !== expectedRepository
                 || !['workflow_run', 'pull_request_target'].includes(context.eventName)
                 || (context.eventName === 'pull_request_target'
-                  && !['ready_for_review', 'dequeued'].includes(context.payload.action))) {
+                  && !['ready_for_review', 'dequeued', 'converted_to_draft'].includes(context.payload.action))) {
               core.notice('NOT_ELIGIBLE: Event is outside the repository enrollment contract');
+              return;
+            }
+            if (context.eventName === 'pull_request_target' && context.payload.action === 'converted_to_draft') {
+              const eventPull = context.payload.pull_request;
+              if (!Number.isSafeInteger(eventPull?.number) || eventPull.number <= 0
+                  || eventPull.draft !== true || !/^[0-9a-f]{40}$/i.test(eventPull.head?.sha ?? '')) {
+                core.notice('NOT_ELIGIBLE: Draft event is missing its exact pull request identity');
+                return;
+              }
+              const query = `
+                query DraftQueueEntry($owner: String!, $repo: String!, $number: Int!) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      id state isDraft baseRefName headRefOid
+                      headRepository { nameWithOwner }
+                      mergeQueueEntry { id position }
+                    }
+                  }
+                }
+              `;
+              const variables = { owner: context.repo.owner, repo: context.repo.repo, number: eventPull.number };
+              const current = (await github.graphql(query, variables)).repository?.pullRequest;
+              const sameDraft = (pull) => pull?.state === 'OPEN' && pull.isDraft
+                && pull.baseRefName === 'main' && pull.headRefOid === eventPull.head.sha
+                && pull.headRepository?.nameWithOwner === expectedRepository;
+              if (!sameDraft(current)) {
+                core.notice(`NOT_ELIGIBLE: #${eventPull.number} is no longer the same open repository-local draft; no withdrawal performed`);
+                return;
+              }
+              if (!Object.hasOwn(current, 'mergeQueueEntry')
+                  || (current.mergeQueueEntry !== null
+                    && (typeof current.mergeQueueEntry?.id !== 'string' || !current.mergeQueueEntry.id))) {
+                throw new Error(`Could not verify draft withdrawal for #${eventPull.number}; queue membership is unknown`);
+              }
+              if (current.mergeQueueEntry === null) {
+                core.notice(`WITHDRAWN: #${eventPull.number} at ${eventPull.head.sha} has no native queue entry (fresh readback)`);
+                return;
+              }
+              await github.graphql(`
+                mutation WithdrawDraft($id: ID!) {
+                  dequeuePullRequest(input: { id: $id }) { mergeQueueEntry { id } }
+                }
+              `, { id: current.id });
+              const after = (await github.graphql(query, variables)).repository?.pullRequest;
+              if (!sameDraft(after) || !Object.hasOwn(after, 'mergeQueueEntry') || after.mergeQueueEntry !== null) {
+                throw new Error(`Could not verify draft withdrawal for #${eventPull.number}; inspect current native queue membership`);
+              }
+              core.notice(`WITHDRAWN: #${eventPull.number} at ${eventPull.head.sha} removed from native queue and absence verified`);
               return;
             }
             let run = context.payload.workflow_run;

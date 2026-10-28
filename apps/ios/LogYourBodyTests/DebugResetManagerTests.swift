@@ -132,12 +132,7 @@ final class DebugResetManagerTests: XCTestCase {
     // MARK: - Keychain
 
     func testClearKeychainRemovesManagedItemsButKeepsUnrelatedEntries() throws {
-        try XCTSkipUnless(
-            KeychainAvailability.isAvailable(),
-            "Keychain unavailable on unsigned CI test host (errSecMissingEntitlement); "
-                + "runs fully on signed hosts and local dev. "
-                + "TODO(@itstimwhite): enable when CI signs the test host."
-        )
+        try KeychainAvailability.requireAvailable()
         let keychain = KeychainManager.shared
         try keychain.saveAuthToken("debug-reset-auth-token")
         try keychain.saveRefreshToken("debug-reset-refresh-token")
