@@ -109,6 +109,7 @@ Both the merge check and staged retry refuse any other unresolved Git path,
 even when the staged ledger and all of its guard sources are valid.
 Conflict-marker scanning disables Git color output as well as text conversion
 and external diff drivers so presentation settings cannot conceal staged markers.
+It also rejects markers shorter than seven characters.
 A staged retry refuses any unstaged ledger edits rather than reporting success
 while ignoring new receipts. Review and stage those edits explicitly before
 retrying; refusal preserves both the index and working file.
