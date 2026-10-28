@@ -504,9 +504,15 @@ private struct DataTypeRow: View {
 
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
+    var onCompletion: (@MainActor (Bool, Bool) -> Void)?
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
         let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        controller.completionWithItemsHandler = { [onCompletion] _, completed, _, error in
+            guard let onCompletion else { return }
+            let failed = error != nil
+            Task { @MainActor in onCompletion(completed, failed) }
+        }
         return controller
     }
 
