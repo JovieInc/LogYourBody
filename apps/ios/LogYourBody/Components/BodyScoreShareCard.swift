@@ -46,7 +46,7 @@ struct BodyScoreShareOptions: Equatable {
     }
 }
 
-struct BodyScoreSharePayload {
+struct BodyScoreSharePayload: Equatable {
     let score: Int
     let scoreText: String
     let tagline: String
@@ -59,7 +59,7 @@ struct BodyScoreSharePayload {
     let deltaText: String?
     let bodyFatPercentage: Double?
     let gender: String?
-    let photoImage: UIImage?
+    var photoImage: UIImage?
     var contextualMetrics: [ContextualMetricSnapshot] = []
     var preferredMetric: ContextualMetricKind?
     var accountSession: AuthManager.ProfileSessionOwnership?
@@ -755,6 +755,7 @@ struct BodyScoreShareSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.openURL) private var openURL
 
     let payload: BodyScoreSharePayload
     let onClose: (() -> Void)?
@@ -762,10 +763,9 @@ struct BodyScoreShareSheet: View {
     @State private var selectedAspect: BodyScoreShareAspect
     @State private var shareOptions = BodyScoreShareOptions()
     @State private var areContentControlsExpanded = false
-    @State private var renderedImage: UIImage?
-    @State private var isRendering = false
+    @StateObject private var exporter = BodyScoreShareExport()
     @State private var exportFailure: String?
-    @State private var showSystemShareSheet = false
+    @State private var lastExportAction: BodyScoreShareExport.Action = .save
     @State private var dragOffsetY: CGFloat = 0
 
     /// Minimum downward drag distance required to dismiss the overlay share sheet.
@@ -807,20 +807,14 @@ struct BodyScoreShareSheet: View {
         .background(Color.jovieCanvas.ignoresSafeArea())
         .offset(y: max(0, dragOffsetY))
         .opacity(dismissDragOpacity)
-        .overlay {
-            if isRendering {
-                ZStack {
-                    Color.black.opacity(0.35)
-                        .ignoresSafeArea()
-
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+        .sheet(isPresented: Binding(
+            get: { exporter.isSystemSharePresented },
+            set: { if !$0 { exporter.hideSystemShare() } }
+        )) {
+            if payload.isOwned(by: authManager.ownsAccountSession), let presentation = exporter.presentation {
+                ShareSheet(items: [presentation.url]) { completed, failed in
+                    exporter.completeShare(id: presentation.id, completed: completed, failed: failed)
                 }
-            }
-        }
-        .sheet(isPresented: $showSystemShareSheet) {
-            if payload.isOwned(by: authManager.ownsAccountSession), let image = renderedImage {
-                ShareSheet(items: [image])
                     .ignoresSafeArea()
             }
         }
@@ -828,6 +822,11 @@ struct BodyScoreShareSheet: View {
             get: { exportFailure != nil },
             set: { if !$0 { exportFailure = nil } }
         )) {
+            if exporter.state == .failed(.photosDenied), let settings = URL(string: UIApplication.openSettingsURLString) {
+                Button("Open Settings") { openURL(settings) }
+            } else {
+                Button("Retry") { startExport(lastExportAction) }
+            }
             Button("OK", role: .cancel) { exportFailure = nil }
         } message: {
             Text(exportFailure ?? "Try again.")
@@ -838,12 +837,12 @@ struct BodyScoreShareSheet: View {
             closeShareSheet()
         }
         .onDisappear { invalidatePrivateExport() }
-        .onChange(of: payload.contextualMetrics) { _, _ in renderedImage = nil }
-        .onChange(of: selectedAspect) { _, _ in
-            renderedImage = nil
-        }
-        .onChange(of: shareOptions) { _, _ in
-            renderedImage = nil
+        .onChange(of: exportSnapshot) { _, snapshot in exporter.reconcile(snapshot) }
+        .onChange(of: exporter.state) { _, state in
+            if case .failed(let failure) = state { exportFailure = failure.message }
+            if showsExportStatus, !state.message.isEmpty {
+                UIAccessibility.post(notification: .announcement, argument: state.message)
+            }
         }
         // Hardware Escape / keyboard dismiss path for the full-screen overlay presentation.
         .onKeyPress(.escape) {
@@ -866,19 +865,13 @@ struct BodyScoreShareSheet: View {
             .onChanged { value in
                 // Only predominantly vertical drags may pull the sheet; horizontal
                 // format-control swipes must not move or dismiss it.
-                guard !isRendering,
-                      Self.isVerticalGesture(
-                        translationWidth: value.translation.width,
-                        translationHeight: value.translation.height
-                      ) else { return }
+                guard Self.isVerticalGesture(
+                    translationWidth: value.translation.width,
+                    translationHeight: value.translation.height
+                ) else { return }
                 dragOffsetY = max(0, value.translation.height)
             }
             .onEnded { value in
-                guard !isRendering else {
-                    dragOffsetY = 0
-                    return
-                }
-
                 // A diagonal or horizontal gesture never dismisses, even when its
                 // vertical component passes the threshold; the surface springs back.
                 let isVertical = Self.isVerticalGesture(
@@ -919,6 +912,7 @@ struct BodyScoreShareSheet: View {
     }
 
     private func closeShareSheet() {
+        invalidatePrivateExport()
         if let onClose {
             onClose()
         } else {
@@ -986,7 +980,20 @@ struct BodyScoreShareSheet: View {
                 cardPreview(height: previewHeight)
 
                 shareActions
-                    .disabled(isRendering)
+                    .disabled(exporter.isBusy)
+
+                if showsExportStatus, !exporter.state.message.isEmpty {
+                    HStack {
+                        if exporter.isBusy { ProgressView().tint(.white) }
+                        Text(exporter.state.message)
+                    }
+                    .font(theme.typography.captionLarge)
+                    .foregroundColor(theme.colors.text)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("body_score_share_export_status")
+                    .onAppear { exporter.feedbackDidAppear() }
+                    .onChange(of: exporter.state) { _, _ in exporter.feedbackDidAppear() }
+                }
             }
             // The content is a real sibling of Close/title under the world screen root.
             .accessibilityElement(children: .contain)
@@ -1063,12 +1070,12 @@ struct BodyScoreShareSheet: View {
     private var shareActions: some View {
         HStack(spacing: JovieTokens.itemGap) {
             shareActionButton(title: "Save", icon: "square.and.arrow.down") {
-                Task { await saveToPhotos() }
+                startExport(.save)
             }
             .accessibilityIdentifier("body_score_share_save_button")
 
             shareActionButton(title: "Share", icon: "square.and.arrow.up") {
-                Task { await shareImage() }
+                startExport(.share)
             }
             .accessibilityIdentifier("body_score_share_system_button")
         }
@@ -1089,69 +1096,25 @@ struct BodyScoreShareSheet: View {
     }
 
     private func invalidatePrivateExport() {
-        renderedImage = nil
-        showSystemShareSheet = false
+        exporter.invalidate()
         exportFailure = nil
     }
 
-    @MainActor
-    private func renderImage() {
-        guard payload.isOwned(by: authManager.ownsAccountSession) else {
-            invalidatePrivateExport()
-            return
-        }
-        isRendering = true
-        defer { isRendering = false }
-
-        let size = selectedAspect.pixelSize
-        let renderer = ImageRenderer(
-            content:
-                BodyScoreShareCardView(payload: payload, aspect: selectedAspect, options: shareOptions)
-                .frame(width: size.width, height: size.height)
-                .environment(\.colorScheme, .dark)
-        )
-        renderer.scale = 1.0
-        renderedImage = renderer.uiImage
+    private var exportSnapshot: BodyScoreShareSnapshot {
+        BodyScoreShareSnapshot(payload: payload, aspect: selectedAspect, options: shareOptions)
     }
 
-    @MainActor
-    private func shareImage() async {
-        guard payload.isOwned(by: authManager.ownsAccountSession) else {
-            invalidatePrivateExport()
-            return
-        }
-        if renderedImage == nil {
-            renderImage()
-        }
-        guard renderedImage != nil else {
-            exportFailure = "The card could not be rendered. Try again."
-            return
-        }
-        showSystemShareSheet = true
+    // New status presentation rolls out separately; correctness guards always protect exports.
+    private var showsExportStatus: Bool {
+        AnalyticsService.shared.isFeatureEnabled(flagKey: "responsive_share_export")
     }
 
-    @MainActor
-    private func saveToPhotos() async {
-        guard payload.isOwned(by: authManager.ownsAccountSession) else {
-            invalidatePrivateExport()
-            return
-        }
-        if renderedImage == nil {
-            renderImage()
-        }
-        guard let image = renderedImage else {
-            exportFailure = "The card could not be rendered. Try again."
-            return
-        }
-
-        let saved = await LivePhotoLibraryAdapter.shared.saveImage(
-            image, whileOwned: { payload.isOwned(by: authManager.ownsAccountSession) })
-        guard payload.isOwned(by: authManager.ownsAccountSession) else {
-            invalidatePrivateExport()
-            return
-        }
-        if !saved {
-            exportFailure = "Photos access is unavailable. Allow access in Settings or use Share to export the card."
+    private func startExport(_ action: BodyScoreShareExport.Action) {
+        lastExportAction = action
+        let snapshot = exportSnapshot
+        exporter.start(action, snapshot: snapshot) {
+            payload.isOwned(by: authManager.ownsAccountSession)
+                && selectedAspect == snapshot.aspect && shareOptions == snapshot.options
         }
     }
 }

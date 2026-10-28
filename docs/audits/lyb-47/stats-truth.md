@@ -290,6 +290,57 @@ GBrain write and same-slug readback succeeded for
 `lyb-47-chart-identity-repair-20261028` with network access outside the sandbox.
 The initial sandboxed query, write and readback attempts could not connect.
 
+## 2026-10-28 correction-ledger conflict repair
+
+Merged main `63afc5eabff4aa476d6be6447335efc07b9a2e4b` into prior head
+`a965b963eae0625853fe0b0df7793f447655f540`, without rebasing. Only the correction
+ledger conflicted. The canonical `--resolve-merge . --stage` resolver retained
+and classified all 141 receipts; `--check-merge .` verified both immutable parents.
+The Stats truth gate, chart identity, PNG expectations and main's share-export
+implementation remain composed in the merged sources.
+
+For recurring fingerprint `fix-red-e3b0c44298`, extend the existing readiness
+machine with Git's attribute-aware `diff --check`. Git permits
+`conflict-marker-size=1`, which the existing raw-diff expression missed. The new
+real-Git regression failed before the extension and passed afterward. The existing
+classifier scenario generator exercises all four minimum-size markers in both
+repair modes. Refusals preserve the index and working files; clean retries,
+ordinary Markdown quotes, whitespace-only findings and recursive ancestors remain
+covered. Existing raw-byte checks, coverage floors and deadlines remain enforced.
+
+Verification on Node 22.23.2 and pinned pnpm 10.34.1:
+
+- `corepack pnpm lint` and `corepack pnpm typecheck`: four tasks passed each.
+- `bash scripts/codex-setup.sh --run test`: eight tasks passed, including
+  192 shared-lib Vitest cases, 122 shared-lib Node cases, 1,411 web Jest cases,
+  three voice-adapter cases and the web production build.
+- The unchanged covered classifier command recorded above: 11 cases passed with
+  100% line, branch and function coverage. The correction coverage/ratchet/owner
+  behavioral command from the required shared-lib runner: 47 cases passed;
+  correction-coverage.mjs measured 99.55% lines, 97.58% branches and 100% functions.
+- `python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q`:
+  52 passed. `python3 scripts/ios/test_launch_ui_regression_audit.py`: 15 passed.
+  `python3 scripts/ios/launch-ui-regression-audit.py --artifact-dir
+/tmp/pr1535-merged-ui-audit` and `bash -n scripts/ios/launch-quality-audit.sh` passed.
+- `swiftlint lint --strict --no-cache --config apps/ios/.swiftlint.yml
+apps/ios/LogYourBody/Components/BodyScoreShareCard.swift`: zero violations;
+  SourceKit-dependent rules are unavailable on Linux.
+- Correction coverage against both full parent SHAs passed at 98/98 guarded rules;
+  ratchet and guard-reference checks passed, retaining 11 existing copy findings.
+  The coverage CLI requires full SHAs rather than `HEAD`, `MERGE_HEAD` or short SHAs.
+- `bash scripts/codex-setup.sh --run product:check`,
+  `python3 scripts/resolve-repository-docs.py`,
+  `python3 scripts/repository_docs.py`, `git diff --check` and
+  `git diff --cached --check` passed.
+
+`gh run view 40639069758 --repo JovieInc/LogYourBody --log-failed` reported that
+the old-head run was still in progress; no failing checks were reported.
+`xcodebuild ... build-for-testing` exited 127 because this host has no Xcode.
+Native execution and exact-head coverage require the harness-pushed CI run.
+The initial gbrain query failed inside the sandbox; the network-enabled retry
+succeeded with no matching results. Git metadata and Node/Git subprocess checks
+also required execution outside the sandbox.
+
 The harness owns pushes and PR edits. Use exactly this machine line in the PR body:
 
-Machine: built scripts/ios/launch-ui-regression-audit.py
+Machine: built packages/shared-lib/scripts/correction-coverage.mjs

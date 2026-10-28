@@ -186,6 +186,7 @@ export const logYourBody = {
       { value: 'https://youtube.com/@logyourbody', reason: 'Product social profile.' },
       { value: 'https://api.github.com', reason: 'GitHub REST API used by CI scripts.' },
       { value: 'https://api.linear.app', reason: 'Linear GraphQL API used by CI remediation intake.' },
+      { value: 'https://linear.app/jovie/issue/LYB-40', reason: 'LYB-40 source evidence for share export lifecycle and confirmed Photos writes.' },
       { value: 'https://linear.app/jovie/issue/LYB-43', reason: 'LYB-43 source evidence for metric identity and accessible action ownership.' },
       { value: 'https://linear.app/jovie/issue/LYB-44', reason: 'LYB-44 source evidence for chart responsiveness and playhead label mapping.' },
       { value: 'https://linear.app/jovie/issue/LYB-74', reason: 'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.' },

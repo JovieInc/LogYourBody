@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B04020261025000000000001 /* BodyScoreShareExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B04020261025000000000002 /* BodyScoreShareExport.swift */; };
+		B04020261025000000000003 /* BodyScoreShareExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B04020261025000000000004 /* BodyScoreShareExportTests.swift */; };
 		A24420261025000000000002 /* MetricSourceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000001 /* MetricSourceAdapter.swift */; };
 		A24420261025000000000004 /* HealthKitManager+MetricSourceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000003 /* HealthKitManager+MetricSourceAdapter.swift */; };
 		A24420261025000000000006 /* MetricSourceAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000005 /* MetricSourceAdapterTests.swift */; };
@@ -564,6 +566,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B04020261025000000000002 /* BodyScoreShareExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreShareExport.swift; sourceTree = "<group>"; };
+		B04020261025000000000004 /* BodyScoreShareExportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreShareExportTests.swift; sourceTree = "<group>"; };
 		A24420261025000000000001 /* MetricSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSourceAdapter.swift; sourceTree = "<group>"; };
 		A24420261025000000000003 /* HealthKitManager+MetricSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitManager+MetricSourceAdapter.swift"; sourceTree = "<group>"; };
 		A24420261025000000000005 /* MetricSourceAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSourceAdapterTests.swift; sourceTree = "<group>"; };
@@ -1620,6 +1624,7 @@
 				AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */,
 				AD3134002F01313400D134A1 /* NotificationManager.swift */,
 				ADAD00012F10000000ABCDEF /* ExternalServicePorts.swift */,
+				B04020261025000000000002 /* BodyScoreShareExport.swift */,
 				832C6BD896D896CCBEBAF565 /* AppReviewNativeAdapter.swift */,
 				ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */,
 				ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */,
@@ -1868,6 +1873,7 @@
 				3CBF4E377107434EA53A2F1B /* PaidWeightLoggerMVPPolicyTests.swift */,
 				FE07A7A700000000000000F7 /* PhotoTimelineHUDPolicyTests.swift */,
 				FE08A8A800000000000000F8 /* BodyScoreShareCardTests.swift */,
+				B04020261025000000000004 /* BodyScoreShareExportTests.swift */,
 				FE09A9A900000000000000F9 /* ProgressPhotoImagePipelineTests.swift */,
 				FE10B0B000000000000000FA /* DashboardTimelineProviderPerformanceTests.swift */,
 				FE11C1C100000000000000FB /* ImageCacheServiceTests.swift */,
@@ -2348,6 +2354,7 @@
 				5DB1A0B114B3417EAE9E143B /* PaidWeightLoggerMVPPolicyTests.swift in Sources */,
 				FE07A7A700000000000000B7 /* PhotoTimelineHUDPolicyTests.swift in Sources */,
 				FE08A8A800000000000000B8 /* BodyScoreShareCardTests.swift in Sources */,
+				B04020261025000000000003 /* BodyScoreShareExportTests.swift in Sources */,
 				FE09A9A900000000000000B9 /* ProgressPhotoImagePipelineTests.swift in Sources */,
 				FE10B0B000000000000000BA /* DashboardTimelineProviderPerformanceTests.swift in Sources */,
 				FE11C1C100000000000000BB /* ImageCacheServiceTests.swift in Sources */,
@@ -2545,6 +2552,7 @@
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
 				ADAD00022F10000000ABCDEF /* ExternalServicePorts.swift in Sources */,
+				B04020261025000000000001 /* BodyScoreShareExport.swift in Sources */,
 				84230C7F619A7210787206E8 /* AppReviewNativeAdapter.swift in Sources */,
 				C7A700022F20000000C0A702 /* ChatService.swift in Sources */,
 				A26100000000000000000001 /* QuickPillRanker.swift in Sources */,

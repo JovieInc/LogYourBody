@@ -284,6 +284,7 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     'textconv-marker',
     'external-marker',
     'color-marker',
+    'single-marker',
   ];
   const markers = [
     '<<<<<<< HEAD',
@@ -314,6 +315,8 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     ...markerScenarios.map((scenario) => [scenario, true]),
   );
   for (const [scenario, stageMerge] of scenarios) {
+    const scenarioMarkers =
+      scenario === 'single-marker' ? ['< HEAD', '| base', '=', '> incoming'] : markers;
     const refused = [
       'concurrent',
       'deleted',
@@ -438,9 +441,16 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       // User presentation settings cannot hide conflict markers from the resolver.
       git('config', 'color.ui', 'always');
     }
+    if (scenario === 'single-marker') {
+      writeFileSync(
+        join(repository, '.gitattributes'),
+        `${rows[0].guard.path} conflict-marker-size=1\n`,
+      );
+      git('add', '.gitattributes');
+    }
     if (markerScenarios.includes(scenario)) {
       // Every presentation variant must reject every marker in both repair modes.
-      for (const marker of markers) {
+      for (const marker of scenarioMarkers) {
         writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
         git('add', rows[0].guard.path);
         writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
