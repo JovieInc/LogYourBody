@@ -341,6 +341,54 @@ The initial gbrain query failed inside the sandbox; the network-enabled retry
 succeeded with no matching results. Git metadata and Node/Git subprocess checks
 also required execution outside the sandbox.
 
+## 2026-10-28 classifier timeout repair
+
+Merged main `558e0e6a31fee7ceddfb5fa32a11e911cc40d191` into prior head
+`10f3bdf14458729d878c560097a010d4f5e99442` without rebasing. The existing ledger
+resolver retained 148 classified receipts from both parents; regenerate the
+source index from the composed manifests rather than choosing either hash.
+
+JavaScript/TypeScript job `122704605647` in run `40655183735` timed out in the
+classifier scenario suite after 30 seconds. `gh run view 40655183735 --repo
+JovieInc/LogYourBody --log-failed` refused logs while the native job was running;
+`gh api repos/JovieInc/LogYourBody/actions/jobs/122704605647/logs` supplied the
+completed failure log.
+
+Extend the existing classifier with `runClassifier(args)`, shared by the CLI and
+its generated merge matrix. Return diagnostics instead of exiting the caller so
+all existing scenarios can execute in-process. Retain real CLI smoke checks,
+refusal assertions, index preservation and the existing 30-second wrapper and
+100% coverage thresholds. Record fingerprint `fix-red-1a39536f40` in the ledger and
+use the same command and programmatic entrypoint to classify all 149 receipts.
+
+Verification on Node 22.23.2 and pinned pnpm 10.34.1:
+
+- `corepack pnpm install --frozen-lockfile --prefer-offline`, `corepack pnpm lint`,
+  `corepack pnpm typecheck` and `corepack pnpm test` passed. The full test run
+  completed eight tasks (six cached); shared-lib executed 197 Vitest and 122 Node
+  cases. The classifier wrapper completed in 9.3 seconds.
+- The covered classifier command recorded above passed all 11 cases at 100%
+  line, branch and function coverage: 17.4 seconds before and 6.1 seconds after.
+  The new in-process matrix rejects the unmodified command in an isolated
+  snapshot because it lacks the reusable entrypoint.
+- Correction coverage against both full merge-parent SHAs passed at 102/102
+  mechanized rules. `correction-ratchet.mjs --base-ref origin/main` and
+  `guard-reference.mjs --base-ref origin/main` passed with the same 11 existing
+  copy findings.
+- `python3 scripts/ios/launch-ui-regression-audit.py --artifact-dir
+/tmp/lyb-pr1535-ui-audit` and `python3 scripts/repository_docs.py` passed.
+- `python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q`
+  passed all 53 cases outside the sandbox.
+
+The initial sandboxed Node test could not run subprocesses, and two runner-routing
+fixtures could not bind Unix sockets. Those checks require execution outside the
+sandbox. Xcode is unavailable here; native execution and exact-head coverage
+remain required from the harness-pushed CI run. No native runtime changes or
+workflow edits were added by this repair.
+
+GBrain write and same-slug readback succeeded for
+`lyb-47-classifier-timeout-repair-20261028`.
+
 The harness owns pushes and PR edits. Use exactly this machine line in the PR body:
 
-Machine: built packages/shared-lib/scripts/correction-coverage.mjs
+Machine: built scripts/correction-classifier.mjs

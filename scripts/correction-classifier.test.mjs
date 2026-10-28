@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { classifyLedger } from './correction-classifier.mjs';
+import { classifyLedger, runClassifier } from './correction-classifier.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const script = fileURLToPath(new URL('./correction-classifier.mjs', import.meta.url));
@@ -263,10 +263,18 @@ test('committed ledger is classified and the default CLI run is idempotent', () 
   assert.equal(readFileSync(path, 'utf8'), before);
 });
 
-test('CLI resolves Git ledger conflicts from three stages without staging other edits', (t) => {
+test('repair command resolves Git ledger conflicts from three stages without staging other edits', (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'lyb-classifier-git-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const run = (...args) => runCli(args, tmpdir());
+  // Exercise every generated scenario through the same command as the CLI, without
+  // paying a Node startup for each marker. Keep real CLI smoke checks below.
+  const run = (...args) => {
+    try {
+      return { status: 0, stdout: runClassifier(args), stderr: '' };
+    } catch (error) {
+      return { status: 1, stdout: '', stderr: `correction-classifier: ${error.message}` };
+    }
+  };
   // These argument and repository failures do not depend on a merge scenario.
   // Exercise them once instead of starting the same seven CLIs for every case.
   assert.match(run('--resolve-merge').stderr, /usage:/);
@@ -386,6 +394,12 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     git('merge', '--no-commit', 'right');
     const before = readFileSync(ledger, 'utf8');
     assert.match(before, /<<<<<<< HEAD/);
+    if (scenario === 'additions' && !stageMerge) {
+      const resolved = runCli(['--resolve-merge', repository], tmpdir());
+      assert.equal(resolved.status, 0, resolved.stderr);
+      // Restore the actual conflict before running the same case in-process.
+      writeFileSync(ledger, before);
+    }
     if (scenario === 'unrelated-conflict') {
       writeLedger(classifyLedger([...rows.slice(2), shared, rows[1]]));
       git('add', 'packages/shared-lib/corrections.json');
@@ -478,6 +492,13 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       assert.equal(git('rev-parse', 'HEAD', 'MERGE_HEAD'), parents);
       const resolved = readFileSync(ledger, 'utf8');
       const index = git('ls-files', '--stage');
+      for (const args of [
+        ['--check-merge', repository],
+        ['--resolve-merge', repository, '--stage'],
+      ]) {
+        const checked = runCli(args, tmpdir());
+        assert.equal(checked.status, 0, checked.stderr);
+      }
       const checked = run('--check-merge', repository);
       assert.equal(checked.status, 0, checked.stderr);
       assert.equal(

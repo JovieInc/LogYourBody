@@ -2926,5 +2926,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40",
+    "correction": "PR #1535 recurring merge/check repair: JavaScript/TypeScript job 122704605647 timed out after 30 seconds in the correction-classifier real-Git scenario matrix while other shared-lib cases passed.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40655183735/job/122704605647",
+    "mechanization": "Extend the existing classifier command with a reusable runClassifier entrypoint that returns diagnostics and throws errors without exiting its caller. Run every existing generated merge, staged retry, marker, presentation filter and receipt-preservation scenario through that same entrypoint in-process, retaining real CLI smoke checks for default classification, errors, union, resolution, staging and verification. This removes repeated Node startups without increasing the existing 30-second wrapper deadline or lowering any 100% coverage threshold. The exact covered command passed 11 cases in 17.4 seconds before and 6.1 seconds after on this host. Use the same command to classify this repair receipt; use the existing ledger resolver and documentation generator to preserve both parents of the required main merge. The lanes harness owns pushes and PR edits.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A single reusable command implementation removes process exit and repeated Node startup from the generated scenario runner by construction while keeping the CLI and programmatic repair path identical."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "// Keep the repair command reusable without starting Node or exiting its caller."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
