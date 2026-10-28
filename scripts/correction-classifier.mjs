@@ -156,8 +156,34 @@ function mergeLedgers(left, right) {
   return [...merged.values()];
 }
 
+function readGitSources(root, objects, execute) {
+  for (const object of objects) {
+    assert.doesNotMatch(object, /[\r\n\0]/u, 'invalid Git source request');
+  }
+  const output = execute('git', ['-C', root, 'cat-file', '--batch'], {
+    input: objects.map((object) => `${object}\n`).join(''),
+    stdio: ['pipe', 'pipe', 'pipe'],
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  let offset = 0;
+  return new Map(
+    objects.map((object) => {
+      const end = output.indexOf(10, offset);
+      const header = output.toString('utf8', offset, end);
+      offset = end + 1;
+      if (header.endsWith(' missing')) return [object, ''];
+      const match = /^[a-f0-9]+ blob (\d+)$/u.exec(header);
+      assert.ok(match, `invalid Git source response: ${header}`);
+      const size = Number(match[1]);
+      const source = output.toString('utf8', offset, offset + size);
+      offset += size + 1;
+      return [object, source];
+    }),
+  );
+}
+
 // Keep the repair command reusable without starting Node or exiting its caller.
-export function runClassifier(args, logger = console) {
+export function runClassifier(args, logger = console, execute = execFileSync) {
   try {
     const resolvingMerge = args[0] === '--resolve-merge';
     const checkingMerge = args[0] === '--check-merge';
@@ -175,30 +201,39 @@ export function runClassifier(args, logger = console) {
     let stageResolution;
     if (resolvingMerge || checkingMerge) {
       const git = (...gitArgs) =>
-        execFileSync('git', ['-C', args[1], ...gitArgs], {
+        execute('git', ['-C', args[1], ...gitArgs], {
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'pipe'],
         });
-      const root = git('rev-parse', '--show-toplevel').trim();
-      path = resolve(root, LEDGER_PATH);
       // Require both immutable merge parents before resolving any ledger.
-      const parents = ['HEAD', 'MERGE_HEAD'].map((ref) =>
-        git('rev-parse', '--verify', ref).trim(),
-      );
+      const [root, ...parents] = git('rev-parse', '--show-toplevel', 'HEAD', 'MERGE_HEAD')
+        .trim()
+        .split('\n');
+      path = resolve(root, LEDGER_PATH);
       const verifyMerge = (receipts) => {
         assert.deepEqual(
           receipts,
           classifyLedger(receipts),
           'staged merge ledger must be classified',
         );
-        const current = guardCoverageReport(receipts, (guard) => git('show', `:0:${guard}`), {
+        const baselines = parents.map((ref) => ({
+          ref,
+          receipts: JSON.parse(git('show', `${ref}:${LEDGER_PATH}`)),
+        }));
+        // Batch guard blobs per verification; never cache the mutable index across retries.
+        const objects = [
+          ...new Set(
+            [{ ref: ':0', receipts }, ...baselines].flatMap(({ ref, receipts }) =>
+              receipts.filter(({ guard }) => guard).map(({ guard }) => `${ref}:${guard.path}`),
+            ),
+          ),
+        ];
+        const sources = readGitSources(root, objects, execute);
+        const current = guardCoverageReport(receipts, (guard) => sources.get(`:0:${guard}`), {
           requireClassification: true,
         });
-        for (const ref of parents) {
-          const baseline = coverageReport(
-            JSON.parse(git('show', `${ref}:${LEDGER_PATH}`)),
-            (guard) => git('show', `${ref}:${guard}`),
-          );
+        for (const { ref, receipts } of baselines) {
+          const baseline = coverageReport(receipts, (guard) => sources.get(`${ref}:${guard}`));
           assertNoRegression(current, baseline);
         }
       };

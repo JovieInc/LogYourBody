@@ -88,6 +88,10 @@ The CLI delegates to `runClassifier(args, logger)`, which returns status without
 changing process exit state. Git fixtures invoke the CLI for each merge scenario
 and reuse this runner for repeated checks, retaining the complete assertion matrix
 within the existing 30-second deadline and 100% classifier coverage gates.
+Each verification batches staged and immutable parent guard blobs in one Git
+process, parsing byte lengths and retaining fresh index reads on every retry.
+The real Git matrix checks the process count, Unicode paths, multibyte and binary
+contents, aggregate output over 1 MiB, and missing staged sources.
 
 For additive ledger conflicts during a merge, run
 `node scripts/correction-classifier.mjs --resolve-merge .` from the repository

@@ -2935,12 +2935,12 @@
     "classification": {
       "codebase": {
         "feasible": true,
-        "rationale": "A single reusable command implementation removes process exit and repeated Node startup from the generated scenario runner by construction while keeping the CLI and programmatic repair path identical."
+        "rationale": "The reusable classifier batches staged and immutable parent guard reads per verification, removing per-guard Git startup by construction while retaining fresh index reads and the same repair semantics."
       }
     },
     "guard": {
       "path": "scripts/correction-classifier.mjs",
-      "anchor": "// Keep the repair command reusable without starting Node or exiting its caller."
+      "anchor": "// Batch guard blobs per verification; never cache the mutable index across retries."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -3055,12 +3055,12 @@
     "classification": {
       "codebase": {
         "feasible": true,
-        "rationale": "A single reusable command implementation removes process exit and repeated Node startup from the generated scenario runner by construction while keeping the CLI and programmatic repair path identical."
+        "rationale": "The reusable classifier batches staged and immutable parent guard reads per verification, removing per-guard Git startup by construction while retaining fresh index reads and the same repair semantics."
       }
     },
     "guard": {
       "path": "scripts/correction-classifier.mjs",
-      "anchor": "// Keep the repair command reusable without starting Node or exiting its caller."
+      "anchor": "// Batch guard blobs per verification; never cache the mutable index across retries."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -3091,12 +3091,12 @@
     "classification": {
       "codebase": {
         "feasible": true,
-        "rationale": "A single reusable command implementation removes process exit and repeated Node startup from the generated scenario runner by construction while keeping the CLI and programmatic repair path identical."
+        "rationale": "The reusable classifier batches staged and immutable parent guard reads per verification, removing per-guard Git startup by construction while retaining fresh index reads and the same repair semantics."
       }
     },
     "guard": {
       "path": "scripts/correction-classifier.mjs",
-      "anchor": "// Keep the repair command reusable without starting Node or exiting its caller."
+      "anchor": "// Batch guard blobs per verification; never cache the mutable index across retries."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -3155,6 +3155,24 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40",
+    "correction": "PR #1551 recurrence 5: JavaScript/TypeScript job 122782113469 times out in the correction-classifier Git matrix at its unchanged 30-second deadline. Reduce repeated work without dropping scenarios, assertions or coverage gates.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40678184145/job/122782113469",
+    "mechanization": "Extend the existing reusable classifier to read all staged and immutable parent guard blobs in one Git cat-file batch per verification and resolve both merge parents in one Git call. Parse blob sizes as bytes, deduplicate requests, retain missing-source refusal and read the index anew on every retry. A real-Git command-count regression fails against the former runner and passes with batching; the retained matrix also covers Unicode paths, multibyte and NUL contents, an aggregate response over 1 MiB, and a missing staged source restored only in the worktree. Keep every CLI scenario, the 30-second wrapper deadline and 100% line, branch and function coverage thresholds. Use the extended runner for the complete required fixture matrix and classify this receipt with the same command. The required main merge was already present. The lanes harness owns pushes and the single PR-body Machine line supplied in the handoff.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The reusable classifier batches staged and immutable parent guard reads per verification, removing per-guard Git startup by construction while retaining fresh index reads and the same repair semantics."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "// Batch guard blobs per verification; never cache the mutable index across retries."
     },
     "level": "codebase",
     "ruleId": "code-prevention"

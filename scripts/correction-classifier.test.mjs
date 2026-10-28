@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFile, spawnSync } from 'node:child_process';
+import { execFile, execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -298,6 +298,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
   assert.match(run('--check-merge', directory, 'extra').stderr, /usage:/);
   assert.equal(run('--resolve-merge', directory).status, 1, 'refuse a non-repository');
   const rows = fixture().slice(0, 4);
+  rows[3].guard.path = 'coverage guard 🧪.mjs';
   rows.push({ ...rows[0], source: `${rows[0].source}#another-receipt` });
   const markerScenarios = [
     'staged-marker',
@@ -338,6 +339,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     ['additions', true],
     ['concurrent', true],
     ['missing-index-guard', true],
+    ['missing-index-source', true],
     ['guard-conflict', true],
     ['unrelated-conflict', true],
     ...markerScenarios.map((scenario) => [scenario, true]),
@@ -352,6 +354,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       'deleted',
       'missing-guard',
       'missing-index-guard',
+      'missing-index-source',
       'guard-conflict',
       ...markerScenarios,
       'manual-missing-receipt',
@@ -408,6 +411,18 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     }
     for (const { guard } of rows.filter(({ guard }) => guard)) {
       writeFileSync(join(repository, guard.path), guard.anchor);
+    }
+    // Batch responses use byte lengths, even for Unicode paths and binary contents.
+    writeFileSync(
+      join(repository, rows[3].guard.path),
+      `${rows[3].guard.anchor}\né中\n\0trailer\n`,
+    );
+    if (scenario === 'additions' && stageMerge) {
+      // The real ledger's combined guard snapshots exceed execFileSync's 1 MiB default.
+      writeFileSync(
+        join(repository, rows[3].guard.path),
+        `${rows[3].guard.anchor}\n${'é'.repeat(200_000)}`,
+      );
     }
     writeLedger(scenario === 'duplicate-parent' ? [rows[0], rows[0]] : [rows[0]]);
     writeFileSync(join(repository, 'unrelated.txt'), 'committed\n');
@@ -491,6 +506,10 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       git('add', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
+    if (scenario === 'missing-index-source') {
+      git('rm', rows[0].guard.path);
+      writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
+    }
     if (scenario === 'binary-marker') {
       // Binary attributes must not hide markers from either resolver mode.
       writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
@@ -567,6 +586,40 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       }
       const checked = await run('--check-merge', repository);
       assert.equal(checked.status, 0, checked.stderr);
+      if (scenario === 'additions') {
+        const commands = [];
+        const status = runClassifier(
+          ['--check-merge', repository],
+          {
+            log() {},
+            error: (message) => assert.fail(message),
+          },
+          (command, args, options) => {
+            commands.push(args);
+            return execFileSync(command, args, options);
+          },
+        );
+        assert.equal(status, 0);
+        assert.equal(
+          commands.filter((args) => args.includes('rev-parse')).length,
+          1,
+          'resolve the repository and both merge parents in one Git call',
+        );
+        assert.equal(
+          commands.filter((args) => args.includes('cat-file')).length,
+          1,
+          'read all staged and immutable parent guards in one Git batch',
+        );
+        assert.equal(
+          commands.filter(
+            (args) =>
+              args.includes('show') &&
+              rows.some(({ guard }) => args.at(-1).endsWith(`:${guard.path}`)),
+          ).length,
+          0,
+          'verification must not start Git once per guard',
+        );
+      }
       assert.equal(
         (await run('--resolve-merge', repository, '--stage')).status,
         0,
