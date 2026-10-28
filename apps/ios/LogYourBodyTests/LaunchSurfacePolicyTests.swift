@@ -13,6 +13,23 @@ import UIKit
 
 
 final class LaunchSurfacePolicyTests: XCTestCase {
+    #if DEBUG
+    @MainActor
+    func testStateFixturesDisableAnimationsForReplayAndOnboarding() {
+        for fixture in ["-lybUITestChatReplayFixture", "-lybUITestBodyScoreOnboardingFixture"] {
+            XCTAssertTrue(LogYourBodyApp.usesDeterministicUITestAnimations(arguments: [fixture]), fixture)
+            XCTAssertTrue(LogYourBodyApp.usesDeterministicUITestAnimations(arguments: ["app", fixture, "other"]), fixture)
+        }
+    }
+
+    @MainActor
+    func testOrdinaryLaunchesAndOtherFixturesKeepAnimationTiming() {
+        for arguments in [[], ["app"], ["-lybUITestPhotoTimelineHUDFixture"], ["-lybUITestChatReplayFixtureExtra"]] {
+            XCTAssertFalse(LogYourBodyApp.usesDeterministicUITestAnimations(arguments: arguments))
+        }
+    }
+    #endif
+
     // Regression: Home chrome text (title, date pill, empty states) used fixed point sizes.
     @MainActor
     func testScaledSystemFontMatchesApprovedSizeByDefaultAndGrowsWithDynamicType() {
