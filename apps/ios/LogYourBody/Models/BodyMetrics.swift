@@ -3,7 +3,6 @@
 // LogYourBody
 //
 import Foundation
-import CryptoKit
 
 struct BodyMetricSource: Codable, Equatable, Hashable {
     let rawValue: String
@@ -116,7 +115,7 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
     let deviceModel: String?
     let sampleId: String?
     let quantityType: String?
-    private(set) var bodyFatSampleId: String?
+    let bodyFatSampleId: String?
     let externalId: String?
     let externalResultId: String?
     let scannerModel: String?
@@ -127,12 +126,7 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
     private var weightEntrySource: String?
     private var bodyFatEntrySource: String?
     private var bodyFatEntryMethod: String?
-    private var weightOperationIdStorage: String?
-    private var weightRevisionStorage: Int?
     private var extraFields: [String: ReportedMeasurementJSON] = [:]
-
-    var weightOperationId: String? { weightOperationIdStorage }
-    var weightRevision: Int? { weightRevisionStorage }
 
     init(
         vendor: String? = nil,
@@ -171,8 +165,6 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         self.weightEntrySource = nil
         self.bodyFatEntrySource = nil
         self.bodyFatEntryMethod = nil
-        self.weightOperationIdStorage = nil
-        self.weightRevisionStorage = nil
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
@@ -195,8 +187,6 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         case weightEntrySource = "weight_entry_source"
         case bodyFatEntrySource = "body_fat_entry_source"
         case bodyFatEntryMethod = "body_fat_entry_method"
-        case weightOperationId = "weight_operation_id"
-        case weightRevision = "weight_revision"
     }
 
     init(from decoder: Decoder) throws {
@@ -220,8 +210,6 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         weightEntrySource = try container.decodeIfPresent(String.self, forKey: .weightEntrySource)
         bodyFatEntrySource = try container.decodeIfPresent(String.self, forKey: .bodyFatEntrySource)
         bodyFatEntryMethod = try container.decodeIfPresent(String.self, forKey: .bodyFatEntryMethod)
-        weightOperationIdStorage = try container.decodeIfPresent(String.self, forKey: .weightOperationId)
-        weightRevisionStorage = try container.decodeIfPresent(Int.self, forKey: .weightRevision)
         var budget = 4_096
         let fields = try ReportedMeasurementJSON.decode(from: decoder, depth: 0, budget: &budget).object ?? [:]
         let knownKeys = Set(CodingKeys.allCases.map(\.rawValue))
@@ -249,8 +237,6 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         try container.encodeIfPresent(weightEntrySource, forKey: .weightEntrySource)
         try container.encodeIfPresent(bodyFatEntrySource, forKey: .bodyFatEntrySource)
         try container.encodeIfPresent(bodyFatEntryMethod, forKey: .bodyFatEntryMethod)
-        try container.encodeIfPresent(weightOperationIdStorage, forKey: .weightOperationId)
-        try container.encodeIfPresent(weightRevisionStorage, forKey: .weightRevision)
         var extra = encoder.container(keyedBy: MetadataKey.self)
         for (key, value) in extraFields {
             try extra.encode(value, forKey: MetadataKey(key))
@@ -322,20 +308,7 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         object["weight_entry_source"] = weightEntrySource
         object["body_fat_entry_source"] = bodyFatEntrySource
         object["body_fat_entry_method"] = bodyFatEntryMethod
-        if let weightOperationIdStorage {
-            object["weight_operation_id"] = weightOperationIdStorage
-        }
-        if let weightRevisionStorage {
-            object["weight_revision"] = weightRevisionStorage
-        }
         return object
-    }
-
-    func settingWeightLifecycle(operationId: String, revision: Int) -> Self {
-        var updated = self
-        updated.weightOperationIdStorage = Self.clean(operationId)
-        updated.weightRevisionStorage = revision
-        return updated
     }
 
     var jsonString: String? {
@@ -385,99 +358,6 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         guard !trimmed.isEmpty else { return nil }
         return String(trimmed.prefix(256))
     }
-}
-
-extension BodyMetricSourceMetadata {
-    static func jsonFragment(for value: String) -> String {
-        guard let data = try? JSONSerialization.data(withJSONObject: [value]),
-              let json = String(data: data, encoding: .utf8) else { return value }
-        return String(json.dropFirst().dropLast())
-    }
-
-    var healthKitContext: [String: String] {
-        extraFields["healthkit_context"]?.object?.compactMapValues(\.string) ?? [:]
-    }
-
-    func recordingHealthKitContext(_ context: [String: String]) -> Self {
-        var updated = self
-        if !context.isEmpty {
-            updated.extraFields["healthkit_context"] = .objectValue(context.mapValues { .text($0) })
-        }
-        return updated
-    }
-
-    var healthKitSampleKey: [String]? {
-        guard let sampleId, let sourceBundleId else { return nil }
-        return [sourceBundleId, sampleId]
-    }
-
-    var healthKitSyncKey: [String]? {
-        guard let sourceBundleId, let quantityType,
-              let identifier = healthKitContext["sync_identifier"], !identifier.isEmpty else { return nil }
-        return [sourceBundleId, quantityType, identifier]
-    }
-
-    var healthKitSyncVersion: Int { Int(healthKitContext["sync_version"] ?? "") ?? 0 }
-
-    var replacedHealthKitSampleIDs: [String] {
-        extraFields["healthkit_replaced_sample_ids"]?.array?.compactMap(\.string) ?? []
-    }
-
-    func replacingHealthKitSample(_ previous: Self) -> Self {
-        var updated = self
-        let retired = Set(previous.replacedHealthKitSampleIDs + [previous.sampleId].compactMap { $0 })
-        updated.extraFields["healthkit_replaced_sample_ids"] = .arrayValue(retired.sorted().map { .text($0) })
-        return updated
-    }
-
-    var pairedHealthKitBodyFat: Self? {
-        Self(jsonObject: extraFields["healthkit_body_fat"]?.foundationValue)
-    }
-
-    func pairingHealthKitBodyFat(_ metadata: Self) -> Self {
-        var updated = self
-        // The nested record retains the second sample's source, timezone and edit lineage.
-        var fields = metadata.extraFields
-        for (key, value) in metadata.jsonObject {
-            if let string = value as? String { fields[key] = .text(string) }
-        }
-        updated.bodyFatSampleId = metadata.sampleId
-        updated.extraFields["healthkit_body_fat"] = .objectValue(fields)
-        return updated
-    }
-
-    func healthKitLocalDate(for date: Date) -> String {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = healthKitContext["time_zone"].flatMap(TimeZone.init(identifier:)) ?? .current
-        return BodyMetricLocalDate.key(for: date, calendar: calendar)
-    }
-
-    func healthKitRecordID(userId: String) -> String? {
-        guard let key = healthKitSyncKey ?? healthKitSampleKey else { return nil }
-        // A stable cloud ID also deduplicates a fresh local store after reinstall.
-        let parts = ["healthkit-v1", userId, healthKitSyncKey == nil ? "sample" : "sync"] + key
-        let canonical = parts.map { "\($0.utf8.count):\($0)" }.joined()
-        let bytes = Array(SHA256.hash(data: Data(canonical.utf8)).prefix(16))
-        return UUID(uuid: (
-            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5],
-            (bytes[6] & 0x0f) | 0x80, bytes[7], (bytes[8] & 0x3f) | 0x80,
-            bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
-        )).uuidString
-    }
-}
-
-enum HealthKitImportIdentityPolicy {
-    static let gateKey = "healthkit_sample_identity_v1"
-
-    @MainActor
-    static func isEnabled(isGateEnabled: ((String) -> Bool)? = nil) -> Bool {
-        let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        return checkGate(gateKey)
-    }
-}
-
-enum HealthKitImportIdentityError: Error {
-    case alreadyRecorded
 }
 
 struct BodyMetricLocalDate: Equatable {

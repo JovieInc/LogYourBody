@@ -414,62 +414,6 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn('Refusing to reuse', result.stderr)
         self.assertEqual(prior.read_text(), 'prior proof must survive')
 
-    def test_shell_cold_build_budget_preserves_build_failures_and_timeout(self):
-        source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
-        default = next(line for line in source.splitlines()
-                       if line.startswith('BUILD_FOR_TESTING_TIMEOUT_SECONDS='))
-        functions = source[source.index('build_for_testing_once() {'):
-                           source.index('# A diagnostic subset never emits')]
-        command = r"""
-set -euo pipefail
-COMMON_XCODEBUILD_ARGS=(-project fixture.xcodeproj -enableCodeCoverage YES)
-XCODEBUILD_SETTINGS_ARRAY=(CODE_SIGNING_REQUIRED=NO)
-cleanup_booted_simulator_apps() { :; }
-xcodebuild() {
-  printf '%s\n' "$@" > "$ARTIFACT_DIR/build-arguments"
-  echo 'compiler output'
-  return "$COMPILER_STATUS"
-}
-run_with_timeout() {
-  echo "$1" >> "$ARTIFACT_DIR/build-attempts"
-  # A virtual elapsed clock exercises the real budget without a 15-minute sleep.
-  if (( BUILD_DURATION > $1 )); then return 124; fi
-  shift
-  "$@"
-}
-""" + default + '\n' + functions + r"""
-build_for_testing_once
-echo 'ready for native tests'
-"""
-        cases = [
-            ('cold', '', 650, 0, 0),
-            ('hung', '', 901, 0, 124),
-            ('compiler-error', '', 100, 65, 65),
-            ('override-timeout', '20', 21, 0, 124),
-            ('override-success', '20', 19, 0, 0),
-        ]
-        for name, override, duration, compiler_status, expected in cases:
-            with self.subTest(name=name):
-                artifact = self.root / name
-                artifact.mkdir()
-                result = subprocess.run(
-                    ['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                    env={**os.environ, 'ARTIFACT_DIR': str(artifact),
-                         'BUILD_FOR_TESTING_TIMEOUT_SECONDS': override,
-                         'BUILD_DURATION': str(duration), 'COMPILER_STATUS': str(compiler_status)})
-                self.assertEqual(result.returncode, expected, result.stderr)
-                self.assertEqual(len((artifact / 'build-attempts').read_text().splitlines()), 1)
-                self.assertEqual('ready for native tests' in result.stdout, expected == 0)
-                log = (artifact / 'launch-quality-build-for-testing.log').read_text()
-                if expected == 124:
-                    self.assertIn('build-for-testing timed out after', log)
-                else:
-                    self.assertIn('compiler output', log)
-                    self.assertEqual((artifact / 'build-arguments').read_text().splitlines(), [
-                        '-project', 'fixture.xcodeproj', '-enableCodeCoverage', 'YES',
-                        'CODE_SIGNING_REQUIRED=NO', 'build-for-testing',
-                    ])
-
     def test_shell_preserves_failed_attempt_and_stops_after_two(self):
         # Execute the real function definitions without running the product build.
         # The extracted range includes the diagnostic launch probe. Its simctl
@@ -506,7 +450,7 @@ run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
         self.assertEqual(log.read_text().count('Running fixture (attempt '), 2)
         self.assertIn('first attempt evidence', (result_bundle.with_name('retry.attempt-1.xcresult') / 'receipt').read_text())
 
-    def test_shell_does_not_retry_timeouts_or_started_tests(self):
+    def test_shell_does_not_retry_xcodebuild_command_timeout(self):
         # Same probe stub as the retry test: simctl is outside this contract.
         source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
         functions = source[source.index('is_simulator_infra_failure() {'):source.index('assert_xcresult_evidence() {')]
@@ -522,37 +466,20 @@ cleanup_booted_simulator_apps() { :; }
 sleep() { :; }
 run_with_timeout() {
   mkdir -p "$RESULT_BUNDLE"
-  printf '%s\n' "$FAILURE_LOG"
-  return "$FAILURE_STATUS"
+  echo 'xcodebuild command timed out after 720s'
+  return 124
 }
 """ + functions + r"""
 start_launch_probe() { :; }
 stop_launch_probe() { :; }
 run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
 """
-        failures = [
-            (124, 'xcodebuild command timed out after 720s'),
-            (124, 'Failed to launch app\nxcodebuild command timed out after 720s'),
-            (65, "Test Case '-[ChatTests testRetry]' exceeded execution time allowance of 3 minutes.\n"
-                 'Restarting after unexpected exit, crash, or test timeout'),
-            (65, "Test Case '-[ChatTests testRetry]' started.\nFailed to launch app"),
-            (65, "Test Suite 'Selected tests' started at 2026-10-26.\nEarly unexpected exit"),
-            (65, 'Restarting after unexpected exit, crash, or test timeout'),
-        ]
-        for index, (status, failure_log) in enumerate(failures):
-            with self.subTest(status=status, failure_log=failure_log):
-                directory = self.root / str(index)
-                directory.mkdir()
-                result_bundle = directory / 'timeout.xcresult'
-                log = directory / 'timeout.log'
-                result = subprocess.run(
-                    ['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                    env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log),
-                         'FAILURE_STATUS': str(status), 'FAILURE_LOG': failure_log})
-                self.assertEqual(result.returncode, status, result.stderr)
-                self.assertFalse(result_bundle.with_name('timeout.attempt-1.xcresult').exists())
-                self.assertEqual(log.read_text().count('Running fixture (attempt '), 1)
-                self.assertNotIn('Retrying fixture', log.read_text())
+        result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=10,
+                                env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertFalse(result_bundle.with_name('timeout.attempt-1.xcresult').exists())
+        self.assertEqual(log.read_text().count('Running fixture (attempt '), 1)
+        self.assertNotIn('Retrying fixture', log.read_text())
 
 
 if __name__ == '__main__':

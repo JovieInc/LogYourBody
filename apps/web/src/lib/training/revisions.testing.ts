@@ -47,7 +47,7 @@ export function revisionHarness() {
         decision: input.decision,
         status: input.decision === 'apply' ? 'applied' : 'rejected',
         actor: { kind: 'self', subject: input.subject },
-        priorState: stored.proposal.priorState,
+        priorState: null,
         revisionId: input.decision === 'apply' ? input.revisionId : null,
         setup: input.decision === 'apply' ? input.setup : null,
         decidedAt: input.now,
@@ -56,29 +56,6 @@ export function revisionHarness() {
         await records.push(input.subject, 'training_feedback', [
           { ...input.setup, record_type: 'program_setup' },
         ]);
-        if (
-          stored.proposal.version === 1 &&
-          stored.proposal.intent.kind === 'repeat_cycle' &&
-          stored.proposal.priorState
-        ) {
-          await records.remove('owner', 'training_feedback', [stored.proposal.priorState.setup.id]);
-        }
-        if (stored.proposal.version === 1 && stored.proposal.intent.kind === 'revise_cycle') {
-          const rows = (await records.pull('owner', 'training_sessions')).records;
-          await records.push(
-            'owner',
-            'training_sessions',
-            rows
-              .filter(
-                (row) =>
-                  row.programSetupId === input.setup.id &&
-                  (row.status === 'in_progress' || row.status === 'paused'),
-              )
-              .map((row) => ({ ...row, programRevisionId: input.revisionId })),
-          );
-        }
-        context.legacySetups = [input.setup];
-        context.legacyFingerprint = input.revisionId;
         context.headRevision = input.revisionId;
       }
       stored.status = receipt.status;

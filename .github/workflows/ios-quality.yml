@@ -32,11 +32,6 @@ on:
         required: false
         default: false
         type: boolean
-      static-audits:
-        description: Run the Xcode-free audits (SwiftLint, static audits, budget summary) on this macOS job. CI sets false and runs them on ubuntu (ci.yml ios_static).
-        required: false
-        default: true
-        type: boolean
 
 permissions:
   contents: read
@@ -121,15 +116,9 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
           DESTINATION: auto
           ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/launch-quality
-          # '' (manual dispatch) keeps the script defaults, which run them.
-          RUN_SWIFTLINT: ${{ format('{0}', inputs.static-audits) }}
-          RUN_STATIC_UI_REGRESSION_AUDIT: ${{ format('{0}', inputs.static-audits) }}
-          RUN_OPTICAL_GRID_AUDIT: ${{ format('{0}', inputs.static-audits) }}
         run: bash scripts/ios/launch-quality-audit.sh
 
       - name: Run performance budget audit
-        # Static-only in CI (unit and launch performance are off), so ci.yml ios_static runs it on ubuntu.
-        if: ${{ format('{0}', inputs.static-audits) != 'false' }}
         timeout-minutes: 8
         env:
           DESTINATION: auto

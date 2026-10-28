@@ -84,16 +84,6 @@ ASC access. Refactoring the literal HealthKit declarations requires updating the
 scanner, not bypassing it. Other data flows and provider settings still require
 source and archive review; this scanner is not a whole-program privacy audit.
 
-LYB-189 extends the same scanner to require each native HealthKit type in the
-shared privacy policy's **Health Data** bullet, including explicit type
-identifiers and direct characteristic getters such as `biologicalSex()`.
-Types named in HealthKit usage strings must also be disclosed there. A new
-identifier without a reviewed disclosure mapping fails closed. The product
-registry's legal-docs sync test keeps the bundled iOS policy byte-identical;
-the web privacy page reads the shared document. See the
-[Tim/legal handoff](healthkit-privacy-review.md) for the factual type list and
-outstanding final prose review.
-
 Run from the repository root:
 
 ```sh

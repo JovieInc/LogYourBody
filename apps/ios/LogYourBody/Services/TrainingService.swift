@@ -28,7 +28,7 @@ enum TrainingRecoveryCopy {
     }
 }
 
-struct TrainingExercisePrescription: Codable, Equatable, Identifiable, Sendable {
+struct TrainingExercisePrescription: Decodable, Equatable, Identifiable, Sendable {
     let id: String
     let name: String
     let primaryMuscle: String
@@ -42,15 +42,14 @@ struct TrainingExercisePrescription: Codable, Equatable, Identifiable, Sendable 
     let progression: String
     let evidenceIds: [String]
     var substitutions: [TrainingExerciseSubstitution]?
-    var setup: TrainingVariantSetup?
 
-    struct RepRange: Codable, Equatable, Sendable {
+    struct RepRange: Decodable, Equatable, Sendable {
         let min: Int
         let max: Int
     }
 }
 
-struct TrainingExerciseSubstitution: Codable, Equatable, Identifiable, Sendable {
+struct TrainingExerciseSubstitution: Decodable, Equatable, Identifiable, Sendable {
     let id: String
     let name: String
     let primaryMuscle: String
@@ -63,29 +62,9 @@ struct TrainingExerciseSubstitution: Codable, Equatable, Identifiable, Sendable 
     let loadInstruction: String?
     let progression: String
     let evidenceIds: [String]
-    var setup: TrainingVariantSetup?
 }
 
-struct TrainingVariantSetup: Codable, Equatable, Sendable {
-    struct Demand: Codable, Equatable, Sendable {
-        let level: String
-        let basis: String
-        let note: String
-    }
-    struct Pulley: Codable, Equatable, Sendable {
-        let height: String
-        let attachment: String
-    }
-    let requires: [String]
-    let bodyPosition: String
-    let torsoSupport: String
-    let trunkDemand: Demand
-    let benchAngleDeg: Double?
-    let pulley: Pulley?
-    let cues: [String]
-}
-
-struct TrainingWorkoutEvent: Codable, Equatable, Identifiable, Sendable {
+struct TrainingWorkoutEvent: Decodable, Equatable, Identifiable, Sendable {
     let id: String
     let kind: String
     let createdAt: String
@@ -94,7 +73,7 @@ struct TrainingWorkoutEvent: Codable, Equatable, Identifiable, Sendable {
     let minutes: Int?
 }
 
-struct TrainingSession: Codable, Equatable, Identifiable, Sendable {
+struct TrainingSession: Decodable, Equatable, Identifiable, Sendable {
     let id: String
     let week: Int
     let slot: Int
@@ -104,7 +83,7 @@ struct TrainingSession: Codable, Equatable, Identifiable, Sendable {
     let safetyStop: Bool
     let explanation: String?
     let evidenceIds: [String]
-    var loggedSets: [TrainingSavedSet]?
+    let loggedSets: [TrainingSavedSet]?
     var executionRevision: Int?
     var executionPaused: Bool?
     var executionEvents: [TrainingWorkoutEvent]?
@@ -141,7 +120,6 @@ struct TrainingNextResponse: Decodable, Equatable, Sendable {
     let week: Int?
     let weekCount: Int?
     let weeklyFractionalVolume: [String: Double]?
-    var phase: String?
     var decision: TrainingProgressDecision?
     var nextBlock: TrainingPlanStoredProposal?
 }
@@ -181,14 +159,6 @@ struct TrainingMuscleFeedbackRequest: Codable, Equatable, Sendable {
     let performance: String?
 }
 
-struct TrainingSetUndoRequest: Codable, Equatable, Sendable {
-    let sessionId: String
-    let exerciseId: String
-    let setNumber: Int
-    let undoId: String
-    let expectedRevision: Int
-}
-
 struct TrainingSetCorrectionRequest: Codable, Equatable, Sendable {
     let sessionId: String
     let exerciseId: String
@@ -204,14 +174,9 @@ struct TrainingWorkoutAction: Encodable, Equatable, Sendable {
     let kind: String
     let exerciseId: String?
     let minutes: Int?
-    var replacementExerciseId: String?
 
     static func equipmentUnavailable(_ exerciseId: String) -> Self {
         Self(kind: "equipment_unavailable", exerciseId: exerciseId, minutes: nil)
-    }
-
-    static func swap(_ exerciseId: String, with replacementId: String) -> Self {
-        Self(kind: "swap", exerciseId: exerciseId, minutes: nil, replacementExerciseId: replacementId)
     }
 
     static func skip(_ exerciseId: String) -> Self {
@@ -393,20 +358,15 @@ enum TrainingServiceError: LocalizedError, Equatable {
         case .invalidResponse:
             return "The training response could not be read. Please try again."
         case .server(let code):
-            switch code {
-            case "not_found":
-                return "Training coaching is not enabled for this account yet."
-            case "set_conflict":
-                return "This set changed since that action. Review it before trying again."
-            case "undo_unavailable":
-                return "This set cannot be undone. Correct it instead."
-            case "delayed_active_workout":
+            if code == "delayed_active_workout" {
                 return "Finish or end your current workout before applying this plan."
-            case "stale_context":
-                return "Your training changed. Refresh the draft before applying it."
-            default:
-                return "Training is temporarily unavailable. Please try again."
             }
+            if code == "stale_context" {
+                return "Your training changed. Refresh the draft before applying it."
+            }
+            return code == "not_found"
+                ? "Training coaching is not enabled for this account yet."
+                : "Training is temporarily unavailable. Please try again."
         }
     }
 }
@@ -415,9 +375,8 @@ protocol TrainingServicing {
     func loadNext(accessToken: String) async throws -> TrainingNextResponse
     func loadProgress(accessToken: String) async throws -> TrainingProgressResponse
     func enroll(accessToken: String, sessionsPerWeek: Int, equipment: String) async throws -> TrainingProgramResponse
-    func logSet(accessToken: String, request: TrainingSetLogRequest) async throws -> TrainingSavedSet
+    func logSet(accessToken: String, request: TrainingSetLogRequest) async throws
     func correctSet(accessToken: String, request: TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
-    func undoSet(accessToken: String, request: TrainingSetUndoRequest) async throws -> TrainingSavedSet
     func applyAction(accessToken: String, request: TrainingWorkoutActionRequest) async throws -> TrainingSession
     func recordFeedback(accessToken: String, request: TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
     func revoke(accessToken: String) async throws -> TrainingRevokeResponse
@@ -453,7 +412,7 @@ final class URLSessionTrainingService: TrainingServicing {
         )
     }
 
-    func logSet(accessToken: String, request: TrainingSetLogRequest) async throws -> TrainingSavedSet {
+    func logSet(accessToken: String, request: TrainingSetLogRequest) async throws {
         let response: TrainingSetLogResponse = try await send(
             path: "log-set",
             method: "POST",
@@ -469,23 +428,6 @@ final class URLSessionTrainingService: TrainingServicing {
               log.loadKg == request.loadKg,
               log.rir == request.rir
         else { throw TrainingServiceError.invalidResponse }
-        return log
-    }
-
-    func undoSet(accessToken: String, request: TrainingSetUndoRequest) async throws -> TrainingSavedSet {
-        let response: TrainingSetCorrectionResponse = try await send(
-            path: "undo-set",
-            method: "POST",
-            accessToken: accessToken,
-            body: request
-        )
-        guard response.log.sessionId == request.sessionId,
-              response.log.exerciseId == request.exerciseId,
-              response.log.setNumber == request.setNumber,
-              response.log.revision == request.expectedRevision + 1,
-              response.log.corrections?.contains(where: { $0.id == request.undoId }) == true
-        else { throw TrainingServiceError.invalidResponse }
-        return response.log
     }
 
     func correctSet(
@@ -659,163 +601,6 @@ private struct TrainingWorkoutActionResponse: Decodable, VersionedTrainingRespon
 }
 private struct TrainingErrorResponse: Decodable { let error: String }
 
-struct TrainingCycleSelection: Codable, Equatable, Identifiable, Sendable {
-    var id: String { "\(fromExerciseId):\(toVariantId)" }
-    let fromExerciseId: String
-    let toVariantId: String
-    var reason: String
-}
-
-struct TrainingCycleSetup: Decodable, Equatable, Sendable {
-    let id: String
-    let equipment: String
-    let sessionsPerWeek: Int
-    let cycle: Configuration?
-
-    struct Configuration: Decodable, Equatable, Sendable {
-        let weekCount: Int
-        let temporaryPriorities: [String]
-        let temporaryConstraints: [Constraint]
-        let retainedVariants: [TrainingCycleSelection]
-
-        struct Constraint: Decodable, Equatable, Sendable {
-            let muscle: String
-            let reason: String
-        }
-    }
-}
-
-struct TrainingCycleReuseOption: Decodable, Identifiable, Sendable {
-    var id: String { "\(fromExerciseId):\(toVariantId)" }
-    let fromExerciseId: String
-    let toVariantId: String
-    let reason: String
-    let name: String
-    var selection: TrainingCycleSelection {
-        .init(fromExerciseId: fromExerciseId, toVariantId: toVariantId, reason: reason)
-    }
-}
-
-struct TrainingCycleContext: Decodable, Sendable {
-    let version: Int
-    let generation: Int
-    let setup: TrainingCycleSetup?
-    let cycle: Status?
-    let reuseOptions: [TrainingCycleReuseOption]
-
-    struct Status: Decodable, Sendable {
-        let currentWeek: Int
-        let weekCount: Int
-        let phase: String?
-    }
-}
-
-struct TrainingCycleIntent: Encodable, Equatable, Sendable {
-    let kind: String
-    let weekCount: Int
-    var adultConfirmed: Bool?
-    var safetyConfirmed: Bool?
-    var sessionsPerWeek: Int?
-    var equipment: String?
-    var keepVariants: [TrainingCycleSelection]?
-    var renewPriorities: Bool?
-    var renewConstraints: Bool?
-}
-
-struct TrainingCycleProposalRequest: Encodable, Sendable {
-    let requestId: String
-    let expectedGeneration: Int
-    let intent: TrainingCycleIntent
-    let reason: String
-}
-
-struct TrainingCycleDraft: Decodable, Sendable {
-    let id: String
-    let reason: String
-    let assumptions: [String]
-    let schedule: [Week]?
-    let plan: Plan
-
-    struct Week: Decodable, Identifiable, Sendable {
-        var id: Int { week }
-        let week: Int
-        let targetRir: Int
-        let deload: Bool
-        let setsPerExercise: Int
-    }
-    struct Plan: Decodable, Sendable {
-        let sessions: [TrainingSession]
-    }
-}
-
-struct TrainingCycleProposalResponse: Decodable, VersionedTrainingResponse {
-    let version: Int
-    let stored: Stored
-
-    struct Stored: Decodable {
-        let status: String
-        let proposal: TrainingCycleDraft
-    }
-}
-
-struct TrainingCycleDecisionRequest: Encodable, Sendable {
-    let requestId: String
-    let proposalId: String
-    let decision: String
-}
-
-struct TrainingCycleDecisionResponse: Decodable, VersionedTrainingResponse {
-    let version: Int
-    let receipt: Receipt
-
-    struct Receipt: Decodable {
-        let proposalId: String
-        let requestId: String
-        let status: String
-        let decision: String
-        let revisionId: String?
-        let setup: TrainingCycleSetup?
-    }
-
-    func matches(_ request: TrainingCycleDecisionRequest) -> Bool {
-        receipt.proposalId == request.proposalId && receipt.requestId == request.requestId &&
-            receipt.decision == request.decision && (request.decision == "apply"
-                ? receipt.status == "applied" && receipt.revisionId != nil && receipt.setup != nil
-                : receipt.status == "rejected" && receipt.revisionId == nil && receipt.setup == nil)
-    }
-}
-
-protocol TrainingCycleServicing {
-    func cycleContext(accessToken: String) async throws -> TrainingCycleContext
-    func proposeCycle(accessToken: String, request: TrainingCycleProposalRequest) async throws -> TrainingCycleDraft
-    func decideCycle(accessToken: String, request: TrainingCycleDecisionRequest) async throws
-}
-
-extension TrainingCycleContext: VersionedTrainingResponse {}
-
-extension URLSessionTrainingService: TrainingCycleServicing {
-    func cycleContext(accessToken: String) async throws -> TrainingCycleContext {
-        try await send(path: "program-proposals", method: "GET", accessToken: accessToken)
-    }
-
-    func proposeCycle(accessToken: String, request: TrainingCycleProposalRequest) async throws -> TrainingCycleDraft {
-        let response: TrainingCycleProposalResponse = try await send(
-            path: "program-proposals", method: "POST", accessToken: accessToken, body: request
-        )
-        guard response.stored.status == "proposed", response.stored.proposal.schedule?.count == request.intent.weekCount else {
-            throw TrainingServiceError.invalidResponse
-        }
-        return response.stored.proposal
-    }
-
-    func decideCycle(accessToken: String, request: TrainingCycleDecisionRequest) async throws {
-        let response: TrainingCycleDecisionResponse = try await send(
-            path: "program-proposals", method: "PATCH", accessToken: accessToken, body: request
-        )
-        guard response.matches(request) else { throw TrainingServiceError.invalidResponse }
-    }
-}
-
 struct TrainingPlanningInputs: Codable, Equatable, Sendable {
     var goal: String?
     var goalDate: String?
@@ -841,8 +626,6 @@ struct TrainingPlanStoredProposal: Decodable, Equatable, Sendable {
             let subject: String
         }
         let id: String
-        var baseRevision: String?
-        var proposedDiff: [TrainingPlanDiff]?
         let reason: String
         let actor: Actor
         let summary: [String]
@@ -955,205 +738,5 @@ extension URLSessionTrainingService: DelegatedTrainingServicing {
                 response.receipt.setup?.programRevisionId == response.receipt.revisionId
               ) else { throw TrainingServiceError.invalidResponse }
         return response
-    }
-}
-
-enum TrainingNativeCardsPolicy {
-    static let featureGate = "native_training_cards_v1"
-
-    static func isEnabled(checkGate: (String) -> Bool) -> Bool {
-        checkGate(TrainingCoachPolicy.featureGate) && checkGate(featureGate)
-    }
-}
-
-/// A closed vocabulary of compiled, LYB-owned views. Text from chat cannot create a view or a write.
-enum TrainingCardComponent: String, Codable, CaseIterable, Sendable {
-    case mesoPlan = "MesoPlanCard"
-    case planChange = "PlanChangeCard"
-    case workoutSession = "WorkoutSessionCard"
-    case exerciseSwap = "ExerciseSwapCard"
-    case trainingFeedback = "TrainingFeedbackCard"
-    case progressReview = "ProgressReviewCard"
-}
-
-enum TrainingCardActionName: String, Codable, CaseIterable, Sendable {
-    case expand, adjust, apply, reject, logSet, correctSet, swap, feedback, review
-}
-
-enum TrainingCardContractError: Error, Equatable {
-    case invalidSchema, invalidIdentity, unauthorized, staleReference, unsupportedAction
-}
-
-/// Properties are references to authenticated domain objects, never model-supplied prescriptions.
-struct TrainingCardReference: Codable, Equatable, Sendable {
-    static let schemaVersion = 1
-    let version: Int
-    let component: TrainingCardComponent
-    let objectId: String
-    let revision: Int
-    let exerciseId: String?
-
-    init(component: TrainingCardComponent, objectId: String, revision: Int, exerciseId: String? = nil) {
-        self.version = Self.schemaVersion
-        self.component = component
-        self.objectId = objectId
-        self.revision = revision
-        self.exerciseId = exerciseId
-    }
-
-    private enum CodingKeys: String, CodingKey, CaseIterable {
-        case version, component, objectId, revision, exerciseId
-    }
-
-    init(from decoder: Decoder) throws {
-        try rejectUnknownKeys(decoder, allowed: CodingKeys.allCases.map(\.rawValue))
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        version = try values.decode(Int.self, forKey: .version)
-        component = try values.decode(TrainingCardComponent.self, forKey: .component)
-        objectId = try values.decode(String.self, forKey: .objectId)
-        revision = try values.decode(Int.self, forKey: .revision)
-        exerciseId = try values.decodeIfPresent(String.self, forKey: .exerciseId)
-        try validate()
-    }
-
-    func validate() throws {
-        guard version == Self.schemaVersion else { throw TrainingCardContractError.invalidSchema }
-        guard UUID(uuidString: objectId) != nil, revision >= 0 else {
-            throw TrainingCardContractError.invalidIdentity
-        }
-        if component == .exerciseSwap {
-            guard let exerciseId, Self.validExerciseId(exerciseId) else {
-                throw TrainingCardContractError.invalidIdentity
-            }
-        } else if exerciseId != nil {
-            throw TrainingCardContractError.invalidSchema
-        }
-    }
-
-    static func validExerciseId(_ value: String) -> Bool {
-        !value.isEmpty && value.count <= 64 && value.unicodeScalars.allSatisfy {
-            CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-")).contains($0)
-        }
-    }
-}
-
-struct TrainingCardAction: Codable, Equatable, Sendable {
-    let reference: TrainingCardReference
-    let name: TrainingCardActionName
-    let alternativeId: String?
-
-    init(reference: TrainingCardReference, name: TrainingCardActionName, alternativeId: String? = nil) {
-        self.reference = reference
-        self.name = name
-        self.alternativeId = alternativeId
-    }
-
-    private enum CodingKeys: String, CodingKey, CaseIterable { case reference, name, alternativeId }
-
-    init(from decoder: Decoder) throws {
-        try rejectUnknownKeys(decoder, allowed: CodingKeys.allCases.map(\.rawValue))
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        reference = try values.decode(TrainingCardReference.self, forKey: .reference)
-        name = try values.decode(TrainingCardActionName.self, forKey: .name)
-        alternativeId = try values.decodeIfPresent(String.self, forKey: .alternativeId)
-        try validate()
-    }
-
-    func validate() throws {
-        try reference.validate()
-        let allowed: [TrainingCardComponent: Set<TrainingCardActionName>] = [
-            .mesoPlan: [.expand, .adjust],
-            .planChange: [.expand, .adjust, .apply, .reject],
-            .workoutSession: [.expand, .logSet, .correctSet],
-            .exerciseSwap: [.swap],
-            .trainingFeedback: [.feedback],
-            .progressReview: [.review]
-        ]
-        guard allowed[reference.component]?.contains(name) == true else {
-            throw TrainingCardContractError.unsupportedAction
-        }
-        if name == .swap {
-            guard let alternativeId, TrainingCardReference.validExerciseId(alternativeId) else {
-                throw TrainingCardContractError.invalidIdentity
-            }
-        } else if alternativeId != nil {
-            throw TrainingCardContractError.invalidSchema
-        }
-    }
-}
-
-enum TrainingCardAdapter {
-    /// Local admission supplements (and never replaces) the canonical API's owner/consent/CAS checks.
-    static func authorize(
-        _ action: TrainingCardAction, current: TrainingCardReference,
-        ownsSession: Bool, canWrite: Bool, eligibleAlternativeIds: Set<String> = []
-    ) throws {
-        try action.validate()
-        guard ownsSession else { throw TrainingCardContractError.unauthorized }
-        guard action.reference == current else { throw TrainingCardContractError.staleReference }
-        if ![.expand, .review].contains(action.name), !canWrite {
-            throw TrainingCardContractError.unauthorized
-        }
-        if let alternativeId = action.alternativeId, !eligibleAlternativeIds.contains(alternativeId) {
-            throw TrainingCardContractError.unsupportedAction
-        }
-    }
-
-    static func workout(_ session: TrainingSession, component: TrainingCardComponent = .workoutSession) -> TrainingCardReference {
-        TrainingCardReference(component: component, objectId: session.id, revision: session.executionRevision ?? 0)
-    }
-}
-
-private struct TrainingCardKey: CodingKey {
-    let stringValue: String
-    var intValue: Int? { nil }
-    init?(stringValue: String) { self.stringValue = stringValue }
-    init?(intValue: Int) { return nil }
-}
-
-private func rejectUnknownKeys(_ decoder: Decoder, allowed: [String]) throws {
-    let values = try decoder.container(keyedBy: TrainingCardKey.self)
-    guard values.allKeys.allSatisfy({ allowed.contains($0.stringValue) }) else {
-        throw TrainingCardContractError.invalidSchema
-    }
-}
-
-struct TrainingPlanDiff: Decodable, Equatable, Sendable {
-    let field: String
-    let before: TrainingPlanDiffValue
-    let after: TrainingPlanDiffValue
-}
-
-/// Engine diff values are inert text. They are never interpreted as actions, HTML or code.
-indirect enum TrainingPlanDiffValue: Decodable, Equatable, Sendable {
-    case null, text(String), number(Double), bool(Bool)
-    case array([TrainingPlanDiffValue]), object([String: TrainingPlanDiffValue])
-
-    init(from decoder: Decoder) throws {
-        let value = try decoder.singleValueContainer()
-        if value.decodeNil() {
-            self = .null
-        } else if let bool = try? value.decode(Bool.self) {
-            self = .bool(bool)
-        } else if let number = try? value.decode(Double.self) {
-            self = .number(number)
-        } else if let text = try? value.decode(String.self) {
-            self = .text(text)
-        } else if let array = try? value.decode([Self].self) {
-            self = .array(array)
-        } else {
-            self = .object(try value.decode([String: Self].self))
-        }
-    }
-
-    var displayText: String {
-        switch self {
-        case .null: "None"
-        case .text(let text): text
-        case .number(let number): number.formatted()
-        case .bool(let bool): bool ? "Yes" : "No"
-        case .array(let array): array.map(\.displayText).joined(separator: ", ")
-        case .object(let object): object.keys.sorted().map { "\($0): \(object[$0]?.displayText ?? "")" }.joined(separator: "; ")
-        }
     }
 }

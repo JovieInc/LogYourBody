@@ -8,48 +8,6 @@ struct TrainingSetPosition: Equatable, Identifiable {
     var id: String { "\(exercise.id)-\(setNumber)" }
 }
 
-enum TrainingSetUndoPolicy {
-    static let compactWindow: TimeInterval = 30
-
-    static func makeReceipt(_ saved: TrainingSavedSet, now: Date) -> TrainingSetUndoReceipt? {
-        guard (saved.revision ?? 0) >= 1,
-              let audit = saved.corrections?.last,
-              UUID(uuidString: audit.id) != nil
-        else { return nil }
-        return TrainingSetUndoReceipt(
-            id: UUID().uuidString,
-            sessionId: saved.sessionId,
-            exerciseId: saved.exerciseId,
-            setNumber: saved.setNumber,
-            expectedRevision: saved.revision ?? 0,
-            reps: audit.previous.reps,
-            loadKg: audit.previous.loadKg,
-            rir: audit.previous.rir,
-            restoresCorrectionId: audit.id,
-            issuedAt: now,
-            submitted: false
-        )
-    }
-
-    static func offer(
-        receipt: TrainingSetUndoReceipt,
-        sessionId: String,
-        saved: TrainingSavedSet?,
-        now: Date
-    ) -> TrainingSetUndoReceipt? {
-        guard receipt.sessionId == sessionId,
-              let saved,
-              saved.sessionId == receipt.sessionId,
-              saved.exerciseId == receipt.exerciseId,
-              saved.setNumber == receipt.setNumber,
-              (saved.revision ?? 0) == receipt.expectedRevision
-        else { return nil }
-        if receipt.submitted { return receipt }
-        guard now.timeIntervalSince(receipt.issuedAt) < compactWindow else { return nil }
-        return receipt
-    }
-}
-
 struct TrainingSetSaveReceipt: Equatable, Identifiable {
     let id: String
     let position: TrainingSetPosition
@@ -65,28 +23,23 @@ final class TrainingSessionDraft: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastSaveReceipt: TrainingSetSaveReceipt?
     @Published private(set) var restUntil: Date?
-    @Published private(set) var rest = TrainingRestDraft()
     @Published private(set) var feedback: TrainingFeedbackDraft?
-    @Published private(set) var undoReceipt: TrainingSetUndoReceipt?
 
     private let ownerId: String
     private let store: TrainingDraftStore
     private let isCurrent: () -> Bool
     private let now: () -> Date
-    let restTimerEnabled: Bool
     private var persistedRows: [String: TrainingSetDraft] = [:]
 
     init(
         session: TrainingSession, ownerId: String, store: TrainingDraftStore,
-        isCurrent: @escaping () -> Bool, now: @escaping () -> Date = Date.init,
-        restTimerEnabled: Bool = false
+        isCurrent: @escaping () -> Bool, now: @escaping () -> Date = Date.init
     ) {
         self.session = session
         self.ownerId = ownerId
         self.store = store
         self.isCurrent = isCurrent
         self.now = now
-        self.restTimerEnabled = restTimerEnabled
         guard isCurrent() else { return }
         // A failed journal read or cleanup must never hide authoritative acknowledgements.
         for saved in session.loggedSets ?? [] where validSavedSet(saved) {
@@ -98,8 +51,6 @@ final class TrainingSessionDraft: ObservableObject {
             }
             persistedRows = rows
             feedback = try store.loadFeedback(ownerId: ownerId, sessionId: session.id)
-            if restTimerEnabled { rest = try store.loadRest(ownerId: ownerId, sessionId: session.id) }
-            undoReceipt = try store.loadUndo(ownerId: ownerId, sessionId: session.id)
         } catch {
             errorMessage = TrainingDraftError.unavailable.localizedDescription
         }
@@ -154,19 +105,6 @@ final class TrainingSessionDraft: ObservableObject {
         setNumber: Int,
         send: (TrainingSetLogRequest) async throws -> Void
     ) async {
-        await saveAcknowledged(exercise, setNumber: setNumber) { request in
-            try await send(request)
-            return nil
-        }
-    }
-
-    /// Adopts the server row when the acknowledgement matches this attempt. A newer
-    /// local revision is left in place, including when the acknowledgement is empty.
-    func saveAcknowledged(
-        _ exercise: TrainingExercisePrescription,
-        setNumber: Int,
-        acknowledge: (TrainingSetLogRequest) async throws -> TrainingSavedSet?
-    ) async {
         var row = row(for: exercise, setNumber: setNumber)
         guard isCurrent(), !isSaving, loggedSets[row.key] == nil else { return }
         isSaving = true
@@ -187,27 +125,29 @@ final class TrainingSessionDraft: ObservableObject {
                 throw TrainingDraftError.changed
             }
             guard isCurrent() else { throw TrainingServiceError.authenticationExpired }
-            let acknowledged = try await acknowledge(request)
+            try await send(request)
             guard isCurrent() else { throw TrainingServiceError.authenticationExpired }
-            try finishLogAcknowledgement(
-                row: row, request: request, acknowledged: acknowledged, exercise: exercise, setNumber: setNumber
+            guard try store.remove(row, ownerId: ownerId, sessionId: session.id) else {
+                throw TrainingDraftError.changed
+            }
+            rows.removeValue(forKey: row.key)
+            persistedRows.removeValue(forKey: row.key)
+            loggedSets[row.key] = TrainingSavedSet(
+                sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
+                reps: request.reps, loadKg: request.loadKg, rir: request.rir,
+                completedAt: ISO8601DateFormatter().string(from: now()), revision: 0, corrections: []
             )
-            persistCachedReceipt()
+            lastSaveReceipt = TrainingSetSaveReceipt(
+                id: "\(row.key)-\(row.revision.uuidString)",
+                position: TrainingSetPosition(exercise: exercise, setNumber: setNumber),
+                corrected: false
+            )
+            restUntil = now().addingTimeInterval(90)
         } catch let error as LocalizedError {
             if isCurrent() { errorMessage = error.errorDescription ?? "The set could not be saved." }
         } catch {
             if isCurrent() { errorMessage = "The set could not be saved." }
         }
-    }
-
-    var undoAffordance: TrainingSetUndoReceipt? {
-        guard let undoReceipt else { return nil }
-        return TrainingSetUndoPolicy.offer(
-            receipt: undoReceipt,
-            sessionId: session.id,
-            saved: loggedSets["\(undoReceipt.exerciseId)-\(undoReceipt.setNumber)"],
-            now: now()
-        )
     }
 
     var allPositions: [TrainingSetPosition] {
@@ -336,7 +276,6 @@ final class TrainingSessionDraft: ObservableObject {
                 saved, expecting: pending, ownerId: ownerId, sessionId: session.id
             ) else { throw TrainingDraftError.changed }
             feedback = saved
-            if response.nextSetRecommendation.action == .symptomSafety { cancelRest() }
             return true
         } catch let error as LocalizedError {
             if isCurrent() { errorMessage = error.errorDescription }
@@ -354,7 +293,6 @@ final class TrainingSessionDraft: ObservableObject {
         }
         reconcileSavedSets()
         restoreRestTimer()
-        persistCachedReceipt()
     }
 
     func beginCorrection(_ position: TrainingSetPosition) {
@@ -432,8 +370,6 @@ final class TrainingSessionDraft: ObservableObject {
             rows.removeValue(forKey: row.key)
             persistedRows.removeValue(forKey: row.key)
             loggedSets[row.key] = corrected
-            persistCachedReceipt()
-            issueUndoReceipt(for: corrected)
             lastSaveReceipt = TrainingSetSaveReceipt(
                 id: request.correctionId,
                 position: position,
@@ -443,176 +379,6 @@ final class TrainingSessionDraft: ObservableObject {
             if isCurrent() { errorMessage = error.errorDescription ?? "The correction could not be saved." }
         } catch {
             if isCurrent() { errorMessage = "The correction could not be saved." }
-        }
-    }
-
-    private func persistCachedReceipt() {
-        var snapshot = session
-        snapshot.loggedSets = loggedSets.values.sorted { "\($0.exerciseId)-\($0.setNumber)" < "\($1.exerciseId)-\($1.setNumber)" }
-        do {
-            try store.updateCachedSession(snapshot, ownerId: ownerId)
-        } catch {
-            errorMessage = TrainingDraftError.unavailable.localizedDescription
-        }
-    }
-
-    func undo(send: (TrainingSetUndoRequest) async throws -> TrainingSavedSet) async {
-        guard var receipt = undoAffordance, isCurrent(), !isSaving else { return }
-        let key = "\(receipt.exerciseId)-\(receipt.setNumber)"
-        guard let saved = loggedSets[key],
-              let position = allPositions.first(where: { $0.id == key })
-        else { return }
-        isSaving = true
-        errorMessage = nil
-        defer { isSaving = false }
-        do {
-            if !receipt.submitted {
-                var queued = receipt
-                queued.submitted = true
-                guard try store.replaceUndo(
-                    queued, expecting: receipt, ownerId: ownerId, sessionId: session.id
-                ) else { throw TrainingDraftError.changed }
-                undoReceipt = queued
-                receipt = queued
-            }
-            var row = rows[key] ?? TrainingSetDraft(
-                exerciseId: receipt.exerciseId,
-                setNumber: receipt.setNumber,
-                repsText: String(receipt.reps),
-                loadText: TrainingLoadInputPolicy.savedText(for: receipt.loadKg),
-                rir: receipt.rir,
-                correctionBase: saved
-            )
-            if row.pendingCorrection == nil {
-                row.repsText = String(receipt.reps)
-                row.loadText = TrainingLoadInputPolicy.savedText(for: receipt.loadKg)
-                row.rir = receipt.rir
-                row.correctionBase = saved
-                row.pendingCorrection = try makeCorrection(row, base: saved, correctionId: receipt.id)
-                row.revision = UUID()
-                guard try store.replace(
-                    row, expecting: persistedRows[key], ownerId: ownerId, sessionId: session.id
-                ) else { throw TrainingDraftError.changed }
-                rows[key] = row
-                persistedRows[key] = row
-            }
-            guard let pending = row.pendingCorrection, pending.correctionId == receipt.id else {
-                throw TrainingDraftError.changed
-            }
-            guard isCurrent() else { throw TrainingServiceError.authenticationExpired }
-            let undone = try await send(
-                TrainingSetUndoRequest(
-                    sessionId: receipt.sessionId,
-                    exerciseId: receipt.exerciseId,
-                    setNumber: receipt.setNumber,
-                    undoId: receipt.id,
-                    expectedRevision: receipt.expectedRevision
-                )
-            )
-            guard isCurrent(),
-                  undone.sessionId == receipt.sessionId,
-                  undone.exerciseId == receipt.exerciseId,
-                  undone.setNumber == receipt.setNumber,
-                  undone.reps == receipt.reps,
-                  undone.loadKg == receipt.loadKg,
-                  undone.rir == receipt.rir,
-                  undone.revision == receipt.expectedRevision + 1,
-                  undone.corrections?.contains(where: { $0.id == receipt.id }) == true
-            else { throw TrainingServiceError.invalidResponse }
-            if rows[key] != nil {
-                guard try store.remove(row, ownerId: ownerId, sessionId: session.id) else {
-                    throw TrainingDraftError.changed
-                }
-                rows.removeValue(forKey: key)
-                persistedRows.removeValue(forKey: key)
-            }
-            guard try store.replaceUndo(nil, expecting: receipt, ownerId: ownerId, sessionId: session.id) else {
-                throw TrainingDraftError.changed
-            }
-            undoReceipt = nil
-            loggedSets[key] = undone
-            persistCachedReceipt()
-            lastSaveReceipt = TrainingSetSaveReceipt(id: receipt.id, position: position, corrected: true)
-        } catch let error as LocalizedError {
-            if isCurrent() { errorMessage = error.errorDescription ?? "The correction could not be undone." }
-        } catch {
-            if isCurrent() { errorMessage = "The correction could not be undone." }
-        }
-    }
-
-    private func finishLogAcknowledgement(
-        row: TrainingSetDraft,
-        request: TrainingSetLogRequest,
-        acknowledged: TrainingSavedSet?,
-        exercise: TrainingExercisePrescription,
-        setNumber: Int
-    ) throws {
-        if let acknowledged {
-            guard acknowledged.sessionId == request.sessionId,
-                  acknowledged.exerciseId == request.exerciseId,
-                  acknowledged.setNumber == request.setNumber,
-                  acknowledged.reps == request.reps,
-                  acknowledged.loadKg == request.loadKg,
-                  acknowledged.rir == request.rir
-            else { throw TrainingServiceError.invalidResponse }
-        }
-        let stored = try store.load(ownerId: ownerId, sessionId: session.id)[row.key]
-        let pendingUnchanged = stored == row
-        let pendingCleared = stored == nil
-        let local = loggedSets[row.key]
-        let localRevision = local?.revision ?? 0
-        let acknowledgedRevision = acknowledged?.revision ?? 0
-        if local != nil && localRevision > acknowledgedRevision {
-            if pendingUnchanged {
-                guard try store.remove(row, ownerId: ownerId, sessionId: session.id) else {
-                    throw TrainingDraftError.changed
-                }
-                rows.removeValue(forKey: row.key)
-                persistedRows.removeValue(forKey: row.key)
-            } else if !pendingCleared {
-                throw TrainingDraftError.changed
-            }
-            errorMessage = nil
-            return
-        }
-        guard pendingUnchanged || pendingCleared else { throw TrainingDraftError.changed }
-        if pendingUnchanged {
-            guard try store.remove(row, ownerId: ownerId, sessionId: session.id) else {
-                throw TrainingDraftError.changed
-            }
-        }
-        rows.removeValue(forKey: row.key)
-        persistedRows.removeValue(forKey: row.key)
-        if let acknowledged {
-            loggedSets[row.key] = acknowledged
-        } else if local == nil || localRevision == 0 {
-            loggedSets[row.key] = TrainingSavedSet(
-                sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
-                reps: request.reps, loadKg: request.loadKg, rir: request.rir,
-                completedAt: ISO8601DateFormatter().string(from: now()), revision: 0, corrections: []
-            )
-        }
-        lastSaveReceipt = TrainingSetSaveReceipt(
-            id: "\(row.key)-\(row.revision.uuidString)",
-            position: TrainingSetPosition(exercise: exercise, setNumber: setNumber),
-            corrected: false
-        )
-        if restTimerEnabled {
-            startRest(after: exercise, setKey: row.key, at: now())
-        } else {
-            restUntil = now().addingTimeInterval(90)
-        }
-    }
-
-    private func issueUndoReceipt(for saved: TrainingSavedSet) {
-        guard let receipt = TrainingSetUndoPolicy.makeReceipt(saved, now: now()) else { return }
-        do {
-            guard try store.replaceUndo(
-                receipt, expecting: undoReceipt, ownerId: ownerId, sessionId: session.id
-            ) else { return }
-            undoReceipt = receipt
-        } catch {
-            undoReceipt = nil
         }
     }
 
@@ -668,13 +434,6 @@ final class TrainingSessionDraft: ObservableObject {
                     }
                     rows.removeValue(forKey: key)
                     persistedRows.removeValue(forKey: key)
-                    if undoReceipt?.id == pending.correctionId {
-                        if try store.replaceUndo(
-                            nil, expecting: undoReceipt, ownerId: ownerId, sessionId: session.id
-                        ) {
-                            undoReceipt = nil
-                        }
-                    }
                 } catch {
                     errorMessage = TrainingDraftError.unavailable.localizedDescription
                 }
@@ -746,66 +505,12 @@ final class TrainingSessionDraft: ObservableObject {
     }
 
     private func restoreRestTimer() {
-        if restTimerEnabled {
-            guard canRest else { cancelRest(); return }
-            guard let position = lastCompletedPosition,
-                  let date = loggedSets[position.id]?.completedAt.flatMap(observationDate)
-            else { return }
-            // Preserve adjustments and skips when refreshing or reopening this session.
-            guard rest.lastSetKey != position.id else {
-                restUntil = rest.countdown?.endsAt
-                return
-            }
-            startRest(after: position.exercise, setKey: position.id, at: date)
-            return
-        }
         let latest = loggedSets.values.compactMap { saved in
             saved.completedAt.flatMap(observationDate)
         }.max()
         guard let latest else { return }
         let restored = latest.addingTimeInterval(90)
         restUntil = restored
-    }
-
-    var ownsSession: Bool { isCurrent() }
-
-    private var canRest: Bool {
-        isCurrent() && currentPosition != nil && !session.safetyStop && session.executionPaused != true &&
-            session.executionEvents?.last?.kind != "ended" && nextSetRecommendation?.action != .symptomSafety
-    }
-
-    func adjustRest(by seconds: Int) {
-        guard restTimerEnabled, canRest, let countdown = rest.countdown,
-              countdown.remaining(at: now()) > 0 else { return }
-        let adjusted = countdown.adjusted(by: seconds)
-        rest.countdown = adjusted
-        rest.durations[countdown.exerciseId] = adjusted.duration
-        persistRest()
-    }
-
-    func cancelRest() {
-        guard restTimerEnabled else { return }
-        rest.countdown = nil
-        restUntil = nil
-        if isCurrent() { persistRest() }
-    }
-
-    private func startRest(after exercise: TrainingExercisePrescription, setKey: String, at date: Date) {
-        rest.lastSetKey = setKey
-        rest.countdown = canRest ? TrainingRestCountdown(
-            id: UUID(), exerciseId: exercise.id, startedAt: date,
-            duration: rest.durations[exercise.id] ?? TrainingRestPolicy.defaultDuration(for: exercise)
-        ) : nil
-        persistRest()
-    }
-
-    private func persistRest() {
-        restUntil = rest.countdown?.endsAt
-        do {
-            try store.saveRest(rest, ownerId: ownerId, sessionId: session.id)
-        } catch {
-            errorMessage = "The rest timer could not be saved on this device."
-        }
     }
 
     private func observationDate(_ value: String) -> Date? {

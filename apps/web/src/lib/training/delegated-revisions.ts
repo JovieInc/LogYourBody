@@ -423,9 +423,6 @@ export async function decideDelegatedProposal(input: Dependencies & { body: unkn
   const stored = await input.revisions.readProposal(input.subject, body.proposalId);
   if (!stored || stored.proposal.version !== 2) return { kind: 'proposal_not_found' as const };
   const p = stored.proposal;
-  // Structured records require their policy and LYB-113 request boundary on apply.
-  if (p.intent.kind === 'record_steering')
-    return { kind: 'unsupported_or_invalid_intent' as const };
   if (
     input.actor.kind === 'coach' &&
     (p.authority !== 'coach_delegation' ||

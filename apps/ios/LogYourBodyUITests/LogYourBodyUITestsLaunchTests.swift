@@ -112,25 +112,6 @@ final class LogYourBodyUITestsLaunchTests: XCTestCase {
         XCTAssertTrue(addPhoto.waitForExistence(timeout: 5))
     }
 
-    func testTrainingEnrollmentOffersTwoThroughSixDays() throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
-        app.launch()
-
-        let open = app.buttons["training_fixture_enroll"]
-        XCTAssertTrue(open.waitForExistence(timeout: 15))
-        open.tap()
-
-        let picker = app.buttons["training_enroll_sessions_picker"]
-        XCTAssertTrue(picker.waitForExistence(timeout: 8))
-        for days in 2...6 {
-            picker.tap()
-            let option = app.buttons["\(days) days"]
-            XCTAssertTrue(option.waitForExistence(timeout: 5))
-            option.tap()
-        }
-    }
-
     func testTrainingEnrollmentCloseMeetsMinimumHitTarget() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]

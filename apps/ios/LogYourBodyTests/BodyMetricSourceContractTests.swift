@@ -73,21 +73,6 @@ final class BodyMetricSourceContractTests: XCTestCase {
         XCTAssertEqual(decoded.jsonObject["vendor"] as? String, "BodySpec")
     }
 
-    func testSourceBundleIdentifierNormalizationAndRoundTrip() throws {
-        let cases: [(String?, String?)] = [
-            (nil, nil), ("", nil), (" \t\n ", nil),
-            ("com.example.scale", "com.example.scale"),
-            (" com.example.scale\n", "com.example.scale")
-        ]
-        for (raw, expected) in cases {
-            let metadata = BodyMetricSourceMetadata(vendor: "apple_health", sourceBundleId: raw)
-            XCTAssertEqual(metadata.sourceBundleId, expected)
-            XCTAssertEqual(metadata.jsonObject["source_bundle_id"] as? String, expected)
-            let decoded = try XCTUnwrap(BodyMetricSourceMetadata(jsonString: metadata.jsonString))
-            XCTAssertEqual(decoded.sourceBundleId, expected)
-        }
-    }
-
     @MainActor
     func testHistoryMetadataConversionServicesMainQueueBeforeFinishing() async throws {
         let (context, cached) = try cachedHistory(count: 151)
@@ -360,25 +345,14 @@ extension BodyMetricSourceContractTests {
         let metadata = BodyMetricSourceMetadata(
             sourceName: "Test scale", sourceBundleId: "com.example.scale", sampleId: "weight",
             importedAt: ISO8601DateFormatter().string(from: imported)
-        ).recordingHealthKitContext(["time_zone": "America/Los_Angeles", "sync_identifier": "weight-edit"])
-        let bodyFat = BodyMetricSourceMetadata(
-            sourceBundleId: "com.example.body-fat", sampleId: "body-fat",
-            importedAt: ISO8601DateFormatter().string(from: imported.addingTimeInterval(60))
-        ).recordingHealthKitContext(["sync_identifier": "body-fat-edit", "sync_version": "2"])
+        )
         let combined = try XCTUnwrap(HealthKitManager.shared.combinedHealthKitMetadata(
-            weightMetadata: metadata, bodyFatMetadata: bodyFat
+            weightMetadata: metadata, bodyFatMetadata: BodyMetricSourceMetadata(sampleId: "body-fat")
         ))
         XCTAssertEqual(combined.sourceName, metadata.sourceName)
         XCTAssertEqual(combined.sourceBundleId, metadata.sourceBundleId)
         XCTAssertEqual(combined.importedAt, metadata.importedAt)
         XCTAssertEqual(combined.bodyFatSampleId, "body-fat")
-        XCTAssertEqual(combined.healthKitContext, metadata.healthKitContext)
-        XCTAssertEqual(combined.pairedHealthKitBodyFat, bodyFat)
-        let bodyFatOnly = try XCTUnwrap(HealthKitManager.shared.combinedHealthKitMetadata(
-            weightMetadata: nil, bodyFatMetadata: bodyFat
-        ))
-        XCTAssertEqual(bodyFatOnly.importedAt, bodyFat.importedAt)
-        XCTAssertEqual(bodyFatOnly.healthKitContext, bodyFat.healthKitContext)
     }
 
     @MainActor

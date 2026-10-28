@@ -257,10 +257,6 @@ export const endpoints = {
       reason: 'Fastlane Match certificates repository.',
     },
     {
-      value: 'https://github.com/JovieInc/LogYourBody/pull/1565',
-      reason: 'PR #1565 source evidence for generated product-registry merge repair.',
-    },
-    {
       value: 'https://github.com/clerk/clerk-ios',
       reason: 'Historical audit/docs remnants; Clerk is not a runtime dependency.',
     },
@@ -373,10 +369,6 @@ export const endpoints = {
       reason: 'Linear GraphQL API used by CI remediation intake.',
     },
     {
-      value: 'https://linear.app/jovie/issue/LYB-43',
-      reason: 'LYB-43 source evidence for metric identity and accessible action ownership.',
-    },
-    {
       value: 'https://linear.app/jovie/issue/LYB-44',
       reason: 'LYB-44 source evidence for chart responsiveness and playhead label mapping.',
     },
@@ -388,10 +380,6 @@ export const endpoints = {
     {
       value: 'https://linear.app/jovie/issue/LYB-95',
       reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.',
-    },
-    {
-      value: 'https://linear.app/jovie/issue/LYB-111',
-      reason: 'LYB-111 source evidence for bounded weekly training splits and enrollment parity.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-112',
@@ -407,11 +395,6 @@ export const endpoints = {
       reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.',
     },
     {
-      value: 'https://linear.app/jovie/issue/LYB-189',
-      reason:
-        'LYB-189 source evidence and Tim/legal review handoff for the Apple Health privacy disclosure.',
-    },
-    {
       value: 'https://linear.app/jovie/issue/LYB-194',
       reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.',
     },
@@ -424,11 +407,6 @@ export const endpoints = {
       value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet',
       reason:
         'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.',
-    },
-    {
-      value: 'https://linear.app/jovie/issue/LYB-254',
-      reason:
-        'LYB-254 source evidence for the guard-reference existence check and shrink-only unguarded baseline.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-225',
@@ -448,22 +426,8 @@ export const endpoints = {
         'LYB-232 source evidence for Statsig client-key injection into the production web build.',
     },
     {
-      value: 'https://linear.app/jovie/issue/LYB-239',
-      reason: 'LYB-239 source evidence for HealthKit import identity and the correction ledger.',
-    },
-    {
       value: 'https://linear.app/jovie/issue/LYB-240',
       reason: 'LYB-240 source evidence for per-reading provenance and effective-date labels.',
-    },
-    {
-      value: 'https://linear.app/jovie/issue/LYB-252',
-      reason:
-        'LYB-252 source evidence for recurring correction escalation and guard-failure detection.',
-    },
-    {
-      value: 'https://linear.app/jovie/issue/LYB-307',
-      reason:
-        'LYB-307 source evidence for emitted lint correction checks and recurrence-based severity.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-97',

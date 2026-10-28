@@ -8,8 +8,6 @@ import Intents
 enum BodyMetricLoggingError: LocalizedError {
     case notAuthenticated
     case noMetrics
-    case protectedDataUnavailable
-    case clarificationCancelled
 
     var errorDescription: String? {
         switch self {
@@ -17,62 +15,13 @@ enum BodyMetricLoggingError: LocalizedError {
             return "Sign in to LogYourBody before logging body metrics."
         case .noMetrics:
             return "No body metrics have been logged yet."
-        case .protectedDataUnavailable:
-            return "Unlock LogYourBody before logging body metrics."
-        case .clarificationCancelled:
-            return "Weight logging was cancelled before a value was confirmed."
         }
     }
-}
-
-/// Stable record and operation ids for one weight log. A retry reuses them.
-/// A deliberate second log uses a new value.
-struct BodyMetricLogIdentity: Equatable {
-    let recordId: String
-    let operationId: String
-}
-
-enum BodyMetricDeviceEffect: String, Equatable {
-    case saved
-    case denied
-    case failed
-    case notClaimed = "not_claimed"
-}
-
-struct BodyMetricLogCompletion: Equatable {
-    let local: BodyMetricDeviceEffect
-    let healthKit: BodyMetricDeviceEffect
-    let cloud: BodyMetricDeviceEffect
-
-    /// Cloud completion is never inferred from a local or HealthKit result.
-    static func separate(localSaved: Bool, healthKitAuthorized: Bool) -> BodyMetricLogCompletion {
-        BodyMetricLogCompletion(
-            local: localSaved ? .saved : .failed,
-            healthKit: healthKitAuthorized ? .saved : .denied,
-            cloud: .notClaimed
-        )
-    }
-}
-
-enum BodyMetricWeightCommandPlan: Equatable {
-    case create(recordId: String, operationId: String)
-    case correct(recordId: String, operationId: String, expectedRevision: Int)
-    case delete(recordId: String, operationId: String, expectedRevision: Int)
-    case identityRequired
-}
-
-enum BodyMetricLocalWrite: Equatable {
-    case insert
-    case apply
-    case retryKeepingTimestamps
-    case preserveTombstone
-    case conflict
 }
 
 struct BodyMetricLoggingResult {
     let metrics: BodyMetrics
     let dialog: String
-    let completion: BodyMetricLogCompletion
 }
 
 struct BodyMetricLatestSummary {
@@ -98,20 +47,8 @@ final class BodyMetricLoggingService {
         weight weightText: String?,
         bodyFat bodyFatText: String?,
         unit: String,
-        date: Date = Date(),
-        timeZone: TimeZone = .current,
-        identity: BodyMetricLogIdentity? = nil,
-        protectedDataAvailable: Bool = true,
-        clarificationCancelled: Bool = false
+        date: Date = Date()
     ) async throws -> BodyMetricLoggingResult {
-        if let gate = Self.admissionGate(
-            authenticated: true,
-            protectedDataAvailable: protectedDataAvailable,
-            clarificationCancelled: clarificationCancelled
-        ), gate != .notAuthenticated {
-            throw gate
-        }
-
         let validation = LogWeightFormValidator.validate(
             weight: weightText ?? "",
             bodyFat: bodyFatText ?? "",
@@ -134,13 +71,6 @@ final class BodyMetricLoggingService {
             displayWeight: validation.weightValue,
             unit: unit
         )
-        let resolvedIdentity = identity ?? (
-            weightInKg != nil
-                ? BodyMetricLogIdentity(recordId: UUID().uuidString, operationId: UUID().uuidString)
-                : nil
-        )
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
 
         if healthKitManager.isAuthorized {
             if let weightValue = validation.weightValue {
@@ -160,14 +90,11 @@ final class BodyMetricLoggingService {
             date: date
         )
 
-        let lifecycleMetadata = resolvedIdentity.map {
-            BodyMetricSourceMetadata().settingWeightLifecycle(operationId: $0.operationId, revision: 1)
-        }
         let metrics = BodyMetrics(
-            id: resolvedIdentity?.recordId ?? UUID().uuidString,
+            id: UUID().uuidString,
             userId: userId,
             date: date,
-            localDate: BodyMetricLocalDate.key(for: date, calendar: calendar),
+            localDate: BodyMetricLocalDate.key(for: date),
             weight: finalWeight,
             weightUnit: finalWeight != nil ? "kg" : nil,
             bodyFatPercentage: validation.bodyFatValue,
@@ -177,7 +104,6 @@ final class BodyMetricLoggingService {
             notes: nil,
             photoUrl: nil,
             dataSource: BodyMetricSource.manual.rawValue,
-            sourceMetadata: lifecycleMetadata,
             createdAt: date,
             updatedAt: date
         )
@@ -200,11 +126,7 @@ final class BodyMetricLoggingService {
 
         return BodyMetricLoggingResult(
             metrics: metrics,
-            dialog: Self.loggedSummary(for: metrics, preferredSystem: .preferredFromDefaults),
-            completion: .separate(
-                localSaved: true,
-                healthKitAuthorized: healthKitManager.isAuthorized
-            )
+            dialog: Self.loggedSummary(for: metrics, preferredSystem: .preferredFromDefaults)
         )
     }
 
@@ -223,96 +145,9 @@ final class BodyMetricLoggingService {
         )
     }
 
-    /// Exact pounds factor shared with the agent weight contract. Display
-    /// conversion elsewhere stays on `UnitConversion` and is not this write path.
-    static let poundsToKilograms = 0.45359237
-
     static func storedWeightInKilograms(displayWeight: Double?, unit: String) -> Double? {
         guard let displayWeight else { return nil }
-        if unit == "lbs" || unit == "lb" {
-            return displayWeight * poundsToKilograms
-        }
-        return displayWeight
-    }
-
-    static func admissionGate(
-        authenticated: Bool,
-        protectedDataAvailable: Bool,
-        clarificationCancelled: Bool
-    ) -> BodyMetricLoggingError? {
-        if clarificationCancelled { return .clarificationCancelled }
-        if !protectedDataAvailable { return .protectedDataUnavailable }
-        if !authenticated { return .notAuthenticated }
-        return nil
-    }
-
-    /// Correction and delete identify an owned measurement and revision.
-    /// A missing identity stays `identityRequired` and is never a create.
-    static func planWeightCommand(
-        kind: String,
-        recordId: String?,
-        operationId: String?,
-        expectedRevision: Int?
-    ) -> BodyMetricWeightCommandPlan {
-        switch kind {
-        case "create":
-            return .create(
-                recordId: nonempty(recordId) ?? UUID().uuidString,
-                operationId: nonempty(operationId) ?? UUID().uuidString
-            )
-        case "correct":
-            guard let recordId = nonempty(recordId),
-                  let expectedRevision, expectedRevision >= 1 else {
-                return .identityRequired
-            }
-            return .correct(
-                recordId: recordId,
-                operationId: nonempty(operationId) ?? UUID().uuidString,
-                expectedRevision: expectedRevision
-            )
-        case "delete":
-            guard let recordId = nonempty(recordId),
-                  let expectedRevision, expectedRevision >= 1 else {
-                return .identityRequired
-            }
-            return .delete(
-                recordId: recordId,
-                operationId: nonempty(operationId) ?? UUID().uuidString,
-                expectedRevision: expectedRevision
-            )
-        default:
-            return .identityRequired
-        }
-    }
-
-    /// Same operation id is a retry or a conflict. A different operation is a new edit.
-    static func decideLocalWrite(
-        hasExisting: Bool,
-        existingOperationId: String?,
-        incomingOperationId: String?,
-        weightsEqual: Bool,
-        existingDeleted: Bool
-    ) -> BodyMetricLocalWrite {
-        guard hasExisting else { return .insert }
-        guard let incomingOperationId,
-              let existingOperationId,
-              incomingOperationId == existingOperationId else {
-            return .apply
-        }
-        if existingDeleted { return .preserveTombstone }
-        if weightsEqual { return .retryKeepingTimestamps }
-        return .conflict
-    }
-
-    static func canonicalWeightsEqual(_ stored: Double, _ incoming: Double?) -> Bool {
-        guard let incoming else { return stored == 0 }
-        return abs(stored - incoming) < 0.0000005
-    }
-
-    private static func nonempty(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        return unit == "lbs" ? displayWeight.lbsToKg : displayWeight
     }
 
     static func formattedWeight(_ weightKg: Double, preferredSystem: MeasurementSystem) -> String {

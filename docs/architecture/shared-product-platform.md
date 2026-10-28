@@ -48,13 +48,3 @@ The same rule applies to the documentation shell. Jovie's current Nextra app is 
 5. Run the registry, drift, web, and native tests.
 
 Do not rename the app, change prices, add a marketed feature, or promise a support channel directly in a component. Change the registry and regenerate consumers.
-
-## Resolving generated registry conflicts
-
-During a merge, resolve and stage source conflicts first, retaining independent
-registry additions from both parents. Then run
-`pnpm --filter @jovieinc/product-registry generate:resolve-merge`. The generator
-refuses unresolved source paths, regenerates and stages only its conflicted
-outputs, and preserves other staged and unstaged edits. Retrying after resolution
-does not write or stage anything. Run `pnpm product:check` afterward to verify all
-generated consumers against the merged registry.

@@ -24,4 +24,4 @@ it('runs correction coverage and owner-loop behavior through the normal CI suite
   );
   expect(output).toContain('# fail 0');
   console.log(output.slice(output.indexOf('# start of coverage report')));
-}, 30_000);
+});

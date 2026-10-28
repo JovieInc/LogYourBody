@@ -1,7 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { execFileSync } from 'node:child_process';
-import console from 'node:console';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 import { format, resolveConfig } from 'prettier';
@@ -20,22 +18,6 @@ const aasaWellKnownPath = resolve(
 );
 const aasaRootPath = resolve(repoRoot, 'apps/web/public/apple-app-site-association');
 const check = process.argv.includes('--check');
-const resolveMerge = process.argv.includes('--resolve-merge');
-let conflictedOutputs;
-if (resolveMerge) {
-  if (check) throw new Error('--resolve-merge cannot be combined with --check');
-  const git = (...args) => execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' });
-  git('rev-parse', '--verify', 'MERGE_HEAD');
-  const generated = new Set(
-    [swiftPath, docsPath, endpointsTsPath, cspTsPath, aasaWellKnownPath, aasaRootPath].map((path) =>
-      relative(repoRoot, path),
-    ),
-  );
-  const conflicts = git('diff', '--name-only', '--diff-filter=U', '-z').split('\0').filter(Boolean);
-  const sources = conflicts.filter((path) => !generated.has(path));
-  if (sources.length) throw new Error(`resolve source conflicts first: ${sources.join(', ')}`);
-  conflictedOutputs = conflicts;
-}
 
 const swiftString = (value) => `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 const plan = logYourBody.plans[0];
@@ -247,8 +229,6 @@ const docs = [
 ].join('\n');
 
 async function sync(path, content) {
-  // A merge repair owns only conflicted projections; preserve other staged and unstaged work.
-  if (resolveMerge && !conflictedOutputs.includes(relative(repoRoot, path))) return;
   if (check) {
     const current = await readFile(path, 'utf8').catch(() => '');
     if (current !== content) throw new Error(`${path} is stale; run pnpm product:generate`);
@@ -279,7 +259,3 @@ await Promise.all([
   sync(aasaWellKnownPath, aasa),
   sync(aasaRootPath, aasa),
 ]);
-if (resolveMerge && conflictedOutputs.length) {
-  execFileSync('git', ['add', '--', ...conflictedOutputs], { cwd: repoRoot });
-  console.log(`product-registry: regenerated and staged ${conflictedOutputs.join(', ')}`);
-}

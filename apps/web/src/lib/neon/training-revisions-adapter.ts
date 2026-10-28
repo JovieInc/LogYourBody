@@ -13,7 +13,6 @@ const contextSchema = revisionContextSchema.extend({
   dateOfBirth: z.unknown(),
   legacySetups: z.array(z.unknown()),
   headRevision: z.string().uuid().nullable(),
-  trainingFingerprint: z.string().optional(),
 });
 const conflictSchema = z.enum([
   'owner_missing',

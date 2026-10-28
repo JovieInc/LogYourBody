@@ -6,11 +6,10 @@ extension DashboardViewLiquid {
     @ViewBuilder
     var glp1MetricCard: some View {
         if let cardData = Glp1DoseCardData.make(from: glp1DoseLogs) {
-            Group {
-                let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
-                    selectedMetricType = .glp1
-                    isMetricDetailActive = true
-                }
+            Button {
+                selectedMetricType = .glp1
+                isMetricDetailActive = true
+            } label: {
                 MetricSummaryCard(
                     icon: "syringe",
                     accentColor: theme.colors.primary,
@@ -27,7 +26,7 @@ extension DashboardViewLiquid {
                             footnote: nil
                         )
                     ),
-                    detailAction: detailAction
+                    isButtonContext: true
                 )
             }
             .buttonStyle(MetricCardButtonStyle())

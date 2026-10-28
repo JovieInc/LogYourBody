@@ -39,16 +39,9 @@ export type NativeBodyMetricsPullResult = {
   next_cursor: NativeBodyMetricsPullCursor | null;
 };
 
-export type NativeBodyMetricConflict = {
-  id: string;
-  code: 'tombstone' | 'stale_write' | 'payload_conflict';
-  record: NativeBodyMetricSyncRecord;
-};
-
 export type NativeBodyMetricsPushResult = {
   records: NativeBodyMetricSyncRecord[];
   rejected_ids: string[];
-  conflicts?: NativeBodyMetricConflict[];
 };
 
 export interface NativeBodyMetricsSyncPort {

@@ -23,8 +23,6 @@ final class ErrorReporterTests: XCTestCase {
             tags.append((value, key))
         }
 
-        func setUser(id: String) {}
-
         func setExtra(value: String, key: String) {}
 
         func capture(error: Error) {

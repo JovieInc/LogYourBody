@@ -10,9 +10,6 @@ export const LYB_MCP_PROTECTED_RESOURCE_METADATA_PATH =
 export const LYB_MCP_SCOPES = {
   trainingRead: 'lyb:training.read',
   trainingWrite: 'lyb:training.write',
-  /** Enforced here. Not registered at the Jovie issuer until JOV-7796 is extended. */
-  metricsRead: 'lyb:metrics.read',
-  metricsWrite: 'lyb:metrics.write',
 } as const;
 export type LybMcpScope = (typeof LYB_MCP_SCOPES)[keyof typeof LYB_MCP_SCOPES];
 
@@ -29,17 +26,11 @@ export function protectedResourceMetadataUrl(resourceUrl: string): string {
   return `${url.origin}${LYB_MCP_PROTECTED_RESOURCE_METADATA_PATH}`;
 }
 
-export function protectedResourceMetadata(input: {
-  resourceUrl: string;
-  issuer: string;
-  metrics?: boolean;
-}) {
-  const scopes: string[] = [LYB_MCP_SCOPES.trainingRead, LYB_MCP_SCOPES.trainingWrite];
-  if (input.metrics) scopes.push(LYB_MCP_SCOPES.metricsRead, LYB_MCP_SCOPES.metricsWrite);
+export function protectedResourceMetadata(input: { resourceUrl: string; issuer: string }) {
   return {
     resource: input.resourceUrl,
     authorization_servers: [input.issuer],
-    scopes_supported: scopes,
+    scopes_supported: [LYB_MCP_SCOPES.trainingRead, LYB_MCP_SCOPES.trainingWrite],
     bearer_methods_supported: ['header'],
     resource_name: 'LogYourBody',
     resource_documentation: `${new URL(input.resourceUrl).origin}/support`,

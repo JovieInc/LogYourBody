@@ -15,24 +15,18 @@ protocol BodySpecDexaAPIClient {
 
 extension BodySpecAPI: BodySpecDexaAPIClient {}
 
-actor BodySpecDexaImporter: MetricSourceAdapter {
+actor BodySpecDexaImporter {
     @MainActor static let shared = BodySpecDexaImporter(api: BodySpecAPI.shared, authManager: .shared)
 
-    // Provider events are unverified. Never infer push delivery from a connected account.
-    nonisolated let capabilities = MetricSourceCapabilities(incrementalPull: true, scheduledPoll: true)
     private let api: BodySpecDexaAPIClient
     private let authManager: AuthManager
     private let coreDataManager: CoreDataManager
-    private let userDefaults: UserDefaults
-    private let syncGuard: @MainActor () throws -> Void
     private let syncTrigger: @MainActor () -> Void
 
     init(
         api: BodySpecDexaAPIClient,
         authManager: AuthManager,
         coreDataManager: CoreDataManager = .shared,
-        userDefaults: UserDefaults = .standard,
-        syncGuard: @escaping @MainActor () throws -> Void = {},
         syncTrigger: @escaping @MainActor () -> Void = {
             RealtimeSyncManager.shared.updatePendingSyncCount()
             RealtimeSyncManager.shared.syncIfNeeded()
@@ -41,28 +35,7 @@ actor BodySpecDexaImporter: MetricSourceAdapter {
         self.api = api
         self.authManager = authManager
         self.coreDataManager = coreDataManager
-        self.userDefaults = userDefaults
-        self.syncGuard = syncGuard
         self.syncTrigger = syncTrigger
-    }
-
-    var lastSuccessfulSync: Date? {
-        get async {
-            await MainActor.run {
-                guard let ownership = authManager.captureAccountSession() else { return nil }
-                return userDefaults.object(forKey: lastSyncKey(for: ownership.subject)) as? Date
-            }
-        }
-    }
-
-    nonisolated func idempotencyKey(for report: BodySpecResultSummary) -> String { report.resultId }
-
-    func checkEntitlementAndCost() async throws { try await syncGuard() }
-
-    func replay(from startDate: Date?) async throws -> ImportResult {
-        try Task.checkCancellation()
-        try await checkEntitlementAndCost()
-        return await importDexaResults(from: startDate)
     }
 
     struct ImportResult {
@@ -83,15 +56,6 @@ actor BodySpecDexaImporter: MetricSourceAdapter {
     }
 
     func importDexaResults() async -> ImportResult {
-        do {
-            return try await MetricSourceScheduler.replay(self, triggeredBy: .incrementalPull)
-                ?? ImportResult(importedCount: 0, skippedCount: 0, failedCount: 0, wasCancelled: false)
-        } catch {
-            return ImportResult(importedCount: 0, skippedCount: 0, failedCount: 0, wasCancelled: true)
-        }
-    }
-
-    private func importDexaResults(from startDate: Date?) async -> ImportResult {
         guard Constants.isBodySpecEnabled else {
             return ImportResult(importedCount: 0, skippedCount: 0, failedCount: 0, wasCancelled: false)
         }
@@ -101,11 +65,7 @@ actor BodySpecDexaImporter: MetricSourceAdapter {
         }
         let session: BodySpecDexaImportSession
         do {
-            let captured = try await api.importSession(for: ownership)
-            session = BodySpecDexaImportSession(api: captured.api, admission: { [syncGuard] in
-                try syncGuard()
-                try captured.admission()
-            })
+            session = try await api.importSession(for: ownership)
             try await session.admission()
         } catch {
             return ImportResult(importedCount: 0, skippedCount: 0, failedCount: 0, wasCancelled: true)
@@ -128,7 +88,6 @@ actor BodySpecDexaImporter: MetricSourceAdapter {
                 try await session.admission()
 
                 let dexaResults = pageResponse.results.filter { summary in
-                    if let startDate, summary.startTime < startDate { return false }
                     guard let code = summary.service.serviceCode?.uppercased() else {
                         return summary.service.name.uppercased() == "DEXA"
                     }
@@ -166,23 +125,7 @@ actor BodySpecDexaImporter: MetricSourceAdapter {
             }
         }
 
-        if failed == 0, !cancelled {
-            do {
-                try await MainActor.run {
-                    try Task.checkCancellation()
-                    try session.admission()
-                    guard authManager.ownsAccountSession(ownership) else { throw CancellationError() }
-                    userDefaults.set(Date(), forKey: lastSyncKey(for: userId))
-                }
-            } catch {
-                cancelled = true
-            }
-        }
         return ImportResult(importedCount: imported, skippedCount: skipped, failedCount: failed, wasCancelled: cancelled)
-    }
-
-    nonisolated private func lastSyncKey(for userId: String) -> String {
-        "metricSource.bodySpec.lastSuccessfulSync.\(userId)"
     }
 
     private func importSingleResult(
@@ -191,23 +134,21 @@ actor BodySpecDexaImporter: MetricSourceAdapter {
         session: BodySpecDexaImportSession
     ) async throws -> BodySpecPairCommitOutcome {
         let userId = ownership.subject
-        let reportID = idempotencyKey(for: summary)
-        guard !reportID.isEmpty else { throw BodySpecImportPersistenceError.invalidPair }
         try await requireOwnership(ownership)
         try await session.admission()
-        let scanInfo = try await session.api.getDexaScanInfo(resultId: reportID)
+        let scanInfo = try await session.api.getDexaScanInfo(resultId: summary.resultId)
         try await requireOwnership(ownership)
-        guard scanInfo.resultId == reportID else { throw BodySpecImportPersistenceError.invalidPair }
+        guard scanInfo.resultId == summary.resultId else { throw BodySpecImportPersistenceError.invalidPair }
         if try await MainActor.run(body: {
-            try coreDataManager.hasCompleteBodySpecImportPair(externalID: reportID, userId: userId) {
+            try coreDataManager.hasCompleteBodySpecImportPair(externalID: summary.resultId, userId: userId) {
                 try Task.checkCancellation()
                 try session.admission()
                 guard authManager.ownsAccountSession(ownership) else { throw CancellationError() }
             }
         }) { return .duplicate }
-        let composition = try await session.api.getDexaComposition(resultId: reportID)
+        let composition = try await session.api.getDexaComposition(resultId: summary.resultId)
         try await requireOwnership(ownership)
-        guard scanInfo.resultId == reportID, composition.resultId == reportID else {
+        guard scanInfo.resultId == summary.resultId, composition.resultId == summary.resultId else {
             throw BodySpecImportPersistenceError.invalidPair
         }
 
@@ -237,7 +178,7 @@ actor BodySpecDexaImporter: MetricSourceAdapter {
                 vendor: "bodyspec",
                 sourceName: "BodySpec DEXA",
                 externalId: summary.service.serviceId,
-                externalResultId: reportID,
+                externalResultId: summary.resultId,
                 scannerModel: scanInfo.scannerModel,
                 locationId: summary.location.locationId,
                 locationName: summary.location.name,
@@ -252,7 +193,7 @@ actor BodySpecDexaImporter: MetricSourceAdapter {
             userId: userId,
             bodyMetricsId: metricsId,
             externalSource: "bodyspec",
-            externalResultId: reportID,
+            externalResultId: summary.resultId,
             externalUpdateTime: scanInfo.analyzeTime,
             scannerModel: scanInfo.scannerModel,
             locationId: summary.location.locationId,
