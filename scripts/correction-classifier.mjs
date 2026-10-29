@@ -158,30 +158,10 @@ function mergeLedgers(left, right) {
   return [...merged.values()];
 }
 
-function readGitSources(root, objects, execute) {
+function readGitSources(root, objects, execute, regularGuards) {
   for (const object of objects) {
     assert.doesNotMatch(object, /[\r\n\0]/u, 'invalid Git source request');
   }
-  // Only regular indexed files can provide staged guard evidence.
-  const regularGuards = new Set(
-    execute(
-      'git',
-      [
-        '-C',
-        root,
-        '--literal-pathspecs',
-        'ls-files',
-        '--stage',
-        '-z',
-        '--',
-        ...objects.filter((object) => object.startsWith(':0:')).map((object) => object.slice(3)),
-      ],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-    )
-      .split('\0')
-      .filter((entry) => /^100(?:644|755) [a-f0-9]+ 0\t/u.test(entry))
-      .map((entry) => entry.slice(entry.indexOf('\t') + 1)),
-  );
   const output = execute('git', ['-C', root, 'cat-file', '--batch'], {
     input: objects.map((object) => `${object}\n`).join(''),
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -235,6 +215,29 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
         .trim()
         .split('\n');
       path = resolve(root, LEDGER_PATH);
+      // Verify the whole merge is conflict-free, including staged retries.
+      assertLedgerMergeReady(root);
+      // Read fresh index metadata once per command, never across mutable retries.
+      const index = git('--literal-pathspecs', 'ls-files', '--stage', '-z').split('\0');
+      // Only regular indexed files can provide staged guard evidence.
+      const regularGuards = new Set(
+        index
+          .filter((entry) => /^100(?:644|755) [a-f0-9]+ 0\t/u.test(entry))
+          .map((entry) => entry.slice(entry.indexOf('\t') + 1)),
+      );
+      const unmergedLedger = index.some(
+        (entry) =>
+          /^\d+ [a-f0-9]+ [123]\t/u.test(entry) &&
+          entry.slice(entry.indexOf('\t') + 1) === LEDGER_PATH,
+      );
+      let ledgers;
+      const readLedgers = () =>
+        (ledgers ??= readGitSources(
+          root,
+          [':0', ...parents].map((ref) => `${ref}:${LEDGER_PATH}`),
+          execute,
+          regularGuards,
+        ));
       const verifyMerge = (receipts) => {
         indexCorrectionReceipts(receipts);
         assert.deepEqual(
@@ -244,7 +247,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
         );
         const baselines = parents.map((ref) => ({
           ref,
-          receipts: JSON.parse(git('show', `${ref}:${LEDGER_PATH}`)),
+          receipts: JSON.parse(readLedgers().get(`${ref}:${LEDGER_PATH}`)),
         }));
         // Batch guard blobs per verification; never cache the mutable index across retries.
         const objects = [
@@ -254,7 +257,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
             ),
           ),
         ];
-        const sources = readGitSources(root, objects, execute);
+        const sources = readGitSources(root, objects, execute, regularGuards);
         const current = guardCoverageReport(receipts, (guard) => sources.get(`:0:${guard}`), {
           requireClassification: true,
         });
@@ -263,17 +266,14 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
           assertNoRegression(current, baseline);
         }
       };
-      // Verify the whole merge is conflict-free, including staged retries.
-      assertLedgerMergeReady(root);
       // A retry after explicit staging verifies the index without overwriting local edits.
-      if (checkingMerge || !git('ls-files', '--unmerged', '--', LEDGER_PATH)) {
+      if (checkingMerge || !unmergedLedger) {
         // Apply the ledger's regular-file contract to every staged retry mode.
-        assert.match(
-          git('--literal-pathspecs', 'ls-files', '--stage', '--', LEDGER_PATH),
-          /^100(?:644|755) /,
+        assert.ok(
+          regularGuards.has(LEDGER_PATH),
           'staged source must be a regular file: correction ledger',
         );
-        const staged = git('show', `:0:${LEDGER_PATH}`);
+        const staged = readLedgers().get(`:0:${LEDGER_PATH}`);
         verifyMerge(JSON.parse(staged));
         assert.equal(
           readSource(LEDGER_PATH, { root }),
@@ -305,6 +305,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
               ),
             ],
             execute,
+            regularGuards,
           )
         : null;
       result = classifyLedger(

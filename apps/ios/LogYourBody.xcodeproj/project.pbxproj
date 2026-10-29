@@ -12,6 +12,7 @@
 		A24420261025000000000002 /* MetricSourceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000001 /* MetricSourceAdapter.swift */; };
 		A24420261025000000000004 /* HealthKitManager+MetricSourceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000003 /* HealthKitManager+MetricSourceAdapter.swift */; };
 		A24420261025000000000006 /* MetricSourceAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000005 /* MetricSourceAdapterTests.swift */; };
+		A26400000000000000000001 /* ContextualHintRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26400000000000000000002 /* ContextualHintRegistryTests.swift */; };
 		A26100000000000000000001 /* QuickPillRanker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26100000000000000000002 /* QuickPillRanker.swift */; };
 		A26100000000000000000003 /* SignalFreshness.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26100000000000000000004 /* SignalFreshness.swift */; };
 		A26100000000000000000005 /* QuickPillRankerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26100000000000000000006 /* QuickPillRankerTests.swift */; };
@@ -117,6 +118,7 @@
 		75A151025036A3D85388BD19 /* ValidationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3BCDDCDB314367722653A8 /* ValidationServiceTests.swift */; };
 		75A53A0D54A438DDC9F12B2E /* HomeV2SettingsCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFCF003F85B6FCE7D15EE6B6 /* HomeV2SettingsCopy.swift */; };
 		773F3C5B9FF015B9A66418D1 /* AnalyticsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC41129661E6DC33C6C4877 /* AnalyticsServiceTests.swift */; };
+		A265E0022E26500100000002 /* BenefitEventsContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A265E0012E26500100000001 /* BenefitEventsContractTests.swift */; };
 		77AE209CC221E82496CC8771 /* OnboardingScoreDisplayPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F72F9E9548064844D56AD75 /* OnboardingScoreDisplayPolicyTests.swift */; };
 		7C37907A5334D86B6A905A8A /* EditEntrySavePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7CC52C2F710012ABB7E7219 /* EditEntrySavePolicy.swift */; };
 		7D497AAAA2BAEEBCDB6A590E /* AddEntrySheet+Part02.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B717977805C943E5BA1410B /* AddEntrySheet+Part02.swift */; };
@@ -582,6 +584,7 @@
 		A24420261025000000000001 /* MetricSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSourceAdapter.swift; sourceTree = "<group>"; };
 		A24420261025000000000003 /* HealthKitManager+MetricSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitManager+MetricSourceAdapter.swift"; sourceTree = "<group>"; };
 		A24420261025000000000005 /* MetricSourceAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSourceAdapterTests.swift; sourceTree = "<group>"; };
+		A26400000000000000000002 /* ContextualHintRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextualHintRegistryTests.swift; sourceTree = "<group>"; };
 		A26100000000000000000002 /* QuickPillRanker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickPillRanker.swift; sourceTree = "<group>"; };
 		A26100000000000000000004 /* SignalFreshness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignalFreshness.swift; sourceTree = "<group>"; };
 		A26100000000000000000006 /* QuickPillRankerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickPillRankerTests.swift; sourceTree = "<group>"; };
@@ -690,6 +693,7 @@
 		6EEA2502D23E9E452D94A9E4 /* BaseButtonPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BaseButtonPolicyTests.swift; sourceTree = "<group>"; };
 		6F426E17B8C3036E6FCEDEA6 /* DashboardViewLiquid+HomeV2Context.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HomeV2Context.swift"; sourceTree = "<group>"; };
 		6FC41129661E6DC33C6C4877 /* AnalyticsServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AnalyticsServiceTests.swift; sourceTree = "<group>"; };
+		A265E0012E26500100000001 /* BenefitEventsContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BenefitEventsContractTests.swift; sourceTree = "<group>"; };
 		7148912B179107B65580E27E /* RevenueCatManager+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "RevenueCatManager+Part02.swift"; path = "RevenueCatManager+Part02.swift"; sourceTree = "<group>"; };
 		D416CADF171F4B0BB27A26A1 /* RevenueCatManager+Lifecycle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "RevenueCatManager+Lifecycle.swift"; sourceTree = "<group>"; };
 		75034CADEA1D4697BDCB5555 /* ImageCacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheService.swift; sourceTree = "<group>"; };
@@ -1477,6 +1481,7 @@
 				0B3ECAB100575E759C5A3D7A /* LogWeightFormValidatorTests.swift */,
 				EECB82E4C8977D7158475EFB /* MetricChartDataPointPresenceTests.swift */,
 				ED6868B1C7F6167E2A9AE0A1 /* OnboardingFlowViewModelTests.swift */,
+				A26400000000000000000002 /* ContextualHintRegistryTests.swift */,
 				4C87F359CE5509C2457AB583 /* PaywallSavingsPolicyTests.swift */,
 				76E40D3BC9C969629954E803 /* PhaseInsightPolicyTests.swift */,
 				C7E0D5025A2839599F4E281D /* PhotoMetadataAndImportPolicyTests.swift */,
@@ -1525,6 +1530,7 @@
 				AF22A9B239CD955EC68D94E1 /* SettingsSurfacePolicyTests.swift */,
 				031C0B385F7C300284AA6A5F /* SessionListOrderingTests.swift */,
 				6FC41129661E6DC33C6C4877 /* AnalyticsServiceTests.swift */,
+				A265E0012E26500100000001 /* BenefitEventsContractTests.swift */,
 				B2193687561E33F2A080CD6A /* BugReportManagerTests.swift */,
 				1CE7640AD9F476ABF4DC7366 /* ErrorReporterTests.swift */,
 				4E493B38B586CB7B2C6FB452 /* ErrorTrackingServiceTests.swift */,
@@ -2451,6 +2457,7 @@
 				FCE2872B32CFB9AD2CE87012 /* MetricChartDataPointPresenceTests.swift in Sources */,
 				E1A2630100000000000000B2 /* EarnedWinDetectorTests.swift in Sources */,
 				327C8C9174FEC7C23E350270 /* OnboardingFlowViewModelTests.swift in Sources */,
+				A26400000000000000000001 /* ContextualHintRegistryTests.swift in Sources */,
 				CCCD701F26CEB5C9F56AA8FB /* PaywallSavingsPolicyTests.swift in Sources */,
 				948778D2A40C5957E42E40CF /* PhaseInsightPolicyTests.swift in Sources */,
 				099DD9F0055C4CFBF7190F4B /* PhotoMetadataAndImportPolicyTests.swift in Sources */,
@@ -2507,6 +2514,7 @@
 				D177A26F5B272DBE23E6F782 /* SettingsSurfacePolicyTests.swift in Sources */,
 				417364FB8DBF56DE4302BA11 /* SessionListOrderingTests.swift in Sources */,
 				773F3C5B9FF015B9A66418D1 /* AnalyticsServiceTests.swift in Sources */,
+				A265E0022E26500100000002 /* BenefitEventsContractTests.swift in Sources */,
 				F9C0344C70E72E212075D058 /* BugReportManagerTests.swift in Sources */,
 				534844CE827E427810B5B337 /* ErrorReporterTests.swift in Sources */,
 				4212B84EECB988D56259A5FD /* ErrorTrackingServiceTests.swift in Sources */,

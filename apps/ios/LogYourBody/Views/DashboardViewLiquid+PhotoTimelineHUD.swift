@@ -575,6 +575,9 @@ private struct PhotoTimelineNavigationMenu: View {
                     Text("LogYourBody")
                         .font(.system(size: 30, weight: .semibold))
                         .foregroundStyle(theme.colors.text)
+                        // Keep the screen marker on a leaf: an identifier on the
+                        // menu container propagates to its independent buttons.
+                        .accessibilityIdentifier("photo_timeline_menu")
 
                     Spacer()
 
@@ -635,7 +638,6 @@ private struct PhotoTimelineNavigationMenu: View {
             .padding(.top, 48)
             .padding(.bottom, JovieTokens.sectionGap)
         }
-        .accessibilityIdentifier("photo_timeline_menu")
     }
 
     private func menuRow(

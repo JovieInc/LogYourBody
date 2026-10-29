@@ -629,7 +629,7 @@ struct HomeV2MetricHero: View {
         }
         .sheet(isPresented: $showsProvenance) {
             if let provenance {
-                HomeV2ProvenanceSheet(detail: provenance)
+                HomeV2ProvenanceSheet(detail: provenance, isPresented: $showsProvenance)
             }
         }
         .onChange(of: provenance) { _, _ in showsProvenance = false }
@@ -688,8 +688,8 @@ struct HomeV2ProvenanceChip: View {
 }
 
 struct HomeV2ProvenanceSheet: View {
-    @Environment(\.dismiss) private var dismiss
     let detail: HomeV2ProvenanceDetail
+    @Binding var isPresented: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
@@ -701,7 +701,7 @@ struct HomeV2ProvenanceSheet: View {
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            Button(action: { dismiss() }, label: {
+            Button(action: { isPresented = false }, label: {
                 Text(HomeV2Copy.done)
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, weight: .semibold, relativeTo: .body)
                     .foregroundStyle(HomeV2Tokens.Colors.ctaInk)

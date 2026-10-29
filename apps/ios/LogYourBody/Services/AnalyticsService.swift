@@ -73,11 +73,191 @@ final class AnalyticsService {
     }
 }
 
+// MARK: - Benefit event schema
+
+/// Closed LYB-173 benefit events. Properties are ids, kinds, and counts.
+/// Names and types that could carry a measurement, photo, or free text are not
+/// representable here; `BenefitEventsContractTests` fails if one is added.
+enum BenefitPropertyType: String, Codable, Equatable {
+    case id
+    case kind
+    case count
+}
+
+struct BenefitEventDefinition: Equatable, Codable {
+    var properties: [String: BenefitPropertyType]
+    var kinds: [String: [String]]
+}
+
+enum BenefitEventSchema {
+    static let manualLogAvoided = "manual_log_avoided"
+    static let homeDecisionShown = "home_decision_shown"
+    static let homeDecisionAccepted = "home_decision_accepted"
+    static let homeDecisionDeferred = "home_decision_deferred"
+    static let homeDecisionRejected = "home_decision_rejected"
+    static let planOverride = "plan_override"
+    static let reversal = "reversal"
+
+    static let events: [String: BenefitEventDefinition] = [
+        manualLogAvoided: BenefitEventDefinition(
+            properties: ["ask_id": .id, "ask_kind": .kind, "avoided_count": .count],
+            kinds: ["ask_kind": ["composition_log", "mixed_log", "scale_log"]]
+        ),
+        homeDecisionShown: BenefitEventDefinition(
+            properties: ["decision_count": .count, "decision_id": .id, "decision_kind": .kind],
+            kinds: ["decision_kind": ["next_block"]]
+        ),
+        homeDecisionAccepted: BenefitEventDefinition(
+            properties: ["decision_count": .count, "decision_id": .id, "decision_kind": .kind],
+            kinds: ["decision_kind": ["next_block"]]
+        ),
+        homeDecisionDeferred: BenefitEventDefinition(
+            properties: ["decision_count": .count, "decision_id": .id, "decision_kind": .kind],
+            kinds: ["decision_kind": ["next_block"]]
+        ),
+        homeDecisionRejected: BenefitEventDefinition(
+            properties: ["decision_count": .count, "decision_id": .id, "decision_kind": .kind],
+            kinds: ["decision_kind": ["next_block"]]
+        ),
+        planOverride: BenefitEventDefinition(
+            properties: ["override_count": .count, "override_kind": .kind, "proposal_id": .id],
+            kinds: ["override_kind": ["steering"]]
+        ),
+        reversal: BenefitEventDefinition(
+            properties: ["proposal_id": .id, "reversal_count": .count, "reversal_kind": .kind],
+            kinds: ["reversal_kind": ["restore"]]
+        )
+    ]
+
+    static func sanitized(event: String, properties: [String: String]?) -> [String: String]? {
+        guard let definition = events[event] else { return nil }
+        let filtered = (properties ?? [:]).filter { key, value in
+            guard let type = definition.properties[key] else { return false }
+            return allows(value, as: type, key: key, definition: definition)
+        }
+        return filtered.isEmpty ? nil : filtered
+    }
+
+    /// True when a property name or declared type could carry a measurement,
+    /// a photo, or free text. Count is the only numeric type, and only by name.
+    static func couldCarryMeasurement(name: String, type: String) -> Bool {
+        let normalized = name.lowercased().replacingOccurrences(of: "-", with: "_")
+        if measurementPhrases.contains(where: { normalized.contains($0) }) { return true }
+        let parts = Set(normalized.split(separator: "_").map(String.init))
+        if !parts.isDisjoint(with: measurementWords) { return true }
+        return type != BenefitPropertyType.id.rawValue
+            && type != BenefitPropertyType.kind.rawValue
+            && type != BenefitPropertyType.count.rawValue
+    }
+
+    static func kindValueCouldCarryMeasurement(_ value: String) -> Bool {
+        guard value.range(of: #"^[a-z][a-z0-9_]{0,32}$"#, options: .regularExpression) != nil else {
+            return true
+        }
+        return couldCarryMeasurement(name: value, type: BenefitPropertyType.kind.rawValue)
+    }
+
+    private static let measurementPhrases = [
+        "weight", "body_fat", "bodyfat", "height", "waist", "lean", "muscle", "ffmi", "fmi", "bmi",
+        "load", "reps", "rir", "percent", "percentage", "photo", "image", "pixel", "note", "notes",
+        "message", "transcript", "comment", "measurement", "calorie", "dose", "bpm", "mass", "value",
+        "free_text", "freetext"
+    ]
+    private static let measurementWords: Set<String> = ["kg", "lb", "lbs", "fat", "bf", "text"]
+
+    private static func allows(
+        _ value: String, as type: BenefitPropertyType, key: String, definition: BenefitEventDefinition
+    ) -> Bool {
+        switch type {
+        case .id:
+            guard value.range(of: #"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"#, options: .regularExpression) != nil else {
+                return false
+            }
+            return value.range(of: #"^[0-9]+(?:\.[0-9]+)?$"#, options: .regularExpression) == nil
+        case .kind:
+            return definition.kinds[key]?.contains(value) == true
+        case .count:
+            return value.range(of: #"^(?:0|[1-9][0-9]{0,2})$"#, options: .regularExpression) != nil
+        }
+    }
+}
+
+/// One emission function per benefit event. Call sites pass ids, kinds, and
+/// counts; `AnalyticsService` drops anything else before it leaves the device.
+@MainActor
+enum BenefitEvents {
+    static var trackerOverride: AnalyticsTracking?
+    private static var shownDecisionIds: Set<String> = []
+    private static var deferredDecisionIds: Set<String> = []
+
+    static func resetVisitLedgerForTesting() {
+        shownDecisionIds.removeAll()
+        deferredDecisionIds.removeAll()
+        trackerOverride = nil
+    }
+
+    static func manualLogAvoided(askId: String, askKind: String, avoidedCount: Int) {
+        emit(BenefitEventSchema.manualLogAvoided, [
+            "ask_id": askId,
+            "ask_kind": askKind,
+            "avoided_count": String(avoidedCount)
+        ])
+    }
+
+    static func homeDecisionShown(decisionId: String, decisionKind: String) {
+        guard shownDecisionIds.insert(decisionId).inserted else { return }
+        emit(BenefitEventSchema.homeDecisionShown, decisionProperties(decisionId, decisionKind))
+    }
+
+    static func homeDecisionAccepted(decisionId: String, decisionKind: String) {
+        shownDecisionIds.remove(decisionId)
+        deferredDecisionIds.remove(decisionId)
+        emit(BenefitEventSchema.homeDecisionAccepted, decisionProperties(decisionId, decisionKind))
+    }
+
+    static func homeDecisionDeferred(decisionId: String, decisionKind: String) {
+        guard deferredDecisionIds.insert(decisionId).inserted else { return }
+        shownDecisionIds.remove(decisionId)
+        emit(BenefitEventSchema.homeDecisionDeferred, decisionProperties(decisionId, decisionKind))
+    }
+
+    static func homeDecisionRejected(decisionId: String, decisionKind: String) {
+        shownDecisionIds.remove(decisionId)
+        deferredDecisionIds.remove(decisionId)
+        emit(BenefitEventSchema.homeDecisionRejected, decisionProperties(decisionId, decisionKind))
+    }
+
+    static func planOverride(proposalId: String, overrideKind: String) {
+        emit(BenefitEventSchema.planOverride, [
+            "proposal_id": proposalId,
+            "override_kind": overrideKind,
+            "override_count": "1"
+        ])
+    }
+
+    static func reversal(proposalId: String, reversalKind: String) {
+        emit(BenefitEventSchema.reversal, [
+            "proposal_id": proposalId,
+            "reversal_kind": reversalKind,
+            "reversal_count": "1"
+        ])
+    }
+
+    private static func decisionProperties(_ decisionId: String, _ decisionKind: String) -> [String: String] {
+        ["decision_id": decisionId, "decision_kind": decisionKind, "decision_count": "1"]
+    }
+
+    private static func emit(_ event: String, _ properties: [String: String]) {
+        let tracker = trackerOverride ?? AppServicePorts.analyticsTracker
+        tracker.track(event: event, properties: properties)
+    }
+}
+
 // MARK: - Product Event Policy
 
 /// Filters app-supplied events only. SDK metadata, exposures, consent and
 /// user-initiated support feedback require separate lifecycle/disclosure work.
-private enum AnalyticsEventPolicy {
+enum AnalyticsEventPolicy {
     struct Payload {
         let event: String
         let properties: [String: String]?
@@ -150,7 +330,15 @@ private enum AnalyticsEventPolicy {
         "trial_start": subscription
     ]
 
+    static var legacyEventNames: Set<String> { Set(rules.keys) }
+
     static func payload(event: String, properties: [String: String]?) -> Payload? {
+        if BenefitEventSchema.events[event] != nil {
+            return Payload(
+                event: event,
+                properties: BenefitEventSchema.sanitized(event: event, properties: properties)
+            )
+        }
         guard let allowed = rules[event] else { return nil }
 
         if event == "entry_saved" {

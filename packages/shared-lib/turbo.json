@@ -23,6 +23,7 @@
         "$TURBO_ROOT$/apps/ios/LogYourBody/Info.plist",
         "$TURBO_ROOT$/apps/ios/LogYourBody/LogYourBody.entitlements",
         "$TURBO_ROOT$/scripts/ios/launch-quality-audit.sh",
+        "$TURBO_ROOT$/scripts/ios/test_training_rest_project.py",
         "$TURBO_ROOT$/scripts/ios/launch-ui-regression-audit.py",
         "$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py",
         "$TURBO_ROOT$/apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift",

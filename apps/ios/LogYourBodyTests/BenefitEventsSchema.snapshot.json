@@ -1,0 +1,74 @@
+{
+  "events": {
+    "home_decision_accepted": {
+      "kinds": {
+        "decision_kind": ["next_block"]
+      },
+      "properties": {
+        "decision_count": "count",
+        "decision_id": "id",
+        "decision_kind": "kind"
+      }
+    },
+    "home_decision_deferred": {
+      "kinds": {
+        "decision_kind": ["next_block"]
+      },
+      "properties": {
+        "decision_count": "count",
+        "decision_id": "id",
+        "decision_kind": "kind"
+      }
+    },
+    "home_decision_rejected": {
+      "kinds": {
+        "decision_kind": ["next_block"]
+      },
+      "properties": {
+        "decision_count": "count",
+        "decision_id": "id",
+        "decision_kind": "kind"
+      }
+    },
+    "home_decision_shown": {
+      "kinds": {
+        "decision_kind": ["next_block"]
+      },
+      "properties": {
+        "decision_count": "count",
+        "decision_id": "id",
+        "decision_kind": "kind"
+      }
+    },
+    "manual_log_avoided": {
+      "kinds": {
+        "ask_kind": ["composition_log", "mixed_log", "scale_log"]
+      },
+      "properties": {
+        "ask_id": "id",
+        "ask_kind": "kind",
+        "avoided_count": "count"
+      }
+    },
+    "plan_override": {
+      "kinds": {
+        "override_kind": ["steering"]
+      },
+      "properties": {
+        "override_count": "count",
+        "override_kind": "kind",
+        "proposal_id": "id"
+      }
+    },
+    "reversal": {
+      "kinds": {
+        "reversal_kind": ["restore"]
+      },
+      "properties": {
+        "proposal_id": "id",
+        "reversal_count": "count",
+        "reversal_kind": "kind"
+      }
+    }
+  }
+}

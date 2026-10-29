@@ -805,17 +805,20 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
           'resolve the repository and both merge parents in one Git call',
         );
         assert.equal(
-          commands.filter((args) => args.includes('cat-file')).length,
+          commands.filter((args) => args.includes('ls-files')).length,
           1,
-          'read all staged and immutable parent guards in one Git batch',
+          'read index stages and regular-file modes once per verification',
         );
         assert.equal(
-          commands.filter(
-            (args) =>
-              args.includes('show') && args.at(-1) === `:0:packages/shared-lib/corrections.json`,
-          ).length,
-          1,
-          'validate and compare the same staged ledger snapshot',
+          commands.filter((args) => args.includes('cat-file')).length,
+          2,
+          'batch the ledgers, then all staged and immutable parent guards',
+        );
+        assert.equal(commands.length, 4, 'verification must retain a fixed Git process budget');
+        assert.equal(
+          commands.filter((args) => args.includes('show')).length,
+          0,
+          'verification must not start Git once per ledger',
         );
         assert.equal(
           commands.filter(

@@ -35,7 +35,7 @@ it('requires verified native text entry before testing draft preservation', () =
   expect(action).not.toContain('field.typeText(');
 });
 
-it('checks Stats composition and real card styling through the launch audit with executed coverage', () => {
+it('checks Stats composition, card styling and provenance dismissal through the launch audit with executed coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
   for (const input of [
@@ -79,7 +79,7 @@ sys.exit(status)
         .filter((line) => /launch-ui-regression-audit|behavior tests executed/.test(line))
         .join('\n'),
     );
-    expect(output).toContain('Launch UI audit behavior tests executed: 17');
+    expect(output).toContain('Launch UI audit behavior tests executed: 21');
     expect(output).toContain('launch-ui-regression-audit');
   } finally {
     rmSync(coverage, { recursive: true, force: true });
