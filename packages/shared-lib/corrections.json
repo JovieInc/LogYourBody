@@ -487,7 +487,7 @@
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
     },
     "level": "static",
-    "ruleId": "ci-invariant"
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -553,7 +553,7 @@
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
     },
     "level": "static",
-    "ruleId": "ci-invariant"
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -619,7 +619,7 @@
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
     },
     "level": "static",
-    "ruleId": "ci-invariant"
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -685,7 +685,7 @@
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
     },
     "level": "static",
-    "ruleId": "ci-invariant"
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -849,7 +849,7 @@
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
     },
     "level": "static",
-    "ruleId": "ci-invariant"
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -2294,7 +2294,7 @@
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
     },
     "level": "static",
-    "ruleId": "ci-invariant"
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -2716,7 +2716,7 @@
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
     },
     "level": "static",
-    "ruleId": "ci-invariant"
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -3222,7 +3222,7 @@
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
     },
     "level": "static",
-    "ruleId": "ci-invariant"
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "correction-merge-staging-uses-index-guards",
@@ -3320,7 +3320,7 @@
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
     },
     "level": "static",
-    "ruleId": "ci-invariant"
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -3799,5 +3799,107 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1585 / LYB-265: Resolve the origin/main correction-ledger conflict by retaining both benefit-instrumentation and backward-planner receipts with their original sources and guards.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1585",
+    "mechanization": "Preserve the additive union of both parent ledgers. The existing required correction coverage check rejects discarded source receipts. Verify the resolved ledger against both immutable merge parents and prove that dropping either parent-specific receipt fails the existing guard.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "PR #1585 / LYB-265: Adding BenefitEventsContractTests.swift to the native test target changed the project manifest without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40220218344/job/121249973987",
+    "mechanization": "Review the four additive test-target references and refresh only the project manifest digest. Retain all seven exact dependency pins and trusted CLI refusal cases. The existing required runner-routing regression fails on the old pin and passes with the reviewed project digest.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1585 / LYB-265: Adding benefit-event test target membership left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary and documentation parity. Regenerate the source projection after reviewing the manifest diff.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40220218344/job/121249973859",
+    "mechanization": "The existing required projection checker fails before regeneration and passes afterward. Retain the Detect Changes and CI Summary gates and the existing regression rejecting a missing or skippable projection check.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "swiftui-menu-container-identifiers-shadow-controls",
+    "correction": "PR #1585 native Launch Quality run40421926840 failed the timeline Settings navigation: the Settings lookup resolved to a Button identified as photo_timeline_menu, then the profile destination did not appear. The menu applied its marker to the parent ZStack, shadowing child control identifiers.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40421926840/job/121918385751",
+    "mechanization": "Move the menu marker onto its existing noninteractive title Text so independent controls retain their concrete identities. In the already-required timeline surface helper, assert no button inherits the menu marker and require exactly one Settings control with its own identifier and label before tapping and checking the unchanged destination deadline. The observed failing native log supplies the pre-fix witness; native execution of the updated helper remains required hosted qualification. Do not add sleeps, retries or larger deadlines.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Owning the menu marker on a leaf prevents identifier propagation through the container by construction, while the required UI regression verifies actual accessible control ownership and navigation."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "\"The menu marker must never replace its independent button identifiers.\""
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "storekit-build-once-preserves-isolated-lifecycle-evidence",
+    "correction": "PR #1585 merge group40764937933 cancelled StoreKit qualification at the unchanged45-minute job boundary after all four method passes but before the fourth XCTest completion and evidence export. Repeated build planning consumed finalization margin.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40764937933/job/123086793219",
+    "mechanization": "Prepare the exact StoreKit test plan once with build-for-testing and reject source changes before any lifecycle. Execute all four unchanged selectors with test-without-building on four separately created, booted and deleted simulators. Preserve per-case XCTest validation, coverage export, source binding and partial failure artifacts. The existing required routing suite executes this runner and the real evidence validator for success and ten failure scenarios. It rejects repeated builds, missing lifecycles, shared devices, skipped validation and swallowed fourth-case failures. The original runner fails the new regression; hosted timing and complete native qualification remain required. No deadline, retry, workflow, signing or permission changes.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing StoreKit controller can eliminate repeated build preparation by construction without sharing mutable simulator or transaction state. Required executable orchestration regressions retain complete per-lifecycle evidence and fail closed on preparation, source, XCTest and coverage errors."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_storekit_lifecycles_use_fresh_devices_and_preserve_failure_evidence"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
