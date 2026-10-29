@@ -5,9 +5,13 @@
 # and repository fingerprints are untouched. Revert the exclusion PR once the
 # profile exists (docs/engineering/signing-expiry.md step 2). The app's Live
 # Activity start code already no-ops gracefully when the extension is absent.
-def exclude_rest_timer_extension_from_release_archive
+def exclude_rest_timer_extension_from_release_archive(project_path = nil)
   require 'xcodeproj'
-  xcodeproj = Xcodeproj::Project.open(File.expand_path('LogYourBody.xcodeproj'))
+  # Fastlane runs plain lane-body code with the cwd inside the fastlane/
+  # folder (only actions are chdir'd up to the project folder), so resolve
+  # the project absolutely from this file's directory.
+  project_path ||= File.expand_path('../LogYourBody.xcodeproj', __dir__)
+  xcodeproj = Xcodeproj::Project.open(project_path)
   app = xcodeproj.targets.find { |target| target.name == 'LogYourBody' }
   extension = xcodeproj.targets.find { |target| target.name == 'LogYourBodyRestTimer' }
   return if app.nil? || extension.nil?
