@@ -43,6 +43,20 @@ without retry. Unit excludes this simulator suite; its selectors and coverage
 floors are unchanged. Run 40300882343 failed the fourth case's restore despite
 one transaction before restore; transaction count alone does not prove access.
 
+The job budget is 60 minutes, including setup, build, four isolated lifecycles,
+XCTest finalization, coverage export and receipt upload. Main run
+[40937070309](https://github.com/JovieInc/LogYourBody/actions/runs/40937070309)
+exceeded the former 45-minute cap after the fourth test method passed but before
+its result bundle finished. GitHub annotated the job with “The job has exceeded
+the maximum execution time of 45m0s”; the artifact upload then encountered a
+disappearing XCTest staging file. This was a job timeout. The existing required
+release-budget regression enforces 15 minutes of additional margin and an
+enclosing release wait of at least 10,901 seconds (StoreKit plus Unit plus the
+measured macOS queue); Validate Release has a 200-minute job budget. Coverage
+export and all four exact passing receipts remain mandatory. LYB-340 closeout
+requires two consecutive main CI runs with StoreKit green and a Release Loop
+that passes Validate Release after the fix lands.
+
 Cleanup deletes the existing transaction IDs once, then waits for both
 `SKTestSession.allTransactions()` and `Transaction.all` to become empty. This
 includes expired and refunded history, which is absent from current entitlements.

@@ -1531,7 +1531,7 @@ def test_storekit_lifecycles_use_fresh_devices_and_preserve_failure_evidence(
     assert builds[0][builds[0].index('-destination') + 1] == 'platform=iOS Simulator,id=seed'
     if creates:
         assert events.index(builds[0]) < events.index(creates[0]), 'Build failure must precede lifecycle creation'
-    assert 'timeout-minutes: 45' in _job_block('ci.yml', 'ios_storekit')
+    assert 'timeout-minutes: 60' in _job_block('ci.yml', 'ios_storekit')
     # Only devices created by this invocation may be deleted, including on failure.
     assert deletes == [f'fresh-{i + 1}' for i in range(len(creates))], result.stderr
     assert (results / 'source-working-tree.patch').exists()

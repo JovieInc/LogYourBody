@@ -4831,5 +4831,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "storekit-job-budget-encloses-finalization-and-receipts",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40937070309",
+    "correction": "LYB-340: Main CI run 40937070309 timed out at the 45-minute StoreKit job cap after the fourth test method passed but before XCTest finalization and evidence export completed. GitHub explicitly annotated the execution timeout; a disappearing xcresult staging file then broke upload, and Release Loop 40937070236 correctly rejected the cancelled CI run.",
+    "mechanization": "Extend the existing required release-budget regression to enforce a 60-minute StoreKit floor, including 15 minutes of finalization and receipt margin, and recompute both enclosing release budgets. The regression fails independently with the former StoreKit cap, 10001-second release wait and 180-minute Validate Release cap; it passes with 60 minutes, 10901 seconds and 200 minutes. Existing required runner-routing tests still execute all four isolated lifecycles and reject XCTest, coverage, source and final-case failures. No receipt, selector, coverage or release-source gate is weakened. Hosted closeout remains two consecutive main StoreKit successes and passing Release Loop Validate Release after merge. Machine: built .github/scripts/release-check-budget.test.mjs",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The runner already builds once and isolates all four StoreKit lifecycles. App code cannot prevent an Actions job cap from interrupting result finalization, and removing coverage or evidence would weaken the required gate."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing budget regression runs in required Detect Changes and can enforce measured timeout headroom plus enclosing release waits without changing native behavior or accepting partial evidence."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/release-check-budget.test.mjs",
+      "anchor": "const STOREKIT_FOUR_LIFECYCLE_MINUTES = 45 + 15;"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

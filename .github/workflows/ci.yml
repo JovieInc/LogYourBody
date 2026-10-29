@@ -444,11 +444,11 @@ jobs:
     # third hosted-macOS pass (13 min p50) over the same change. CI Summary still requires it in the queue.
     if: github.event_name == 'push' || (github.event_name == 'merge_group' && needs.detect-changes.outputs.ios_changed == 'true')
     runs-on: macos-15
-    # Runs 40627001572 and 40630174025 cancelled this job at 30 minutes after
-    # three lifecycles passed and the fourth xcodebuild had started. Main run
-    # 40618754083 spent 6m08s in that fourth case. The release-budget test
-    # rejects a lower cap and encloses this value in the release wait.
-    timeout-minutes: 45
+    # Main run 40937070309 exceeded 45 minutes after the fourth method passed,
+    # before XCTest finalization and receipt upload completed. Allow 15 minutes
+    # of headroom for cold simulator/launch variance and complete receipts.
+    # The release-budget test encloses this cap in the release wait.
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
