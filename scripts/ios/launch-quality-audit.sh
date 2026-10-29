@@ -567,11 +567,7 @@ run_xcodebuild_test \
   -only-testing:LogYourBodyTests \
   -skip-testing:LogYourBodyTests/StoreKitPurchaseRestoreTests
 assert_xcresult_evidence \
-  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}" \
-  --expected-test 'MetricCorrectionTests/testExcludedReadingsRemainInFetchButNotLatestStatsTrendOrHero()' \
-  --expected-test 'CoreDataModelMigrationTests/testPopulatedV4StoreMigratesOverlayDefaultsAndRetainsImportAfterReopen()' \
-  --expected-test 'CoreDataModelMigrationTests/testPopulatedV5StoreRetainsWorkoutReconciliationAndImportsWhenMigratingToV7()' \
-  --expected-test 'CoreDataModelMigrationTests/testPopulatedV6StoreRetainsDatedOutcomeAndImportsWhenMigratingToV7()'
+  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"
 
 python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --coverage "$ARTIFACT_DIR/launch-quality-unit-tests.coverage.json" \
