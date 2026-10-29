@@ -10,15 +10,19 @@ const source = (path: string) =>
   );
 const code = (path: string) => source(path).replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '');
 
-it('keeps dated-outcome V5 immutable and adds overlays only in V6', () => {
+it('keeps retained V5 and V6 immutable and adds overlays only in V7', () => {
   const models = 'Models/LogYourBody.xcdatamodeld/';
   const v5 = source(models + 'LogYourBodyV5.xcdatamodel/contents');
-  // Independently reviewed dated-outcome schema from PR #1561. A later feature
-  // must not rewrite a model version that can already identify persisted stores.
+  // Main's workout schema and #1561's additive dated-outcome schema must both
+  // remain reproducible when composing the subsequent overlay feature.
   expect(createHash('sha256').update(v5).digest('hex')).toBe(
-    'be742f8f1a0e112072f46bb34ffe385ff3a591861c346bf38078ccaf7728aff7',
+    'd344e8c50e13ea843757659942ef2cadf59ad204f672026c360be25b1d6475b4',
   );
-  let withoutOverlays = source(models + 'LogYourBodyV6.xcdatamodel/contents');
+  const v6 = source(models + 'LogYourBodyV6.xcdatamodel/contents');
+  expect(createHash('sha256').update(v6).digest('hex')).toBe(
+    '3ad6bfa15f2f50b936249e5bfc6caab6038f07b0b596c743c1f5624b62ed40a5',
+  );
+  let withoutOverlays = source(models + 'LogYourBodyV7.xcdatamodel/contents');
   for (const attribute of [
     '        <attribute name="isExcluded" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>\n',
     '        <attribute name="correctedValueJSON" optional="YES" attributeType="String"/>\n',
@@ -26,8 +30,8 @@ it('keeps dated-outcome V5 immutable and adds overlays only in V6', () => {
     expect(withoutOverlays.split(attribute)).toHaveLength(2);
     withoutOverlays = withoutOverlays.replace(attribute, '');
   }
-  expect(withoutOverlays).toBe(v5);
-  expect(source(models + '.xccurrentversion')).toContain('LogYourBodyV6.xcdatamodel');
+  expect(withoutOverlays).toBe(v6);
+  expect(source(models + '.xccurrentversion')).toContain('LogYourBodyV7.xcdatamodel');
 });
 
 it('quotes Xcode file-reference paths containing OpenStep punctuation (LYB-243)', () => {

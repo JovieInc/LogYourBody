@@ -55,7 +55,7 @@ def main():
             sql("create table schema_migrations(version text primary key); create table chat_usage_limits(user_subject text); create table chat_conversations(user_subject text);")
             for migration in ['20260714183000_create_app_users.sql','20260714213000_add_app_user_profile.sql',
                               '20260715040000_create_body_metrics.sql','20260813120000_native_body_metrics_sync.sql',
-                              '20261025120000_weight_lifecycle.sql',
+                              '20261025120000_weight_lifecycle.sql','20261025190000_gym_registry.sql',
                               '20260813130000_native_product_records.sql','20260927102000_training_record_collections.sql']:
                 run(client + ['-f', str(web/'db/migrations'/migration)])
             run(client + ['-f', str(args.migration or web / 'db/migrations/20261010090000_training_revision_foundation.sql')])
@@ -217,6 +217,7 @@ def main():
                 'delete from public.metrics_agent_grants where user_subject = ${subject}',
                 'delete from public.body_metrics where user_subject = ${subject}',
                 'delete from public.native_records where user_subject = ${subject}',
+                'select public.lyb_delete_my_gyms(${subject})',
                 "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ${subject}",
             ]
             assert [re.sub(r'\s+', ' ', s).strip() for s in statements] == expected_cleanup

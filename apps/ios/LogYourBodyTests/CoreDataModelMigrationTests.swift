@@ -620,8 +620,13 @@ extension CoreDataModelMigrationTests {
     }
 
     @MainActor
-    func testPopulatedV5StoreRetainsDatedOutcomeAndImportsWhenMigratingToV6() throws {
+    func testPopulatedV5StoreRetainsWorkoutReconciliationAndImportsWhenMigratingToV7() throws {
         try assertOverlayMigrationPreservesStore(from: "LogYourBodyV5")
+    }
+
+    @MainActor
+    func testPopulatedV6StoreRetainsDatedOutcomeAndImportsWhenMigratingToV7() throws {
+        try assertOverlayMigrationPreservesStore(from: "LogYourBodyV6")
     }
 
     @MainActor
@@ -647,6 +652,16 @@ extension CoreDataModelMigrationTests {
         let datedPayload = Data("retained dated outcome".utf8)
         let datedRevision = UUID()
         let hasDatedOutcome = legacy.entitiesByName["CachedDatedOutcome"] != nil
+        XCTAssertEqual(hasDatedOutcome, modelName == "LogYourBodyV6")
+        let hasWorkoutReconciliation = legacy.entitiesByName["CachedWorkoutReconciliationDay"] != nil
+        XCTAssertEqual(hasWorkoutReconciliation, modelName != "LogYourBodyV4")
+        let workoutPayload = Data("retained workout reconciliation".utf8)
+        if hasWorkoutReconciliation {
+            let day = NSEntityDescription.insertNewObject(forEntityName: "CachedWorkoutReconciliationDay", into: context)
+            day.setValue("owner-243", forKey: "ownerId")
+            day.setValue("2027-01-01", forKey: "day")
+            day.setValue(workoutPayload, forKey: "payload")
+        }
         if hasDatedOutcome {
             let outcome = NSEntityDescription.insertNewObject(forEntityName: "CachedDatedOutcome", into: context)
             outcome.setValue("owner-243", forKey: "ownerId")
@@ -690,6 +705,14 @@ extension CoreDataModelMigrationTests {
         XCTAssertEqual(retained.value(forKey: "weight") as? Double, 81.234567)
         XCTAssertEqual(retained.value(forKey: "isExcluded") as? Bool, true)
         XCTAssertEqual(retained.value(forKey: "correctedValueJSON") as? String, "{\"weight\":79.125}")
+        if hasWorkoutReconciliation {
+            let days = try reopenedContext.fetch(NSFetchRequest<NSManagedObject>(entityName: "CachedWorkoutReconciliationDay"))
+            XCTAssertEqual(days.count, 1)
+            let day = try XCTUnwrap(days.first)
+            XCTAssertEqual(day.value(forKey: "ownerId") as? String, "owner-243")
+            XCTAssertEqual(day.value(forKey: "day") as? String, "2027-01-01")
+            XCTAssertEqual(day.value(forKey: "payload") as? Data, workoutPayload)
+        }
         if hasDatedOutcome {
             let outcomes = try reopenedContext.fetch(NSFetchRequest<NSManagedObject>(entityName: "CachedDatedOutcome"))
             XCTAssertEqual(outcomes.count, 1)

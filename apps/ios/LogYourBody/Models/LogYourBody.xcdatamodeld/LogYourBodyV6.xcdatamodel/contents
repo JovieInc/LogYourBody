@@ -7,8 +7,6 @@
         <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="date" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" attributeType="String"/>
-        <attribute name="isExcluded" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
-        <attribute name="correctedValueJSON" optional="YES" attributeType="String"/>
         <attribute name="isMarkedDeleted" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="isSynced" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="lastModified" attributeType="Date" usesScalarValueType="NO"/>
@@ -187,6 +185,17 @@
         <attribute name="nickname" optional="YES" attributeType="String"/>
         <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="userId" attributeType="String"/>
+    </entity>
+    <entity name="CachedWorkoutReconciliationDay" representedClassName="NSManagedObject" syncable="YES">
+        <attribute name="ownerId" attributeType="String"/>
+        <attribute name="day" attributeType="String"/>
+        <attribute name="payload" attributeType="Binary"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="ownerId"/>
+                <constraint value="day"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
     </entity>
     <entity name="CachedDatedOutcome" representedClassName="NSManagedObject" syncable="YES">
         <attribute name="ownerId" attributeType="String"/>

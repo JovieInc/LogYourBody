@@ -18,7 +18,7 @@ Platform/Statsig gate `dated_outcome_v1`; API traffic requires
 `LYB_DATED_OUTCOME_ENABLED=true`. Enable both only after migration and native
 validation.
 
-The V5 Core Data model adds `CachedDatedOutcome` without modifying V1–V4.
+The additive V6 Core Data model adds `CachedDatedOutcome` while preserving V1–V5 byte-for-byte. Main’s V5 contains `CachedWorkoutReconciliationDay`; the earlier dated-outcome V5 proposal must not replace that published schema. Both app and widget select V6.
 An owner-scoped journal commits each value and recompute request together.
 Unchanged values create no request. The current value and pending requests
 survive store reopening and logout; signed-out reads/writes fail closed, and
@@ -54,7 +54,7 @@ Verification:
 
 - `DatedOutcomeStoreTests` covers SQLite reopen, account isolation, exact request
   counts, failure rollback, retry identity, stale receipts, clean-device pull,
-  and V4-to-current migration retaining both measurements and profile targets.
+  and V4/V5-to-V6 migration retaining measurements, profile targets and existing workout-reconciliation payloads.
   It is wired into the existing native test target and is not skipped by Unit.
 - The existing disposable PostgreSQL verifier now runs
   `apps/web/db/tests/verify-dated-outcomes.ts`, exercising the real adapter,
@@ -70,3 +70,5 @@ Verification:
 On the implementation Linux host, PostgreSQL16 and web checks can execute;
 XCTest/Core Data runtime execution and native coverage require the repository's
 real macOS runner. TestFlight evidence remains with LYB-183.
+
+The existing required native-project guard freezes each reviewed model version, verifies app/widget membership and current-version selection, and rejects a reused version before native build. Its model files and current-version plist participate in the existing Turbo test inputs. Native SQLite migration tests remain required; static fingerprint checks alone do not prove runtime migration.

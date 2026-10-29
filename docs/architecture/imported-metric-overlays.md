@@ -21,10 +21,11 @@ photos and linked DEXA reports remain untouched. Sync timestamps advance so the
 undo propagates. A stale receipt, deleted/foreign row, pending edit, expired
 account session or failed save cannot overwrite another state.
 
-Core Data V5 adds a default-false Boolean and an optional JSON string; V1–V4
-remain bundled for inferred lightweight migration. The migration test creates a
-populated V4 SQLite store, opens it with the current model, checks originals and
-new defaults, and verifies overlays survive reopening.
+Core Data V7 adds a default-false Boolean and an optional JSON string to the
+retained V6 schema. V1–V6 stay byte-identical and bundled for inferred lightweight
+migration. Migration tests create populated V4, V5 and V6 SQLite stores, open
+them with V7, retain original measurements, workout reconciliation and dated
+outcomes where present, check overlay defaults, and verify values after reopening.
 
 Cloud persistence uses the existing first-party Neon sync API, not Supabase.
 `20261025140000_imported_metric_overlays.sql` adds `is_excluded` and

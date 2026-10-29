@@ -33,6 +33,31 @@ final class HomeV2PhotoViewerLayoutUITests: XCTestCase {
         app.buttons["home_v2_photo_stage"].tap()
         XCTAssertTrue(app.buttons["home_v2_viewer_close"].waitForExistence(timeout: 5))
         XCTAssertFalse(mode.exists, "Reopening the viewer starts in normal photo mode")
+        assertGlassFilmstripKeepsPhotoDateAndWeightTogether(in: app)
+    }
+
+    private func assertGlassFilmstripKeepsPhotoDateAndWeightTogether(in app: XCUIApplication) {
+        app.buttons["home_v2_viewer_details"].tap()
+        let ruler = app.descendants(matching: .any)["home_v2_photo_ruler"]
+        reveal(ruler, in: app)
+        XCTAssertTrue(ruler.label.contains("thumbnail strip"), "The default-off fixture must exercise the glass strip")
+        XCTAssertGreaterThanOrEqual(ruler.frame.height, 44)
+        let heading = app.staticTexts["home_v2_viewer_date"]
+        let weight = app.staticTexts["home_v2_viewer_weight"]
+        let start = ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
+        let end = ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        let oldest = expectation(for: NSPredicate(format: "label == %@", "186.7 lb"), evaluatedWith: weight)
+        XCTAssertEqual(XCTWaiter.wait(for: [oldest], timeout: 5), .completed)
+        XCTAssertTrue(app.staticTexts["Photo 1 of 5"].exists)
+        let oldestDate = heading.label
+        capture(app, named: "glass-filmstrip-oldest-photo-and-metrics")
+        ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        let latest = expectation(for: NSPredicate(format: "label == %@", "181.0 lb"), evaluatedWith: weight)
+        XCTAssertEqual(XCTWaiter.wait(for: [latest], timeout: 5), .completed)
+        XCTAssertTrue(app.staticTexts["Photo 5 of 5"].exists)
+        XCTAssertNotEqual(heading.label, oldestDate)
+        capture(app, named: "glass-filmstrip-latest-photo-and-metrics")
     }
 
     func testExpandedDetailsDisplaysTheFullComparisonDate() throws {
@@ -141,7 +166,12 @@ final class HomeV2PhotoViewerLayoutUITests: XCTestCase {
             "-UIPreferredContentSizeCategoryName",
             largestText ? "UICTContentSizeCategoryAccessibilityXXXL" : "UICTContentSizeCategoryL"
         ]
-        if holdScrub { app.launchArguments.append("-lybUITestPhotoHoldScrub") }
+        if holdScrub {
+            app.launchArguments += ["-lybUITestPhotoHoldScrub", "-lybUITestGlassFilmstrip"]
+            for key in ["XCTestSessionIdentifier", "XCTestBundlePath"] {
+                app.launchEnvironment[key] = ProcessInfo.processInfo.environment[key]
+            }
+        }
         app.launch()
         let photo = app.descendants(matching: .any)["home_v2_photo_stage"]
         XCTAssertTrue(photo.waitForExistence(timeout: 30))
