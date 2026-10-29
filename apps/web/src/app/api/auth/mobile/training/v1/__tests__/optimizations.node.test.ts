@@ -38,6 +38,27 @@ function handlers(overrides: { coach?: boolean; optimizer?: boolean } = {}) {
 }
 
 describe('mesocycle optimizer HTTP boundary', () => {
+  it('rejects malformed nested proposals instead of trusting their claimed certification', async () => {
+    const open = handlers({ optimizer: true });
+    const created = await (await open.POST(request('POST', body))).json();
+    for (const malformed of [
+      null,
+      [],
+      { ...created.proposal, changes: [null] },
+      { ...created.proposal, findings: null },
+      { ...created.proposal, tradeoff: {} },
+    ]) {
+      const response = await open.PATCH(
+        request('PATCH', {
+          source: body,
+          proposal: malformed,
+          decision: 'apply',
+          currentFingerprint: created.proposal.baseFingerprint,
+        }),
+      );
+      expect([400, 409]).toContain(response.status);
+    }
+  });
   it('stays hidden unless both the coach API and the optimizer flag are on', async () => {
     const closed = handlers({ optimizer: false });
     expect((await closed.POST(request('POST', body))).status).toBe(404);

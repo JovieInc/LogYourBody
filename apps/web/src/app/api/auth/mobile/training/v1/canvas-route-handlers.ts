@@ -33,6 +33,7 @@ const requestSchema = z.discriminatedUnion('action', [
   z
     .object({
       action: z.literal('submit'),
+      requestId: z.string().uuid().optional(),
       transcript: z.string().trim().min(1).max(500),
       expectedWrite: writeToken,
     })
@@ -40,6 +41,7 @@ const requestSchema = z.discriminatedUnion('action', [
   z
     .object({
       action: z.literal('propose'),
+      requestId: z.string().uuid().optional(),
       operation: z.unknown(),
       expectedWrite: writeToken,
     })
@@ -47,6 +49,7 @@ const requestSchema = z.discriminatedUnion('action', [
   z
     .object({
       action: z.literal('decide'),
+      requestId: z.string().uuid().optional(),
       proposalId: z.string().uuid(),
       decision: z.enum(['apply', 'reject']),
       expectedWrite: writeToken,
@@ -111,7 +114,7 @@ export function createCanvasRouteHandlers(deps: Dependencies) {
           if (!operation)
             return json({ error: 'unsupported_or_invalid_intent', applied: false }, 400);
           const result = await proposeCanvasEdit(ledger, owner.sub, {
-            requestId: crypto.randomUUID(),
+            requestId: body.data.requestId ?? crypto.randomUUID(),
             expectedWrite: body.data.expectedWrite,
             operation,
             now,
@@ -120,7 +123,7 @@ export function createCanvasRouteHandlers(deps: Dependencies) {
         }
         if (body.data.action === 'propose') {
           const result = await proposeCanvasEdit(ledger, owner.sub, {
-            requestId: crypto.randomUUID(),
+            requestId: body.data.requestId ?? crypto.randomUUID(),
             expectedWrite: body.data.expectedWrite,
             operation: body.data.operation as PlanOperation,
             now,
@@ -132,7 +135,7 @@ export function createCanvasRouteHandlers(deps: Dependencies) {
           return json(result, commandStatus(result.kind));
         }
         const result = await decideCanvasProposal(ledger, owner.sub, {
-          requestId: crypto.randomUUID(),
+          requestId: body.data.requestId ?? crypto.randomUUID(),
           proposalId: body.data.proposalId,
           decision: body.data.decision,
           expectedWrite: body.data.expectedWrite,

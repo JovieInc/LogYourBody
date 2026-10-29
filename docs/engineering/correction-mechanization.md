@@ -118,6 +118,11 @@ merge bases and their shared parent before applying the same union. The pre-comm
 `--check-merge` path and staged retries use the same check; cleaning only the working
 file cannot hide an unresolved staged source. Resolve and stage the source, then
 retry the same command. Unrelated unstaged edits remain untouched.
+
+The readiness check forces text inspection even when Git attributes mark a staged
+file as binary, so those attributes cannot conceal unresolved conflict markers.
+It accepts up to 16 MiB of staged diff output, including markers at the end of a
+large merge, and refuses larger output rather than inspecting a truncated diff.
 Both resolver modes require an active merge before writing; conflicted cherry-picks
 are refused without changing the ledger or index.
 

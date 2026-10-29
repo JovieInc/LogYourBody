@@ -18,6 +18,7 @@ import {
 } from './optimizer-rules';
 import { trainingRequestHash } from './revisions';
 import { stableTrainingUuid, swappedPrescription } from './service';
+import { reviewSessionSequence, sequencingContextSchema, type SequenceReview } from './sequencing';
 import {
   MUSCLE_GROUPS,
   type ExercisePrescription,
@@ -56,6 +57,7 @@ const planExerciseSchema = z
     primaryMuscle: z.enum(MUSCLE_GROUPS),
     sets: z.number().int().positive().max(50),
     userEdited: z.boolean().optional(),
+    phase: z.enum(['warmup', 'working']).optional(),
     muscleContribution: z.record(z.string(), z.number().finite().nonnegative()).optional(),
   })
   .strict();
@@ -129,6 +131,7 @@ export const optimizerInputSchema = z
     logs: z.array(setLogSchema).optional(),
     targetRir: z.number().int().min(0).max(6).optional(),
     baseFingerprint: z.string().min(1).optional(),
+    sequencingContext: sequencingContextSchema.optional(),
     declineSupersets: z
       .object({
         scope: z.enum(['durable', 'location']),
@@ -138,7 +141,16 @@ export const optimizerInputSchema = z
       .strict()
       .optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) =>
+      new Set(input.sessions.map((row) => row.id)).size === input.sessions.length &&
+      input.sessions.every(
+        (session) =>
+          new Set(session.exercises.map((row) => row.id)).size === session.exercises.length,
+      ),
+    'ambiguous_session_or_exercise_identity',
+  );
 
 export type OptimizerInput = z.infer<typeof optimizerInputSchema>;
 export type PlanExercise = z.infer<typeof planExerciseSchema>;
@@ -264,6 +276,7 @@ export type OptimizationProposal = {
   changes: OptimizationChange[];
   tradeoff: OptimizationTradeoff;
   rationale: string[];
+  sequencing: SequenceReview[];
   persisted: false;
 };
 
@@ -273,6 +286,7 @@ export type OptimizerEvaluation = {
   changes: OptimizationChange[];
   tradeoff: OptimizationTradeoff;
   rationale: string[];
+  sequencing: SequenceReview[];
 };
 
 export const PAIN_PAUSE_MESSAGE =
@@ -291,6 +305,7 @@ export function optimizationPlanFingerprint(sessions: readonly PlanSession[]): s
         id: exercise.id,
         sets: exercise.sets,
         userEdited: exercise.userEdited === true,
+        ...(exercise.phase ? { phase: exercise.phase } : {}),
       })),
     })),
   );
@@ -416,10 +431,18 @@ function preferenceBlocks(
   });
 }
 
-function equipmentReady(exerciseId: string, available: ReadonlySet<CatalogEquipment>): boolean {
+function equipmentReady(
+  exerciseId: string,
+  available: ReadonlySet<CatalogEquipment>,
+  input: NormalizedInput,
+): boolean {
   const variant = catalogVariantById(exerciseId);
   if (!variant) return false;
-  return isEligibleVariant(variant, { available });
+  return isEligibleVariant(variant, {
+    available,
+    excludedConcerns: input.sequencingContext?.excludedConcerns,
+    excludedExerciseIds: input.sequencingContext?.excludedExerciseIds,
+  });
 }
 
 type PairStatus =
@@ -450,7 +473,7 @@ function pairStatus(
   ) {
     return 'blocked';
   }
-  if (!equipmentReady(left.id, available) || !equipmentReady(right.id, available)) {
+  if (!equipmentReady(left.id, available, input) || !equipmentReady(right.id, available, input)) {
     return 'infeasible_equipment';
   }
   const leftStation = annotationFor(rules, left.id).stationClass;
@@ -475,14 +498,36 @@ export function evaluateMesocycle(
   rules: OptimizerRuleSet,
 ): OptimizerEvaluation {
   const resolvedLocation = resolveOptimizerLocation(input);
-  const available = resolveAvailableEquipment({
-    profile: input.equipmentProfile,
-    declared: input.declaredEquipment,
-    sessionUnavailable: input.unavailableEquipment,
-  });
+  const available = input.sequencingContext?.inventory
+    ? new Set(input.sequencingContext.inventory)
+    : resolveAvailableEquipment({
+        profile: input.equipmentProfile,
+        declared: input.declaredEquipment,
+        sessionUnavailable: input.unavailableEquipment,
+      });
+  for (const item of input.unavailableEquipment) available.delete(item as CatalogEquipment);
   const findings: OptimizationFinding[] = [];
   const changes: OptimizationChange[] = [];
   const handled = new Set<string>();
+
+  const sequencing = input.sessions.map((session) =>
+    reviewSessionSequence({
+      session,
+      context: input.sequencingContext,
+      legacyPriorities: input.priorityMuscles,
+      equipmentProfile: input.equipmentProfile,
+      declaredEquipment: input.declaredEquipment,
+      unavailableEquipment: input.unavailableEquipment,
+      logs: input.logs,
+      lowReadiness: input.readiness.some(
+        (row) => row.sessionId === session.id && row.reported === 'low',
+      ),
+      painfulExerciseIds: input.pain
+        .filter((row) => row.jointPain > 0)
+        .map((row) => row.exerciseId),
+      rules,
+    }),
+  );
 
   for (const session of input.sessions) {
     for (const exercise of session.exercises) {
@@ -512,7 +557,11 @@ export function evaluateMesocycle(
         currentExerciseId: exercise.id,
         currentContribution: contributionOf(exercise),
         available,
-        excludedConcerns: pain.concern ? [pain.concern] : [],
+        excludedConcerns: [
+          ...(input.sequencingContext?.excludedConcerns ?? []),
+          ...(pain.concern ? [pain.concern] : []),
+        ],
+        excludedExerciseIds: input.sequencingContext?.excludedExerciseIds,
         preferTorsoSupport: true,
         maxTrunkDemand: 'low',
       })[0];
@@ -598,7 +647,11 @@ export function evaluateMesocycle(
     const eligible =
       variant !== undefined &&
       variant.primaryMuscle === exercise.primaryMuscle &&
-      isEligibleVariant(variant, { available });
+      isEligibleVariant(variant, {
+        available,
+        excludedConcerns: input.sequencingContext?.excludedConcerns,
+        excludedExerciseIds: input.sequencingContext?.excludedExerciseIds,
+      });
     const prescription = eligible
       ? swappedPrescription(
           asPrescription(exercise, input.targetRir),
@@ -639,8 +692,13 @@ export function evaluateMesocycle(
   }
 
   for (const session of input.sessions) {
+    const review = sequencing.find((row) => row.sessionId === session.id)!;
+    const remaining = new Set(review.remaining.map((row) => row.exerciseId));
+    const working = session.exercises.filter(
+      (exercise) => exercise.phase !== 'warmup' && remaining.has(exercise.id),
+    );
     const conflict = gripConflict(
-      session.exercises.map((exercise) => exercise.id),
+      working.map((exercise) => exercise.id),
       rules,
     );
     if (!conflict) continue;
@@ -654,7 +712,11 @@ export function evaluateMesocycle(
         message: `${direct?.name ?? conflict.directId} before ${support?.name ?? conflict.supportId} is possible grip interference. Direct forearm work may tire the grip a later pull needs. This is not a measured fatigue score.`,
       }),
     );
-    if (direct?.userEdited || support?.userEdited) {
+    const crossed = session.exercises.slice(
+      session.exercises.findIndex((row) => row.id === conflict.directId),
+      session.exercises.findIndex((row) => row.id === conflict.supportId) + 1,
+    );
+    if (crossed.some((row) => row.userEdited)) {
       findings.push(
         finding(rules, 'user_edit_v1', {
           code: 'user_edit_preserved',
@@ -665,6 +727,19 @@ export function evaluateMesocycle(
       );
       continue;
     }
+    if (
+      input.readiness.some((row) => row.sessionId === session.id && row.reported === 'low') ||
+      crossed.some((row) => row.phase === 'warmup') ||
+      input.pain.some((row) => row.exerciseId === conflict.supportId && row.jointPain > 0) ||
+      review.blockedExerciseIds.includes(conflict.supportId) ||
+      review.decision.exceptions.includes('unfinished_work_requires_reconciliation')
+    )
+      continue;
+    if (
+      review.move?.exerciseId === conflict.supportId &&
+      review.move.beforeExerciseId === conflict.directId
+    )
+      continue;
     changes.push({
       kind: 'reorder',
       sessionId: session.id,
@@ -672,6 +747,30 @@ export function evaluateMesocycle(
       beforeExerciseId: conflict.directId,
       ruleId: 'grip_interference_v1',
     });
+  }
+
+  for (const review of sequencing) {
+    if (!review.move) continue;
+    changes.push({
+      kind: 'reorder',
+      sessionId: review.sessionId,
+      moveExerciseId: review.move.exerciseId,
+      beforeExerciseId: review.move.beforeExerciseId,
+      ruleId: 'priority_sequence_v1',
+    });
+  }
+  for (const review of sequencing) {
+    const ordered = [...review.remaining];
+    for (const change of changes) {
+      if (change.kind !== 'reorder' || change.sessionId !== review.sessionId) continue;
+      const index = ordered.findIndex((row) => row.exerciseId === change.moveExerciseId);
+      if (index < 0) continue;
+      const [moved] = ordered.splice(index, 1);
+      const before = ordered.findIndex((row) => row.exerciseId === change.beforeExerciseId);
+      if (before < 0) ordered.splice(index, 0, moved!);
+      else ordered.splice(before, 0, moved!);
+    }
+    review.remaining = ordered;
   }
 
   for (const overlap of sameDayPrimaryOverlaps(input.sessions, rules)) {
@@ -688,7 +787,7 @@ export function evaluateMesocycle(
         code: 'same_day_local_overlap',
         sessionId: overlap.laterSessionId,
         muscle: overlap.muscle,
-        message: `${overlap.day} AM and PM both train ${overlap.muscle}, so the later session has no recovery opportunity for that muscle.${readiness} This is a scheduling constraint, not a measured recovery time.`,
+        message: `${overlap.day} AM and PM both train ${overlap.muscle}. The later session is not assumed recovered and a new start does not reset earlier observations.${readiness} This is possible overlap, not a measured recovery time.`,
       }),
     );
     changes.push({
@@ -847,7 +946,7 @@ export function evaluateMesocycle(
     noCompromise: timeSavedMinutes !== null && compromises.length === 0,
   };
   const rationale = [...notes, tradeoffSentence(tradeoff)];
-  return { resolvedLocation, findings, changes, tradeoff, rationale };
+  return { resolvedLocation, findings, changes, tradeoff, rationale, sequencing };
 }
 
 export function reviewedSwapPrescription(
