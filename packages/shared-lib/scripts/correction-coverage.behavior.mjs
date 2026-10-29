@@ -408,6 +408,33 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
   assert.equal(readFileSync(path, 'utf8'), marker);
 });
 
+test('ledger merge readiness handles large staged diffs without hiding trailing markers', (t) => {
+  const { root } = fixtureRepo(t, []);
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+  const path = join(root, guard.path);
+  const ledger = readFileSync(join(root, LEDGER_PATH), 'utf8');
+  const large = `${anchor}\n${'const retained = true;\n'.repeat(60_000)}`;
+  assert.ok(Buffer.byteLength(large) > 1024 * 1024);
+  writeFileSync(path, large);
+  git('add', guard.path);
+  assertLedgerMergeReady(root);
+  for (const marker of ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming']) {
+    writeFileSync(path, `${large}${marker}\n`);
+    git('add', guard.path);
+    writeFileSync(path, anchor);
+    const index = git('ls-files', '--stage');
+    assert.throws(
+      () => assertLedgerMergeReady(root),
+      /ledger merge: resolve staged conflict markers first/,
+    );
+    assert.equal(git('ls-files', '--stage'), index, 'refusal preserves the large staged diff');
+    assert.equal(readFileSync(join(root, LEDGER_PATH), 'utf8'), ledger);
+    assert.equal(readFileSync(path, 'utf8'), anchor);
+  }
+  git('add', guard.path);
+  assertLedgerMergeReady(root);
+});
+
 test('ledger merge readiness checks raw staged bytes despite Git diff attributes', (t) => {
   const { root } = fixtureRepo(t, []);
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });

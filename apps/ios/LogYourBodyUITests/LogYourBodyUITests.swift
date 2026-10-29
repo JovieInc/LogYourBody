@@ -3498,8 +3498,20 @@ final class LogYourBodyUITests: XCTestCase {
                 }
                 _ = app.keyboards.element.waitForExistence(timeout: 2)
                 let addition = syntheticQuestionInsertion(current: current, question: question)
-                if !addition.isEmpty {
-                    composer.typeText(addition)
+                var prefix = current
+                // Acknowledge each prefix while the simulator keyboard connects.
+                for character in addition {
+                    composer.typeText(String(character))
+                    if String(character) == XCUIKeyboardKey.delete.rawValue {
+                        prefix = String(prefix.dropLast())
+                    } else {
+                        prefix.append(character)
+                    }
+                    if prefix.isEmpty { continue }
+                    let received = XCTNSPredicateExpectation(
+                        predicate: NSPredicate(format: "value == %@", prefix), object: composer
+                    )
+                    guard XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }
                 }
             }
             let entered = XCTNSPredicateExpectation(
