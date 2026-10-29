@@ -4791,5 +4791,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-queue-enrollment-preserves-explicit-hold",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1627",
+    "correction": "Readying held PR1627 exposed that the existing native queue controller never reads hold labels. Its observed enrollment job stopped because CI had not completed, not because the hold was enforced. The token re-enrollment path also trusted an older queue snapshot and could re-enqueue a newly held source. No held-head admission is claimed from this observation.",
+    "mechanization": "In the existing native controller, reject an explicit hold or absent/malformed current label evidence for completed CI, ready-for-review and transient dequeue events. Re-read the current PR immediately before token queue mutations and preserve holds, source identity, draft and repository scope. Keep no-positive-certification-label admission, exact-head CI, transient retry cap, permissions, credentials and all required checks unchanged. Existing executable workflow regressions fail six cases before the fix and all83 policy/enrollment tests pass after it.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Execute both actual inline controller scripts against API fixtures in the existing required policy suite; assert no queue mutation on held or unprovable sources and unchanged unheld admission."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/merge-queue-enrollment.test.mjs",
+      "anchor": "test('token enrollment re-reads current hold evidence before any queue mutation'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

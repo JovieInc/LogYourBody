@@ -76,6 +76,7 @@ async function nativeScenario({
     node_id: 'PR_fixture',
     draft: false,
     state: 'open',
+    labels: [],
     base: { ref: 'main', repo: { full_name: repository } },
     head: { sha: head, repo: { full_name: repository } },
   };
@@ -613,7 +614,7 @@ for (const [name, mutate] of [
   });
 }
 
-async function tokenScenario({ mutate = () => {}, entryMutate = () => {} } = {}) {
+async function tokenScenario({ mutate = () => {}, entryMutate = () => {}, freshMutate = () => {} } = {}) {
   const context = {
     repo: { owner: 'JovieInc', repo: 'LogYourBody' },
     eventName: 'workflow_run',
@@ -648,10 +649,17 @@ async function tokenScenario({ mutate = () => {}, entryMutate = () => {} } = {})
   ];
   mutate(context);
   entryMutate(entry, checkRuns);
+  const fresh = {
+    number: 1284, state: 'open', draft: false, labels: [],
+    base: { ref: 'main', repo: { full_name: repository } },
+    head: { sha: head, repo: { full_name: repository } },
+  };
+  freshMutate(fresh);
   const calls = [];
   const core = recordingCore();
   const github = {
     rest: {
+      pulls: { async get() { return { data: fresh }; } },
       checks: {
         async listForRef() {
           return { data: { check_runs: checkRuns } };
@@ -863,4 +871,82 @@ test('App minting stays pinned, scoped to LYB and separate from secret-free nati
   assert.match(tokenWorkflow, /permission-pull-requests: write/);
   assert.doesNotMatch(tokenWorkflow, /actions\/checkout@|pull_request/);
   assert.doesNotMatch(nativeWorkflow, /actions\/checkout@|secrets\./);
+});
+
+for (const action of ['completed', 'ready_for_review', 'dequeued']) {
+  test(`native ${action} enrollment preserves a current hold on an otherwise green head`, async () => {
+    const { calls, core } = await nativeScenario({
+      mutate: (scenario) => {
+        if (action !== 'completed') {
+          scenario.context.eventName = 'pull_request_target';
+          scenario.context.payload.action = action;
+        }
+        scenario.context.payload.pull_request = { ...scenario.pull, labels: [] };
+        scenario.pull.labels = [{ name: 'HoLd' }];
+      },
+      removals: [removal('checks_timed_out')],
+    });
+    assert.equal(calls.length, 0, 'A hold forbids queue mutation and retry');
+    assert.ok(core.messages.some(message => message.includes('explicit hold')));
+  });
+}
+
+test('native enrollment fails closed if current label evidence is absent or malformed', async () => {
+  for (const labels of [undefined, null, {}, [null], [{}], [{ name: 1 }]]) {
+    const { calls, core } = await nativeScenario({ mutate: ({ pull }) => { pull.labels = labels; } });
+    assert.equal(calls.length, 0);
+    assert.ok(core.messages.some(message => message.includes('labels are unavailable')));
+  }
+});
+
+test('native enrollment does not require a positive certification label', async () => {
+  for (const labels of [[], [{ name: 'bug' }], [{ name: 'machine-certified' }]]) {
+    const { calls } = await nativeScenario({ mutate: ({ pull }) => { pull.labels = labels; } });
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].query, /mutation Enqueue/);
+  }
+});
+
+test('token enrollment re-reads current hold evidence before any queue mutation', async () => {
+  const { calls, core } = await tokenScenario({ freshMutate: pull => { pull.labels = [{ name: 'hold' }]; } });
+  assert.equal(calls.length, 1, 'Do not dequeue or re-enqueue a held entry');
+  assert.ok(core.messages.some(message => message.includes('explicit hold')));
+});
+
+test('token enrollment rejects missing labels and a source that changed since the queue snapshot', async () => {
+  for (const freshMutate of [
+    pull => { delete pull.labels; },
+    pull => { pull.labels = [null]; },
+    pull => { pull.head.sha = 'b'.repeat(40); },
+    pull => { pull.draft = true; },
+    pull => { pull.state = 'closed'; },
+    pull => { pull.base.ref = 'production'; },
+    pull => { pull.head.repo.full_name = 'someone/fork'; },
+  ]) {
+    const { calls } = await tokenScenario({ freshMutate });
+    assert.equal(calls.length, 1, 'A stale queue listing cannot authorize a mutation');
+  }
+});
+
+test('token enrollment preserves a denied fresh source read as a real failure', async () => {
+  const denial = new Error('Resource not accessible by integration');
+  // Exercise the production script with a real throwing API boundary.
+  const context = {
+    repo: { owner: 'JovieInc', repo: 'LogYourBody' }, eventName: 'workflow_run',
+    payload: { workflow_run: { name: 'Native Merge Queue Enrollment', status: 'completed', conclusion: 'success', repository: { full_name: repository } } },
+  };
+  const github = {
+    graphql: async query => {
+      assert.match(query, /query Queue/, 'No mutation may follow a failed current-source read');
+      return { repository: { mergeQueue: { entries: { nodes: [{
+        enqueuer: { login: 'github-actions[bot]' },
+        pullRequest: { id: 'PR_fixture', number: 1284, state: 'OPEN', isDraft: false, baseRefName: 'main', headRefOid: head, headRepository: { nameWithOwner: repository } },
+      }] } } } };
+    },
+    rest: {
+      checks: { listForRef: async () => ({ data: { check_runs: [{ name: 'CI Summary', conclusion: 'success', head_sha: head }] } }) },
+      pulls: { get: async () => { throw denial; } },
+    },
+  };
+  await assert.rejects(inlineScript(tokenWorkflow)(github, context, recordingCore()), error => error === denial);
 });
