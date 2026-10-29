@@ -1,3 +1,28 @@
+# LYB-310 temporary exclusion: com.logyourbody.app.rest-timer has no App Store
+# provisioning profile yet, so an app-store export cannot sign or embed the
+# extension. Remove the extension dependency and embed entry from the app
+# target for this archive only. The checked-in project file, Debug/dev builds
+# and repository fingerprints are untouched. Revert the exclusion PR once the
+# profile exists (docs/engineering/signing-expiry.md step 2). The app's Live
+# Activity start code already no-ops gracefully when the extension is absent.
+def exclude_rest_timer_extension_from_release_archive
+  require 'xcodeproj'
+  xcodeproj = Xcodeproj::Project.open(File.expand_path('LogYourBody.xcodeproj'))
+  app = xcodeproj.targets.find { |target| target.name == 'LogYourBody' }
+  extension = xcodeproj.targets.find { |target| target.name == 'LogYourBodyRestTimer' }
+  return if app.nil? || extension.nil?
+
+  app.dependencies.delete_if { |dependency| dependency.target == extension }
+  app.copy_files_build_phases.each do |phase|
+    phase.files.delete_if do |file|
+      file.fileRef == extension.productReference ||
+        file.display_name.to_s.include?('LogYourBodyRestTimer')
+    end
+  end
+  xcodeproj.save
+  UI.message('Rest Timer extension excluded from this Release archive (no App Store profile yet; LYB-310)')
+end
+
   desc "Build and upload Alpha to TestFlight (dev branch - rapid)"
   lane :alpha do |options|
     # Setup API key
@@ -129,18 +154,21 @@
     bundle_identifier = ENV["APP_IDENTIFIER"] || "com.logyourbody.app"
     release_profile = ENV["PROVISIONING_PROFILE_SPECIFIER"].to_s
     release_profile = "match AppStore com.logyourbody.app 1780400349" if release_profile.empty?
-    rest_bundle_identifier = "#{bundle_identifier}.rest-timer"
-    rest_profile = ENV["REST_TIMER_PROVISIONING_PROFILE_SPECIFIER"].to_s
-    rest_profile = "match AppStore #{rest_bundle_identifier}" if rest_profile.empty?
 
     if ENV["MATCH_GIT_URL"] && ENV["MATCH_PASSWORD"]
       setup_provisioning(type: "appstore", readonly: true)
     end
 
+    # LYB-310: the extension has no App Store provisioning profile yet, so the
+    # archive cannot sign or embed it. Exclude it for this archive only; the
+    # checked-in project and Debug/dev builds are untouched. Revert the
+    # exclusion PR to re-enable once the profile exists
+    # (docs/engineering/signing-expiry.md step 2).
+    exclude_rest_timer_extension_from_release_archive
+
     # Each embedded executable requires its own profile. A command-line profile override
     # would also apply the app profile to the extension and make the archive unsignable.
-    { "LogYourBody" => [bundle_identifier, release_profile],
-      "LogYourBodyRestTimer" => [rest_bundle_identifier, rest_profile] }.each do |target, (identifier, profile)|
+    { "LogYourBody" => [bundle_identifier, release_profile] }.each do |target, (identifier, profile)|
       update_code_signing_settings(
         path: project, targets: [target], use_automatic_signing: false,
         team_id: ENV["APPLE_TEAM_ID"], bundle_identifier: identifier,
@@ -157,8 +185,7 @@
       export_options: {
         teamID: ENV["APPLE_TEAM_ID"],
         provisioningProfiles: {
-          bundle_identifier => release_profile,
-          rest_bundle_identifier => rest_profile
+          bundle_identifier => release_profile
         },
         compileBitcode: false,
         uploadBitcode: false,
@@ -348,11 +375,18 @@
     # If using match with git repository
     if ENV["MATCH_GIT_URL"]
       begin
-        # Build match parameters
+        # Build match parameters. LYB-310: the match repository has no App Store
+        # profile for the rest-timer extension yet, and readonly release syncs
+        # fail on the missing profile, so readonly runs request only the app
+        # identifier. Read-write runs (docs/engineering/signing-expiry.md step 2)
+        # keep the extension identifier so the profile can be created, and
+        # development syncs keep it for Debug builds.
+        base_identifier = ENV["APP_IDENTIFIER"] || "com.logyourbody.app"
+        match_identifiers = [base_identifier]
+        match_identifiers << "#{base_identifier}.rest-timer" unless readonly
         match_params = {
           type: match_type,
-          app_identifier: [ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
-                           "#{ENV["APP_IDENTIFIER"] || "com.logyourbody.app"}.rest-timer"],
+          app_identifier: match_identifiers,
           readonly: readonly,
           git_url: ENV["MATCH_GIT_URL"],
           git_branch: ENV["MATCH_GIT_BRANCH"].to_s.empty? ? "main" : ENV["MATCH_GIT_BRANCH"],

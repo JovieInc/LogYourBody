@@ -45,6 +45,15 @@ default extension profile name is `match AppStore com.logyourbody.app.rest-timer
 `REST_TIMER_PROVISIONING_PROFILE_SPECIFIER` can select an already-installed profile.
 No signing credentials or profiles are created by this change.
 
+LYB-310 temporary exclusion: the Match repository has no App Store profile for
+`com.logyourbody.app.rest-timer` yet. The `build_release` lane therefore strips the
+extension dependency and embed entry from the app target for that archive only, signs
+and exports only the app profile, and readonly match syncs request only the app
+identifier. The checked-in project graph, Debug/dev builds and the fingerprints above
+are unchanged. Once the profile exists (`bundle exec fastlane setup_provisioning
+type:appstore readonly:false force:false`), revert the exclusion PR to restore the
+two-target release signing described above.
+
 Validation entry points:
 
 - `TrainingSessionDraftTests`: exercise defaults, acknowledgement and retry, final
