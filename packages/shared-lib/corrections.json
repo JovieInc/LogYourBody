@@ -4737,5 +4737,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-logout-regression-scopes-system-alert-actions",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40856673874/job/123389575579",
+    "correction": "At exact head 34a883a596d431e7b311896fe689ea3e14219de9, all 2,122 Unit cases passed, but the mandatory logout-from-pushed-detail UI regression could not find settings_logout_confirm after tapping Log Out. The assertion failed before sign-out; no production authentication failure is established.",
+    "mechanization": "Keep the same required native regression and signed-out assertion. Scope confirmation controls to the exact native logout alert and user-visible action labels instead of relying on optional SwiftUI identifiers on system-rendered alert actions. Exercise Cancel first and require the session to remain, then reopen and confirm sign-out. Reject a missing dialog or unhittable action. Log only the alert control identifiers/labels to distinguish identifier loss from presentation failure on hosted execution. Existing full launch-quality selection, evidence validation and timeouts remain unchanged.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing XCTest lookup can bind only controls within the named native alert, eliminating app-wide identifier dependence while the mandatory runtime case checks both cancellation and sign-out. Product authentication and confirmation behavior are unchanged."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "let logoutConfirmation = app.alerts[\"Log out of LogYourBody?\"]"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

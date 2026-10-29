@@ -735,10 +735,43 @@ final class LogYourBodyUITests: XCTestCase {
 
         let logoutButton = app.descendants(matching: .any)["settings_logout_button"]
         XCTAssertTrue(logoutButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(logoutButton.isHittable)
+        let logoutConfirmation = app.alerts["Log out of LogYourBody?"]
+        XCTAssertFalse(logoutConfirmation.exists)
         logoutButton.tap()
 
-        let confirmLogout = app.buttons.matching(identifier: "settings_logout_confirm").firstMatch
-        XCTAssertTrue(confirmLogout.waitForExistence(timeout: 5))
+        // System-rendered alert actions may omit SwiftUI accessibility identifiers.
+        // Bind the action to this exact native alert, never a background Log Out button.
+        XCTAssertTrue(logoutConfirmation.waitForExistence(timeout: 5), app.debugDescription)
+        let controlsBeforeCancel = logoutConfirmation.buttons.allElementsBoundByIndex.map {
+            "\($0.identifier)=\($0.label)"
+        }
+        XCTContext.runActivity(named: "Logout dialog controls before cancel: \(controlsBeforeCancel)") { activity in
+            let attachment = XCTAttachment(string: logoutConfirmation.debugDescription)
+            attachment.lifetime = .keepAlways
+            activity.add(attachment)
+        }
+        let cancelLogout = logoutConfirmation.buttons["Cancel"]
+        XCTAssertTrue(cancelLogout.exists)
+        XCTAssertTrue(cancelLogout.isHittable)
+        cancelLogout.tap()
+        XCTAssertTrue(logoutConfirmation.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(logoutButton.exists)
+        XCTAssertFalse(app.buttons["continueWithAppleButton"].exists)
+
+        logoutButton.tap()
+        XCTAssertTrue(logoutConfirmation.waitForExistence(timeout: 5), app.debugDescription)
+        let controlsBeforeConfirm = logoutConfirmation.buttons.allElementsBoundByIndex.map {
+            "\($0.identifier)=\($0.label)"
+        }
+        XCTContext.runActivity(named: "Logout dialog controls before confirm: \(controlsBeforeConfirm)") { activity in
+            let attachment = XCTAttachment(string: logoutConfirmation.debugDescription)
+            attachment.lifetime = .keepAlways
+            activity.add(attachment)
+        }
+        let confirmLogout = logoutConfirmation.buttons["Log Out"]
+        XCTAssertTrue(confirmLogout.exists)
+        XCTAssertTrue(confirmLogout.isHittable)
         confirmLogout.tap()
 
         XCTAssertTrue(app.buttons["continueWithAppleButton"].waitForExistence(timeout: 8))
