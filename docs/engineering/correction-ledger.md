@@ -87,7 +87,10 @@ There is no implicit prose or human fallback for missing or malformed assessment
 The CLI delegates to `runClassifier(args, logger)`, which returns status without
 changing process exit state. Git fixtures invoke the CLI for each merge scenario
 and reuse this runner for repeated checks, retaining the complete assertion matrix
-within the existing 30-second deadline and 100% classifier coverage gates.
+within a bounded 120-second process deadline and 100% classifier coverage gates.
+The expanded matrix covers dozens of isolated Git scenarios; each Git or CLI child
+retains its five-second deadline, and the Vitest wrapper allows five seconds
+to report a process timeout before its own deadline.
 Each verification batches staged and immutable parent guard blobs in one Git
 process, parsing byte lengths and retaining fresh index reads on every retry.
 Staged conflict resolution also batches the union's guards, including repeated
@@ -110,6 +113,14 @@ retained guards before writing the classified result. Annotation conflicts
 identify the existing and incoming source receipts; review their classifications
 and retained guards explicitly before retrying. Conflicting annotations are never
 selected automatically.
+If Git refuses to stage the resolved ledger (for example, because another writer
+holds `index.lock`), the resolver restores the original ledger bytes and reports
+the staging error. Remove the obstruction and retry the same command.
+If the working ledger is already valid JSON and differs from the computed merge,
+both resolver entrypoints refuse to overwrite it through the same shared guard.
+Review and stage that manual resolution, then use `--check-merge` to verify
+retention against both parents. Repeating an unstaged resolver run with its
+unchanged computed result remains safe.
 After explicit staging, either resolver invocation verifies the staged ledger
 against both merge parents without writing or restaging local edits. Missing
 conflict stages for an unresolved ledger fail without writing.

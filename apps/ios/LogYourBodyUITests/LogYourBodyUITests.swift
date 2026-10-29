@@ -3551,14 +3551,18 @@ final class LogYourBodyUITests: XCTestCase {
         let answer = app.descendants(matching: .any).matching(
             NSPredicate(format: "label == %@", "LogYourBody: " + response)
         ).firstMatch
-        let terminal = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            answer.exists && app.buttons["chat_send_button"].label == "Send message"
-                && !app.buttons["chat_retry_button"].exists
-                && !app.descendants(matching: .any)["chat_recovery_message"].exists
-        }, object: app)
+        // Observe the answer outside a predicate callback: a nested remote query
+        // can consume the callback's entire wait and be interrupted by its waiter.
+        let rendered = answer.waitForExistence(timeout: 8)
+        let terminal = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "Send message"), object: app.buttons["chat_send_button"]
+        )
         let completed = XCTWaiter.wait(for: [terminal], timeout: 8) == .completed
         attachScreenshot(named: capture, from: app)
-        XCTAssertTrue(completed, "Require the full rendered answer and terminal success, not a root, partial text or HTTP status")
+        XCTAssertTrue(
+            rendered && completed && answer.exists,
+            "Require the full rendered answer and terminal success, not a root, partial text or HTTP status"
+        )
         XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["chat_recovery_message"].exists)
         XCTAssertFalse(app.buttons["chat_retry_button"].exists)

@@ -540,6 +540,8 @@
 		26820261025000000000004 /* DatedOutcomeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26820261025000000000003 /* DatedOutcomeStore.swift */; };
 		26820261025000000000006 /* ProductAPIClient+DatedOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26820261025000000000005 /* ProductAPIClient+DatedOutcome.swift */; };
 		26820261025000000000008 /* DatedOutcomeStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26820261025000000000007 /* DatedOutcomeStoreTests.swift */; };
+		F1B241000000000000000002 /* HealthSyncState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B241000000000000000001 /* HealthSyncState.swift */; };
+		F1B241000000000000000004 /* HealthSyncStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B241000000000000000003 /* HealthSyncStateTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1195,6 +1197,8 @@
 		26820261025000000000007 /* DatedOutcomeStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStoreTests.swift; sourceTree = "<group>"; };
 		26820261025000000000009 /* LogYourBodyV6.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV6.xcdatamodel; sourceTree = "<group>"; };
 		2682026102500000000000A /* LogYourBodyV6.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV6.xcdatamodel; sourceTree = "<group>"; };
+		F1B241000000000000000001 /* HealthSyncState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSyncState.swift; sourceTree = "<group>"; };
+		F1B241000000000000000003 /* HealthSyncStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSyncStateTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1477,6 +1481,7 @@
 				C23900000000000000000002 /* HealthImportIdempotencyTests.swift */,
 				18FA96B2F0B80609BBBC0DE1 /* HealthKitFullSyncCompletionPolicyTests.swift */,
 				DDACB9E8EEAB1EBF446F0F02 /* HealthSyncCoordinatorPipelineTests.swift */,
+				F1B241000000000000000003 /* HealthSyncStateTests.swift */,
 				1C662CF613D4755CA2B93A43 /* HealthSyncPipelineTests.swift */,
 				A23800052F23800100ABCDE3 /* HealthAnchorStoreTests.swift */,
 				A4A1C6C2438CB1EDCEC43C67 /* HealthSyncTestDoubles.swift */,
@@ -1587,6 +1592,7 @@
 		AD723ADC2E15FA5C002376C6 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				F1B241000000000000000001 /* HealthSyncState.swift */,
 				ADA600452ED375EE00088042 /* GlobalTimelineModels.swift */,
 				ADA600462ED375EE00088042 /* Glp1Medication.swift */,
 				ADA6003D2ED2BC9100088042 /* Glp1DoseLog.swift */,
@@ -2455,6 +2461,7 @@
 				C23900000000000000000001 /* HealthImportIdempotencyTests.swift in Sources */,
 				6200622347BFBBB809890E19 /* HealthKitFullSyncCompletionPolicyTests.swift in Sources */,
 				9BCEB21BE7B69676BCA5C211 /* HealthSyncCoordinatorPipelineTests.swift in Sources */,
+				F1B241000000000000000004 /* HealthSyncStateTests.swift in Sources */,
 				8FB91216C622624E0F7815CC /* HealthSyncPipelineTests.swift in Sources */,
 				A23800062F23800100ABCDE3 /* HealthAnchorStoreTests.swift in Sources */,
 				C2465BE618C74154F47B1E1F /* HealthSyncTestDoubles.swift in Sources */,
@@ -2702,6 +2709,7 @@
 				ADA600482ED375EE00088042 /* Glp1Medication.swift in Sources */,
 				ADDC47DE2E2D89F3003C97E7 /* IntegrationsView.swift in Sources */,
 				ADF1F6BE2ED58E3F00745F33 /* HealthSyncCoordinator.swift in Sources */,
+				F1B241000000000000000002 /* HealthSyncState.swift in Sources */,
 				ADDC47E02E2D89F3003C97E7 /* BulkPhotoImportView.swift in Sources */,
 				ADDC47E12E2D89F3003C97E7 /* DeleteAccountView.swift in Sources */,
 				ADF1F6BC2ED4C69F00745F33 /* UnitConversion.swift in Sources */,
