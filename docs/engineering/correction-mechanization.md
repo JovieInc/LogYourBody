@@ -109,6 +109,9 @@ start a second PR owner.
 
 For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
 merges and classifies the correction ledger after other conflicts are resolved.
+Repair a conflicted source projection first with
+`python3 scripts/resolve-repository-docs.py --staged`. If staging fails, it restores
+the original projection bytes (or absence), so the same command remains retryable.
 The shared readiness check also rejects newly added conflict markers in the index,
 including diff3 base markers, markers shorter than seven characters, and files
 marked binary by Git attributes, before

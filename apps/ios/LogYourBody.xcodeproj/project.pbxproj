@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AD2600012F00000100ABCDEF /* HomeFocusSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD2600022F00000100ABCDEF /* HomeFocusSelector.swift */; };
+		AD2600032F00000100ABCDEF /* HomeFocusSelectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD2600042F00000100ABCDEF /* HomeFocusSelectorTests.swift */; };
 		B04020261025000000000001 /* BodyScoreShareExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B04020261025000000000002 /* BodyScoreShareExport.swift */; };
 		B04020261025000000000003 /* BodyScoreShareExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B04020261025000000000004 /* BodyScoreShareExportTests.swift */; };
 		A24420261025000000000002 /* MetricSourceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000001 /* MetricSourceAdapter.swift */; };
@@ -586,6 +588,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AD2600022F00000100ABCDEF /* HomeFocusSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFocusSelector.swift; sourceTree = "<group>"; };
+		AD2600042F00000100ABCDEF /* HomeFocusSelectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFocusSelectorTests.swift; sourceTree = "<group>"; };
 		B04020261025000000000002 /* BodyScoreShareExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreShareExport.swift; sourceTree = "<group>"; };
 		B04020261025000000000004 /* BodyScoreShareExportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreShareExportTests.swift; sourceTree = "<group>"; };
 		A24420261025000000000001 /* MetricSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSourceAdapter.swift; sourceTree = "<group>"; };
@@ -1441,6 +1445,7 @@
 		AD723ACF2E15FA5C002376C6 /* LogYourBodyTests */ = {
 			isa = PBXGroup;
 			children = (
+				AD2600042F00000100ABCDEF /* HomeFocusSelectorTests.swift */,
 				E24920261025000400000001 /* WorkoutReconciliationPromptTests.swift */,
 				B26920261025000000000003 /* BackwardPlannerTests.swift */,
 				B26920261025000000000005 /* lyb-launch-contract.json */,
@@ -1761,6 +1766,7 @@
 		AD723AF22E15FA5C002376C6 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				AD2600022F00000100ABCDEF /* HomeFocusSelector.swift */,
 				E24920261025000300000001 /* WorkoutReconciliationViewModel.swift */,
 				ADF1F6B92ED4C66400745F33 /* GlobalTimelineStore.swift */,
 				ADA4B75C2ED1183900F4262A /* DashboardViewModel.swift */,
@@ -2461,6 +2467,7 @@
 				CC4917DEC8E46FACECDF3424 /* DashboardDataVizPolicyTests.swift in Sources */,
 				98DAEAD9993013F8C7C81764 /* DashboardTimelineAndPolicyTests.swift in Sources */,
 				050A49949BCAA09D23C66035 /* DashboardViewModelHealthSyncWiringTests.swift in Sources */,
+				AD2600032F00000100ABCDEF /* HomeFocusSelectorTests.swift in Sources */,
 				B7E4D91A06C34815F02A6C32 /* DashboardStepPersistenceTests.swift in Sources */,
 				B11404E6ED2FB64ADE0E0EAE /* EditEntrySavePolicyTests.swift in Sources */,
 				18ED1A86B416E8821C250840 /* GlobalTimelineServiceTests.swift in Sources */,
@@ -2784,6 +2791,7 @@
 				C6C89B5EB7601C19F712D015 /* LogoutButton.swift in Sources */,
 				AD8872952EB946BE0041C426 /* CoreMetricsRow.swift in Sources */,
 				ADA4B75D2ED1183900F4262A /* DashboardViewModel.swift in Sources */,
+				AD2600012F00000100ABCDEF /* HomeFocusSelector.swift in Sources */,
 				AD8872962EB946BE0041C426 /* Theme.swift in Sources */,
 				ADA6003E2ED2BC9100088042 /* Glp1DoseLog.swift in Sources */,
 				AD8872972EB946BE0041C426 /* ErrorStateView.swift in Sources */,
