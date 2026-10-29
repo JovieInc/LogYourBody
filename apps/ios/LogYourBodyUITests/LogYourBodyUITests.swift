@@ -1677,6 +1677,40 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_timeline"].exists)
     }
 
+    func testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance() throws {
+        let app = XCUIApplication()
+        app.forwardActualXCTestContext()
+        launch(app, with: [
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestPhaseInsightFixture", "-lybUITestMetricStatsTruth", "-dashboard_selected_time_range", "1M"
+        ])
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        openStatsPage(in: app)
+        let card = app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"]
+        scrollUntilHittable(card, in: app)
+        XCTAssertTrue(card.label.contains("Observed"))
+        XCTAssertTrue(card.label.contains("Past 30 days"))
+        let value = try XCTUnwrap(card.label.split(separator: ",").dropFirst().first?.split(separator: " ").first)
+        card.tap()
+        let headline = app.descendants(matching: .any)["metric_detail_headline"]
+        XCTAssertTrue(headline.waitForExistence(timeout: 8))
+        XCTAssertEqual(headline.label, String(value))
+        let context = app.staticTexts["metric_detail_observation_context"]
+        XCTAssertTrue(context.waitForExistence(timeout: 5))
+        XCTAssertTrue(context.label.contains("Mean of"))
+        let chart = app.descendants(matching: .any)["metric_detail_chart_plot"]
+        scrollUntilHittable(chart, in: app)
+        let start = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)))
+        let selectedValue = headline.label
+        let selectedContext = context.label
+        XCTAssertFalse(selectedContext.isEmpty)
+        XCTAssertFalse(selectedContext.contains("Updated"))
+        // Read the chart after release; selection must continue to match the headline.
+        XCTAssertTrue((chart.value as? String)?.contains("current selection \(selectedValue)") == true)
+        attachScreenshot(named: "lyb47-observation-drilldown", from: app)
+    }
+
     func testMetricDetailOpensFromStatsAndShowsSharedTimelineContext() throws {
         let app = XCUIApplication()
         launch(app, with: [
@@ -2304,13 +2338,21 @@ final class LogYourBodyUITests: XCTestCase {
         let menu = app.buttons["Open Menu"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
         menu.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_menu"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["photo_timeline_menu"].waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            app.buttons.matching(identifier: "photo_timeline_menu").count, 0,
+            "The menu marker must never replace its independent button identifiers."
+        )
     }
 
     private func openSettingsFromPhotoTimelineMenu(in app: XCUIApplication) {
         openPhotoTimelineMenu(in: app)
-        let settings = app.buttons["Settings"]
+        let settingsButtons = app.buttons.matching(identifier: "photo_timeline_menu_settings")
+        let settings = settingsButtons.firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        XCTAssertEqual(settingsButtons.count, 1, "Settings must have one distinct control owner.")
+        XCTAssertEqual(settings.identifier, "photo_timeline_menu_settings")
+        XCTAssertEqual(settings.label, "Settings")
         XCTAssertTrue(settings.isHittable)
         settings.tap()
         XCTAssertTrue(app.buttons["settings_profile_link"].waitForExistence(timeout: 8))
@@ -3440,24 +3482,44 @@ final class LogYourBodyUITests: XCTestCase {
 
     private func submitSyntheticChatQuestion(in app: XCUIApplication) {
         let composer = app.textFields["chat_composer"]
-        composer.tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 8))
         let question = "Synthetic full-turn question"
-        // The simulator can drop a typing burst while the keyboard connects.
-        // Acknowledge each prefix before sending more input; never retry a turn.
-        var prefix = ""
-        for character in question {
-            composer.typeText(String(character))
-            prefix.append(character)
-            let received = XCTNSPredicateExpectation(
-                predicate: NSPredicate(format: "value == %@", prefix), object: composer
+        // Launch Quality run 40189917522 kept only "S" after one typeText while
+        // the app was still settling. Top up a prefix; never send anything else.
+        var complete = false
+        for attempt in 0..<3 {
+            let current = enteredSyntheticQuestion(in: composer)
+            if current != question {
+                // A center tap in a short draft can leave the caret before the
+                // committed prefix. The trailing edge puts it after that text.
+                if current.isEmpty {
+                    composer.tap()
+                } else {
+                    composer.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+                }
+                _ = app.keyboards.element.waitForExistence(timeout: 2)
+                let addition = syntheticQuestionInsertion(current: current, question: question)
+                var prefix = current
+                // Acknowledge each prefix while the simulator keyboard connects.
+                for character in addition {
+                    composer.typeText(String(character))
+                    if String(character) == XCUIKeyboardKey.delete.rawValue {
+                        prefix = String(prefix.dropLast())
+                    } else {
+                        prefix.append(character)
+                    }
+                    let received = XCTNSPredicateExpectation(
+                        predicate: NSPredicate(format: "value == %@", prefix), object: composer
+                    )
+                    guard XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }
+                }
+            }
+            let entered = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "value == %@", question), object: composer
             )
-            guard XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }
+            let timeout: TimeInterval = attempt == 0 ? 8 : 4
+            complete = XCTWaiter.wait(for: [entered], timeout: timeout) == .completed
+            if complete { break }
         }
-        let entered = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value == %@", question), object: composer
-        )
-        let complete = XCTWaiter.wait(for: [entered], timeout: 8) == .completed
         if !complete {
             let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             screenshot.name = "chat-synthetic-incomplete-draft-screen"
@@ -3468,7 +3530,11 @@ final class LogYourBodyUITests: XCTestCase {
             hierarchy.lifetime = .keepAlways
             add(hierarchy)
         }
-        XCTAssertTrue(complete, "Require the complete synthetic question before Send; never submit partial input")
+        let observed = composer.value ?? "nil"
+        XCTAssertTrue(
+            complete,
+            "Require the complete synthetic question before Send; never submit partial input (saw \(observed))"
+        )
         guard complete else { return }
         let send = app.buttons["chat_send_button"]
         let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: send)
@@ -3476,19 +3542,38 @@ final class LogYourBodyUITests: XCTestCase {
         send.tap()
     }
 
+    /// Committed composer text. An empty SwiftUI field reports its placeholder.
+    private func enteredSyntheticQuestion(in composer: XCUIElement) -> String {
+        guard let value = composer.value as? String, !value.isEmpty else { return "" }
+        if value == composer.placeholderValue || value == "Ask about your progress" { return "" }
+        return value
+    }
+
+    /// Keystrokes still required. A value that is not a prefix is cleared first.
+    private func syntheticQuestionInsertion(current: String, question: String) -> String {
+        if question.hasPrefix(current) {
+            return String(question.dropFirst(current.count))
+        }
+        return String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count) + question
+    }
+
     private func assertSyntheticChatCompleted(in app: XCUIApplication, capture: String) {
         let response = "Your fixture trend is stable. Open Timeline to inspect the selected day."
         let answer = app.descendants(matching: .any).matching(
             NSPredicate(format: "label == %@", "LogYourBody: " + response)
         ).firstMatch
-        let terminal = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            answer.exists && app.buttons["chat_send_button"].label == "Send message"
-                && !app.buttons["chat_retry_button"].exists
-                && !app.descendants(matching: .any)["chat_recovery_message"].exists
-        }, object: app)
+        // Observe the answer outside a predicate callback: a nested remote query
+        // can consume the callback's entire wait and be interrupted by its waiter.
+        let rendered = answer.waitForExistence(timeout: 8)
+        let terminal = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "Send message"), object: app.buttons["chat_send_button"]
+        )
         let completed = XCTWaiter.wait(for: [terminal], timeout: 8) == .completed
         attachScreenshot(named: capture, from: app)
-        XCTAssertTrue(completed, "Require the full rendered answer and terminal success, not a root, partial text or HTTP status")
+        XCTAssertTrue(
+            rendered && completed && answer.exists,
+            "Require the full rendered answer and terminal success, not a root, partial text or HTTP status"
+        )
         XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["chat_recovery_message"].exists)
         XCTAssertFalse(app.buttons["chat_retry_button"].exists)

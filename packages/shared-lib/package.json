@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint --ext .js,.jsx,.ts,.tsx src",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs ../../.github/scripts/web-production-smoke.test.mjs ../../.github/scripts/verify-public-build-env.test.mjs ../../.github/scripts/signing-expiry.test.mjs"
+    "test:mutation": "node ../../scripts/mutation/run.mjs",
+    "test": "vitest run --maxWorkers=1 --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs ../../.github/scripts/web-production-smoke.test.mjs ../../.github/scripts/verify-public-build-env.test.mjs ../../.github/scripts/signing-expiry.test.mjs"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.71.0",

@@ -100,6 +100,13 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
     private(set) var fetchTodayStepCountCallCount = 0
     private(set) var didCallForceFullHealthKitSync = false
     var forceFullHealthKitSyncResult = true
+    var syncWeightError: Error?
+    var syncStepsError: Error?
+    var todayStepCount: Int? = 123
+    var onSyncWeight: (() async throws -> Void)?
+    var backgroundDeliveryError: Error?
+    var smartScaleRefreshResult = HealthKitSmartScaleRefreshResult.inactive
+    private(set) var smartScaleRefreshCallCount = 0
 
     func checkAuthorizationStatus() {
         didCallCheckAuthorizationStatus = true
@@ -124,6 +131,7 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
 
     func setupBackgroundDelivery() async throws {
         setupBackgroundDeliveryCallCount += 1
+        if let backgroundDeliveryError { throw backgroundDeliveryError }
     }
 
     func setupStepCountBackgroundDelivery() async throws {
@@ -136,19 +144,50 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
 
     func syncWeightFromHealthKit() async throws {
         syncWeightFromHealthKitCallCount += 1
+        try await onSyncWeight?()
+        if let syncWeightError { throw syncWeightError }
     }
 
     func syncStepsFromHealthKit() async throws {
         syncStepsFromHealthKitCallCount += 1
+        if let syncStepsError { throw syncStepsError }
     }
 
     func fetchTodayStepCount() async throws -> Int? {
         fetchTodayStepCountCallCount += 1
-        return 123
+        return todayStepCount
     }
 
     func forceFullHealthKitSync() async -> Bool {
         didCallForceFullHealthKitSync = true
         return forceFullHealthKitSyncResult
+    }
+
+    func refreshSmartScaleSamplesIfEnabled() async -> HealthKitSmartScaleRefreshResult {
+        smartScaleRefreshCallCount += 1
+        return smartScaleRefreshResult
+    }
+}
+
+/// Records anchored HealthKit fetches for weight, body fat, and steps.
+final class AnchoredSampleFetchProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var requests: [(HealthAnchorSampleKind, Data?)] = []
+    var page = HealthAnchoredSamplePage(added: [], deleted: [], newAnchor: Data([9]))
+
+    func callAsFunction(
+        _ kind: HealthAnchorSampleKind, _ anchor: Data?
+    ) async throws -> HealthAnchoredSamplePage {
+        lock.lock()
+        requests.append((kind, anchor))
+        let response = page
+        lock.unlock()
+        return response
+    }
+
+    func recorded() -> [(HealthAnchorSampleKind, Data?)] {
+        lock.lock()
+        defer { lock.unlock() }
+        return requests
     }
 }

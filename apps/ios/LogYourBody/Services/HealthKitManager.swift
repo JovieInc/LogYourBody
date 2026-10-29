@@ -13,6 +13,9 @@ enum HealthKitDefaultsKey: String {
     case fullSyncCompleted = "hasPerformedFullHealthKitSync"
     case smartScaleWeightAnchor = "healthKitSmartScaleWeightAnchor"
     case smartScaleBodyFatAnchor = "healthKitSmartScaleBodyFatAnchor"
+    case weightQueryAnchor = "healthKitWeightQueryAnchor"
+    case bodyFatQueryAnchor = "healthKitBodyFatQueryAnchor"
+    case stepQueryAnchor = "healthKitStepQueryAnchor"
 
     func scoped(with userId: String?) -> String {
         guard let userId = userId, !userId.isEmpty else {
@@ -245,6 +248,10 @@ class HealthKitManager: ObservableObject {
     /// Tests replace these. Production uses the Statsig gate and anchored HealthKit reads.
     var smartScaleSyncEnabled: @MainActor () -> Bool = { HealthKitSmartScaleSyncPolicy.isEnabled() }
     var smartScaleSampleQuery: ((HealthKitSmartScaleAnchors) async throws -> HealthKitSmartScaleQueryResult)?
+    /// Tests replace the weight, body-fat, and step anchored fetch. Nil uses HealthKit.
+    var anchoredSampleQuery: ((HealthAnchorSampleKind, Data?) async throws -> HealthAnchoredSamplePage)?
+    /// Tests replace the per-day step total used when an anchored step page names a day.
+    var stepDayTotalQuery: ((Date) async throws -> Int?)?
     var metricSourceSyncGuard: @MainActor () throws -> Void = {}
 
     init(
@@ -306,7 +313,7 @@ class HealthKitManager: ObservableObject {
 
     // Health types - using computed properties to avoid crashes if HealthKit types fail to initialize
 
-    // Sync management
+    // Import serialization only. HealthSyncCoordinator owns status through HealthSyncState.
     let syncStateQueue = DispatchQueue(label: "com.logyourbody.healthkit.sync.state")
     var isSyncingWeight = false
     var syncDebounceTimer: Timer?
@@ -498,6 +505,19 @@ enum HealthKitSmartScaleSyncPolicy {
         let value: Double
         let date: Date
         let sourceName: String?
+        let sourceBundleId: String?
+
+        init(
+            sampleId: String, kind: Kind, value: Double, date: Date,
+            sourceName: String?, sourceBundleId: String? = nil
+        ) {
+            self.sampleId = sampleId
+            self.kind = kind
+            self.value = value
+            self.date = date
+            self.sourceName = sourceName
+            self.sourceBundleId = sourceBundleId
+        }
     }
 
     struct Existing: Equatable {
@@ -531,13 +551,15 @@ enum HealthKitSmartScaleSyncPolicy {
     }
 
     static func makeSample(
-        sampleId: String, kind: Kind, value: Double, date: Date, sourceName: String?
+        sampleId: String, kind: Kind, value: Double, date: Date, sourceName: String?, sourceBundleId: String? = nil
     ) -> Sample? {
         let id = sampleId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !id.isEmpty, value.isFinite, value > 0 else { return nil }
         let name = sourceName?.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleaned = (name?.isEmpty == false) ? name : nil
-        return Sample(sampleId: id, kind: kind, value: value, date: date, sourceName: cleaned)
+        return Sample(
+            sampleId: id, kind: kind, value: value, date: date, sourceName: cleaned, sourceBundleId: sourceBundleId
+        )
     }
 
     static func attribution(sourceName: String?) -> String {

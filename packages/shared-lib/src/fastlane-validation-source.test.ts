@@ -168,6 +168,35 @@ describe('Fastlane validation source preservation', () => {
       'project graph passed',
     );
   });
+  it('rejects native test registrations lost or duplicated during project merges', () => {
+    const script = fileURLToPath(
+      new URL('../../../scripts/ios/test_training_rest_project.py', import.meta.url),
+    );
+    const project = readFileSync(
+      new URL('../../../apps/ios/LogYourBody.xcodeproj/project.pbxproj', import.meta.url),
+      'utf8',
+    );
+    const registrations = project
+      .split('\n')
+      .filter((line) => line.includes('ContextualHintRegistryTests.swift'));
+    expect(registrations).toHaveLength(4);
+    const directory = mkdtempSync(`${tmpdir()}/lyb-project-membership-`);
+    try {
+      const candidate = `${directory}/project.pbxproj`;
+      for (const registration of registrations) {
+        writeFileSync(candidate, project.replace(`${registration}\n`, ''));
+        expect(() => execFileSync('python3', [script, candidate], { stdio: 'pipe' })).toThrow();
+      }
+      const source = registrations.find(
+        (line) => line.includes('in Sources') && !line.includes('='),
+      );
+      expect(source).toBeDefined();
+      writeFileSync(candidate, project.replace(`${source}\n`, `${source}\n${source}\n`));
+      expect(() => execFileSync('python3', [script, candidate], { stdio: 'pipe' })).toThrow();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
   it('signs the rest Live Activity extension separately in the real release lane', () => {
     const script = fileURLToPath(
       new URL('../../../scripts/ios/test_training_rest_release.rb', import.meta.url),

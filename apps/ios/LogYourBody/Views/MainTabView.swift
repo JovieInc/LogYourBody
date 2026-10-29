@@ -1324,6 +1324,9 @@ struct ChatTabView: View {
                 if let trainingErrorMessage { Text(trainingErrorMessage).font(.footnote) }
             }
             .padding(16)
+            .onAppear {
+                BenefitEvents.homeDecisionShown(decisionId: next.proposal.id, decisionKind: "next_block")
+            }
         } else if let week = trainingResponse?.week {
             if trainingResponse?.phase == "review" {
                 Text("Block complete. Review your training before starting the next block.")

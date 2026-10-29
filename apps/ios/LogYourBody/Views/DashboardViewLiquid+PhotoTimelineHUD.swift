@@ -65,7 +65,8 @@ extension DashboardViewLiquid {
                 .padding(.top, 8)
                 .padding(.bottom, 4)
                 .contentShape(Rectangle())
-                .highPriorityGesture(photoTimelineSwipe)
+                // Header swipes must coexist with menu and day-detail button taps.
+                .simultaneousGesture(photoTimelineSwipe)
 
             photoTimelineHomeContent
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? 0 : .infinity)
@@ -465,7 +466,7 @@ extension DashboardViewLiquid {
     }
 
     func formatHUDDate(_ date: Date) -> String {
-        FormatterCache.mediumDateFormatter.string(from: date)
+        DashboardMetricFormatting.readingDateLabel(effectiveDate: date)
     }
 
     var photoTimelineHUDEmptyState: some View {
@@ -574,6 +575,9 @@ private struct PhotoTimelineNavigationMenu: View {
                     Text("LogYourBody")
                         .font(.system(size: 30, weight: .semibold))
                         .foregroundStyle(theme.colors.text)
+                        // Keep the screen marker on a leaf: an identifier on the
+                        // menu container propagates to its independent buttons.
+                        .accessibilityIdentifier("photo_timeline_menu")
 
                     Spacer()
 
@@ -634,7 +638,6 @@ private struct PhotoTimelineNavigationMenu: View {
             .padding(.top, 48)
             .padding(.bottom, JovieTokens.sectionGap)
         }
-        .accessibilityIdentifier("photo_timeline_menu")
     }
 
     private func menuRow(

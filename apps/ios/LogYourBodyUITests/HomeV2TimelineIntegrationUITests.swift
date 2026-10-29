@@ -37,13 +37,23 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         // One day cannot arm hold-to-scrub. A long press would open the photo
         // and cover the menu, so the menu is opened from the resting Today page.
         XCTAssertFalse(app.staticTexts["home_v2_photo_scrub_mode"].exists)
-        app.buttons["photo_timeline_root_menu"].tap()
+        let menu = app.buttons["photo_timeline_root_menu"]
         let scrim = app.buttons["home_v2_sidebar_scrim"]
-        XCTAssertTrue(scrim.waitForExistence(timeout: 5))
+        for _ in 0..<3 {
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: menu)
+            XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
+            menu.tap()
+            XCTAssertTrue(scrim.waitForExistence(timeout: 5), "Each single menu tap must open the sidebar")
+            scrim.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+            XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))
+            XCTAssertEqual(pager.value as? String, "Entry 1 of 1")
+            XCTAssertFalse(app.staticTexts["home_v2_photo_scrub_mode"].exists)
+        }
+        let start = menu.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 280, dy: 22))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -220, dy: 0)))
+        XCTAssertTrue(scrim.waitForExistence(timeout: 5), "Header swipes must still open the sidebar")
         scrim.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
         XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))
-        XCTAssertEqual(pager.value as? String, "Entry 1 of 1")
-        XCTAssertFalse(app.staticTexts["home_v2_photo_scrub_mode"].exists)
         stage.tap()
         XCTAssertTrue(app.buttons["home_v2_viewer_close"].waitForExistence(timeout: 5))
     }
