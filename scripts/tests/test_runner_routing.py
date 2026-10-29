@@ -2366,12 +2366,14 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
     project_name = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj'
-    # Frozen reviewed bytes from main at e3fffe422; the existing policy digest is unchanged.
-    # Ordinary target additions may change the live project without authorizing new diagnostic tooling.
-    # Keep this offline fixture so shallow CI checkouts can still exercise the real trusted CLI.
-    reviewed_project = gzip.decompress(
-        (_REPO_ROOT / 'scripts/tests/fixtures/reviewed-diagnostic-project.pbxproj.gz').read_bytes())
+    # Admission must exercise current source bytes, as the real main diagnostic does.
+    # Refreshing the policy digest remains an explicit review of the project diff.
+    reviewed_project = (_REPO_ROOT / project_name).read_bytes()
     assert hashlib.sha256(reviewed_project).hexdigest() == dependencies[project_name]
+    # Keep the prior reviewed project immutable as a refusal fixture in shallow CI.
+    previous_project = gzip.decompress(
+        (_REPO_ROOT / 'scripts/tests/fixtures/reviewed-diagnostic-project.pbxproj.gz').read_bytes())
+    assert hashlib.sha256(previous_project).hexdigest() == '5c4f7e214a1e3e979f9f65a6cefdbd4f715b21c73503d70b3f30a1e78f162c2c'
     # The previous pin was the unlanded candidate. It stays a rejected fixture.
     unlanded = _reviewed_diagnostic_candidate_bytes()
     reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
@@ -2445,7 +2447,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'frozen-main-audit', 'frozen-branch-audit', 'previous-main-audit', 'previous-branch-audit', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'previous-reviewed-project', 'frozen-main-audit', 'frozen-branch-audit', 'previous-main-audit', 'previous-branch-audit', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
                 'dependency-symlink', 'changed-project', 'wrong-resolver']
     for scenario in fixtures:
@@ -2499,6 +2501,8 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
             helper.symlink_to(audit)
         elif scenario == 'changed-project':
             (root / project_name).write_bytes(reviewed_project + b'\n')
+        elif scenario == 'previous-reviewed-project':
+            (root / project_name).write_bytes(previous_project)
         _diagnostic_git(root, 'init', '-q')
         _diagnostic_git(root, 'add', '.')
         _diagnostic_git(root, '-c', 'user.name=Diagnostic Test', '-c', 'user.email=diagnostic@example.invalid',
