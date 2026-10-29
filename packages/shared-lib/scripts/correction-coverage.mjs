@@ -172,20 +172,22 @@ export function assertNoRegression(current, baseline) {
   }
 }
 
+export function indexCorrectionReceipts(rows) {
+  const indexed = new Map();
+  for (const row of rows) {
+    const key = JSON.stringify([
+      row.fingerprint.trim().toLowerCase().replace(/\s+/g, '-'),
+      new URL(row.source).href,
+    ]);
+    assert.ok(!indexed.has(key), `ledger merge: duplicate receipt ${key}`);
+    indexed.set(key, row);
+  }
+  return indexed;
+}
+
 export function mergeCorrectionLedgers(base, ours, theirs, readGuard = readSource) {
   const reports = [base, ours, theirs].map((rows) => coverageReport(rows, readGuard));
-  const [original, left, right] = [base, ours, theirs].map((rows) => {
-    const indexed = new Map();
-    for (const row of rows) {
-      const key = JSON.stringify([
-        row.fingerprint.trim().toLowerCase().replace(/\s+/g, '-'),
-        new URL(row.source).href,
-      ]);
-      assert.ok(!indexed.has(key), `ledger merge: duplicate receipt ${key}`);
-      indexed.set(key, row);
-    }
-    return indexed;
-  });
+  const [original, left, right] = [base, ours, theirs].map(indexCorrectionReceipts);
   for (const key of original.keys()) {
     assert.ok(left.has(key) && right.has(key), `ledger merge: removed receipt ${key}`);
   }

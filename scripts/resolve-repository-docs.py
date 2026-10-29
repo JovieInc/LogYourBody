@@ -51,6 +51,7 @@ def resolve_staged(root):
     ).stdout
     # Rebuild a conflicted projection from staged inputs before resolving unrelated ledgers.
     # Every actual input must have stage zero; staged_bytes fails closed otherwise.
+    # An unrelated ledger conflict must not deadlock the two existing merge resolvers.
     if (dirty and not conflicted) or (output.exists() and not tracked):
         raise ValueError("unstaged projection edits: " + config["output"])
     # Render the index, so partially staged manifests cannot leak into the commit.

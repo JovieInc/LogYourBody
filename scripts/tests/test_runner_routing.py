@@ -1639,6 +1639,21 @@ def test_chat_corpus_selects_public_turns_and_requires_exact_unit_and_ui_passes(
         assert selectors.count("-only-testing:LogYourBodyUITests/" + identifier.removesuffix("()")) == 1
         assert expected_ui.count(identifier) == 1
     assert expected_unit == required_unit
+    native_ui = (_REPO_ROOT / 'apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift').read_text()
+    completion = native_ui.split('private func assertSyntheticChatCompleted(', 1)[1].split('\n    }', 1)[0]
+    # Nested remote queries can exhaust and interrupt the predicate's own waiter
+    # even when Retry has already rendered the full answer (run 40752594817).
+    assert 'NSPredicate {' not in completion, 'Completion predicates must not issue nested remote UI queries'
+    assert '"LogYourBody: " + response' in completion
+    assert 'Your fixture trend is stable. Open Timeline to inspect the selected day.' in completion
+    rendered = completion.index('answer.waitForExistence(timeout: 8)')
+    terminal = completion.index('NSPredicate(format: "label == %@", "Send message")')
+    assert rendered < terminal, 'Observe the full answer before waiting for terminal success'
+    assert 'object: app.buttons["chat_send_button"]' in completion
+    assert re.search(r'XCTAssertTrue\(\s*rendered && completed && answer\.exists,', completion)
+    for identifier in ['chat_thinking_indicator', 'chat_recovery_message', 'chat_retry_button']:
+        assert re.search(r'XCTAssertFalse\([^\n]*\["' + identifier + r'"\]\.exists\)', completion)
+    assert 'XCTAssertTrue(app.textFields["chat_composer"].isHittable)' in completion
     assert '--require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"' in source
     spec = importlib.util.spec_from_file_location("chat_corpus_evidence", _REPO_ROOT / "scripts/ios/launch-quality-evidence.py")
     evidence = importlib.util.module_from_spec(spec)
@@ -2074,14 +2089,22 @@ def test_full_launch_cold_build_budget_reaches_the_complete_unit_target(tmp_path
 
 
 def test_full_launch_build_failure_or_timeout_stops_without_retry_or_qualification(tmp_path: Path) -> None:
-    for status in ('65', '124'):
-        result, calls, receipt = _run_diagnostic_dispatch(tmp_path / status, mode='', BUILD_EXIT=status)
-        assert result.returncode == int(status) and receipt is None, result.stdout + result.stderr
+    for name, overrides, status in [
+            ('compiler-error', {'BUILD_EXIT': '65'}, 65),
+            ('timeout-exit', {'BUILD_EXIT': '124'}, 124),
+            ('elapsed-timeout', {'BUILD_DURATION_SECONDS': '901'}, 124)]:
+        result, calls, receipt = _run_diagnostic_dispatch(tmp_path / name, mode='', **overrides)
+        assert result.returncode == status and receipt is None, result.stdout + result.stderr
+        timed = [json.loads(c) for c in calls if c.startswith('["fake-timeout"')]
+        assert len(timed) == 1 and 'build-for-testing' in timed[0]
         commands = [json.loads(c) for c in calls if c.startswith('["xcodebuild"')]
-        assert len(commands) == 1 and 'build-for-testing' in commands[0]
-        artifacts = tmp_path / status / 'artifacts'
+        if name == 'elapsed-timeout':
+            assert not commands  # The virtual clock expires inside the timeout fixture.
+        else:
+            assert len(commands) == 1 and 'build-for-testing' in commands[0]
+        artifacts = tmp_path / name / 'artifacts'
         log = (artifacts / 'launch-quality-build-for-testing.log').read_text()
-        if status == '124':
+        if status == 124:
             assert 'build-for-testing timed out after 900s' in log
         assert not list(artifacts.glob('*.xcresult'))
         assert not list(artifacts.glob('*.evidence.json'))
