@@ -12,6 +12,14 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const detectScript = path.join(scriptDir, 'detect-changes.sh');
 const ciWorkflow = fs.readFileSync(path.join(scriptDir, '../workflows/ci.yml'), 'utf8');
 
+test('approved App Store release pins a runner with Ruby 3.1 builds', () => {
+  const workflow = fs.readFileSync(path.join(scriptDir, '../workflows/ios-app-store-approved-release.yml'), 'utf8');
+  const release = workflow.split('\n  release-approved-version:\n')[1]?.split(/\n {2}\S/)[0] ?? '';
+  // ruby-builder publishes Ruby 3.1.7 for Ubuntu 24.04, but not 26.04.
+  assert.match(release, /^ {4}runs-on: ubuntu-24\.04$/m);
+  assert.match(release, /uses: \.\/\.github\/actions\/setup-ruby-bundler/);
+});
+
 // Fixture git must not inherit a hook's GIT_DIR/GIT_INDEX_FILE.
 const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
 Object.assign(gitEnv, {
