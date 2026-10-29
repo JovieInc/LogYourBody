@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "ci-lyb-289334995-release-approved-app-store-version",
+    "correction": "LYB-329: The scheduled Release Approved App Store Version job failed in Ruby setup after ubuntu-latest moved to Ubuntu 26.04, which has no Ruby 3.1.7 archive.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40792372921/job/123180448212",
+    "mechanization": "Pin the approved App Store release job to Ubuntu 24.04, which has the Ruby 3.1.7 archive used by the existing shared setup action. Extend the existing required Detect Changes suite to reject runner drift and retain shared Ruby setup. The regression fails against ubuntu-latest and passes with the pin. Preserve release approval states, credentials, permissions and all CI gates. The lanes harness retains push and PR ownership; hosted post-merge execution remains required to verify the external release monitor.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Product runtime cannot control GitHub runner aliases or upstream Ruby archive availability; upgrading the shared iOS Ruby toolchain exceeds this focused workflow repair."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required Detect Changes suite can reject a release runner change to an image without the retained Ruby 3.1 build before the scheduled job executes."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "test('approved App Store release pins a runner with Ruby 3.1 builds'"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "fix-red-1a39536f40",
     "correction": "PR #1622 (fix-red-e3b0c44298 occurrence 33): Both merge-group attempts fail JavaScript/TypeScript because the correction-classifier real-Git suite exceeds its unchanged 30-second deadline; the shared private-data guard passes.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40762530604",

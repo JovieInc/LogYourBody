@@ -23,7 +23,8 @@ jobs:
   release-approved-version:
     name: Release Approved App Store Version
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    # Ruby 3.1 has prebuilt archives for Ubuntu 24.04, but not Ubuntu 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
