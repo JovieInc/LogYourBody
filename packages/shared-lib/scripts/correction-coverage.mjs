@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { dirname, posix, resolve } from 'node:path';
+import { appendFileSync, closeSync, fstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { StringDecoder } from 'node:string_decoder';
+import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { planCorrectionIssues } from './correction-recurrence.mjs';
@@ -329,6 +331,61 @@ export function readGitMergeLedgers(root) {
   }
 }
 
+function stagedDiffHasConflictMarker(root) {
+  // A merge can import more than execFileSync's pipe limit. Spool the diff and
+  // scan bounded chunks, retaining only the current added-line marker prefix.
+  const directory = mkdtempSync(join(tmpdir(), 'lyb-ledger-diff-'));
+  let fd;
+  try {
+    fd = openSync(join(directory, 'staged.diff'), 'w+', 0o600);
+    // Read staged bytes as text so binary attributes cannot conceal conflict markers.
+    // Ordinary main integrations can exceed Node's 1 MiB output default.
+    // Keep the entire scan, with the same bounded ceiling as guard reads.
+    // Main integration can exceed Node's default 1 MiB diff buffer.
+    execFileSync(
+      'git',
+      ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--text', '--no-color', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
+      { cwd: root, stdio: ['ignore', fd, 'pipe'] },
+    );
+    if (fstatSync(fd).size > 16 * 1024 * 1024) {
+      throw Object.assign(new Error('ENOBUFS: staged diff exceeds the complete 16 MiB guard ceiling'), { code: 'ENOBUFS' });
+    }
+    const buffer = Buffer.alloc(64 * 1024);
+    const decoder = new StringDecoder('utf8');
+    let state = 'start';
+    let marker = '';
+    let count = 0;
+    let position = 0;
+    for (;;) {
+      const bytes = readSync(fd, buffer, 0, buffer.length, position);
+      position += bytes;
+      const chunk = bytes ? decoder.write(buffer.subarray(0, bytes)) : decoder.end();
+      for (const character of chunk) {
+        if ('\n\r\u2028\u2029'.includes(character)) {
+          if (state === 'marker' && count >= 2) return true;
+          state = 'start';
+        } else if (state === 'start') {
+          state = character === '+' ? 'added' : 'skip';
+        } else if (state === 'added') {
+          marker = character;
+          count = 1;
+          state = '<|=>'.includes(character) ? 'marker' : 'skip';
+        } else if (state === 'marker') {
+          if (character === marker) count = Math.min(count + 1, 2);
+          else {
+            if (character === ' ' && count >= 2) return true;
+            state = 'skip';
+          }
+        }
+      }
+      if (!bytes) return state === 'marker' && count >= 2;
+    }
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
 export function assertLedgerMergeReady(root) {
   const otherConflicts = execFileSync('git', ['diff', '--name-only', '--diff-filter=U', '-z'], {
     cwd: root,
@@ -342,38 +399,9 @@ export function assertLedgerMergeReady(root) {
     0,
     `ledger merge: resolve other conflicts first: ${otherConflicts.join(', ')}`,
   );
-  const staged = execFileSync(
-    'git',
-    [
-      'diff',
-      '--cached',
-      '--no-ext-diff',
-      '--no-textconv',
-      '--text',
-      '--no-color',
-      '--unified=0',
-      '--',
-      '.',
-      `:!${LEDGER_PATH}`,
-    ],
-    {
-      cwd: root,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      // Ordinary main integrations can exceed Node's 1 MiB output default.
-      // Keep the entire scan, with the same bounded ceiling as guard reads.
-      // Main integration can exceed Node's default 1 MiB diff buffer.
-      maxBuffer: 16 * 1024 * 1024,
-    },
-  );
   // Staging a file does not prove its conflict markers were resolved.
-  // Read staged bytes as text so binary attributes cannot conceal conflict markers.
-  // conflict-marker-size can emit markers shorter than the default seven characters.
-  assert.doesNotMatch(
-    staged,
-    /^\+(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |$)/m,
-    'ledger merge: resolve staged conflict markers first',
-  );
+  // Scan every added byte while retaining bounded memory and main's short-marker protection.
+  assert.equal(stagedDiffHasConflictMarker(root), false, 'ledger merge: resolve staged conflict markers first');
   // Git honors per-path conflict-marker-size, including size 1. A global
   // single-character regex would also reject ordinary Markdown blockquotes.
   let checked;

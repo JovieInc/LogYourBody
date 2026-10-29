@@ -262,6 +262,49 @@ test('artifact CLI prints one summary line and fails when the output cannot be w
   assert.equal(failure.stdout, '');
 });
 
+test('merge readiness scans large staged imports and still rejects trailing conflict markers', (t) => {
+  const { root } = fixtureRepo(t, []);
+  const source = join(root, 'large-source.txt');
+  const content = 'already reviewed upstream source\n'.repeat(50_000);
+  const stage = (suffix, prefix = content) => {
+    writeFileSync(source, prefix + suffix);
+    execFileSync('git', ['add', 'large-source.txt'], { cwd: root });
+  };
+  stage('resolved source\n');
+  assert.doesNotThrow(() => assertLedgerMergeReady(root));
+  for (const marker of ['<<<<<<< ours', '||||||| base', '=======', '>>>>>>>> theirs']) {
+    stage(marker + '\n');
+    assert.throws(() => assertLedgerMergeReady(root), /resolve staged conflict markers/);
+  }
+  stage('=======ordinary content\n');
+  assert.doesNotThrow(() => assertLedgerMergeReady(root));
+
+  // Position a marker across a 64KiB scanner boundary, including the diff header.
+  stage('<<<<<<< ours\n', 'x\n');
+  const initialDiff = execFileSync('git', ['diff', '--cached', '--no-ext-diff', '--unified=0'], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  const markerOffset = initialDiff.indexOf('+<<<<<<< ours');
+  assert.ok(markerOffset > 0);
+  stage('<<<<<<< ours\n', 'x'.repeat(1 + 64 * 1024 - 4 - markerOffset) + '\n');
+  assert.throws(() => assertLedgerMergeReady(root), /resolve staged conflict markers/);
+
+  // Neither a giant ordinary line nor a marker run needs unbounded retained text.
+  const giantLine = 'x'.repeat(2 * 1024 * 1024) + '\n';
+  stage('resolved source\n', giantLine);
+  assert.doesNotThrow(() => assertLedgerMergeReady(root));
+  stage('||||||| base\n', giantLine);
+  assert.throws(() => assertLedgerMergeReady(root), /resolve staged conflict markers/);
+  for (const marker of ['<< ours', '|| base', '==', '>> theirs']) {
+    stage(marker + '\n');
+    assert.throws(() => assertLedgerMergeReady(root), /resolve staged conflict markers/);
+  }
+  // Keep the same explicit ceiling as the bounded guard reads and buffered check.
+  stage('', 'x'.repeat(17 * 1024 * 1024));
+  assert.throws(() => assertLedgerMergeReady(root), /ENOBUFS/);
+});
+
 test('ledger merge retains independent receipts and one-sided edits without mutating inputs', () => {
   const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
   const base = [row('kept')];

@@ -43,7 +43,10 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
             let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: menu)
             XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
             menu.tap()
-            XCTAssertTrue(scrim.waitForExistence(timeout: 5), "Each single menu tap must open the sidebar")
+            XCTAssertTrue(
+                scrim.waitForExistence(timeout: 5),
+                "Each single menu tap must open the sidebar. Hierarchy: \(app.debugDescription)"
+            )
             scrim.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
             XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))
             XCTAssertEqual(pager.value as? String, "Entry 1 of 1")

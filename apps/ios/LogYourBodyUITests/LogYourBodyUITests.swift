@@ -735,13 +735,55 @@ final class LogYourBodyUITests: XCTestCase {
 
         let logoutButton = app.descendants(matching: .any)["settings_logout_button"]
         XCTAssertTrue(logoutButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(logoutButton.isHittable)
+        let logoutConfirmation = app.alerts["Log out of LogYourBody?"]
+        XCTAssertFalse(logoutConfirmation.exists)
         logoutButton.tap()
 
-        let confirmLogout = app.buttons.matching(identifier: "settings_logout_confirm").firstMatch
-        XCTAssertTrue(confirmLogout.waitForExistence(timeout: 5))
+        // Native alerts can expose both a wrapper button and its action button.
+        // Require one hittable leaf inside this alert, never a background button.
+        XCTAssertTrue(logoutConfirmation.waitForExistence(timeout: 5), app.debugDescription)
+        let cancelLogout = try hittableLogoutAction(
+            in: logoutConfirmation, identifier: "settings_logout_cancel", label: "Cancel"
+        )
+        cancelLogout.tap()
+        XCTAssertTrue(logoutConfirmation.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(logoutButton.exists)
+        XCTAssertFalse(app.buttons["continueWithAppleButton"].exists)
+
+        logoutButton.tap()
+        XCTAssertTrue(logoutConfirmation.waitForExistence(timeout: 5), app.debugDescription)
+        let confirmLogout = try hittableLogoutAction(
+            in: logoutConfirmation, identifier: "settings_logout_confirm", label: "Log Out"
+        )
         confirmLogout.tap()
 
         XCTAssertTrue(app.buttons["continueWithAppleButton"].waitForExistence(timeout: 8))
+    }
+
+    private func hittableLogoutAction(in alert: XCUIElement, identifier: String, label: String) throws -> XCUIElement {
+        let candidates = alert.buttons.matching(identifier: identifier)
+        func interactiveActions() -> [XCUIElement] {
+            candidates.allElementsBoundByIndex.filter {
+                $0.label == label && $0.isEnabled && $0.isHittable
+                    && !$0.descendants(matching: .button).matching(identifier: identifier).firstMatch.exists
+            }
+        }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            interactiveActions().count == 1
+        }, object: nil)
+        let result = XCTWaiter.wait(for: [ready], timeout: 5)
+        let controls = alert.buttons.allElementsBoundByIndex.map {
+            "\($0.identifier)=\($0.label) enabled=\($0.isEnabled) hittable=\($0.isHittable) frame=\($0.frame)"
+        }
+        XCTContext.runActivity(named: "Logout action \(identifier): \(controls)") { activity in
+            let attachment = XCTAttachment(string: alert.debugDescription)
+            attachment.lifetime = .keepAlways
+            activity.add(attachment)
+        }
+        XCTAssertEqual(result, .completed, alert.debugDescription)
+        let actions = interactiveActions()
+        return try XCTUnwrap(actions.count == 1 ? actions.first : nil, alert.debugDescription)
     }
 
     func testProfileEditorProvidesAnEscapeRoute() throws {

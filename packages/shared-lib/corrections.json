@@ -4701,5 +4701,95 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-imports-local-lint-scope",
+    "correction": "PR #1481: merging current main into a dependency-only branch selected hundreds of already-integrated files for pre-commit lint, requiring SwiftLint on a Linux web repair and preventing source publication. Check the real branch and resolution delta when importing verified main.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1481",
+    "mechanization": "The existing pre-commit hook uses a merge-aware lint-staged wrapper. For a single incoming fetched-main ancestor it compares that commit with the immutable index tree, retaining branch changes and conflict resolutions while excluding identical imported main files. Ordinary and unverified merges keep full staged checks, unresolved indexes fail closed, and lint failures propagate. Required Detect Changes runs real Git fixture tests for imported native source, resolution edits, unstaged edits, fallback, conflicts and failure propagation. Ordinary integration with main c53c5e997 retains incoming no-textconv/no-color protection and the landed classifier worker bound. Current qualification passes89 actual-Git hook/detection/scanner tests plus rootlint4, typecheck4 and test8tasks, including186 shared-lib tests and122 subsequent Node tests. All currentmain receipts remain semantically unchanged.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The local hook can derive the exact reviewed merge source delta without changing hosted CI, native test requirements or merge queue gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/pre-commit-lint.mjs",
+      "anchor": "Only a fetched main ancestor can supply already-integrated source."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-large-merge-diff",
+    "correction": "PR #1535: correction-ledger merge readiness crashed with spawnSync git ENOBUFS after integrating a large main diff, preventing an otherwise valid repair from preserving its correction receipts.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1535",
+    "mechanization": "Stream the complete staged Git diff through an owner-private temporary file and inspect bounded UTF-8 chunks for added conflict-marker lines. Preserve all existing marker boundary semantics and fail closed on Git/read errors; remove the spool on all exits. The existing required correction-coverage behavior suite checks a diff larger than the former pipe limit, all four trailing marker variants, and ordinary marker-like text. Ordinary integration with main c53c5e997 retains incoming no-textconv/no-color protection and the landed classifier worker bound. Current qualification passes89 actual-Git hook/detection/scanner tests plus rootlint4, typecheck4 and test8tasks, including186 shared-lib tests and122 subsequent Node tests. All currentmain receipts remain semantically unchanged.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Bounded streaming preserves the full marker guard while removing a size-dependent failure from large main integrations."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.behavior.mjs",
+      "anchor": "merge readiness scans large staged imports and still rejects trailing conflict markers"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-logout-regression-scopes-system-alert-actions",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40856673874/job/123389575579",
+    "correction": "At exact head 34a883a596d431e7b311896fe689ea3e14219de9, all 2,122 Unit cases passed, but the mandatory logout-from-pushed-detail UI regression could not find settings_logout_confirm after tapping Log Out. The assertion failed before sign-out; no production authentication failure is established.",
+    "mechanization": "Keep the same required native regression and signed-out assertion. Scope confirmation controls to the exact native logout alert and user-visible action labels instead of relying on optional SwiftUI identifiers on system-rendered alert actions. Exercise Cancel first and require the session to remain, then reopen and confirm sign-out. Reject a missing dialog or unhittable action. Log only the alert control identifiers/labels to distinguish identifier loss from presentation failure on hosted execution. Existing full launch-quality selection, evidence validation and timeouts remain unchanged.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing XCTest lookup can bind only controls within the named native alert, eliminating app-wide identifier dependence while the mandatory runtime case checks both cancellation and sign-out. Product authentication and confirmation behavior are unchanged."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "let logoutConfirmation = app.alerts[\"Log out of LogYourBody?\"]"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-logout-action-must-be-uniquely-interactive",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40866009010/job/123421170062",
+    "correction": "At bc91, the named logout alert appeared with two copies of each expected identifier and label. The label-first Cancel lookup existed but was not hittable, failing before cancellation or sign-out. This proves the test selected a noninteractive node; it does not prove a production authentication failure or that another node is hittable.",
+    "mechanization": "Within the exact alert, enumerate the exact action identifier, require its expected label and enabled/hittable state, and fail closed unless exactly one action meets those conditions within five seconds. Retain cancellation/session-preservation and actual sign-out postconditions. Publish live enabled/hittable/frame diagnostics through XCTest activities. Existing required native runtime execution remains the acceptance check; no product source, selector, overall deadline or retry-budget changes.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The required logout runtime regression now rejects zero or multiple interactive targets and verifies actual cancellation and sign-out. Exact-host execution is still required; local static qualification does not prove this candidate passes."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "private func hittableLogoutAction(in alert: XCUIElement, identifier: String, label: String) throws -> XCUIElement"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-alert-action-query-excludes-wrapper-buttons",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40882928976/job/123479399281",
+    "correction": "At exact53b1, the required logout test failed because its uniqueness predicate counted two hittable nodes. The printed native hierarchy proves each expected action is a Button containing a child Button with identical identifier, label and frame. The alert and user action exist; raw descendant-count uniqueness incorrectly treats wrapper and leaf as separate actions.",
+    "mechanization": "Keep the exact alert, action identifier, expected label, enabled/hittable predicate and one-action requirement. Exclude a matching node only when it contains another Button with the same identifier, selecting the concrete leaf action. Distinct leaf actions still fail closed. Preserve cancel/session and actual sign-out assertions, the five-second readiness bound, required native selectors and overall deadlines. Hosted red-before53b1 is retained; candidate acceptance requires actual native execution.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing required runtime test exercises both native alert actions and their outcomes. The selector now models the observed wrapper/child hierarchy without accepting arbitrary duplicate siblings or changing product authentication."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "&& !$0.descendants(matching: .button).matching(identifier: identifier).firstMatch.exists"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
