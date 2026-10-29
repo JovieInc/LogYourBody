@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "ruby-native-cache-isolates-runtime-builds",
+    "correction": "PR #1581: Merge-group CI restored incompatible native Ruby gems on the self-hosted Mac; date_core.bundle failed to load with Symbol not found: _rb_cFalseClass before iOS tests began. Partition both exact and fallback bundle cache keys by architecture, runner environment and the running Ruby build configuration.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40280789081/job/121433401010",
+    "mechanization": "Extend the existing shared Ruby setup action to fingerprint RbConfig::CONFIG and include it, runner architecture and runner environment in both cache keys. The existing required Mac Runner Routing Tests execute the actual fingerprint step, verify stable and incompatible builds, reject cross-runtime cache collisions and stop on fingerprint failure. The two new regressions failed on the old action and pass on the repaired action. Native iOS execution still requires the repaired head on macOS.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot partition native gem artifacts restored by the CI setup action before the app is built."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required routing suite can execute the shared action's Ruby fingerprint step and compare both primary and fallback cache keys across incompatible runtime identities before merge."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "test_ruby_bundle_cache_isolates_native_extension_builds"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
     "correction": "PR #1537: Resolve the origin/main correction-ledger conflict by retaining the Sentry identity and StoreKit cleanup receipts alongside main's recurrence, measurement-freshness and release receipts.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1537",

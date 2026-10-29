@@ -662,6 +662,83 @@ def test_hosted_ios_jobs_retain_existing_test_quality_and_summary_gates() -> Non
     assert 'heartbeat' not in summary
 
 
+def test_ruby_bundle_cache_isolates_native_extension_builds() -> None:
+    import re
+
+    action = (_REPO_ROOT / '.github/actions/setup-ruby-bundler/action.yml').read_text()
+    cache = action.split('    - name: Cache Ruby dependencies\n', 1)[1].split('\n    - name:', 1)[0]
+    key = next(line.strip().removeprefix('key: ') for line in cache.splitlines() if line.strip().startswith('key: '))
+    restores = [line.strip() for line in cache.split('        restore-keys: |\n', 1)[1].splitlines() if line.strip()]
+    values = {
+        'runner.os': 'macOS', 'runner.arch': 'ARM64', 'runner.environment': 'self-hosted',
+        'inputs.cache-key-prefix': 'ios-gems', 'steps.ruby-version.outputs.version': '3.1.7p261',
+        'steps.ruby-version.outputs.abi': 'homebrew-build', 'steps.gemfile-hash.outputs.hash': 'lock-a',
+    }
+
+    def render(template: str, **overrides: str) -> str:
+        context = {**values, **overrides}
+        return re.sub(r'\$\{\{\s*(.*?)\s*\}\}', lambda match: context[match[1]], template)
+
+    current = render(key)
+    assert all(current.startswith(render(prefix)) for prefix in restores)
+    assert all(render(key, **{'steps.gemfile-hash.outputs.hash': 'lock-b'}).startswith(render(prefix)) for prefix in restores)
+    incompatible = [
+        {'runner.arch': 'X64'},
+        {'runner.environment': 'github-hosted'},
+        {'steps.ruby-version.outputs.abi': 'different-build'},
+        {'steps.ruby-version.outputs.version': '3.1.6p260'},
+    ]
+    for changes in incompatible:
+        assert render(key, **changes) != current, changes
+        assert all(not current.startswith(render(prefix, **changes)) for prefix in restores), changes
+    legacy = 'macOS-ios-gems-ruby-3.1.7p261-lock-a'
+    assert all(not legacy.startswith(render(prefix)) for prefix in restores)
+
+
+def test_ruby_bundle_abi_uses_the_running_ruby_configuration(tmp_path: Path) -> None:
+    import re
+
+    action = (_REPO_ROOT / '.github/actions/setup-ruby-bundler/action.yml').read_text()
+    step = action.split('    - name: Get Ruby version\n', 1)[1].split('\n    - name:', 1)[0]
+    body = step.split('      run: ', 1)[1]
+    body = textwrap.dedent(body[2:]) if body.startswith('|\n') else body.strip()
+    preload = tmp_path / 'rbconfig-fixture.rb'
+    preload.write_text("require 'rbconfig'\nRbConfig::CONFIG[ENV.fetch('CONFIG_KEY')] = ENV.fetch('CONFIG_VALUE')\n")
+    identities = []
+    for index, (key, value) in enumerate([
+        ('arch', 'arm64-darwin-25'), ('arch', 'arm64-darwin-25'),
+        ('arch', 'x86_64-darwin-25'), ('prefix', '/different-ruby-build'),
+        ('configure_args', '--enable-shared'),
+    ]):
+        output = tmp_path / f'output-{index}'
+        result = subprocess.run(
+            ['bash', '-e', '-o', 'pipefail', '-c', body], text=True, capture_output=True,
+            check=False, pass_fds=_coverage_fds(),
+            env={**os.environ, 'GITHUB_OUTPUT': str(output), 'RUBYOPT': f'-r{preload}',
+                 'CONFIG_KEY': key, 'CONFIG_VALUE': value},
+        )
+        assert result.returncode == 0, result.stderr
+        identity = dict(line.split('=', 1) for line in output.read_text().splitlines())
+        assert re.fullmatch(r'[0-9a-f]{64}', identity.get('abi', '')), identity
+        identities.append(identity)
+    assert identities[0] == identities[1]
+    assert len({identity['version'] for identity in identities}) == 1
+    assert len({identity['abi'] for identity in identities}) == 4
+    # A failed fingerprint must stop setup before any cache can be restored.
+    ruby = tmp_path / 'ruby'
+    ruby.write_text('#!/usr/bin/env bash\nif [[ "$1" == -v ]]; then echo "ruby 3.1.7p261"; else exit 42; fi\n')
+    ruby.chmod(0o755)
+    output = tmp_path / 'failed-output'
+    result = subprocess.run(
+        ['bash', '-e', '-o', 'pipefail', '-c', body], text=True, capture_output=True,
+        check=False, pass_fds=_coverage_fds(),
+        env={**os.environ, 'GITHUB_OUTPUT': str(output), 'RUBYOPT': '',
+             'PATH': f'{tmp_path}:{os.environ["PATH"]}'},
+    )
+    assert result.returncode == 42
+    assert not output.exists()
+
+
 def _run_manual_quality_guard(tmp_path: Path, **overrides: str) -> subprocess.CompletedProcess[str]:
     quality = _job_block("ios-quality.yml", "quality")
     guard_step = quality.split("      - name: Validate manual qualification source\n", 1)[1]

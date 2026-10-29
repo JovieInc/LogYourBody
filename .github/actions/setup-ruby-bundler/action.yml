@@ -45,7 +45,14 @@ runs:
     - name: Get Ruby version
       id: ruby-version
       shell: bash
-      run: echo "version=$(ruby -v | awk '{print $2}')" >> $GITHUB_OUTPUT
+      run: |
+        version="$(ruby -v | awk '{print $2}')"
+        # Native gems also depend on the Ruby build, not just its version.
+        abi="$(ruby -rrbconfig -rdigest -e 'puts Digest::SHA256.hexdigest(RbConfig::CONFIG.sort.inspect)')"
+        {
+          echo "version=$version"
+          echo "abi=$abi"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Get Gemfile.lock hash
       id: gemfile-hash
@@ -64,9 +71,10 @@ runs:
       id: bundler-cache
       with:
         path: ${{ inputs.working-directory }}/vendor/bundle
-        key: ${{ runner.os }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-${{ steps.gemfile-hash.outputs.hash }}
+        # Keep hosted Ruby and Homebrew builds (and their native extensions) apart.
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-${{ steps.ruby-version.outputs.abi }}-${{ steps.gemfile-hash.outputs.hash }}
         restore-keys: |
-          ${{ runner.os }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-
+          ${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-${{ steps.ruby-version.outputs.abi }}-
 
     - name: Install Bundler
       shell: bash
