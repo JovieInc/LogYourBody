@@ -4451,5 +4451,27 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "migration-oracle-checks-retained-schema-plus-exact-overlay-delta",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40815091047/job/123254355965",
+    "correction": "The inherited workout V4 migration test equated every old entity hash with the current model. V7 intentionally adds two attributes to CachedBodyMetrics; native CI completed2108tests with only that obsolete full-entity hash assertion failing.",
+    "mechanization": "Keep exact entity hashes for all other retained entities. For CachedBodyMetrics require the exact retained property set plus isExcluded and correctedValueJSON, equal hashes for every retained property, unchanged class/abstract/superentity/hash-modifier/renaming/uniqueness metadata, and exact additive type/optional/default contracts. Keep inferred mapping, actual populated SQLite migration, retained data and reconciliation behavior assertions. Existing frozen model guard still preserves V1–V6 bytes and the exact two-attribute V7 delta; no product schema changed to satisfy a stale test.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Production must add the approved overlay fields, which necessarily changes the aggregate entity hash. Preserving that obsolete oracle through a product change would erase the feature or fail to migrate."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing migration regression can verify retained schema identity at property granularity and permit exactly the intended additive delta while retaining its real SQLite migration behavior."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/WorkoutReconciliationPromptTests.swift",
+      "anchor": "func testV4MigrationPreservesExistingEntitiesAndAddsReconciliationStorage() throws {"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
