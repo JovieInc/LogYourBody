@@ -612,3 +612,117 @@ final class CoreDataModelMigrationTests: XCTestCase {
 private enum MigrationFixtureError: Error {
     case message(String)
 }
+
+extension CoreDataModelMigrationTests {
+    @MainActor
+    func testPopulatedV4StoreMigratesOverlayDefaultsAndRetainsImportAfterReopen() throws {
+        try assertOverlayMigrationPreservesStore(from: "LogYourBodyV4")
+    }
+
+    @MainActor
+    func testPopulatedV5StoreRetainsWorkoutReconciliationAndImportsWhenMigratingToV7() throws {
+        try assertOverlayMigrationPreservesStore(from: "LogYourBodyV5")
+    }
+
+    @MainActor
+    func testPopulatedV6StoreRetainsDatedOutcomeAndImportsWhenMigratingToV7() throws {
+        try assertOverlayMigrationPreservesStore(from: "LogYourBodyV6")
+    }
+
+    @MainActor
+    private func assertOverlayMigrationPreservesStore(from modelName: String) throws {
+        let bundle = Bundle(for: CoreDataManager.self)
+        let models = try XCTUnwrap(bundle.url(forResource: "LogYourBody", withExtension: "momd"))
+        let legacy = try XCTUnwrap(NSManagedObjectModel(contentsOf: models.appendingPathComponent("\(modelName).mom")))
+        XCTAssertNil(legacy.entitiesByName["CachedBodyMetrics"]?.attributesByName["isExcluded"])
+        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: legacy)
+        let store = try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL)
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = coordinator
+        let date = Date(timeIntervalSince1970: 1_780_000_000)
+        let row = NSEntityDescription.insertNewObject(forEntityName: "CachedBodyMetrics", into: context)
+        for key in ["createdAt", "date", "lastModified", "updatedAt"] { row.setValue(date, forKey: key) }
+        row.setValue("v4-import", forKey: "id")
+        row.setValue("owner-243", forKey: "userId")
+        row.setValue(81.234567, forKey: "weight")
+        row.setValue("kg", forKey: "weightUnit")
+        row.setValue(18.25, forKey: "bodyFatPercentage")
+        row.setValue("bodyspec_dexa", forKey: "dataSource")
+        row.setValue("{\"external_result_id\":\"original-report\"}", forKey: "sourceMetadataJSON")
+        let datedPayload = Data("retained dated outcome".utf8)
+        let datedRevision = UUID()
+        let hasDatedOutcome = legacy.entitiesByName["CachedDatedOutcome"] != nil
+        XCTAssertEqual(hasDatedOutcome, modelName == "LogYourBodyV6")
+        let hasWorkoutReconciliation = legacy.entitiesByName["CachedWorkoutReconciliationDay"] != nil
+        XCTAssertEqual(hasWorkoutReconciliation, modelName != "LogYourBodyV4")
+        let workoutPayload = Data("retained workout reconciliation".utf8)
+        if hasWorkoutReconciliation {
+            let day = NSEntityDescription.insertNewObject(forEntityName: "CachedWorkoutReconciliationDay", into: context)
+            day.setValue("owner-243", forKey: "ownerId")
+            day.setValue("2027-01-01", forKey: "day")
+            day.setValue(workoutPayload, forKey: "payload")
+        }
+        if hasDatedOutcome {
+            let outcome = NSEntityDescription.insertNewObject(forEntityName: "CachedDatedOutcome", into: context)
+            outcome.setValue("owner-243", forKey: "ownerId")
+            outcome.setValue(datedRevision, forKey: "revision")
+            outcome.setValue(Int64(7), forKey: "sequence")
+            outcome.setValue(datedPayload, forKey: "payload")
+            outcome.setValue(true, forKey: "pending")
+        }
+        try context.save()
+        try coordinator.remove(store)
+
+        let current = CoreDataManager.makeManagedObjectModel(in: bundle)
+        _ = try NSMappingModel.inferredMappingModel(forSourceModel: legacy, destinationModel: current)
+        let migrated = NSPersistentStoreCoordinator(managedObjectModel: current)
+        let migratedStore = try migrated.addPersistentStore(
+            ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL,
+            options: [NSMigratePersistentStoresAutomaticallyOption: true, NSInferMappingModelAutomaticallyOption: true]
+        )
+        let verification = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        verification.persistentStoreCoordinator = migrated
+        let request = NSFetchRequest<NSManagedObject>(entityName: "CachedBodyMetrics")
+        let rows = try verification.fetch(request)
+        XCTAssertEqual(rows.count, 1)
+        let imported = try XCTUnwrap(rows.first)
+        XCTAssertEqual(imported.value(forKey: "weight") as? Double, 81.234567)
+        XCTAssertEqual(imported.value(forKey: "bodyFatPercentage") as? Double, 18.25)
+        XCTAssertEqual(imported.value(forKey: "sourceMetadataJSON") as? String,
+                       "{\"external_result_id\":\"original-report\"}")
+        XCTAssertEqual(imported.value(forKey: "isExcluded") as? Bool, false)
+        XCTAssertNil(imported.value(forKey: "correctedValueJSON"))
+        imported.setValue(true, forKey: "isExcluded")
+        imported.setValue("{\"weight\":79.125}", forKey: "correctedValueJSON")
+        try verification.save()
+        try migrated.remove(migratedStore)
+
+        let reopened = NSPersistentStoreCoordinator(managedObjectModel: current)
+        let reopenedStore = try reopened.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL)
+        let reopenedContext = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        reopenedContext.persistentStoreCoordinator = reopened
+        let retained = try XCTUnwrap(reopenedContext.fetch(request).first)
+        XCTAssertEqual(retained.value(forKey: "weight") as? Double, 81.234567)
+        XCTAssertEqual(retained.value(forKey: "isExcluded") as? Bool, true)
+        XCTAssertEqual(retained.value(forKey: "correctedValueJSON") as? String, "{\"weight\":79.125}")
+        if hasWorkoutReconciliation {
+            let days = try reopenedContext.fetch(NSFetchRequest<NSManagedObject>(entityName: "CachedWorkoutReconciliationDay"))
+            XCTAssertEqual(days.count, 1)
+            let day = try XCTUnwrap(days.first)
+            XCTAssertEqual(day.value(forKey: "ownerId") as? String, "owner-243")
+            XCTAssertEqual(day.value(forKey: "day") as? String, "2027-01-01")
+            XCTAssertEqual(day.value(forKey: "payload") as? Data, workoutPayload)
+        }
+        if hasDatedOutcome {
+            let outcomes = try reopenedContext.fetch(NSFetchRequest<NSManagedObject>(entityName: "CachedDatedOutcome"))
+            XCTAssertEqual(outcomes.count, 1)
+            let outcome = try XCTUnwrap(outcomes.first)
+            XCTAssertEqual(outcome.value(forKey: "ownerId") as? String, "owner-243")
+            XCTAssertEqual(outcome.value(forKey: "revision") as? UUID, datedRevision)
+            XCTAssertEqual(outcome.value(forKey: "sequence") as? Int64, 7)
+            XCTAssertEqual(outcome.value(forKey: "payload") as? Data, datedPayload)
+            XCTAssertEqual(outcome.value(forKey: "pending") as? Bool, true)
+        }
+        try reopened.remove(reopenedStore)
+    }
+}

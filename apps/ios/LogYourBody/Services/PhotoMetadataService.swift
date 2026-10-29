@@ -193,9 +193,9 @@ class PhotoMetadataService {
                 userId: userId,
                 date: existing.date,
                 localDate: existing.localDate,
-                weight: updatedWeight,
+                weight: changedFields.contains(.weight) ? updatedWeight : existing.originalWeight,
                 weightUnit: existing.weightUnit ?? "kg",
-                bodyFatPercentage: updatedBodyFat,
+                bodyFatPercentage: changedFields.contains(.bodyFat) ? updatedBodyFat : existing.originalBodyFatPercentage,
                 bodyFatMethod: updatedBodyFatMethod,
                 muscleMass: existing.muscleMass,
                 boneMass: existing.boneMass,
@@ -206,6 +206,8 @@ class PhotoMetadataService {
                 photoUrl: photoUrl ?? existing.photoUrl,
                 dataSource: existing.dataSource,
                 sourceMetadata: metadata,
+                isExcluded: existing.isExcluded,
+                correctedValue: existing.correctedValue,
                 createdAt: existing.createdAt,
                 updatedAt: Date()
             )
@@ -329,11 +331,11 @@ class PhotoMetadataService {
                 "lastModified", "isSynced", "syncStatus"
             ])
             if fields.contains(.weight) {
-                cached.weight = previous.weight ?? 0
+                cached.weight = previous.originalWeight ?? 0
                 cached.weightUnit = previous.weightUnit
             }
             if fields.contains(.bodyFat) {
-                cached.bodyFatPercentage = previous.bodyFatPercentage ?? 0
+                cached.bodyFatPercentage = previous.originalBodyFatPercentage ?? 0
                 cached.bodyFatMethod = previous.bodyFatMethod
             }
             cached.sourceMetadataJSON = (BodyMetricSourceMetadata(jsonString: cached.sourceMetadataJSON) ??
@@ -381,7 +383,7 @@ class PhotoMetadataService {
 
     /// Estimate weight based on nearby entries
     func estimateWeight(for date: Date, metrics: [BodyMetrics]) -> (value: Double, isEstimated: Bool)? {
-        let sortedMetrics = metrics.filter { $0.weight != nil }.sorted { $0.date < $1.date }
+        let sortedMetrics = metrics.filter { !$0.isExcluded && $0.weight != nil }.sorted { $0.date < $1.date }
         guard !sortedMetrics.isEmpty else { return nil }
 
         // Find metrics before and after the date
@@ -430,7 +432,7 @@ class PhotoMetadataService {
     func estimateBodyFat(for date: Date, metrics: [BodyMetrics]) -> (value: Double, isEstimated: Bool)? {
         var before: BodyMetrics?
         var after: BodyMetrics?
-        for metric in metrics where metric.bodyFatPercentage != nil {
+        for metric in metrics where !metric.isExcluded && metric.bodyFatPercentage != nil {
             if metric.date <= date {
                 // Match stable chronological sorting: the last equal-date entry wins before.
                 if let previous = before, previous.date > metric.date { continue }

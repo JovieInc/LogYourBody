@@ -106,7 +106,7 @@ final class BodyScoreRecalculationService {
 
         // Use the most recent entry that has both weight and body fat
         let sorted = metrics.sorted { $0.date > $1.date }
-        guard let latest = sorted.first(where: { $0.weight != nil && $0.bodyFatPercentage != nil }) else {
+        guard let latest = sorted.first(where: { !$0.isExcluded && $0.weight != nil && $0.bodyFatPercentage != nil }) else {
             return
         }
 

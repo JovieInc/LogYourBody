@@ -46,6 +46,16 @@ const NativeBodyMetricPushSchema = z
     notes: z.string().max(2000).nullable(),
     data_source: z.enum(DATA_SOURCES),
     source_metadata: z.record(z.string(), z.unknown()),
+    is_excluded: z.boolean().optional(),
+    corrected_value: z
+      .object({
+        weight: z.number().finite().min(32).max(300).optional(),
+        body_fat_percentage: z.number().finite().min(3).max(60).optional(),
+      })
+      .strict()
+      .refine((value) => Object.keys(value).length > 0)
+      .nullable()
+      .optional(),
     created_at: isoDateTime,
     updated_at: isoDateTime,
   })
@@ -99,6 +109,8 @@ function mapPushRecord(record: z.infer<typeof NativeBodyMetricPushSchema>) {
     notes: record.notes,
     data_source: record.data_source,
     source_metadata: record.source_metadata,
+    is_excluded: record.is_excluded,
+    corrected_value: record.corrected_value,
     created_at: new Date(record.created_at).toISOString(),
     updated_at: new Date(record.updated_at).toISOString(),
   };

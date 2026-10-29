@@ -83,6 +83,7 @@ LOCKED_MODEL_VERSIONS = {
     'LogYourBodyV4.xcdatamodel': '66da9882db8b7624867d6149e336f7847647c69ab1b431c7d161ef590e09db96',
     'LogYourBodyV5.xcdatamodel': 'd344e8c50e13ea843757659942ef2cadf59ad204f672026c360be25b1d6475b4',
     'LogYourBodyV6.xcdatamodel': '3ad6bfa15f2f50b936249e5bfc6caab6038f07b0b596c743c1f5624b62ed40a5',
+    'LogYourBodyV7.xcdatamodel': '9a16e86aa6811d337b2b4a875f6b5e66f7d9b2a68548279ec71a77db27766ef6',
 }
 
 

@@ -100,6 +100,34 @@ function request(method: 'GET' | 'POST' | 'DELETE', token?: string, body?: unkno
 }
 
 describe('/api/auth/mobile/sync/v1/body-metrics', () => {
+  it('accepts correction/exclusion overlays without replacing source values and supports undo', async () => {
+    const { handlers, sync } = makeHarness();
+    const overlay = { ...morningInput, is_excluded: true, corrected_value: { weight: 79.125 } };
+    const response = await handlers.POST(request('POST', 'access-a', { records: [overlay] }));
+    expect(response.status).toBe(200);
+    expect(sync.pushed[0]?.records[0]).toMatchObject(overlay);
+    expect((await response.json()).records[0]).toMatchObject(overlay);
+    const undo = { ...morningInput, is_excluded: false, corrected_value: null };
+    expect((await handlers.POST(request('POST', 'access-a', { records: [undo] }))).status).toBe(
+      200,
+    );
+    expect(sync.pushed[1]?.records[0]).toMatchObject(undo);
+  });
+
+  it.each([{}, { weight: 0 }, { weight: 301 }, { body_fat_percentage: 99 }, { unknown: 80 }])(
+    'rejects invalid correction overlays %j',
+    async (corrected_value) => {
+      const { handlers, sync } = makeHarness();
+      const response = await handlers.POST(
+        request('POST', 'access-a', {
+          records: [{ ...morningInput, corrected_value }],
+        }),
+      );
+      expect(response.status).toBe(400);
+      expect(sync.pushed).toEqual([]);
+    },
+  );
+
   it('rejects missing bearer tokens before touching persistence', async () => {
     const { handlers, sync } = makeHarness();
     expect((await handlers.GET(request('GET'))).status).toBe(401);

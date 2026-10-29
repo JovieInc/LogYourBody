@@ -4505,5 +4505,201 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "xcode-file-paths-use-valid-openstep-strings",
+    "correction": "PR #1564 / LYB-243: Quote the CoreDataManager+Part06.swift project path. Its unquoted plus sign prevents Xcode project loading, so Launch Quality and StoreKit exit with code 74 before tests run.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40202027853/job/121195099171",
+    "mechanization": "Quote the path and retain a required shared-lib regression that rejects file-reference paths containing punctuation outside the OpenStep bare-string grammar unless quoted. The regression fails on the original path and passes with the fix; the Nanaimo parser independently reproduces the original error and accepts the repaired project.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot enforce the serialization grammar of the Xcode project manifest loaded before the app compiles."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing shared-lib test suite runs in required JavaScript/TypeScript CI and can reject unquoted file-reference paths with invalid OpenStep token characters before native jobs load the project."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/metric-correction-boundary.test.ts",
+      "anchor": "quotes Xcode file-reference paths containing OpenStep punctuation (LYB-243)"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "core-data-parallel-model-version-collision",
+    "correction": "Parallel dated-outcome and metric-correction changes each introduced a different Core Data V5, so combining them could discard dated entities or reinterpret an existing store version.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1564",
+    "mechanization": "Historical repair retained dated-outcome V5 and overlay V6 before current main introduced a different V5. Current reconciliation preserves main V1–V5 and the additive dated-outcome V6 byte-for-byte, adds overlays only in V7, and selects V7 in app and widget. The existing required immutable model/graph guard extends to V7; the overlay boundary test fixes both retained V5/V6 identities and the exact two-attribute V7 delta. Native populated V4/V5/V6 migrations preserve imports, workout reconciliation and dated outcomes, plus overlay edits after reopen. All three migration cases are mandatory in the existing launch-quality evidence command, whose regression rejects each missing, failed or skipped case. Exact-head native execution and coverage remain hosted requirements.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Keeping published model versions immutable and expressing later changes as a new additive version makes the composed model lineage unambiguous."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/metric-correction-boundary.test.ts",
+      "anchor": "it('keeps retained V5 and V6 immutable and adds overlays only in V7'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-overlay-sync-replay-fencing",
+    "correction": "Composing metric overlays with the canonical native upsert requires old clients to preserve omitted overlays while stale writes, equal-timestamp changes, foreign ownership and tombstones remain rejected.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1564",
+    "mechanization": "Extend the canonical timestamp-fenced CTE with nullable overlay presence and replay equality. Keep original observations separate; explicit false/null performs undo. Execute the production upsert SQL in the existing disposable PostgreSQL16 verifier for correction, omission, undo, exact replay, stale/equal-timestamp conflict, owner and tombstone cases. This is part of the existing required database gate, not a second SQL implementation.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The production upsert gates overlays with the same timestamp and owner predicates as original observations and distinguishes omission from explicit removal by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/web/db/tests/verify-training-mutations.py",
+      "anchor": "def verify_native_overlay_replays(web, sql, subject):"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "mainactor-injected-callback-isolation",
+    "correction": "MetricCorrectionService injected callbacks invoked MainActor APIs but their stored/default closure types did not retain actor isolation, producing a Swift concurrency compile error.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1564",
+    "mechanization": "Declare the stored and injected admission, rollout and sync closures as MainActor, matching the service and their actual dependencies. The existing native target compiles and exercises MetricCorrectionServiceTests; Linux source inspection does not establish a native compile pass.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Expressing actor isolation in each callback type prevents loss of isolation at the injection boundary."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/MetricCorrectionService.swift",
+      "anchor": "private let isEnabled: @MainActor () -> Bool"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "metric-exclusion-estimates-preserve-measurement-precision",
+    "correction": "PR #1564 / LYB-243: MetricCorrectionTests.swift compared rounded exclusion fallback estimates with the full-precision imported weight, causing two Launch Quality assertions to fail even though the original measurement remained intact.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40425013619/job/121928674249",
+    "mechanization": "Extend the existing native exclusion regression with a reusable calculation contract for original, corrected and undone fractional weights through the same hero cache. Keep rounded estimates separate from precise measurements. Require this exact case in the existing launch-quality evidence command so missing or skipped execution fails. The existing Python/shared-lib guard fails before this requirement and passes afterward, rejecting skipped, failed and absent native evidence. Repaired native execution and coverage still require the real macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The defect is in a test oracle: application behavior intentionally rounds interpolation estimates while retaining precise measurements. Changing production rounding to satisfy that oracle would change the product contract."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required native test target can enforce both precision contracts across correction and undo using one reusable assertion helper and a table of fractional fixtures."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "def test_unit_command_requires_passing_metric_overlay_regression(self):"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "quality-unit-required-cases-do-not-rewrite-reviewed-launcher",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40814236131/job/123251455396",
+    "correction": "Adding mandatory overlay and migration cases directly to the reviewed launch-quality script changed its bytes and caused both diagnostic trust regression checks to fail on PR1564. No new diagnostic authority was requested.",
+    "mechanization": "Restore the entire reviewed launch-quality launcher byte-for-byte main. The existing full Unit profile flag now adds overlay and V4/V5/V6 migration requirements inside the existing evidence validator, preserving all caller requirements and function coverage. The CLI regression fails eight skipped/absent-case controls before the repair and passes afterward, while failed/unknown cases and stale-pass removal remain enforced. Actual routing regressions verify the unchanged reviewed launcher.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing profile-aware evidence validator can own required execution identities, so adding behavior proof does not require changing the diagnostic launcher or granting new executable bytes."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-evidence.py",
+      "anchor": "REQUIRED_QUALITY_UNIT_TESTS = ("
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "unit-shell-fixture-replays-real-populated-arguments",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40814236131/job/123251726907",
+    "correction": "The overlay evidence fixture synthesized CHAT_UNIT_EVIDENCE_ARGS=() under nounset. Hosted macOS Bash3 treats expansion of that empty array as unbound, so the fixture failed before reaching any native test. The production script populates this array from nine retained chat cases.",
+    "mechanization": "Replay the exact production argument-construction block through the existing sanitized system-shell helper rather than invent an empty array. Require nonempty retained chat arguments and the full Unit profile flag, then run the real validator CLI with valid and missing/skipped/failed/unknown overlay and migration evidence. Keep the actual reviewed launcher unchanged; hosted Bash3 qualification remains required.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The production argument array is already populated. Changing product or runtime shell policy to accommodate an inaccurate test fixture would not repair the fixture."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing behavior fixture can execute the real populated construction block with its ordinary system shell and verify the actual validator CLI, avoiding a synthetic platform-sensitive empty array."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "def test_unit_command_requires_passing_metric_overlay_regression(self):"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "migration-oracle-checks-retained-schema-plus-exact-overlay-delta",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40815091047/job/123254355965",
+    "correction": "The inherited workout V4 migration test equated every old entity hash with the current model. V7 intentionally adds two attributes to CachedBodyMetrics; native CI completed2108tests with only that obsolete full-entity hash assertion failing.",
+    "mechanization": "Keep exact entity hashes for all other retained entities. For CachedBodyMetrics require the exact retained property set plus isExcluded and correctedValueJSON, equal hashes for every retained property, unchanged class/abstract/superentity/hash-modifier/renaming/uniqueness metadata, and exact additive type/optional/default contracts. Keep inferred mapping, actual populated SQLite migration, retained data and reconciliation behavior assertions. Existing frozen model guard still preserves V1–V6 bytes and the exact two-attribute V7 delta; no product schema changed to satisfy a stale test.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Production must add the approved overlay fields, which necessarily changes the aggregate entity hash. Preserving that obsolete oracle through a product change would erase the feature or fail to migrate."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing migration regression can verify retained schema identity at property granularity and permit exactly the intended additive delta while retaining its real SQLite migration behavior."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/WorkoutReconciliationPromptTests.swift",
+      "anchor": "func testV4MigrationPreservesExistingEntitiesAndAddsReconciliationStorage() throws {"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "recursive-ledger-resolution-reuses-immutable-guard-reads",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1564#repair-20261029-occurrence40",
+    "correction": "Recurring conflict repair fix-red-e3b0c44298 occurrence 40: preserve imported metric overlays, the merged dated-outcome prerequisite, and every parent receipt. Recursive ledger reconstruction repeatedly launches Git for the same immutable guard blobs.",
+    "mechanization": "Extend the existing recursive ledger resolver with a per-resolution immutable guard cache. The required shared-lib real-Git regression traces the recursive merge and fails before the change with 24 guard reads instead of three; it passes afterward with exactly one read per revision and guard path. Replay the actual ledger conflict through --resolve-merge . --stage, then verify both parents through --check-merge . and the coverage report. Retain all refusal, coverage and native gates. The harness owns pushing and PR edits and must supply exactly Machine: built packages/shared-lib/scripts/correction-coverage.mjs in the PR body.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can retain immutable guard text within one reconstruction, preventing redundant subprocess work by construction without sharing mutable index evidence or changing merge policy."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Cache immutable guard reads only within this recursive merge resolution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "staged-source-projection-repair-restores-on-staging-failure",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1564#repair-20261029-occurrence41",
+    "correction": "Recurring conflict repair fix-red-e3b0c44298 occurrence 41: merge main while preserving imported metric overlays and every parent receipt. A source-map repair that writes its output before a failed git add leaves an unstaged projection that blocks the same command on retry.",
+    "mechanization": "Extend the existing staged source-map resolver to restore the original projection bytes or absence if writing or staging fails. Three real-Git cases fail before the change and pass afterward: conflicted, existing and new projections retain the index and another writer's lock, then retry successfully and idempotently. The existing required Detect Changes suite runs these regressions. Use the extended --staged resolver for this merge before the existing ledger union and both-parent check. The harness retains push and PR-body ownership and must replace any earlier machine declaration with exactly Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator can restore its output when staging fails, preventing a failed repair from creating an unstaged projection that its own preflight refuses. The Git index and unrelated edits remain untouched."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Keep failed staging retryable, including the original conflict markers."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

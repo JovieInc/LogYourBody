@@ -22,7 +22,7 @@ enum HomeV2TimelinePolicy {
         private let weightChanges: [EntryID: Double]
 
         init(metrics: [BodyMetrics] = [], owner: String? = nil, calendar: Calendar = .current) {
-            self.metrics = metrics.filter { $0.userId == owner }.sorted {
+            self.metrics = metrics.filter { !$0.isExcluded && $0.userId == owner }.sorted {
                 $0.date == $1.date ? $0.id > $1.id : $0.date > $1.date
             }
             chronologicalDates = self.metrics.reversed().map(\.date)

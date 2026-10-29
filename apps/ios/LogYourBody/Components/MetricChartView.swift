@@ -242,7 +242,7 @@ struct MetricChartView: View {
             break
 
         case .bodyFatChart:
-            for metric in bodyMetrics {
+            for metric in bodyMetrics where !metric.isExcluded {
                 if let bf = metric.bodyFatPercentage {
                     points.append(DashboardChartDataPoint(
                         date: metric.date,
@@ -253,7 +253,7 @@ struct MetricChartView: View {
             }
 
         case .weightChart:
-            for metric in bodyMetrics {
+            for metric in bodyMetrics where !metric.isExcluded {
                 if let weight = metric.weight {
                     points.append(DashboardChartDataPoint(
                         date: metric.date,
@@ -274,7 +274,7 @@ struct MetricChartView: View {
 
             let heightInches = heightCm / 2.54
 
-            for metric in bodyMetrics {
+            for metric in bodyMetrics where !metric.isExcluded {
                 if let ffmiResult = interpolationService.estimateFFMI(
                     for: metric.date,
                     metrics: bodyMetrics,

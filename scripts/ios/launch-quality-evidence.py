@@ -17,6 +17,15 @@ CANVAS_REDUCED_TEST = 'MesocycleCanvasUITests/testReducedMotionUsesStackedDayCar
 CANVAS_REPLAY_TEST = 'MesocycleCanvasUITests/testGoalThroughUndoKeepsTheCanvasAndReadbackTogether()'
 REQUIRED_TESTS = (CRITICAL_TEST, ONBOARDING_TEST, FIRST_PHOTO_TEST, TIMELINE_TEST,
                   CANVAS_REDUCED_TEST, CANVAS_REPLAY_TEST)
+# The existing biometric-coverage invocation is the full Launch Quality Unit
+# profile. Keep its migration/overlay execution requirements in this validator,
+# so ordinary test additions do not rewrite the reviewed diagnostic launcher.
+REQUIRED_QUALITY_UNIT_TESTS = (
+    'MetricCorrectionTests/testExcludedReadingsRemainInFetchButNotLatestStatsTrendOrHero()',
+    'CoreDataModelMigrationTests/testPopulatedV4StoreMigratesOverlayDefaultsAndRetainsImportAfterReopen()',
+    'CoreDataModelMigrationTests/testPopulatedV5StoreRetainsWorkoutReconciliationAndImportsWhenMigratingToV7()',
+    'CoreDataModelMigrationTests/testPopulatedV6StoreRetainsDatedOutcomeAndImportsWhenMigratingToV7()',
+)
 REQUIRED_CAPTURES = (
     'launch-quality-chat-composer',
     'launch-quality-chat-tab',
@@ -161,7 +170,10 @@ def main():
         if not args.bundle.is_dir():
             raise ValueError(f'Missing xcresult bundle: {args.bundle}')
         payload = run_json('get', 'test-results', 'tests', '--path', str(args.bundle))
-        cases = validate_cases(payload, args.expected_test)
+        expected = [*args.expected_test]
+        if args.require_biometric_coverage:
+            expected.extend(REQUIRED_QUALITY_UNIT_TESTS)
+        cases = validate_cases(payload, expected)
         prior_attempt = args.bundle.with_name(args.bundle.stem + '.attempt-1.xcresult')
         attempt_log = args.bundle.with_suffix('.log')
         retried = f'Retrying {args.bundle.stem} after simulator launch failure'

@@ -52,13 +52,13 @@ final class HeroMetricInterpolationCache {
 
         // Weight & body fat prefer the metric's own recorded value (matching the
         // previous logic), otherwise fall back to interpolation.
-        if let weight = metric.weight {
+        if !metric.isExcluded, let weight = metric.weight {
             result.weight = weight
         } else {
             result.weight = weightContext?.estimate(for: metric.date)?.value
         }
 
-        if let bodyFat = metric.bodyFatPercentage {
+        if !metric.isExcluded, let bodyFat = metric.bodyFatPercentage {
             result.bodyFat = bodyFat
         } else {
             result.bodyFat = bodyFatContext?.estimate(for: metric.date)?.value
@@ -90,6 +90,7 @@ final class HeroMetricInterpolationCache {
         var hasher = Hasher()
         hasher.combine(metrics.count)
         for metric in metrics {
+            hasher.combine(metric.isExcluded)
             hasher.combine(metric.date)
             hasher.combine(metric.weight)
             hasher.combine(metric.bodyFatPercentage)
