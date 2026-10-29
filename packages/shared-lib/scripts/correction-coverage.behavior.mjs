@@ -108,6 +108,34 @@ test('classifier rejects missing assessments, unsupported fallbacks and conflict
   );
 });
 
+test('annotation conflicts identify both source receipts for an explicit merge repair', () => {
+  const existing = receipt('same-rule', undefined, {
+    source: 'https://example.com/corrections/existing',
+    classification: classification('codebase'),
+    guard,
+  });
+  const revised = classification('codebase');
+  revised.codebase.rationale = 'A different reviewed rationale';
+  for (const [assessed, incomingGuard] of [
+    [classification('static'), { ...guard, path: 'incoming-guard.mjs' }],
+    [revised, guard],
+  ]) {
+    const incoming = receipt('same-rule', undefined, {
+      source: 'https://example.com/corrections/incoming',
+      classification: assessed,
+      guard: incomingGuard,
+    });
+    assert.throws(() => report([existing, incoming]), (error) => {
+      assert.match(error.message, /conflicting coverage annotations: same-rule/);
+      assert.ok(error.message.includes(existing.source), error.message);
+      assert.ok(error.message.includes(incoming.source), error.message);
+      assert.ok(error.message.includes(`existing guard: ${guard.path}`), error.message);
+      assert.ok(error.message.includes(`incoming guard: ${incoming.guard.path}`), error.message);
+      return true;
+    });
+  }
+});
+
 test('current ledger requires classification while historical baselines remain readable', (t) => {
   const legacy = receipt('retained', 'static', { guard });
   const { root, ref } = fixtureRepo(t, [legacy]);
@@ -314,6 +342,24 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
     row('ours'),
   ]);
   assert.equal(git(['ls-files', '-u']).trim().split('\n').length, 3, 'staging remains explicit');
+  const computed = readFileSync(path, 'utf8');
+  assert.equal(runCoverage(['--merge-ledger'], { root, env: {} }).mechanized, 3);
+  assert.equal(readFileSync(path, 'utf8'), computed, 'an unchanged computed result is retryable');
+  for (const manual of [
+    JSON.stringify([...JSON.parse(computed), row('manual-receipt')]),
+    '[]',
+    'null',
+  ]) {
+    writeFileSync(path, manual);
+    const index = git(['ls-files', '--stage']);
+    assert.throws(
+      () => runCoverage(['--merge-ledger'], { root, env: {} }),
+      /refuses to overwrite a manually resolved ledger/,
+    );
+    assert.equal(readFileSync(path, 'utf8'), manual, 'manual resolution must survive refusal');
+    assert.equal(git(['ls-files', '--stage']), index, 'refusal must preserve the conflict stages');
+  }
+  writeFileSync(path, computed);
   const before = readFileSync(path, 'utf8');
   const blob = git(['hash-object', '-w', '--stdin'], anchor).trim();
   git(['update-index', '--force-remove', guard.path]);
@@ -396,6 +442,32 @@ test('ledger merge readiness checks raw staged bytes despite Git diff attributes
   }
 });
 
+test('ledger merge readiness rejects Git single-character conflict markers', (t) => {
+  const { root } = fixtureRepo(t, []);
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+  writeFileSync(join(root, '.gitattributes'), `${guard.path} conflict-marker-size=1\n`);
+  git('add', '.gitattributes');
+  for (const marker of ['< HEAD', '| base', '=', '> incoming']) {
+    writeFileSync(join(root, guard.path), `${anchor}\n${marker}\n`);
+    git('add', guard.path);
+    writeFileSync(join(root, guard.path), anchor);
+    const index = git('ls-files', '--stage');
+    assert.throws(
+      () => assertLedgerMergeReady(root),
+      /ledger merge: resolve staged conflict markers first/,
+    );
+    assert.equal(git('ls-files', '--stage'), index, 'refusal preserves the index');
+    assert.equal(readFileSync(join(root, guard.path), 'utf8'), anchor);
+  }
+  git('add', guard.path);
+  assertLedgerMergeReady(root);
+  writeFileSync(join(root, '.gitattributes'), `${guard.path} conflict-marker-size=7\n`);
+  writeFileSync(join(root, guard.path), `${anchor}\n> Ordinary Markdown quote.  \n`);
+  git('config', 'core.whitespace', 'blank-at-eol');
+  git('add', '.gitattributes', guard.path);
+  assertLedgerMergeReady(root);
+});
+
 test('ledger merge rebuilds a conflicted recursive ancestor from both merge bases', (t) => {
   const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
   const { root } = fixtureRepo(t, [row('base')]);
@@ -420,6 +492,9 @@ test('ledger merge rebuilds a conflicted recursive ancestor from both merge base
     );
     assert.equal(result.status, 1, result.stderr);
   };
+  writeFileSync(join(root, '.gitattributes'), `${LEDGER_PATH} conflict-marker-size=1\n`);
+  git(['add', '.gitattributes']);
+  git(['commit', '-qm', 'single-character conflict markers']);
   git(['branch', 'right']);
   write([row('left')]);
   commit('left receipt');
@@ -430,6 +505,7 @@ test('ledger merge rebuilds a conflicted recursive ancestor from both merge base
   const right = git(['rev-parse', 'HEAD']).trim();
   git(['switch', branch]);
   merge(right);
+  assert.match(readFileSync(join(root, LEDGER_PATH), 'utf8'), /^< /m);
   write([row('left'), row('right')]);
   commit('merge right into left');
   git(['switch', 'right']);
@@ -440,7 +516,7 @@ test('ledger merge rebuilds a conflicted recursive ancestor from both merge base
   merge('right');
   const ancestor = git(['show', `:1:${LEDGER_PATH}`]);
   assert.throws(() => JSON.parse(ancestor));
-  assert.match(ancestor, /^<{7,} /m);
+  assert.match(ancestor, /^<{3} /m);
   const report = runCoverage(['--merge-ledger'], { root, env: {} });
   assert.deepEqual(
     JSON.parse(readFileSync(join(root, LEDGER_PATH), 'utf8')).map((item) => item.fingerprint),
@@ -591,6 +667,54 @@ test('ledger CI retains each source against Git even when rule coverage and rece
   writeFileSync(join(root, LEDGER_PATH), JSON.stringify(revised));
   const value = runCoverage(['--base-ref', ref], { root, env: {} });
   assert.deepEqual(value.rules[0].recurrence, { receiptCount: 3, repeatCount: 2 });
+});
+
+test('merge verification retains receipts from every supplied parent', (t) => {
+  const first = receipt('retained', 'static', {
+    guard,
+    classification: classification('static'),
+  });
+  const second = { ...first, source: 'https://example.com/incoming-receipt' };
+  const { root, ref } = fixtureRepo(t, [first]);
+  const ledger = join(root, LEDGER_PATH);
+  const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  writeFileSync(ledger, JSON.stringify([second]));
+  git(['add', '.']);
+  git([
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.com',
+    'commit',
+    '-qm',
+    'incoming',
+  ]);
+  const incoming = git(['rev-parse', 'HEAD']);
+  const args = ['--base-ref', ref, '--base-ref', incoming];
+  writeFileSync(ledger, JSON.stringify([first, second]));
+  const output = 'coverage/corrections/parents.json';
+  const value = runCoverage(['--output', output, ...args], { root, env: {} });
+  assert.deepEqual(JSON.parse(readFileSync(join(root, output), 'utf8')), value);
+  assert.deepEqual(value.rules[0].recurrence, { receiptCount: 2, repeatCount: 1 });
+
+  for (const [kept, parent] of [
+    [first, ref],
+    [second, incoming],
+  ]) {
+    writeFileSync(ledger, JSON.stringify([kept]));
+    // Checking only one parent permits silently losing the other's receipt.
+    assert.equal(runCoverage(['--base-ref', parent], { root, env: {} }).percent, 100);
+    assert.throws(() => runCoverage(args, { root, env: {} }), /removed receipt/);
+  }
+  for (const invalid of [
+    [...args, '--base-ref'],
+    [...args, '--unknown', ref],
+    [...args, '--base-ref', ''],
+  ]) {
+    assert.throws(() => runCoverage(invalid, { root, env: {} }), /usage/);
+  }
+  writeFileSync(ledger, JSON.stringify([first, second]));
+  assert.throws(() => runCoverage([...args, '--base-ref', 'f'.repeat(40)], { root, env: {} }));
 });
 
 test('empty ledger is N/A and proposed or absent guards earn no credit', () => {

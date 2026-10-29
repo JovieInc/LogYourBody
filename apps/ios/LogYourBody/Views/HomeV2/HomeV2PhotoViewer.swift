@@ -236,6 +236,7 @@ struct HomeV2PhotoViewer: View {
                     guard chronological.indices.contains(position) else { return }
                     selectedIndex = chronological[position]
                 },
+                photoURLs: chronological.map { bodyMetrics[$0].photoUrl },
                 allowsVerticalScrolling: true
             )
             .padding(.top, HomeV2Tokens.Space.compact)

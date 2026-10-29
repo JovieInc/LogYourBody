@@ -113,6 +113,7 @@ extension DashboardViewLiquid {
                     .background(Capsule().fill(theme.colors.text))
             }
             .padding(16)
+            .contentShape(Rectangle())
             .dashboardContentSurface(cornerRadius: theme.radius.card, border: theme.colors.border)
         }
         .buttonStyle(.plain)

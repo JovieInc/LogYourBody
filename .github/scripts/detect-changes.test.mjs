@@ -13,6 +13,14 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const detectScript = path.join(scriptDir, 'detect-changes.sh');
 const ciWorkflow = fs.readFileSync(path.join(scriptDir, '../workflows/ci.yml'), 'utf8');
 
+test('approved App Store release pins a runner with Ruby 3.1 builds', () => {
+  const workflow = fs.readFileSync(path.join(scriptDir, '../workflows/ios-app-store-approved-release.yml'), 'utf8');
+  const release = workflow.split('\n  release-approved-version:\n')[1]?.split(/\n {2}\S/)[0] ?? '';
+  // ruby-builder publishes Ruby 3.1.7 for Ubuntu 24.04, but not 26.04.
+  assert.match(release, /^ {4}runs-on: ubuntu-24\.04$/m);
+  assert.match(release, /uses: \.\/\.github\/actions\/setup-ruby-bundler/);
+});
+
 // Fixture git must not inherit a hook's GIT_DIR/GIT_INDEX_FILE.
 const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
 Object.assign(gitEnv, {
@@ -193,6 +201,13 @@ test('every input the iOS jobs read selects iOS; JS-only roots do not', () => {
     const fx = queueFixture({ [file]: 'changed' });
     const { outputs } = detect(fx.workspace, mergeGroup(fx));
     assert.deepEqual(outputs, surfaces('true', 'false', 'false', 'false'), file);
+  }
+});
+
+test('iOS release and diagnostic workflows are not inputs of the PR iOS jobs', () => {
+  for (const file of ['.github/workflows/ios-ui-diagnostics.yml', '.github/workflows/ios-release-loop.yml', '.github/workflows/ios-testflight-deploy.yml', '.github/workflows/ios-post-merge-quality.yml']) {
+    const fx = queueFixture({ [file]: 'changed' });
+    assert.equal(detect(fx.workspace, mergeGroup(fx), noHold).outputs.ios_unit, 'false', file);
   }
 });
 
@@ -596,6 +611,27 @@ test("daily-step verifier rejects execution without explicit disposable opt-in",
   );
 });
 
+test('Launch Quality leaves StoreKit lifecycle tests to the dedicated StoreKit job', () => {
+  const audit = fs.readFileSync(new URL('../../scripts/ios/launch-quality-audit.sh', import.meta.url), 'utf8');
+  assert.match(audit, /-only-testing:LogYourBodyTests \\\n\s+-skip-testing:LogYourBodyTests\/StoreKitPurchaseRestoreTests/);
+  assert.match(audit, /general unit target \(StoreKit lifecycle tests run in the required dedicated job\)/);
+  assert.doesNotMatch(audit, /the complete unit target/);
+  // The skip is only safe while the dedicated job still runs the suite in the queue and on main.
+  assert.match(jobBlock('ios_storekit'), /storekit-purchase-restore\.sh/);
+});
+
+test('UI tests are hermetic: no localhost, and fixed sleeps only shrink', () => {
+  const dir = new URL('../../apps/ios/LogYourBodyUITests/', import.meta.url);
+  let sleeps = 0;
+  for (const name of fs.readdirSync(dir).filter((f) => f.endsWith('.swift'))) {
+    const source = fs.readFileSync(new URL(name, dir), 'utf8');
+    assert.doesNotMatch(source, /localhost|127\.0\.0\.1/, `${name} reaches a local server; use a launch-argument fixture or URLProtocol stub`);
+    sleeps += (source.match(/Thread\.sleep|[^a-zA-Z.]u?sleep\(/g) ?? []).length;
+  }
+  // Ratchet (1 on 2026-10-26, the reduced-motion observation): wait on state for transitions.
+  assert.ok(sleeps <= 1, `UI tests use ${sleeps} fixed sleeps; replace with waitForExistence or an XCTNSPredicateExpectation`);
+});
+
 test('CI Summary does not require StoreKit on a native pull_request (the merge group runs it)', () => {
   const pr = { web: 'false', ios: 'false', quality: 'true', js: 'skipped', iosResult: 'skipped', qualityResult: 'success', event: 'pull_request' };
   assert.equal(runSummaryGate({ ...pr, storekitResult: 'skipped' }), 0);
@@ -620,7 +656,7 @@ test('Launch Quality static audits run on ubuntu and are gated by CI Summary', (
   }
 });
 
-function sourceMapConflict({ sourceConflict = false } = {}) {
+function sourceMapConflict({ sourceConflict = false, ledgerConflict = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'source-map-merge-'));
   git(root, 'init', '-q', '-b', 'main');
   const source = 'first\n' + 'context\n'.repeat(10) + 'last\n';
@@ -637,12 +673,14 @@ function sourceMapConflict({ sourceConflict = false } = {}) {
     'README.md': 'Local instructions\n',
     'repository-docs.json': JSON.stringify(config),
     'workflow.yml': source,
+    ...(ledgerConflict ? { 'corrections.json': 'base receipt\n' } : {}),
   }, 'base sources');
   const generate = () => execFileSync('python3', [
     path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', root, '--write',
   ], { env: gitEnv });
   const checkpoint = (contents, message) => {
     fs.writeFileSync(path.join(root, 'workflow.yml'), contents);
+    if (ledgerConflict) fs.writeFileSync(path.join(root, 'corrections.json'), `${message}\n`);
     generate();
     git(root, 'add', '.');
     git(root, 'commit', '-q', '-m', message);
@@ -654,8 +692,9 @@ function sourceMapConflict({ sourceConflict = false } = {}) {
   checkpoint(source.replace(sourceConflict ? 'first' : 'last', 'main'), 'main workflow');
   git(root, 'checkout', '-q', 'feature');
   assert.throws(() => git(root, 'merge', '--no-commit', 'main'), 'fixture must conflict');
-  const resolve = () => spawnSync('python3', [
+  const resolve = ({ staged = false } = {}) => spawnSync('python3', [
     path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root,
+    ...(staged ? ['--staged'] : []),
   ], { env: gitEnv, encoding: 'utf8' });
   return { root, output, config, resolve };
 }
@@ -682,6 +721,51 @@ test('source-map merge repair regenerates from both parents and stages only the 
     assert.equal(parity.status, 0, parity.stderr);
     assert.equal(fx.resolve().status, 0, 'repair is idempotent');
     assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test('staged source-map repair resolves its projection before an unrelated ledger conflict', () => {
+  const fx = sourceMapConflict({ ledgerConflict: true });
+  try {
+    const ledger = fs.readFileSync(path.join(fx.root, 'corrections.json'), 'utf8');
+    const ledgerStages = git(fx.root, 'ls-files', '--stage', '--', 'corrections.json');
+    assert.match(ledger, /<<<<<<< HEAD/);
+    const stagedSource = git(fx.root, 'show', ':workflow.yml');
+    fs.appendFileSync(path.join(fx.root, 'workflow.yml'), 'unstaged source edit\n');
+    const result = fx.resolve({ staged: true });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(git(fx.root, 'diff', '--name-only', '--diff-filter=U'), 'corrections.json');
+    assert.equal(git(fx.root, 'ls-files', '--stage', '--', 'corrections.json'), ledgerStages);
+    assert.equal(fs.readFileSync(path.join(fx.root, 'corrections.json'), 'utf8'), ledger);
+    assert.equal(git(fx.root, 'show', ':workflow.yml'), stagedSource);
+    assert.match(fs.readFileSync(path.join(fx.root, 'workflow.yml'), 'utf8'), /unstaged source edit/);
+    const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    assert.doesNotMatch(projection, /<<<<<<<|=======|>>>>>>>/);
+    assert.equal(git(fx.root, 'show', `:${fx.output}`), projection.trim());
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(fx.resolve({ staged: true }).status, 0, 'repair is idempotent');
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    // The result must describe the staged source, even while its worktree differs.
+    git(fx.root, 'restore', '--worktree', '--', 'workflow.yml');
+    const parity = spawnSync('python3', [
+      path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', fx.root,
+    ], { env: gitEnv, encoding: 'utf8' });
+    assert.equal(parity.status, 0, parity.stderr);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test('staged source-map repair refuses a conflicted input without changing the index or projection', () => {
+  const fx = sourceMapConflict({ sourceConflict: true });
+  try {
+    const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.notEqual(fx.resolve({ staged: true }).status, 0);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
   } finally {
     fs.rmSync(fx.root, { recursive: true, force: true });
   }

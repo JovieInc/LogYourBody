@@ -220,13 +220,20 @@ struct LogYourBodyApp: App {
             ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
+    #if DEBUG
+    static func usesDeterministicUITestAnimations(arguments: [String]) -> Bool {
+        arguments.contains("-lybUITestChatReplayFixture") ||
+            arguments.contains("-lybUITestBodyScoreOnboardingFixture")
+    }
+    #endif
+
     init() {
         LaunchMetrics.begin()
         LogYourBodyAppShortcuts.updateAppShortcutParameters()
         #if DEBUG
-        // Replay fixtures verify terminal states and identity, independently of
+        // State fixtures verify terminal states and identity, independently of
         // animation timing. iOS 26 can leave XCTest waiting 60s per transition.
-        if ProcessInfo.processInfo.arguments.contains("-lybUITestChatReplayFixture") {
+        if Self.usesDeterministicUITestAnimations(arguments: ProcessInfo.processInfo.arguments) {
             UIView.setAnimationsEnabled(false)
         }
         FrameHitchMonitor.shared.start()
@@ -241,7 +248,7 @@ struct LogYourBodyApp: App {
 #if DEBUG
                 .modifier(UITestViewportModifier())
                 .transaction { transaction in
-                    if ProcessInfo.processInfo.arguments.contains("-lybUITestChatReplayFixture") {
+                    if Self.usesDeterministicUITestAnimations(arguments: ProcessInfo.processInfo.arguments) {
                         transaction.animation = nil
                         transaction.disablesAnimations = true
                     }

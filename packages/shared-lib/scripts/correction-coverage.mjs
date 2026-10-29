@@ -66,7 +66,8 @@ export function coverageReport(
     const previous = rules.get(fingerprint);
     assert.ok(
       !previous || previous.annotation === annotation,
-      `conflicting coverage annotations: ${fingerprint}`,
+      // Keep every conflicting source visible; divergent annotations still require review.
+      `conflicting coverage annotations: ${fingerprint}; existing sources: ${previous ? [...previous.receipts.keys()].join(', ') : '(none)'}; incoming source: ${receipt.source}; existing guard: ${previous?.guard?.path ?? '(none)'}; incoming guard: ${guard?.path ?? '(none)'}`,
     );
     let mechanized = false;
     if (guard) {
@@ -351,13 +352,58 @@ export function assertLedgerMergeReady(root) {
     { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
   );
   // Staging a file does not prove its conflict markers were resolved.
-  // Inspect raw staged bytes; Git attributes must not hide unresolved markers.
+  // Read staged bytes as text so binary attributes cannot conceal conflict markers.
   // conflict-marker-size can emit markers shorter than the default seven characters.
   assert.doesNotMatch(
     staged,
     /^\+(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |$)/m,
     'ledger merge: resolve staged conflict markers first',
   );
+  // Git honors per-path conflict-marker-size, including size 1. A global
+  // single-character regex would also reject ordinary Markdown blockquotes.
+  let checked;
+  try {
+    checked = execFileSync(
+      'git',
+      [
+        'diff',
+        '--cached',
+        '--no-ext-diff',
+        '--no-textconv',
+        '--text',
+        '--no-color',
+        '--check',
+        '--',
+        '.',
+        `:!${LEDGER_PATH}`,
+      ],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, LC_ALL: 'C' },
+      },
+    );
+  } catch (error) {
+    if (error.status !== 2) throw error;
+    checked = error.stdout;
+  }
+  assert.doesNotMatch(
+    checked,
+    /: leftover conflict marker$/m,
+    'ledger merge: resolve staged conflict markers first',
+  );
+}
+
+export function assertLedgerResolutionUnchanged(original, merged, message) {
+  let workingReceipts;
+  try {
+    workingReceipts = JSON.parse(original);
+  } catch {
+    // Unresolved Git conflict markers are not valid JSON.
+    return;
+  }
+  assert.equal(JSON.stringify(workingReceipts), JSON.stringify(merged), message);
 }
 
 export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
@@ -367,30 +413,38 @@ export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
     const merged = mergeCorrectionLedgers(stages[0], stages[2], stages[1], (path) =>
       readSource(path, { root }),
     );
-    readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
+    const original = readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
+    assertLedgerResolutionUnchanged(
+      original,
+      merged,
+      'merge-ledger refuses to overwrite a manually resolved ledger; review and stage it explicitly',
+    );
     writeFileSync(resolve(root, LEDGER_PATH), `${JSON.stringify(merged, null, 2)}\n`);
     argv = [];
   }
-  const options = new Map();
+  const usage =
+    'usage: correction-coverage.mjs [--base-ref <sha|origin/main>]... [--output <path>] | --merge-ledger';
+  const baseRefs = [];
+  let output;
+  assert.equal(argv.length % 2, 0, usage);
   for (let index = 0; index < argv.length; index += 2) {
     const option = argv[index];
     const value = argv[index + 1];
     assert.ok(
-      ['--base-ref', '--output'].includes(option) &&
-        value?.trim() &&
-        !value.startsWith('--') &&
-        !options.has(option),
-      'usage: correction-coverage.mjs [--base-ref <sha|origin/main>] [--output <path>] | --merge-ledger',
+      ['--base-ref', '--output'].includes(option) && value?.trim() && !value.startsWith('--'),
+      usage,
     );
-    options.set(option, value);
+    if (option === '--output') {
+      assert.equal(output, undefined, usage);
+      output = value;
+    } else baseRefs.push(value);
   }
   const current = guardCoverageReport(
     JSON.parse(readSource(LEDGER_PATH, { root })),
     (path) => readSource(path, { root }),
     { requireClassification: true },
   );
-  if (options.has('--base-ref')) {
-    const ref = options.get('--base-ref');
+  for (const ref of baseRefs) {
     const baseline = coverageReport(JSON.parse(readSource(LEDGER_PATH, { root, ref })), (path) =>
       readSource(path, { root, ref }),
     );
@@ -402,10 +456,10 @@ export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
     encoding: 'utf8',
   }).trim();
   current.timestamp = new Date().toISOString();
-  if (options.has('--output')) {
-    const output = resolve(root, options.get('--output'));
-    mkdirSync(dirname(output), { recursive: true });
-    writeFileSync(output, `${JSON.stringify(current, null, 2)}\n`);
+  if (output) {
+    const outputPath = resolve(root, output);
+    mkdirSync(dirname(outputPath), { recursive: true });
+    writeFileSync(outputPath, `${JSON.stringify(current, null, 2)}\n`);
   }
   return current;
 }

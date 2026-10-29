@@ -110,6 +110,7 @@ Run from the repository root:
 node packages/shared-lib/scripts/correction-coverage.mjs
 node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
 node packages/shared-lib/scripts/correction-coverage.mjs --output coverage/corrections/coverage.json
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref <prior-head-sha> --base-ref <merged-main-sha> --output coverage/corrections/coverage.json
 node packages/shared-lib/scripts/guard-reference.mjs --base-ref origin/main
 node --test packages/shared-lib/scripts/guard-reference.behavior.mjs
 node packages/shared-lib/scripts/jovie-separation.mjs
@@ -128,8 +129,10 @@ counts and share; without it, stdout remains the full JSON report. This artifact
 adds no threshold enforcement and preserves the existing regression checks.
 
 The required behavioral suite runs ledger repair, artifact emission, and default
-and baseline reporting together against real Git snapshots. This compatibility
-guard prevents concurrent CLI changes from dropping either repair or reporting.
+and baseline reporting together against real Git snapshots. Repeat `--base-ref`
+to check every merge parent in that same run, including together with `--output`.
+This compatibility guard prevents concurrent CLI changes from dropping either
+repair or reporting.
 Invalid options must leave the ledger, existing artifact and job summary intact.
 Ledger repair checks raw staged bytes, rejecting newly staged conflict markers
 even with forced Git colors, binary diff attributes or text conversion,

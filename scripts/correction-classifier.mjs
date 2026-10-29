@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   assertLedgerMergeReady,
+  assertLedgerResolutionUnchanged,
   assertNoRegression,
   coverageReport,
   guardCoverageReport,
@@ -156,9 +157,38 @@ function mergeLedgers(left, right) {
   return [...merged.values()];
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+function readGitSources(root, objects, execute, regularGuards) {
+  for (const object of objects) {
+    assert.doesNotMatch(object, /[\r\n\0]/u, 'invalid Git source request');
+  }
+  const output = execute('git', ['-C', root, 'cat-file', '--batch'], {
+    input: objects.map((object) => `${object}\n`).join(''),
+    stdio: ['pipe', 'pipe', 'pipe'],
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  let offset = 0;
+  return new Map(
+    objects.map((object) => {
+      const end = output.indexOf(10, offset);
+      const header = output.toString('utf8', offset, end);
+      offset = end + 1;
+      if (header.endsWith(' missing')) return [object, ''];
+      const match = /^[a-f0-9]+ blob (\d+)$/u.exec(header);
+      assert.ok(match, `invalid Git source response: ${header}`);
+      const size = Number(match[1]);
+      const source = output.toString('utf8', offset, offset + size);
+      offset += size + 1;
+      return [
+        object,
+        object.startsWith(':0:') && !regularGuards.has(object.slice(3)) ? '' : source,
+      ];
+    }),
+  );
+}
+
+// Keep the repair command reusable without starting Node or exiting its caller.
+export function runClassifier(args, logger = console, execute = execFileSync) {
   try {
-    const args = process.argv.slice(2);
     const resolvingMerge = args[0] === '--resolve-merge';
     const checkingMerge = args[0] === '--check-merge';
     const stagingMerge = resolvingMerge && args[2] === '--stage';
@@ -175,55 +205,119 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     let stageResolution;
     if (resolvingMerge || checkingMerge) {
       const git = (...gitArgs) =>
-        execFileSync('git', ['-C', args[1], ...gitArgs], {
+        execute('git', ['-C', args[1], ...gitArgs], {
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'pipe'],
         });
-      const root = git('rev-parse', '--show-toplevel').trim();
+      // Require both immutable merge parents before resolving any ledger.
+      const [root, ...parents] = git('rev-parse', '--show-toplevel', 'HEAD', 'MERGE_HEAD')
+        .trim()
+        .split('\n');
       path = resolve(root, LEDGER_PATH);
+      // Verify the whole merge is conflict-free, including staged retries.
+      assertLedgerMergeReady(root);
+      // Read fresh index metadata once per command, never across mutable retries.
+      const index = git('--literal-pathspecs', 'ls-files', '--stage', '-z').split('\0');
+      // Only regular indexed files can provide staged guard evidence.
+      const regularGuards = new Set(
+        index
+          .filter((entry) => /^100(?:644|755) [a-f0-9]+ 0\t/u.test(entry))
+          .map((entry) => entry.slice(entry.indexOf('\t') + 1)),
+      );
+      const unmergedLedger = index.some(
+        (entry) =>
+          /^\d+ [a-f0-9]+ [123]\t/u.test(entry) &&
+          entry.slice(entry.indexOf('\t') + 1) === LEDGER_PATH,
+      );
+      let ledgers;
+      const readLedgers = () =>
+        (ledgers ??= readGitSources(
+          root,
+          [':0', ...parents].map((ref) => `${ref}:${LEDGER_PATH}`),
+          execute,
+          regularGuards,
+        ));
       const verifyMerge = (receipts) => {
-        const parents = ['HEAD', 'MERGE_HEAD'].map((ref) =>
-          git('rev-parse', '--verify', ref).trim(),
-        );
         assert.deepEqual(
           receipts,
           classifyLedger(receipts),
           'staged merge ledger must be classified',
         );
-        const current = guardCoverageReport(receipts, (guard) => git('show', `:0:${guard}`), {
+        const baselines = parents.map((ref) => ({
+          ref,
+          receipts: JSON.parse(readLedgers().get(`${ref}:${LEDGER_PATH}`)),
+        }));
+        // Batch guard blobs per verification; never cache the mutable index across retries.
+        const objects = [
+          ...new Set(
+            [{ ref: ':0', receipts }, ...baselines].flatMap(({ ref, receipts }) =>
+              receipts.filter(({ guard }) => guard).map(({ guard }) => `${ref}:${guard.path}`),
+            ),
+          ),
+        ];
+        const sources = readGitSources(root, objects, execute, regularGuards);
+        const current = guardCoverageReport(receipts, (guard) => sources.get(`:0:${guard}`), {
           requireClassification: true,
         });
-        for (const ref of parents) {
-          const baseline = coverageReport(
-            JSON.parse(git('show', `${ref}:${LEDGER_PATH}`)),
-            (guard) => git('show', `${ref}:${guard}`),
-          );
+        for (const { ref, receipts } of baselines) {
+          const baseline = coverageReport(receipts, (guard) => sources.get(`${ref}:${guard}`));
           assertNoRegression(current, baseline);
         }
       };
-      // Verify the whole merge is conflict-free, including staged retries.
-      assertLedgerMergeReady(root);
-      if (checkingMerge || (stagingMerge && !git('ls-files', '--unmerged', '--', LEDGER_PATH))) {
-        verifyMerge(JSON.parse(git('show', `:0:${LEDGER_PATH}`)));
+      // A retry after explicit staging verifies the index without overwriting local edits.
+      if (checkingMerge || !unmergedLedger) {
+        // Apply the ledger's regular-file contract to every staged retry mode.
+        assert.ok(
+          regularGuards.has(LEDGER_PATH),
+          'staged source must be a regular file: correction ledger',
+        );
+        const staged = readLedgers().get(`:0:${LEDGER_PATH}`);
+        verifyMerge(JSON.parse(staged));
         assert.equal(
           readSource(LEDGER_PATH, { root }),
-          git('show', `:0:${LEDGER_PATH}`),
+          staged,
           'staged retry refuses unstaged ledger edits; review and stage them explicitly',
         );
-        console.log('correction-classifier: verified staged ledger against both merge parents');
-        process.exit(0);
+        logger.log('correction-classifier: verified staged ledger against both merge parents');
+        return 0;
+      }
+      const working = readSource(LEDGER_PATH, { root }); // Refuse symlinked output.
+      if (!/^(?:<+|\|+|=+|>+)(?: |$)/m.test(working)) {
+        // Validate manual input, but require explicit staging if it differs from the union.
+        classifyLedger(JSON.parse(working));
       }
       // Reuse the coverage tool's three-way policy rather than a second resolver.
       // Classify snapshots first so derived metadata cannot look like concurrent edits.
-      const stages = readGitMergeLedgers(root).map((rows) => classifyLedger(rows));
+      // Normalize identical parent replays with the existing union policy.
+      const stages = readGitMergeLedgers(root).map((rows) => mergeLedgers(rows, []));
+      // Batch the staged union's guards too; repeated receipts must not spawn Git.
+      const sources = stagingMerge
+        ? readGitSources(
+            root,
+            [
+              ...new Set(
+                stages
+                  .flat()
+                  .filter(({ guard }) => guard)
+                  .map(({ guard }) => `:0:${guard.path}`),
+              ),
+            ],
+            execute,
+            regularGuards,
+          )
+        : null;
       result = classifyLedger(
         // Keep incoming order, then append branch-only receipts so future main
         // prepends do not collide with the same branch receipt on every repair.
         mergeCorrectionLedgers(stages[0], stages[2], stages[1], (guard) =>
-          readSource(guard, { root }),
+          stagingMerge ? sources.get(`:0:${guard}`) : readSource(guard, { root }),
         ),
       );
-      readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
+      assertLedgerResolutionUnchanged(
+        working,
+        result,
+        'resolve-merge refuses to overwrite a manually resolved ledger; review and stage it explicitly',
+      );
       if (stagingMerge) {
         // Validate staged guards and both parents before writing or staging anything.
         verifyMerge(result);
@@ -248,9 +342,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       writeFileSync(path, formatted);
     }
     stageResolution?.();
-    console.log(`correction-classifier: classified ${result.length} receipts`);
+    logger.log(`correction-classifier: classified ${result.length} receipts`);
+    return 0;
   } catch (error) {
-    console.error(`correction-classifier: ${error.message}`);
-    process.exitCode = 1;
+    logger.error(`correction-classifier: ${error.message}`);
+    return 1;
   }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  process.exitCode = runClassifier(process.argv.slice(2));
 }
