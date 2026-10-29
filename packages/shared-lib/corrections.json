@@ -4791,5 +4791,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-recovery-preserves-original-build-budget",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1569",
+    "correction": "The originally unauthorized600-to900second cold-build increase now exists in main32d5eb390 as well as held1569. Restoring only the held branch would leave the main default expanded. Reuse the existing unpublished root-owned restoration work against current main; preserve the held branch and every receipt.",
+    "mechanization": "Restore the existing full-audit build-for-testing default to600seconds. The required real-shell evidence suite checks550seconds and the exact600second boundary, rejects601seconds before native testing, propagates compiler failures and shorter explicit overrides, and requires one logged build attempt with exact deadline. Four subcases fail against900 and all34evidence tests pass at600. This is deadline restoration, not proof of a performance repair. Keep existing diagnostic source binding unchanged and fail closed pending independent review of the final composed script; no policy, authority or dependency pin has been changed.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing timeout owner enforces the original finite build deadline before any native test can run, and its real-shell fault regressions prove boundary enforcement and failure propagation. Exact-head native qualification remains required."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "def test_shell_cold_build_budget_preserves_build_failures_and_timeout(self):"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
