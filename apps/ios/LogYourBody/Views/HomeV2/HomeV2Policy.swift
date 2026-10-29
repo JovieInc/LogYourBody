@@ -466,7 +466,12 @@ enum HomeV2WeightQuality {
         // Keep the original flagged measurement visible for correction; do not
         // replace it with a trend from otherwise supported surrounding records.
         guard !metric.isExcluded, metric.weight == nil || isWithinSupportedLoggingRange(metric.weight) else { return nil }
-        return trendContext(for: metrics)?.trendWeight(for: metric.date)?.value
+        // Memoized: this runs from View.body once per rendered card (a
+        // Sentry App Hanging hot path), so reuse the shared trend context.
+        return MetricsInterpolationService.shared.estimateTrendWeight(
+            for: metric.date,
+            metrics: metrics.filter { !$0.isExcluded && isWithinSupportedLoggingRange($0.weight) }
+        )?.value
     }
 }
 

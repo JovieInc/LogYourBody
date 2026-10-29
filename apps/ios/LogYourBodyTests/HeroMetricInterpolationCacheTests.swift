@@ -188,6 +188,65 @@ final class HeroMetricInterpolationCacheTests: XCTestCase {
         XCTAssertNil(photoOnly.weight)
     }
 
+    // MARK: - Service context memo (App Hanging fix)
+
+    /// The memoized convenience APIs must equal a freshly built context for
+    /// every query, in any order, and must rebuild when the data changes.
+    func testMemoizedEstimatesMatchFreshContextsInAnyQueryOrder() throws {
+        service.resetInterpolationMemo()
+        let metrics = Self.mixedMetrics()
+        // Query newest-first, then oldest-first, so reused EMA checkpoints are
+        // exercised in both directions.
+        let orders = [metrics.reversed().map { $0 }, metrics]
+        for order in orders {
+            for metric in order {
+                let freshWeight = service.makeWeightInterpolationContext(for: metrics)?.trendWeight(for: metric.date)
+                XCTAssertEqual(service.estimateTrendWeight(for: metric.date, metrics: metrics)?.value, freshWeight?.value)
+                XCTAssertEqual(service.estimateTrendWeight(for: metric.date, metrics: metrics)?.isInterpolated, freshWeight?.isInterpolated)
+                let freshBodyFat = service.makeBodyFatInterpolationContext(for: metrics)?.estimate(for: metric.date)
+                XCTAssertEqual(service.estimateBodyFat(for: metric.date, metrics: metrics)?.value, freshBodyFat?.value)
+            }
+        }
+    }
+
+    func testMemoRebuildsWhenAWeightChanges() throws {
+        service.resetInterpolationMemo()
+        let original = [
+            Self.metric(daysAgo: 20, weight: 90, bodyFat: 25),
+            Self.metric(daysAgo: 10, weight: 88, bodyFat: 23),
+            Self.metric(daysAgo: 0, weight: 86, bodyFat: 21)
+        ]
+        let date = original[2].date
+        let before = try XCTUnwrap(service.estimateTrendWeight(for: date, metrics: original)).value
+
+        var edited = original
+        edited[2] = Self.metric(daysAgo: 0, weight: 70, bodyFat: 21)
+        let after = try XCTUnwrap(service.estimateTrendWeight(for: date, metrics: edited)).value
+        let fresh = try XCTUnwrap(service.makeWeightInterpolationContext(for: edited)?.trendWeight(for: date)).value
+        XCTAssertEqual(after, fresh)
+        XCTAssertNotEqual(after, before)
+        XCTAssertNotEqual(
+            MetricsInterpolationService.interpolationFingerprint(for: original),
+            MetricsInterpolationService.interpolationFingerprint(for: edited)
+        )
+    }
+
+    /// Regression guard for the Sentry hang: a long history queried once per
+    /// rendered card must stay well under a frame budget after the first call.
+    func testRepeatedTrendQueriesOnLongHistoryReuseTheContext() throws {
+        service.resetInterpolationMemo()
+        let history = (0..<730).map { day in
+            Self.metric(daysAgo: day * 2, weight: 80 + Double(day % 7) * 0.1, bodyFat: day % 30 == 0 ? 18 : nil)
+        }
+        _ = service.estimateFFMI(for: history[0].date, metrics: history, heightInches: heightInches)
+        let start = Date()
+        for metric in history.prefix(60) {
+            _ = service.estimateFFMI(for: metric.date, metrics: history, heightInches: heightInches)
+        }
+        // 60 FFMI estimates used to rebuild and re-walk the EMA per call.
+        XCTAssertLessThan(Date().timeIntervalSince(start), 1.0)
+    }
+
     // MARK: - Fixtures
 
     private static let baseDate = Date(timeIntervalSinceReferenceDate: 700_000_000)
