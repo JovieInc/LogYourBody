@@ -186,11 +186,15 @@
         <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="userId" attributeType="String"/>
     </entity>
-    <entity name="CachedDatedOutcome" representedClassName="NSManagedObject" syncable="YES">
+    <entity name="CachedWorkoutReconciliationDay" representedClassName="NSManagedObject" syncable="YES">
         <attribute name="ownerId" attributeType="String"/>
-        <attribute name="revision" attributeType="UUID" usesScalarValueType="NO"/>
-        <attribute name="sequence" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="day" attributeType="String"/>
         <attribute name="payload" attributeType="Binary"/>
-        <attribute name="pending" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="ownerId"/>
+                <constraint value="day"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
     </entity>
 </model>

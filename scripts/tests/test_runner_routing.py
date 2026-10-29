@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import stat
 import subprocess
 import textwrap
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _WORKFLOWS = _REPO_ROOT / ".github" / "workflows"
@@ -768,6 +771,25 @@ def test_hosted_ios_jobs_retain_existing_test_quality_and_summary_gates() -> Non
     assert 'heartbeat' not in summary
 
 
+def test_unit_reuses_package_cache_without_archiving_test_builds() -> None:
+    # Run 40648671494 passed Unit and coverage, then hit the 40m job cap
+    # uploading 4.2 GB of DerivedData. Setup already owns the package cache.
+    unit = _job_block('ios-unit.yml', 'unit')
+    assert 'uses: ./.github/actions/setup-ios-build' in unit
+    assert 'working-directory: apps/ios' in unit
+    assert 'actions/cache' not in unit, 'reuse setup package cache; do not archive Unit build outputs'
+    assert 'timeout-minutes: 40' in unit
+    setup = (_REPO_ROOT / '.github/actions/setup-ios-build/action.yml').read_text()
+    cache = setup.split('    - name: Cache Swift Package Manager\n', 1)[1].split('\n    - name:', 1)[0]
+    assert "if: runner.environment == 'github-hosted'" in cache
+    assert 'uses: actions/cache@' in cache
+    paths = cache.split('        path: |\n', 1)[1].split('        key:', 1)[0]
+    assert [line.strip() for line in paths.splitlines() if line.strip()] == [
+        '${{ inputs.working-directory }}/SourcePackages',
+        '~/Library/Developer/Xcode/DerivedData/**/SourcePackages',
+    ]
+
+
 def _run_manual_quality_guard(tmp_path: Path, **overrides: str) -> subprocess.CompletedProcess[str]:
     quality = _job_block("ios-quality.yml", "quality")
     guard_step = quality.split("      - name: Validate manual qualification source\n", 1)[1]
@@ -1148,6 +1170,399 @@ def test_heartbeat_is_secretless_and_setup_canary_is_manual() -> None:
     assert "create-config-files: 'false'" in canary
 
 
+def test_ruby_gem_cache_rejects_foreign_native_extensions_and_legacy_keys() -> None:
+    step = _ruby_setup_step('Cache Ruby dependencies')
+    key = step.split('        key: ', 1)[1].splitlines()[0]
+    restores = textwrap.dedent(step.split('        restore-keys: |\n', 1)[1]).splitlines()
+    context = {'runner.os': 'macOS', 'runner.arch': 'ARM64',
+               'runner.environment': 'self-hosted', 'inputs.cache-key-prefix': 'ios-gems',
+               'steps.ruby-version.outputs.version': '3.1.7p261',
+               'steps.ruby-version.outputs.abi': 'a' * 64,
+               'steps.gemfile-hash.outputs.hash': 'lock-a'}
+
+    def render(template: str, **changes: str) -> str:
+        values = {**context, **changes}
+        return re.sub(r'\$\{\{\s*(.*?)\s*\}\}', lambda match: values[match[1]], template)
+
+    def can_restore(candidate: str) -> bool:
+        return candidate == render(key) or any(candidate.startswith(render(prefix)) for prefix in restores)
+
+    assert can_restore(render(key))
+    # A lockfile update may reuse native gems only from the same runtime.
+    assert can_restore(render(key, **{'steps.gemfile-hash.outputs.hash': 'lock-b'}))
+    assert not can_restore('macOS-ios-gems-ruby-3.1.7p261-lock-a')
+    for field, value in [('runner.os', 'Linux'), ('runner.arch', 'X64'),
+                         ('runner.environment', 'github-hosted'),
+                         ('steps.ruby-version.outputs.version', '3.1.6p260'),
+                         ('steps.ruby-version.outputs.abi', 'b' * 64)]:
+        assert not can_restore(render(key, **{field: value})), field
+
+
+def test_ruby_cache_identity_changes_with_runtime_build_and_native_library(tmp_path: Path) -> None:
+    binary = tmp_path / 'ruby'
+    library = tmp_path / 'libruby.so'
+    binary.write_text('ruby build one')
+    library.write_text('ruby library one')
+    preload = tmp_path / 'rbconfig-fixture.rb'
+    preload.write_text(textwrap.dedent('''\
+        require 'rbconfig'
+        require 'digest'
+        RbConfig.define_singleton_method(:ruby) { ENV.fetch('FIXTURE_RUBY') }
+        RbConfig::CONFIG['libdir'] = File.dirname(ENV.fetch('FIXTURE_RUBY'))
+        RbConfig::CONFIG['LIBRUBY_SO'] = 'libruby.so'
+        RbConfig::CONFIG['arch'] = ENV.fetch('FIXTURE_ARCH')
+    '''))
+    output = tmp_path / 'github-output'
+
+    def probe(arch: str = 'arm64-darwin-25') -> str:
+        output.write_text('')
+        result = subprocess.run(['bash', '-e', '-c', _ruby_setup_body('Get Ruby version')],
+                                env={**os.environ, 'GITHUB_OUTPUT': str(output),
+                                     'RUBYOPT': f'-r{preload}', 'FIXTURE_RUBY': str(binary),
+                                     'FIXTURE_ARCH': arch}, text=True, capture_output=True,
+                                check=False, pass_fds=_coverage_fds())
+        assert result.returncode == 0, result.stderr
+        values = dict(line.split('=', 1) for line in output.read_text().splitlines())
+        assert values['version']
+        assert re.fullmatch('[0-9a-f]{64}', values['abi'])
+        return values['abi']
+
+    initial = probe()
+    assert probe() == initial
+    assert probe('x86_64-darwin-25') != initial
+    binary.write_text('ruby build two')
+    rebuilt = probe()
+    assert rebuilt != initial
+    library.write_text('ruby library two')
+    assert probe() != rebuilt
+    # Statically linked Ruby has no separate shared library to fingerprint.
+    library.unlink()
+    assert probe() == probe()
+
+
+def test_ruby_setup_fails_when_cached_date_or_psych_cannot_load(tmp_path: Path) -> None:
+    bundle = tmp_path / 'bundle'
+    bundle.write_text(textwrap.dedent('''\
+        #!/usr/bin/env bash
+        if [[ "$1" == exec ]]; then
+          printf '%s\\n' "$*" >> "$NATIVE_LOAD_CALLS"
+          exit "$NATIVE_LOAD_STATUS"
+        fi
+        echo 'fixture bundle config'
+    '''))
+    bundle.chmod(0o755)
+    marker = tmp_path / 'native-load-calls'
+    for status in [0, 1]:
+        result = subprocess.run(['bash', '-e', '-c', _ruby_setup_body('Verify Ruby setup')],
+                                env={**os.environ, 'PATH': f'{tmp_path}:{os.environ["PATH"]}',
+                                     'NATIVE_LOAD_CALLS': str(marker), 'NATIVE_LOAD_STATUS': str(status)},
+                                text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
+        assert result.returncode == status, result.stderr
+    assert len(marker.read_text().splitlines()) == 2
+    assert all('exec ruby' in line and 'date' in line and 'psych' in line
+               for line in marker.read_text().splitlines())
+
+
+def test_ruby_setup_loads_locked_native_gems_after_bundler_setup(tmp_path: Path) -> None:
+    ruby_api = subprocess.check_output(
+        ['ruby', '-rrbconfig', '-e', 'print RbConfig::CONFIG.fetch("ruby_version")'], text=True,
+    )
+    cache = tmp_path / 'vendor/bundle/ruby' / ruby_api
+    (cache / 'specifications').mkdir(parents=True)
+    for name in ['date', 'psych', 'json', 'ffi']:
+        library = cache / 'gems' / f'{name}-99.0.0' / 'lib'
+        library.mkdir(parents=True)
+        (cache / 'specifications' / f'{name}-99.0.0.gemspec').write_text(textwrap.dedent(f'''\
+            Gem::Specification.new do |spec|
+              spec.name = "{name}"
+              spec.version = "99.0.0"
+              spec.summary = "Offline bundled native dependency fixture"
+              spec.authors = ["CI"]
+            end
+        '''))
+        (library / f'{name}.rb').write_text(
+            f'raise LoadError, "fixture {name} native load failed" if ENV["BROKEN_NATIVE_GEM"] == "{name}"\n'
+            f'puts "Bundled {name} loaded"\n'
+        )
+    (tmp_path / 'Gemfile').write_text(
+        'source "https://rubygems.org"\ngem "date", "99.0.0"\ngem "psych", "99.0.0"\ngem "json", "99.0.0"\ngem "ffi", "99.0.0"\n'
+    )
+    (tmp_path / 'Gemfile.lock').write_text(textwrap.dedent('''\
+        GEM
+          remote: https://rubygems.org/
+          specs:
+            date (99.0.0)
+            ffi (99.0.0)
+            json (99.0.0)
+            psych (99.0.0)
+
+        PLATFORMS
+          ruby
+
+        DEPENDENCIES
+          date (= 99.0.0)
+          ffi (= 99.0.0)
+          json (= 99.0.0)
+          psych (= 99.0.0)
+    '''))
+    bundle = tmp_path / 'bundle'
+    # Reproduce the failing runner's command-line -r loads before RUBYOPT's
+    # bundler/setup on every host Ruby, using the real Bundler and gem loader.
+    bundle.write_text(textwrap.dedent('''\
+        #!/usr/bin/env bash
+        set -euo pipefail
+        if [[ "$1" == exec ]]; then
+          shift
+          command="$1"
+          shift
+          options=()
+          while [[ "$1" != -e ]]; do
+            options+=("$1")
+            shift
+          done
+          exec "$command" "${options[@]}" -rbundler/setup "$@"
+        fi
+        echo 'fixture bundle config'
+    '''))
+    bundle.chmod(0o755)
+    for broken in ['', 'date', 'psych', 'json', 'ffi']:
+        result = subprocess.run(
+            ['bash', '-e', '-c', _ruby_setup_body('Verify Ruby setup')], cwd=tmp_path,
+            env={**os.environ, 'PATH': f'{tmp_path}:{os.environ["PATH"]}', 'RUBYOPT': '',
+                 'BUNDLE_GEMFILE': str(tmp_path / 'Gemfile'), 'BUNDLE_PATH': str(tmp_path / 'vendor/bundle'),
+                 'BUNDLE_IGNORE_CONFIG': 'true', 'BUNDLE_DEPLOYMENT': 'true', 'BUNDLE_FROZEN': 'true',
+                 'BROKEN_NATIVE_GEM': broken},
+            text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+        )
+        if broken:
+            assert result.returncode != 0
+            assert f'fixture {broken} native load failed' in result.stderr
+            assert 'Ruby native dependencies loaded' not in result.stdout
+        else:
+            assert result.returncode == 0, result.stderr
+            assert 'Bundled date loaded\nBundled psych loaded\nBundled json loaded\nBundled ffi loaded\nRuby native dependencies loaded' in result.stdout
+
+
+@pytest.fixture
+def live_testmanager_socket(tmp_path: Path):
+    import socket
+
+    with socket.socket(socket.AF_UNIX) as live_socket:
+        socket_path = tmp_path / 'testmanager.sock'
+        live_socket.bind(str(socket_path))
+        yield socket_path
+
+
+def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_destination(
+    tmp_path: Path, live_testmanager_socket: Path,
+) -> None:
+    binaries = tmp_path / 'bin'
+    binaries.mkdir()
+    native = binaries / 'native.py'
+    native.write_text(textwrap.dedent('''\
+        #!/usr/bin/python3
+        import json, os, sys
+        from pathlib import Path
+        args = sys.argv[1:]
+        command = Path(sys.argv[0]).name
+        log = Path(os.environ['NATIVE_CALLS'])
+        with log.open('a') as stream:
+            stream.write(json.dumps([command, *args]) + '\\n')
+        scenario = os.environ['NATIVE_SCENARIO']
+        events = [json.loads(line) for line in log.read_text().splitlines()]
+        restarted = any(e[1:3] == ['simctl', 'shutdown'] for e in events)
+        if command == 'xcodebuild':
+            assert '-showdestinations' in args
+            print('{ platform:iOS Simulator, arch:arm64, id:selected, OS:26.2, name:iPhone 16 }')
+        elif args == ['simctl', 'boot', 'selected']:
+            if scenario == 'already-booted' or (scenario == 'restart-boot-failure' and restarted):
+                sys.exit(149)
+        elif args == ['simctl', 'bootstatus', 'selected', '-b']:
+            if scenario == 'bootstatus-failure' or (scenario == 'restart-status-failure' and restarted):
+                sys.exit(71)
+        elif args == ['simctl', 'getenv', 'selected', 'TESTMANAGERD_SIM_SOCK']:
+            if scenario == 'getenv-failure':
+                sys.exit(72)
+            if scenario == 'empty-socket':
+                sys.exit(0)
+            if scenario == 'regular-file':
+                print(os.environ['REGULAR_FILE'])
+            elif scenario in ['healthy', 'already-booted'] or (scenario == 'stale-recovered' and restarted):
+                print(os.environ['LIVE_SOCKET'])
+            else:
+                print(os.environ['LIVE_SOCKET'] + '.missing')
+        elif args == ['simctl', 'shutdown', 'selected']:
+            if scenario == 'shutdown-failure':
+                sys.exit(73)
+        else:
+            sys.exit('Unexpected native invocation: ' + repr(args))
+    '''))
+    native.chmod(0o755)
+    for name in ['xcrun', 'xcodebuild']:
+        (binaries / name).symlink_to(native)
+    regular = tmp_path / 'regular-file'
+    regular.write_text('A regular file is not a testmanagerd socket.')
+    scenarios = {'stale-persistent': 70, 'healthy': 0, 'already-booted': 0,
+                 'stale-recovered': 0, 'empty-socket': 70, 'getenv-failure': 70,
+                 'regular-file': 70, 'bootstatus-failure': 71, 'shutdown-failure': 73,
+                 'restart-boot-failure': 149, 'restart-status-failure': 71}
+    # A real socket distinguishes healthy launchd state from missing paths or regular files.
+    for scenario, expected in scenarios.items():
+        calls = tmp_path / f'{scenario}.calls'
+        result = subprocess.run(
+            ['bash', str(_REPO_ROOT / 'scripts/ios/resolve-simulator-destination.sh')],
+            env={**os.environ, 'PATH': f'{binaries}:{os.environ["PATH"]}', 'IOS_DIR': str(tmp_path),
+                 'NATIVE_CALLS': str(calls), 'NATIVE_SCENARIO': scenario,
+                 'LIVE_SOCKET': str(live_testmanager_socket), 'REGULAR_FILE': str(regular)},
+            text=True, capture_output=True, check=False, pass_fds=_coverage_fds(), timeout=10)
+        assert result.returncode == expected, (scenario, result.stdout, result.stderr)
+        events = [json.loads(line) for line in calls.read_text().splitlines()]
+        shutdowns = [e for e in events if e[1:3] == ['simctl', 'shutdown']]
+        assert len(shutdowns) == (0 if scenario in ['healthy', 'already-booted', 'bootstatus-failure'] else 1)
+        assert all(e[3] == 'selected' for e in events if e[0] == 'xcrun')
+        assert all(e[0] != 'xcodebuild' or '-showdestinations' in e for e in events)
+        if expected == 0:
+            assert result.stdout == 'platform=iOS Simulator,id=selected\n'
+            assert events[-1] == ['xcrun', 'simctl', 'getenv', 'selected', 'TESTMANAGERD_SIM_SOCK']
+            assert 'ready' in result.stderr
+        else:
+            assert result.stdout == '', 'An unhealthy simulator must never be admitted to native tests'
+            assert 'ready' not in result.stderr
+
+
+@pytest.mark.parametrize('scenario', [
+    'success', 'build-failure', 'build-dirty', 'test-failure', 'skipped', 'duplicate',
+    'coverage-failure', 'fourth-test-failure', 'fourth-coverage-failure', 'boot-failure', 'dirty',
+])
+def test_storekit_lifecycles_use_fresh_devices_and_preserve_failure_evidence(
+    tmp_path: Path, live_testmanager_socket: Path, scenario: str,
+) -> None:
+    cases = ['testAnnualTrialPurchaseRestoreExpiration', 'testMonthlyTrialPurchaseRestoreExpiration',
+             'testAnnualTrialPurchaseRestoreRefund', 'testMonthlyTrialPurchaseRestoreRefund']
+    root = tmp_path / 'repo'
+    (root / 'apps/ios').mkdir(parents=True)
+    scripts = root / 'scripts/ios'
+    scripts.mkdir(parents=True)
+    for name in ['storekit-purchase-restore.sh', 'resolve-simulator-destination.sh', 'launch-quality-evidence.py']:
+        (scripts / name).write_bytes((_REPO_ROOT / 'scripts/ios' / name).read_bytes())
+    _diagnostic_git(root, 'init', '-q')
+    _diagnostic_git(root, 'add', '.')
+    _diagnostic_git(root, '-c', 'user.name=CI Test', '-c', 'user.email=ci@example.invalid',
+                    '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'StoreKit runner fixture')
+    binaries = tmp_path / 'bin'
+    binaries.mkdir()
+    native = binaries / 'native.py'
+    native.write_text(textwrap.dedent('''\
+        #!/usr/bin/python3
+        import json, os, sys
+        from pathlib import Path
+        args = sys.argv[1:]
+        command = Path(sys.argv[0]).name
+        log = Path(os.environ['NATIVE_CALLS'])
+        with log.open('a') as stream:
+            stream.write(json.dumps([command, *args]) + '\\n')
+        scenario = os.environ['NATIVE_SCENARIO']
+        if command == 'xcodebuild':
+            if '-showdestinations' in args:
+                print('{ platform:iOS Simulator, arch:arm64, id:seed, OS:26.2, name:iPhone 16 }')
+            elif 'build-for-testing' in args:
+                if scenario == 'build-failure':
+                    sys.exit(65)
+                if scenario == 'build-dirty':
+                    Path('changed-source.swift').write_text('unreviewed build generation')
+                    os.system('git add changed-source.swift')
+            else:
+                selector = next((a for a in args if a.startswith('-only-testing:')), '')
+                case = selector.rsplit('/', 1)[-1]
+                bundle = Path(args[args.index('-resultBundlePath') + 1])
+                bundle.mkdir()
+                (bundle / 'case').write_text(case)
+                if scenario == 'dirty':
+                    Path('changed-source.swift').write_text('unreviewed generation')
+                    os.system('git add changed-source.swift')
+                if scenario == 'test-failure' or (scenario == 'fourth-test-failure' and 'MonthlyTrialPurchaseRestoreRefund' in case):
+                    print('No active subscriptions found', flush=True)
+                    sys.exit(65)
+        elif args[:4] == ['simctl', 'list', 'devices', 'available']:
+            print(json.dumps({'devices': {'runtime': [{'udid': 'seed', 'deviceTypeIdentifier': 'iphone'}]}}))
+        elif args[:2] == ['simctl', 'getenv']:
+            print(os.environ['LIVE_SOCKET'])
+        elif args[:2] == ['simctl', 'create']:
+            count = sum('"create"' in line for line in log.read_text().splitlines())
+            print(f'fresh-{count}')
+        elif args[:2] == ['simctl', 'bootstatus']:
+            if scenario == 'boot-failure' and args[2] != 'seed':
+                sys.exit(70)
+        elif args[:4] == ['xcresulttool', 'get', 'test-results', 'tests']:
+            case = (Path(args[-1]) / 'case').read_text()
+            result = 'Skipped' if scenario == 'skipped' else 'Passed'
+            nodes = [{'nodeType': 'Test Case', 'nodeIdentifier': f'StoreKitPurchaseRestoreTests/{case}()',
+                      'result': result}]
+            print(json.dumps({'testNodes': nodes * (2 if scenario == 'duplicate' else 1)}))
+        elif args[:2] == ['xccov', 'view']:
+            case = (Path(args[-1]) / 'case').read_text()
+            if scenario == 'coverage-failure' or (scenario == 'fourth-coverage-failure' and 'MonthlyTrialPurchaseRestoreRefund' in case):
+                sys.exit(65)
+            print('{"targets": []}')
+    '''))
+    native.chmod(0o755)
+    for name in ['xcrun', 'xcodebuild']:
+        (binaries / name).symlink_to(native)
+    results = tmp_path / scenario
+    calls = tmp_path / f'{scenario}.calls'
+    result = subprocess.run(['bash', str(scripts / 'storekit-purchase-restore.sh')], cwd=root,
+                                env={**os.environ, 'PATH': f'{binaries}:{os.environ["PATH"]}',
+                                     'STOREKIT_RESULTS': str(results), 'NATIVE_CALLS': str(calls),
+                                     'NATIVE_SCENARIO': scenario, 'LIVE_SOCKET': str(live_testmanager_socket),
+                                     'GITHUB_STEP_SUMMARY': ''},
+                                text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
+    events = [json.loads(line) for line in calls.read_text().splitlines()]
+    invocations = [e for e in events if e[0] == 'xcodebuild' and '-showdestinations' not in e]
+    builds = [e for e in invocations if 'build-for-testing' in e]
+    executions = [e for e in invocations if 'build-for-testing' not in e]
+    creates = [e for e in events if e[:3] == ['xcrun', 'simctl', 'create']]
+    deletes = [e[-1] for e in events if e[:3] == ['xcrun', 'simctl', 'delete']]
+    assert len(builds) == 1, 'Prepare StoreKit once instead of rebuilding every isolated lifecycle'
+    assert not any('test' in e for e in executions), 'Lifecycle execution must reuse the reviewed build'
+    for invocation in invocations:
+        assert invocation[invocation.index('-testPlan') + 1] == 'StoreKit'
+        assert invocation[invocation.index('-enableCodeCoverage') + 1] == 'YES'
+        assert 'CODE_SIGNING_REQUIRED=NO' in invocation and 'CODE_SIGNING_ALLOWED=NO' in invocation
+    assert builds[0][builds[0].index('-destination') + 1] == 'platform=iOS Simulator,id=seed'
+    if creates:
+        assert events.index(builds[0]) < events.index(creates[0]), 'Build failure must precede lifecycle creation'
+    assert 'timeout-minutes: 45' in _job_block('ci.yml', 'ios_storekit')
+    # Only devices created by this invocation may be deleted, including on failure.
+    assert deletes == [f'fresh-{i + 1}' for i in range(len(creates))], result.stderr
+    assert (results / 'source-working-tree.patch').exists()
+    assert (results / 'storekit.log').exists()
+    for i, (invocation, case) in enumerate(zip(executions, cases)):
+        assert invocation[-1] == 'test-without-building'
+        assert f'-only-testing:LogYourBodyTests/StoreKitPurchaseRestoreTests/{case}' in invocation
+        assert invocation[invocation.index('-destination') + 1] == f'platform=iOS Simulator,id=fresh-{i + 1}'
+    if scenario == 'success' or scenario.startswith('fourth-'):
+        assert len(executions) == len(creates) == 4
+        passed_cases = cases if scenario == 'success' else cases[:3]
+        assert result.returncode == (0 if scenario == 'success' else 65), result.stderr + result.stdout
+        assert len(list(results.glob('*.evidence.json'))) == len(passed_cases)
+        for case in passed_cases:
+            receipt = json.loads((results / f'{case}.evidence.json').read_text())
+            assert receipt['tests'] == [{'identifier': f'StoreKitPurchaseRestoreTests/{case}()', 'result': 'Passed'}]
+            assert receipt['sourceRevision'] == _diagnostic_git(root, 'rev-parse', 'HEAD')
+            assert (results / f'{case}.coverage.json').is_file()
+        if scenario.startswith('fourth-'):
+            assert (results / f'{cases[-1]}.xcresult').is_dir(), 'Retain the failed final bundle without declaring success'
+            assert not (results / f'{cases[-1]}.evidence.json').exists()
+    else:
+        assert result.returncode == (70 if scenario == 'boot-failure' else 65), scenario
+        assert len(executions) <= 1, 'A failed lifecycle must not be retried or advance to the next case'
+        assert not list(results.glob('*.evidence.json'))
+        if scenario.startswith('build-'):
+            assert not creates and not executions, 'A failed or source-dirty build must not admit any lifecycle'
+        if scenario == 'test-failure':
+            assert 'restore returned no active entitlement' in result.stdout
+
+
 def test_invalid_awaiter_bounds_and_missing_helper_fall_back(tmp_path: Path) -> None:
     cases = [
         {'HEARTBEAT_POLL_ATTEMPTS': '0'},
@@ -1195,7 +1610,7 @@ def test_chat_corpus_selects_public_turns_and_requires_exact_unit_and_ui_passes(
     import pytest
 
     source = (_REPO_ROOT / "scripts/ios/launch-quality-audit.sh").read_text()
-    unit = "CHAT_QUALIFICATION_UNIT_TESTS=(" + source.split("CHAT_QUALIFICATION_UNIT_TESTS=(", 1)[1].split("# The whole unit target", 1)[0]
+    unit = "CHAT_QUALIFICATION_UNIT_TESTS=(" + source.split("CHAT_QUALIFICATION_UNIT_TESTS=(", 1)[1].split("# Launch Quality gates the general unit target.", 1)[0]
     ui = "LAUNCH_QUALITY_UI_TESTS=(" + source.split("LAUNCH_QUALITY_UI_TESTS=(", 1)[1].split("UI_RESULT_BUNDLE=", 1)[0]
     result = subprocess.run(["bash", "-e", "-u", "-c", unit + ui +
         '\nprintf "selector:%s\\n" "${UI_SELECTORS[@]}"\n' +
@@ -1240,6 +1655,26 @@ def test_chat_corpus_selects_public_turns_and_requires_exact_unit_and_ui_passes(
                 negative["testNodes"][index]["result"] = status
             with pytest.raises(ValueError):
                 evidence.validate_cases(negative, required)
+
+
+def test_slow_chat_fixture_cannot_complete_before_explicit_cancellation() -> None:
+    source = (_REPO_ROOT / 'apps/ios/LogYourBody/Services/ChatService.swift').read_text()
+    fixture = source.split('struct FixtureChatService: ChatServicing {', 1)[1].split('\n#endif', 1)[0]
+    # Both the ephemeral and replay fixture must outlive XCTest's 60s idle wait.
+    slow_paths = [fixture.split('case .slow:', 1)[1].split('\n                }', 1)[0],
+                  fixture.split('if mode == .slow && row.attempts == 1 && !replayed {', 1)[1]
+                  .split('\n            }', 1)[0]]
+    for path in slow_paths:
+        assert 'try await waitForCancellation()' in path
+        assert 'Task.sleep' not in path, 'One elapsed delay cannot end a cancellation fixture'
+    wait = fixture.split('private func waitForCancellation() async throws {', 1)[1].split('\n    }', 1)[0]
+    assert 'while true {' in wait
+    assert 'try Task.checkCancellation()' in wait
+    assert 'try await slowTick()' in wait
+    assert 'try?' not in wait and 'break' not in wait and 'return' not in wait
+    native = (_REPO_ROOT / 'apps/ios/LogYourBodyTests/ChatServiceTests.swift').read_text()
+    assert 'elapsedSeconds == 61' in native
+    assert 'Slow fixture must remain pending past XCTest quiescence' in native
 
 
 def verify_coverage(report: Path) -> None:
@@ -1379,7 +1814,12 @@ def _diagnostic_repository(tmp_path: Path) -> tuple[Path, str]:
     for name, code in {
         'bootstrap-local-config.sh': '#!/bin/bash\nprintf "bootstrap\\n" >> "$FAKE_CALLS"\n',
         'resolve-simulator-destination.sh': '#!/bin/bash\nprintf "destination\\n" >> "$FAKE_CALLS"\nprintf "platform=iOS Simulator,id=11111111-1111-1111-1111-111111111111\\n"\n',
-        'test_launch_quality_evidence.py': 'print("Ordinary evidence tests")\n',
+        'test_launch_quality_evidence.py': (
+            'import os, sys\n'
+            'with open(os.environ["FAKE_CALLS"], "a") as calls:\n'
+            '    calls.write("evidence-preflight\\n")\n'
+            'sys.exit(int(os.environ.get("PREFLIGHT_EXIT", "0")))\n'
+        ),
     }.items():
         (root / 'scripts/ios' / name).write_text(code)
     _diagnostic_git(root, 'init', '-q')
@@ -1397,7 +1837,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'
+        'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -1497,6 +1937,9 @@ name=pathlib.Path(sys.argv[0]).name
 args=sys.argv[1:]
 with open(os.environ['FAKE_CALLS'],'a') as f:f.write(json.dumps([name,*args])+'\\n')
 if name=='fake-timeout':
+    if ('build-for-testing' in args
+            and int(args[1].removesuffix('s')) < int(os.environ.get('BUILD_DURATION_SECONDS','0'))):
+        sys.exit(124)
     sys.exit(subprocess.call(args[2:]))
 if name=='xcrun':
     if args[:3]==['xcresulttool','get','test-results']:
@@ -1545,6 +1988,7 @@ def test_focused_diagnostic_real_dispatcher_builds_once_selects_only_seven_and_n
     result, calls, receipt = _run_diagnostic_dispatch(tmp_path, BUILD_FOR_TESTING_TIMEOUT_SECONDS='1',
         DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE='999', UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS='1')
     assert result.returncode == 0, result.stdout + result.stderr
+    assert 'evidence-preflight' not in calls
     commands = [json.loads(c) for c in calls if c.startswith('["xcodebuild"')]
     assert len(commands) == 2
     assert 'build-for-testing' in commands[0] and 'test-without-building' in commands[1]
@@ -1562,6 +2006,24 @@ def test_focused_diagnostic_real_dispatcher_builds_once_selects_only_seven_and_n
     assert receipt['unitWitnessCoverageRatchetPerformanceProtectedSignedPhysical'] == 'NOT_EXECUTED_OR_QUALIFIED'
     artifacts = tmp_path / 'artifacts'
     assert not list(artifacts.glob('*.evidence.json')) and not list(artifacts.glob('*.coverage.json'))
+
+
+def test_launch_quality_validator_preflight_finishes_before_simulator_boot_and_failure_stops_native_work(tmp_path: Path) -> None:
+    # Exercise the real dispatcher: a booted simulator must not compete with the
+    # validator's bounded shell fixtures, and failed preflight must stay fatal.
+    for status in (0, 65, 124):
+        result, calls, receipt = _run_diagnostic_dispatch(
+            tmp_path / str(status), mode='', DESTINATION='auto', PREFLIGHT_EXIT=str(status))
+        assert receipt is None
+        if status == 0:
+            assert result.returncode == 88, result.stdout + result.stderr
+            assert calls[:3] == ['evidence-preflight', 'bootstrap', 'destination']
+            assert calls.count('evidence-preflight') == 1
+            assert any('build-for-testing' in call for call in calls)
+            assert any('-only-testing:LogYourBodyTests' in call for call in calls)
+        else:
+            assert result.returncode == status, result.stdout + result.stderr
+            assert calls == ['evidence-preflight']
 
 
 def test_focused_diagnostic_dispatch_failure_timeout_and_missing_catalogue_never_pass_or_retry_after_tests(tmp_path: Path) -> None:
@@ -1595,6 +2057,38 @@ def test_focused_diagnostic_one_ui_command_even_for_infrastructure_failure_and_d
     assert result.returncode == 64 and not calls and receipt is None
 
 
+def test_full_launch_cold_build_budget_reaches_the_complete_unit_target(tmp_path: Path) -> None:
+    for name, overrides, expected in [
+            ('default', {'BUILD_DURATION_SECONDS': '750'}, '900s'),
+            ('override', {'BUILD_FOR_TESTING_TIMEOUT_SECONDS': '37', 'BUILD_DURATION_SECONDS': '25'}, '37s')]:
+        result, calls, receipt = _run_diagnostic_dispatch(tmp_path / name, mode='', **overrides)
+        assert result.returncode == 88 and receipt is None, result.stdout + result.stderr
+        timed = [json.loads(c) for c in calls if c.startswith('["fake-timeout"')]
+        assert len(timed) == 2
+        assert timed[0][2] == expected and 'build-for-testing' in timed[0]
+        assert timed[1][2] == '1020s' and '-only-testing:LogYourBodyTests' in timed[1]
+        assert '-enableCodeCoverage' in timed[0]
+        assert timed[0][timed[0].index('-enableCodeCoverage') + 1] == 'YES'
+        assert timed[1][timed[1].index('-default-test-execution-time-allowance') + 1] == '90'
+        assert timed[1][timed[1].index('-maximum-test-execution-time-allowance') + 1] == '180'
+
+
+def test_full_launch_build_failure_or_timeout_stops_without_retry_or_qualification(tmp_path: Path) -> None:
+    for status in ('65', '124'):
+        result, calls, receipt = _run_diagnostic_dispatch(tmp_path / status, mode='', BUILD_EXIT=status)
+        assert result.returncode == int(status) and receipt is None, result.stdout + result.stderr
+        commands = [json.loads(c) for c in calls if c.startswith('["xcodebuild"')]
+        assert len(commands) == 1 and 'build-for-testing' in commands[0]
+        artifacts = tmp_path / status / 'artifacts'
+        log = (artifacts / 'launch-quality-build-for-testing.log').read_text()
+        if status == '124':
+            assert 'build-for-testing timed out after 900s' in log
+        assert not list(artifacts.glob('*.xcresult'))
+        assert not list(artifacts.glob('*.evidence.json'))
+        assert not list(artifacts.glob('*.coverage.json'))
+        assert not (artifacts / 'summary.md').exists()
+
+
 def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_preserves_pending_runs() -> None:
     source = (_WORKFLOWS / 'ios-ui-diagnostics.yml').read_text()
     assert '  queue: max\n' in source and '  cancel-in-progress: false\n' in source
@@ -1607,7 +2101,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'" in source
+    assert "REVIEWED_AUDIT_SHA256 = 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -1840,17 +2334,59 @@ def _reviewed_diagnostic_candidate_bytes() -> bytes:
 
 
 def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins(tmp_path: Path) -> None:
+    import gzip
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'
+    expected = 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
+    project_name = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj'
+    # Frozen reviewed bytes from main at e3fffe422; the existing policy digest is unchanged.
+    # Ordinary target additions may change the live project without authorizing new diagnostic tooling.
+    # Keep this offline fixture so shallow CI checkouts can still exercise the real trusted CLI.
+    reviewed_project = gzip.decompress(
+        (_REPO_ROOT / 'scripts/tests/fixtures/reviewed-diagnostic-project.pbxproj.gz').read_bytes())
+    assert hashlib.sha256(reviewed_project).hexdigest() == dependencies[project_name]
     # The previous pin was the unlanded candidate. It stays a rejected fixture.
     unlanded = _reviewed_diagnostic_candidate_bytes()
     reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert hashlib.sha256(reviewed).hexdigest() == expected
+    # Historical refusal fixtures must not be reconstructed from the changing candidate.
+    frozen_main = gzip.decompress(
+        (_REPO_ROOT / 'scripts/tests/fixtures/diagnostic-audit-ad4098afa11c.sh.gz').read_bytes())
+    assert hashlib.sha256(frozen_main).hexdigest() == 'ad4098afa11c60dededb52592a74de1c3374d84f87da891f754b4b47f6aba2aa'
+    frozen_branch = gzip.decompress(
+        (_REPO_ROOT / 'scripts/tests/fixtures/diagnostic-audit-ffdea3b6fb51.sh.gz').read_bytes())
+    assert hashlib.sha256(frozen_branch).hexdigest() == 'ffdea3b6fb517caf8e47ff9ffcc2d348840d59b57c150842b5253dfdb0f16fea'
+    previous_main = frozen_main.replace(
+        b'  "LogYourBodyUITests/testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance"\n',
+        b'', 1)
+    assert hashlib.sha256(previous_main).hexdigest() == 'd77acce04a7d6eff69ddadcf28e869a703ed3ae98b50921b3625878490c481a8'
+    previous_branch = frozen_main.replace(
+        b'  # Finish validator shell fixtures before simulator boot competes for host resources.\n'
+        b'  python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"\n', b'', 1)
+    previous_branch = previous_branch.replace(
+        b'\nbuild_for_testing_once\n\nCHAT_QUALIFICATION_UNIT_TESTS=(',
+        b'\npython3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"\n'
+        b'build_for_testing_once\n\nCHAT_QUALIFICATION_UNIT_TESTS=(', 1)
+    assert hashlib.sha256(previous_branch).hexdigest() == '47d6ee6b7d56796527fa0154082f89a46c8a30be0ecfd5ce7e13866a600b633a'
+    previous_preflight = previous_main.replace(
+        b'  # Finish validator shell fixtures before simulator boot competes for host resources.\n'
+        b'  python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"\n', b'', 1)
+    previous_preflight = previous_preflight.replace(
+        b'\nbuild_for_testing_once\n\nCHAT_QUALIFICATION_UNIT_TESTS=(',
+        b'\npython3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"\n'
+        b'build_for_testing_once\n\nCHAT_QUALIFICATION_UNIT_TESTS=(', 1)
+    assert hashlib.sha256(previous_preflight).hexdigest() == '21f66fca1c8bd7e7a296947f3374c693677bd6cc0e05012419e5f02ec999d459'
+    previous_reviewed = previous_preflight.replace(
+        b'# Bound the one cold build independently of XCTest execution. Run 40388372132\n'
+        b'# missed every Swift package cache and was still compiling test targets at 600s.\n'
+        b'# Allow 15m for compilation; keep test timeouts, retries and the outer step cap.\n'
+        b'BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"',
+        b'BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-600}"', 1)
+    assert hashlib.sha256(previous_reviewed).hexdigest() == '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'
     # Recover exact old V16 only as inert bytes, to prove real CLI refusal of it.
     legacy = unlanded.decode()
     start = legacy.index('# An unknown mode must fail')
@@ -1886,15 +2422,15 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'frozen-main-audit', 'frozen-branch-audit', 'previous-main-audit', 'previous-branch-audit', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
-                'dependency-symlink']
+                'dependency-symlink', 'changed-project', 'wrong-resolver']
     for scenario in fixtures:
         root = (tmp_path / scenario / 'repo').resolve()
         root.mkdir(parents=True)
         for name, digest in dependencies.items():
             source = _REPO_ROOT / name
-            data = source.read_bytes()
+            data = reviewed_project if name == project_name else source.read_bytes()
             assert source.is_file() and not source.is_symlink()
             assert hashlib.sha256(data).hexdigest() == digest
             target = root / name
@@ -1903,7 +2439,19 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         audit = root / 'scripts/ios/launch-quality-audit.sh'
         audit.write_bytes(reviewed)
         helper = root / 'scripts/ios/bootstrap-local-config.sh'
-        if scenario == 'unlanded-candidate':
+        if scenario == 'frozen-main-audit':
+            audit.write_bytes(frozen_main)
+        elif scenario == 'frozen-branch-audit':
+            audit.write_bytes(frozen_branch)
+        elif scenario == 'previous-main-audit':
+            audit.write_bytes(previous_main)
+        elif scenario == 'previous-branch-audit':
+            audit.write_bytes(previous_branch)
+        elif scenario == 'previous-preflight-audit':
+            audit.write_bytes(previous_preflight)
+        elif scenario == 'previous-reviewed-audit':
+            audit.write_bytes(previous_reviewed)
+        elif scenario == 'unlanded-candidate':
             audit.write_bytes(unlanded)
         elif scenario == 'legacy-v16':
             audit.write_bytes(legacy_bytes)
@@ -1918,11 +2466,16 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
             audit.symlink_to(helper)
         elif scenario == 'wrong-dependency':
             helper.write_bytes(helper.read_bytes() + b'\n')
+        elif scenario == 'wrong-resolver':
+            resolver = root / 'scripts/ios/resolve-simulator-destination.sh'
+            resolver.write_bytes(resolver.read_bytes() + b'\n')
         elif scenario == 'missing-dependency':
             helper.unlink()
         elif scenario == 'dependency-symlink':
             helper.unlink()
             helper.symlink_to(audit)
+        elif scenario == 'changed-project':
+            (root / project_name).write_bytes(reviewed_project + b'\n')
         _diagnostic_git(root, 'init', '-q')
         _diagnostic_git(root, 'add', '.')
         _diagnostic_git(root, '-c', 'user.name=Diagnostic Test', '-c', 'user.email=diagnostic@example.invalid',

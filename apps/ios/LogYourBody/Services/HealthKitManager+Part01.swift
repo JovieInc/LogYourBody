@@ -206,7 +206,8 @@ func sourceMetadata(from sample: HKQuantitySample) -> BodyMetricSourceMetadata {
             deviceManufacturer: sample.device?.manufacturer,
             deviceModel: sample.device?.model,
             sampleId: idempotencyKey(for: sample),
-            quantityType: sample.quantityType.identifier
+            quantityType: sample.quantityType.identifier,
+            importedAt: ISO8601DateFormatter().string(from: Date())
         ).recordingHealthKitContext(context)
     }
 
@@ -227,7 +228,8 @@ func combinedHealthKitMetadata(
             deviceModel: primary?.deviceModel ?? bodyFatMetadata?.deviceModel,
             sampleId: primary?.sampleId ?? bodyFatMetadata?.sampleId,
             quantityType: primary?.quantityType ?? bodyFatMetadata?.quantityType,
-            bodyFatSampleId: bodyFatMetadata?.sampleId
+            bodyFatSampleId: bodyFatMetadata?.sampleId,
+            importedAt: primary?.importedAt ?? bodyFatMetadata?.importedAt
         ).recordingHealthKitContext(primary?.healthKitContext ?? [:])
         return bodyFatMetadata.map { combined.pairingHealthKitBodyFat($0) } ?? combined
     }
@@ -568,12 +570,17 @@ func resetForCurrentUser() async {
         }
 
         let userId = await MainActor.run { AuthManager.shared.currentUser?.id }
+        let importUserId = await MainActor.run { (importAuthManager ?? .shared).currentUser?.id }
         let lastObserverKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: userId)
         let fullSyncKey = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: userId)
         userDefaults.removeObject(forKey: HealthKitDefaultsKey.authorizationConfirmed.rawValue)
         userDefaults.removeObject(forKey: HealthKitDefaultsKey.readProbeRecord.rawValue)
         userDefaults.removeObject(forKey: lastObserverKey)
         userDefaults.removeObject(forKey: fullSyncKey)
+        HealthAnchorStore(defaults: userDefaults).reset(userId: userId)
+        if importUserId != userId {
+            HealthAnchorStore(defaults: userDefaults).reset(userId: importUserId)
+        }
 
         await MainActor.run {
             self.isAuthorized = false

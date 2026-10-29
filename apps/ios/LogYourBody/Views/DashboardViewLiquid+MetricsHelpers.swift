@@ -174,7 +174,8 @@ extension DashboardViewLiquid {
                     date: metric.date,
                     primaryValue: convertedWeight,
                     secondaryValue: metric.bodyFatPercentage,
-                    source: metricEntrySourceType(from: metric.dataSource)
+                    source: metricEntrySourceType(from: metric.measurementSource(for: .weight).rawValue),
+                    sourceName: metric.measurementSource(for: .weight) == .manual ? "Manual" : metric.provenance.sourceName
                 )
             }
 
@@ -217,7 +218,8 @@ extension DashboardViewLiquid {
                     date: metric.date,
                     primaryValue: bodyFatValue,
                     secondaryValue: secondaryValue,
-                    source: metricEntrySourceType(from: metric.dataSource)
+                    source: metricEntrySourceType(from: metric.measurementSource(for: .bodyFat).rawValue),
+                    sourceName: metric.measurementSource(for: .bodyFat) == .manual ? "Manual" : metric.provenance.sourceName
                 )
             }
 
@@ -333,46 +335,11 @@ extension DashboardViewLiquid {
     }
 
     func formatCardDateOnly(_ date: Date?) -> String? {
-        guard let date = date else { return nil }
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let day = calendar.startOfDay(for: date)
-
-        if day == today {
-            return "Today"
-        }
-
-        if let days = calendar.dateComponents([.day], from: day, to: today).day, days == 1 {
-            return "Yesterday"
-        }
-
-        let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: today)
-        if sameYear {
-            return FormatterCache.monthDayFormatter.string(from: date)
-        } else {
-            return FormatterCache.monthYearFormatter.string(from: date)
-        }
+        date.map { DashboardMetricFormatting.readingDateLabel(effectiveDate: $0) }
     }
 
     func formatCardDate(_ date: Date) -> String {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let day = calendar.startOfDay(for: date)
-
-        if day == today {
-            return "Today"
-        }
-
-        if let days = calendar.dateComponents([.day], from: day, to: today).day, days == 1 {
-            return "Yesterday"
-        }
-
-        let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: today)
-        if sameYear {
-            return FormatterCache.monthDayFormatter.string(from: date)
-        } else {
-            return FormatterCache.monthYearFormatter.string(from: date)
-        }
+        DashboardMetricFormatting.readingDateLabel(effectiveDate: date)
     }
 
     func generateStepsChartData() -> [MetricDataPoint] {

@@ -240,6 +240,45 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "training-response-loss-relaunch-exact-retry", from: app)
     }
 
+    func testApprovedCardsNavigateOfflineAndRetainPendingIdentityAfterRelaunch() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingCards",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.switches["training_fixture_offline"].tap()
+        app.buttons["training_fixture_open"].tap()
+        let navigation = app.descendants(matching: .any)["training_workout_navigation"]
+        XCTAssertTrue(navigation.waitForExistence(timeout: 5))
+        navigation.tap()
+        let second = app.buttons["training_navigate_fixture_press-2"]
+        XCTAssertTrue(second.waitForExistence(timeout: 5))
+        second.tap()
+        let log = app.buttons["training_log_set_fixture_press_2"]
+        for _ in 0..<8 where !log.isHittable { app.swipeUp() }
+        XCTAssertTrue(log.isHittable)
+        XCTAssertGreaterThanOrEqual(log.frame.height, 44)
+        log.tap()
+        XCTAssertTrue(app.staticTexts["training_pending_sync"].waitForExistence(timeout: 5))
+        attachScreenshot(named: "approved-card-offline-pending-large-type", from: app)
+        app.buttons["training_live_session_close_button"].tap()
+        app.terminate()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestTrainingCards"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        app.descendants(matching: .any)["training_workout_navigation"].tap()
+        app.buttons["training_navigate_fixture_press-2"].tap()
+        XCTAssertTrue(app.staticTexts["training_pending_sync"].waitForExistence(timeout: 5))
+        app.buttons["training_log_set_fixture_press_2"].tap()
+        app.buttons["training_live_session_close_button"].tap()
+        XCTAssertEqual(app.staticTexts["training_fixture_count"].label, "Acknowledged sets: 1")
+        XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 2")
+        attachScreenshot(named: "approved-card-relaunch-exact-pending-retry", from: app)
+    }
+
     func testTrainingHistoryShowsRecordedPerformanceAtAccessibilityTextSize() throws {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -1638,6 +1677,40 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_timeline"].exists)
     }
 
+    func testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance() throws {
+        let app = XCUIApplication()
+        app.forwardActualXCTestContext()
+        launch(app, with: [
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestPhaseInsightFixture", "-lybUITestMetricStatsTruth", "-dashboard_selected_time_range", "1M"
+        ])
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        openStatsPage(in: app)
+        let card = app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"]
+        scrollUntilHittable(card, in: app)
+        XCTAssertTrue(card.label.contains("Observed"))
+        XCTAssertTrue(card.label.contains("Past 30 days"))
+        let value = try XCTUnwrap(card.label.split(separator: ",").dropFirst().first?.split(separator: " ").first)
+        card.tap()
+        let headline = app.descendants(matching: .any)["metric_detail_headline"]
+        XCTAssertTrue(headline.waitForExistence(timeout: 8))
+        XCTAssertEqual(headline.label, String(value))
+        let context = app.staticTexts["metric_detail_observation_context"]
+        XCTAssertTrue(context.waitForExistence(timeout: 5))
+        XCTAssertTrue(context.label.contains("Mean of"))
+        let chart = app.descendants(matching: .any)["metric_detail_chart_plot"]
+        scrollUntilHittable(chart, in: app)
+        let start = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)))
+        let selectedValue = headline.label
+        let selectedContext = context.label
+        XCTAssertFalse(selectedContext.isEmpty)
+        XCTAssertFalse(selectedContext.contains("Updated"))
+        // Read the chart after release; selection must continue to match the headline.
+        XCTAssertTrue((chart.value as? String)?.contains("current selection \(selectedValue)") == true)
+        attachScreenshot(named: "lyb47-observation-drilldown", from: app)
+    }
+
     func testMetricDetailOpensFromStatsAndShowsSharedTimelineContext() throws {
         let app = XCUIApplication()
         launch(app, with: [
@@ -2265,13 +2338,21 @@ final class LogYourBodyUITests: XCTestCase {
         let menu = app.buttons["Open Menu"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
         menu.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_menu"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["photo_timeline_menu"].waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            app.buttons.matching(identifier: "photo_timeline_menu").count, 0,
+            "The menu marker must never replace its independent button identifiers."
+        )
     }
 
     private func openSettingsFromPhotoTimelineMenu(in app: XCUIApplication) {
         openPhotoTimelineMenu(in: app)
-        let settings = app.buttons["Settings"]
+        let settingsButtons = app.buttons.matching(identifier: "photo_timeline_menu_settings")
+        let settings = settingsButtons.firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        XCTAssertEqual(settingsButtons.count, 1, "Settings must have one distinct control owner.")
+        XCTAssertEqual(settings.identifier, "photo_timeline_menu_settings")
+        XCTAssertEqual(settings.label, "Settings")
         XCTAssertTrue(settings.isHittable)
         settings.tap()
         XCTAssertTrue(app.buttons["settings_profile_link"].waitForExistence(timeout: 8))
@@ -3401,13 +3482,33 @@ final class LogYourBodyUITests: XCTestCase {
 
     private func submitSyntheticChatQuestion(in app: XCUIApplication) {
         let composer = app.textFields["chat_composer"]
-        composer.tap()
         let question = "Synthetic full-turn question"
-        composer.typeText(question)
-        let entered = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value == %@", question), object: composer
-        )
-        let complete = XCTWaiter.wait(for: [entered], timeout: 8) == .completed
+        // Launch Quality run 40189917522 kept only "S" after one typeText while
+        // the app was still settling. Top up a prefix; never send anything else.
+        var complete = false
+        for attempt in 0..<3 {
+            let current = enteredSyntheticQuestion(in: composer)
+            if current != question {
+                // A center tap in a short draft can leave the caret before the
+                // committed prefix. The trailing edge puts it after that text.
+                if current.isEmpty {
+                    composer.tap()
+                } else {
+                    composer.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+                }
+                _ = app.keyboards.element.waitForExistence(timeout: 2)
+                let addition = syntheticQuestionInsertion(current: current, question: question)
+                if !addition.isEmpty {
+                    composer.typeText(addition)
+                }
+            }
+            let entered = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "value == %@", question), object: composer
+            )
+            let timeout: TimeInterval = attempt == 0 ? 8 : 4
+            complete = XCTWaiter.wait(for: [entered], timeout: timeout) == .completed
+            if complete { break }
+        }
         if !complete {
             let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
             screenshot.name = "chat-synthetic-incomplete-draft-screen"
@@ -3418,12 +3519,31 @@ final class LogYourBodyUITests: XCTestCase {
             hierarchy.lifetime = .keepAlways
             add(hierarchy)
         }
-        XCTAssertTrue(complete, "Require the complete synthetic question before Send; never submit partial input")
+        let observed = composer.value ?? "nil"
+        XCTAssertTrue(
+            complete,
+            "Require the complete synthetic question before Send; never submit partial input (saw \(observed))"
+        )
         guard complete else { return }
         let send = app.buttons["chat_send_button"]
         let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: send)
         XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 8), .completed)
         send.tap()
+    }
+
+    /// Committed composer text. An empty SwiftUI field reports its placeholder.
+    private func enteredSyntheticQuestion(in composer: XCUIElement) -> String {
+        guard let value = composer.value as? String, !value.isEmpty else { return "" }
+        if value == composer.placeholderValue || value == "Ask about your progress" { return "" }
+        return value
+    }
+
+    /// Keystrokes still required. A value that is not a prefix is cleared first.
+    private func syntheticQuestionInsertion(current: String, question: String) -> String {
+        if question.hasPrefix(current) {
+            return String(question.dropFirst(current.count))
+        }
+        return String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count) + question
     }
 
     private func assertSyntheticChatCompleted(in app: XCUIApplication, capture: String) {

@@ -114,13 +114,6 @@ extension DashboardViewLiquid {
         .fullScreenCover(isPresented: $isHomeV2AllPhotosPresented) {
             homeV2AllPhotosFromHome
         }
-        .sheet(item: $homeV2EditingSession) { session in
-            homeV2EditEntrySheet(for: session)
-                #if DEBUG
-                .onAppear { recordHomeEditTransition("sheet.appear") }
-                .onDisappear { recordHomeEditTransition("sheet.disappear") }
-                #endif
-        }
         #if DEBUG
         .onChange(of: homeV2EditingSession?.id) { _, _ in
             recordHomeEditTransition("item.changed")
@@ -131,6 +124,13 @@ extension DashboardViewLiquid {
         #endif
         .navigationDestination(isPresented: $isHomeV2ContextPresented) {
             homeV2ContextView
+                .sheet(item: $homeV2EditingSession) { session in
+                    homeV2EditEntrySheet(for: session)
+                        #if DEBUG
+                        .onAppear { recordHomeEditTransition("sheet.appear") }
+                        .onDisappear { recordHomeEditTransition("sheet.disappear") }
+                        #endif
+                }
         }
         .navigationDestination(isPresented: $isHomeV2EntriesPresented) {
             homeV2EntriesView
@@ -465,7 +465,7 @@ extension DashboardViewLiquid {
     }
 
     func formatHUDDate(_ date: Date) -> String {
-        FormatterCache.mediumDateFormatter.string(from: date)
+        DashboardMetricFormatting.readingDateLabel(effectiveDate: date)
     }
 
     var photoTimelineHUDEmptyState: some View {
@@ -574,6 +574,9 @@ private struct PhotoTimelineNavigationMenu: View {
                     Text("LogYourBody")
                         .font(.system(size: 30, weight: .semibold))
                         .foregroundStyle(theme.colors.text)
+                        // Keep the screen marker on a leaf: an identifier on the
+                        // menu container propagates to its independent buttons.
+                        .accessibilityIdentifier("photo_timeline_menu")
 
                     Spacer()
 
@@ -634,7 +637,6 @@ private struct PhotoTimelineNavigationMenu: View {
             .padding(.top, 48)
             .padding(.bottom, JovieTokens.sectionGap)
         }
-        .accessibilityIdentifier("photo_timeline_menu")
     }
 
     private func menuRow(

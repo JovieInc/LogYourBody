@@ -441,9 +441,9 @@ final class ChaosMonkeyUITests: XCTestCase {
         openDefaultHomeAsk(in: app)
         let composer = app.textFields["chat_composer"]
         XCTAssertTrue(composer.waitForExistence(timeout: 12))
-        composer.tap()
         let draft = "local chaos draft"
-        composer.typeText(draft)
+        XCTAssertTrue(typeVerifiedText(draft, into: composer, app: app))
+        XCTAssertEqual(composer.value as? String, draft, "Require the complete draft before testing dismissal.")
         XCTAssertEqual(
             dismissKeyboardForStep(app: app, refocusingIfNeeded: composer),
             .executed(.dismiss)
@@ -1050,17 +1050,38 @@ final class ChaosMonkeyUITests: XCTestCase {
         return .executed(.swipe)
     }
 
+    /// Pace native input through SwiftUI layout/focus updates and require every
+    /// prefix to land. Never clear or retry a mismatched draft: that is a failure.
+    private func typeVerifiedText(_ text: String, into field: XCUIElement, app: XCUIApplication) -> Bool {
+        guard !text.isEmpty, field.exists, field.isHittable,
+              let value = field.value as? String else { return false }
+        var expected = value == field.placeholderValue ? "" : value
+        field.tap()
+        for character in text {
+            if !app.keyboards.firstMatch.exists { field.tap() }
+            guard app.keyboards.firstMatch.waitForExistence(timeout: 1.5) else { return false }
+            field.typeText(String(character))
+            expected.append(character)
+            let entered = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "value == %@", expected), object: field
+            )
+            guard XCTWaiter.wait(for: [entered], timeout: 2) == .completed else {
+                attachDiagnostics(app: app, name: "incomplete-native-text-entry")
+                return false
+            }
+        }
+        return true
+    }
+
     private func performType(app: XCUIApplication, rng: inout ChaosRNG, fields: [XCUIElement]? = nil) -> ChaosStepOutcome {
         let available = (fields ?? (app.textFields.allElementsBoundByIndex + app.searchFields.allElementsBoundByIndex))
             .filter { $0.isHittable && !isDenylisted($0) }
         guard let field = available.first else { return .skipped("no safe text field") }
-        field.tap()
-        guard app.keyboards.element.waitForExistence(timeout: 1.5) else {
-            return .skipped("text field did not gain keyboard focus")
-        }
         let edge = Self.edgeStrings.randomElement(using: &rng) ?? ""
         guard !edge.isEmpty else { return .skipped("seeded text was empty") }
-        field.typeText(String(edge.prefix(24)))
+        guard typeVerifiedText(String(edge.prefix(24)), into: field, app: app) else {
+            return .skipped("native text entry was incomplete")
+        }
         // A view update can drop the keyboard after typing. Refocus so dismissal
         // is still verified instead of skipping a step that already entered text.
         guard dismissKeyboardForStep(app: app, refocusingIfNeeded: field) == .executed(.dismiss) else {
@@ -1087,7 +1108,12 @@ final class ChaosMonkeyUITests: XCTestCase {
 
     private func performBackground(app: XCUIApplication) throws -> ChaosStepOutcome {
         XCUIDevice.shared.press(.home)
-        Thread.sleep(forTimeInterval: 2)
+        let backgrounded = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                app.state == .runningBackground || app.state == .runningBackgroundSuspended
+            }, object: app)
+        XCTAssertEqual(XCTWaiter.wait(for: [backgrounded], timeout: 5), .completed,
+                       "The app must enter the background before reactivation.")
         app.activate()
         // `activate()` returns before the state transition is guaranteed to
         // have landed; poll briefly so the next step's foreground check does

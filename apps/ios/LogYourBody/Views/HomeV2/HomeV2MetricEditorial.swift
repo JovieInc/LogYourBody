@@ -390,6 +390,7 @@ struct HomeV2MetricCanvasRequest {
     let formatValue: (Double) -> String
     let dateText: (Date) -> String
     var calendar = Calendar.current
+    var observationSummary: MetricObservationSummary?
 }
 
 /// Hero copy for Steps, Weight, Body fat, FFMI, and the home timeline.
@@ -424,7 +425,9 @@ enum HomeV2MetricEditorial {
             prefersHigh: request.metric.prefersHigh,
             calendar: request.calendar
         )
-        let comparison = comparisonText(
+        let comparison = request.observationSummary?.changeText(
+            unit: request.metric == .steps ? "steps" : request.unit
+        ) ?? comparisonText(
             metric: request.metric,
             stats: stats,
             deltaUnit: request.deltaUnit,
@@ -438,7 +441,7 @@ enum HomeV2MetricEditorial {
             formatValue: request.formatValue,
             dateText: request.dateText
         )
-        let value = stats.latest.map(request.formatValue) ?? "—"
+        let value = (request.observationSummary?.point?.value ?? stats.latest).map(request.formatValue) ?? "—"
         let resolvedUnit = request.metric == .steps ? stepsDisplayUnit : request.unit
         var lines = [value, comparison]
         if !resolvedUnit.isEmpty { lines.append(resolvedUnit) }
@@ -626,7 +629,7 @@ struct HomeV2MetricHero: View {
         }
         .sheet(isPresented: $showsProvenance) {
             if let provenance {
-                HomeV2ProvenanceSheet(detail: provenance)
+                HomeV2ProvenanceSheet(detail: provenance, isPresented: $showsProvenance)
             }
         }
         .onChange(of: provenance) { _, _ in showsProvenance = false }
@@ -685,8 +688,8 @@ struct HomeV2ProvenanceChip: View {
 }
 
 struct HomeV2ProvenanceSheet: View {
-    @Environment(\.dismiss) private var dismiss
     let detail: HomeV2ProvenanceDetail
+    @Binding var isPresented: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
@@ -698,7 +701,7 @@ struct HomeV2ProvenanceSheet: View {
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            Button(action: { dismiss() }, label: {
+            Button(action: { isPresented = false }, label: {
                 Text(HomeV2Copy.done)
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, weight: .semibold, relativeTo: .body)
                     .foregroundStyle(HomeV2Tokens.Colors.ctaInk)

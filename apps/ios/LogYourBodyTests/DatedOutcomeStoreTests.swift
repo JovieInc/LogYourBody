@@ -221,9 +221,17 @@ final class DatedOutcomeStoreTests: XCTestCase {
     }
 
     func testExistingV4StoreMigratesWithoutChangingMeasurementsOrCreatingOutcome() throws {
+        try assertExistingStoreMigrates(version: "LogYourBodyV4")
+    }
+
+    func testExistingV5StoreMigratesWithoutLosingWorkoutReconciliationOrCreatingOutcome() throws {
+        try assertExistingStoreMigrates(version: "LogYourBodyV5")
+    }
+
+    private func assertExistingStoreMigrates(version: String) throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("outcome-migration-\(UUID()).sqlite")
         defer { removeStore(url) }
-        let legacy = try coordinator(version: "LogYourBodyV4", url: url)
+        let legacy = try coordinator(version: version, url: url)
         let legacyContext = context(legacy)
         let profile = NSEntityDescription.insertNewObject(forEntityName: "CachedProfile", into: legacyContext)
         profile.setValue("owner-a", forKey: "id")
@@ -235,6 +243,16 @@ final class DatedOutcomeStoreTests: XCTestCase {
         metric.setValue("owner-a", forKey: "userId")
         for key in ["createdAt", "updatedAt", "lastModified", "date"] { metric.setValue(Date(), forKey: key) }
         metric.setValue(85.5, forKey: "weight")
+        let reconciliationPayload = Data("retained-reconciliation".utf8)
+        if version == "LogYourBodyV5" {
+            XCTAssertNotNil(legacy.managedObjectModel.entitiesByName["CachedWorkoutReconciliationDay"])
+            let day = NSEntityDescription.insertNewObject(
+                forEntityName: "CachedWorkoutReconciliationDay", into: legacyContext
+            )
+            day.setValue("owner-a", forKey: "ownerId")
+            day.setValue("2027-01-01", forKey: "day")
+            day.setValue(reconciliationPayload, forKey: "payload")
+        }
         try legacyContext.save()
         try close(legacy)
         let migrated = try coordinator(url: url)
@@ -244,6 +262,14 @@ final class DatedOutcomeStoreTests: XCTestCase {
         XCTAssertEqual(profiles.first?.value(forKey: "goalWeight") as? Double, 80)
         let metrics = try migratedContext.fetch(NSFetchRequest<NSManagedObject>(entityName: "CachedBodyMetrics"))
         XCTAssertEqual(metrics.first?.value(forKey: "weight") as? Double, 85.5)
+        if version == "LogYourBodyV5" {
+            let request = NSFetchRequest<NSManagedObject>(entityName: "CachedWorkoutReconciliationDay")
+            let days = try migratedContext.fetch(request)
+            XCTAssertEqual(days.count, 1)
+            XCTAssertEqual(days.first?.value(forKey: "ownerId") as? String, "owner-a")
+            XCTAssertEqual(days.first?.value(forKey: "day") as? String, "2027-01-01")
+            XCTAssertEqual(days.first?.value(forKey: "payload") as? Data, reconciliationPayload)
+        }
         let store = store(migratedContext)
         XCTAssertNil(try store.load())
         try store.save(value)
