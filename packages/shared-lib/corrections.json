@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "diagnostic-main-admission-uses-current-project",
+    "correction": "LYB-214: Scheduled diagnostic run 40952105110 on main rejected the current Xcode project against a stale reviewed digest, while Mac Runner Routing Tests passed using a frozen older project as their positive fixture.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40952105110/job/123722593353",
+    "mechanization": "Review the manifest difference from the frozen project: additive source/test membership and Core Data model versions, with build settings, targets, dependencies and packages unchanged. Refresh only the exact project digest. The existing required trusted-CLI regression now admits current source bytes and rejects the unchanged frozen project as historical evidence, retaining all seven dependency pins and every existing refusal scenario. The regression fails with the old policy and passes with the repair. Machine: built scripts/tests/test_runner_routing.py. The harness retains push and PR ownership; current-head macOS execution remains required after merge.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Automatically deriving the workflow trust grant from candidate project bytes would remove independent digest review; application code cannot prevent a stale policy from landing."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required Mac Runner Routing Tests can compare the explicit policy with current source bytes and execute the real trusted CLI against accepted current and rejected historical projects before any candidate helper or native command executes."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "# Admission must exercise current source bytes, as the real main diagnostic does."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "ci-lyb-289334995-release-approved-app-store-version",
     "correction": "LYB-329: The scheduled Release Approved App Store Version job failed in Ruby setup after ubuntu-latest moved to Ubuntu 26.04, which has no Ruby 3.1.7 archive.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40792372921/job/123180448212",
