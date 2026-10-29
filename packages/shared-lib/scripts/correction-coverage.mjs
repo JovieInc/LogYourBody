@@ -355,6 +355,8 @@ export function assertLedgerMergeReady(root) {
       cwd: root,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
+      // Ordinary main integrations can exceed Node's 1 MiB output default.
+      // Keep the entire scan, with the same bounded ceiling as guard reads.
       // Main integration can exceed Node's default 1 MiB diff buffer.
       maxBuffer: 16 * 1024 * 1024,
     },
@@ -389,6 +391,8 @@ export function assertLedgerMergeReady(root) {
         cwd: root,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
+        // Check diagnostics can exceed the staged patch when whitespace repeats.
+        maxBuffer: 16 * 1024 * 1024,
         env: { ...process.env, LC_ALL: 'C' },
       },
     );
