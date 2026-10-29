@@ -4773,5 +4773,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-alert-action-query-excludes-wrapper-buttons",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40882928976/job/123479399281",
+    "correction": "At exact53b1, the required logout test failed because its uniqueness predicate counted two hittable nodes. The printed native hierarchy proves each expected action is a Button containing a child Button with identical identifier, label and frame. The alert and user action exist; raw descendant-count uniqueness incorrectly treats wrapper and leaf as separate actions.",
+    "mechanization": "Keep the exact alert, action identifier, expected label, enabled/hittable predicate and one-action requirement. Exclude a matching node only when it contains another Button with the same identifier, selecting the concrete leaf action. Distinct leaf actions still fail closed. Preserve cancel/session and actual sign-out assertions, the five-second readiness bound, required native selectors and overall deadlines. Hosted red-before53b1 is retained; candidate acceptance requires actual native execution.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing required runtime test exercises both native alert actions and their outcomes. The selector now models the observed wrapper/child hierarchy without accepting arbitrary duplicate siblings or changing product authentication."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "&& !$0.descendants(matching: .button).matching(identifier: identifier).firstMatch.exists"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

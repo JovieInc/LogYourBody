@@ -740,8 +740,8 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(logoutConfirmation.exists)
         logoutButton.tap()
 
-        // Native alerts can expose noninteractive copies of the same action.
-        // Require one hittable action inside this alert, never a background button.
+        // Native alerts can expose both a wrapper button and its action button.
+        // Require one hittable leaf inside this alert, never a background button.
         XCTAssertTrue(logoutConfirmation.waitForExistence(timeout: 5), app.debugDescription)
         let cancelLogout = try hittableLogoutAction(
             in: logoutConfirmation, identifier: "settings_logout_cancel", label: "Cancel"
@@ -764,7 +764,10 @@ final class LogYourBodyUITests: XCTestCase {
     private func hittableLogoutAction(in alert: XCUIElement, identifier: String, label: String) throws -> XCUIElement {
         let candidates = alert.buttons.matching(identifier: identifier)
         func interactiveActions() -> [XCUIElement] {
-            candidates.allElementsBoundByIndex.filter { $0.label == label && $0.isEnabled && $0.isHittable }
+            candidates.allElementsBoundByIndex.filter {
+                $0.label == label && $0.isEnabled && $0.isHittable
+                    && !$0.descendants(matching: .button).matching(identifier: identifier).firstMatch.exists
+            }
         }
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             interactiveActions().count == 1
