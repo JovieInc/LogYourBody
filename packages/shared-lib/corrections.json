@@ -4403,5 +4403,107 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "PR #1571 / LYB-260: Adding the Home focus selector and its regression tests to their Xcode targets changed the project manifest without refreshing its diagnostic dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40204727038/job/121203140455",
+    "mechanization": "Review the eight added Xcode file, group and source entries, then refresh only the exact project manifest hash. Retain all seven dependency pins and trusted CLI rejection cases. The existing required routing regression reproduces the digest mismatch before the change and passes afterward.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1571 / LYB-260: Adding Home focus selector Xcode target membership left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary and documentation parity. Regenerate the source projection after reviewing the manifest diff.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40204727038/job/121203140546",
+    "mechanization": "The existing required projection checker reproduces the stale Xcode manifest fingerprint before regeneration and passes afterward. Retain Detect Changes, CI Summary and the regression rejecting a missing or skippable parity step.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "reviewed-project-repair-keeps-derived-artifacts-together",
+    "correction": "PR #1571 / LYB-260: Repeated main-merge conflicts in Xcode membership leave the diagnostic project pin and generated source map stale. Repair both derived artifacts together after reviewing the merged project.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1571",
+    "mechanization": "Extend the existing repository documentation repair helper with --reviewed-project-sha256. Require an explicit digest matching the staged merged project and refuse unstaged edits, symlinks, staged markers, ambiguous pins, unresolved source conflicts and pinned-import drift before updating the single project pin and source map. The new success regression fails without the option and passes with it; the existing required Detect Changes suite exercises repair, idempotence and refusal without file or index changes. Use the helper for this merge; the harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can verify an explicitly reviewed digest and construct the dependent pin and source map together. This prevents incomplete metadata repairs by construction while preserving the independent review boundary and every existing CI gate."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Only an explicit reviewed digest may update this trust boundary; never derive it here."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "reviewed-project-repair-rejects-raw-conflict-markers",
+    "correction": "PR #1571 recurring conflict repair (fix-red-e3b0c44298): merge origin/main while preserving Home focus ranking, target membership and both parents' correction receipts. The reviewed project-pin repair must reject short and CRLF staged conflict markers before updating derived artifacts.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1571",
+    "mechanization": "Extend the existing reviewed project-pin/source-map repair helper to reject short Git conflict markers and CRLF separator markers in raw staged snapshots. The existing required Detect Changes Git fixtures demonstrate that both inputs were accepted before the fix and are refused afterward without changing either artifact or the index. Retain explicit digest review, all seven dependency pins, source parity and every existing refusal case. Use the extended helper with the reviewed merged-project SHA-256, and the existing three-way classifier resolver plus --check-merge, for this merge. The lanes harness retains push and PR-body ownership; Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing reviewed-project repair helper can refuse raw staged conflict markers before constructing the diagnostic pin and source map, preventing acceptance of unresolved source snapshots by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Git supports short markers; raw snapshots can also retain CRLF endings."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "diagnostic-refusal-fixtures-do-not-follow-candidate",
+    "correction": "PR #1571 main integration: the inherited project digest attempted to follow ordinary native target additions, conflicting with main’s frozen reviewed diagnostic project fixture. Automatic approval review refused a new diagnostic trust grant.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1571",
+    "mechanization": "Retain the current main diagnostic workflow byte-for-byte, including the frozen reviewed project digest, audit digest, six other dependency pins and all refusal checks. Preserve all eight HomeFocusSelector and HomeFocusSelectorTests native registrations. The existing required trusted-CLI regression fails with the inherited 7fb06af project pin against the immutable 5c4f7e2 reviewed fixture, and passes after restoring main’s grant. The opt-in reviewed-project helper is not invoked; ordinary repair and hooks never authorize a new digest. Record this recurrence without altering prior receipts, retry budgets or the held PR #1569 source.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application and native build logic cannot prevent a regression fixture from reconstructing historical evidence from mutable candidate bytes."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing suite executes the actual trusted workflow CLI against immutable prior audit bytes, preserving hash, source, path and dependency refusal before candidate tooling can execute."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

@@ -2,6 +2,7 @@
 // runs detect-changes.sh against real git fixtures, then runs the gate's shell.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -792,6 +793,115 @@ for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
         'unsafe-output': /unsafe repository path/,
       }[failure]);
       assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+function projectPinRepair() {
+  const fx = sourceMapConflict();
+  const project = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj';
+  const workflow = '.github/workflows/ios-ui-diagnostics.yml';
+  const bytes = 'reviewed merged target memberships\n';
+  const digest = createHash('sha256').update(bytes).digest('hex');
+  const policy = `reviewed audit and six other pins stay unchanged\n              '${project}': '${'a'.repeat(64)}',\n`;
+  for (const [name, contents] of [[project, bytes], [workflow, policy]]) {
+    fs.mkdirSync(path.dirname(path.join(fx.root, name)), { recursive: true });
+    fs.writeFileSync(path.join(fx.root, name), contents);
+    fx.config.sources.push({ path: name, purpose: 'Reviewed tooling' });
+  }
+  fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+  git(fx.root, 'add', project, workflow, 'repository-docs.json');
+  const resolve = (hash = digest) => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', fx.root,
+    '--reviewed-project-sha256', hash,
+  ], { env: gitEnv, encoding: 'utf8' });
+  return { ...fx, project, workflow, digest, policy, resolve };
+}
+
+test('reviewed project repair refreshes only its exact pin and the merged source map', () => {
+  const fx = projectPinRepair();
+  try {
+    const stagedProject = git(fx.root, 'show', `:${fx.project}`);
+    const normal = spawnSync('python3', [
+      path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', fx.root,
+    ], { env: gitEnv, encoding: 'utf8' });
+    assert.equal(normal.status, 0, normal.stderr);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.workflow), 'utf8'), fx.policy, 'normal repair never grants review');
+    const result = fx.resolve();
+    assert.equal(result.status, 0, result.stderr);
+    const workflow = fs.readFileSync(path.join(fx.root, fx.workflow), 'utf8');
+    assert.equal(workflow, fx.policy.replace('a'.repeat(64), fx.digest));
+    assert.equal(git(fx.root, 'show', `:${fx.workflow}`), workflow.trim());
+    assert.equal(git(fx.root, 'show', `:${fx.project}`), stagedProject);
+    assert.equal(git(fx.root, 'diff', '--name-only', '--diff-filter=U'), '');
+    const parity = spawnSync('python3', [
+      path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', fx.root,
+    ], { env: gitEnv, encoding: 'utf8' });
+    assert.equal(parity.status, 0, parity.stderr);
+    assert.equal(fx.resolve().status, 0, 'repair is idempotent');
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const failure of ['wrong-hash', 'malformed-hash', 'dirty-project', 'dirty-workflow', 'duplicate-pin', 'missing-pin', 'staged-markers', 'short-staged-markers', 'crlf-staged-markers', 'pinned-drift', 'source-conflict', 'symlink']) {
+  test(`reviewed project repair refuses ${failure} without changing files or index`, () => {
+    const fx = projectPinRepair();
+    try {
+      if (failure.startsWith('dirty-')) {
+        fs.appendFileSync(path.join(fx.root, failure === 'dirty-project' ? fx.project : fx.workflow), 'unstaged\n');
+      }
+      if (failure === 'duplicate-pin') {
+        fs.appendFileSync(path.join(fx.root, fx.workflow), fx.policy);
+        git(fx.root, 'add', fx.workflow);
+      }
+      if (failure === 'missing-pin' || failure.endsWith('staged-markers')) {
+        const marker = {
+          'staged-markers': '<<<<<<< HEAD\n',
+          'short-staged-markers': '|| base\n',
+          'crlf-staged-markers': '=======\r\n',
+        }[failure];
+        fs.writeFileSync(path.join(fx.root, fx.workflow), failure === 'missing-pin' ? 'no pin\n' : fx.policy + marker);
+        git(fx.root, 'add', fx.workflow);
+      }
+      if (failure === 'pinned-drift') {
+        fx.config.imports = [{ repository: 'example/policy', revision: 'b'.repeat(40),
+          path: 'missing.md', destination: 'missing.md', sha256: '0'.repeat(64) }];
+        fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+      }
+      if (failure === 'source-conflict') {
+        git(fx.root, 'update-index', '--force-remove', 'workflow.yml');
+        const blob = git(fx.root, 'rev-parse', 'HEAD:workflow.yml');
+        execFileSync('git', ['update-index', '--index-info'], { cwd: fx.root, env: gitEnv,
+          input: `100644 ${blob} 1\tworkflow.yml\n100644 ${blob} 2\tworkflow.yml\n100644 ${blob} 3\tworkflow.yml\n` });
+      }
+      if (failure === 'symlink') {
+        fs.renameSync(path.join(fx.root, fx.project), path.join(fx.root, 'project-copy'));
+        fs.symlinkSync('../../../project-copy', path.join(fx.root, fx.project));
+        git(fx.root, 'add', fx.project);
+      }
+      const before = [fx.workflow, fx.output].map((name) => fs.readFileSync(path.join(fx.root, name), 'utf8'));
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.resolve(failure === 'wrong-hash' ? '0'.repeat(64) : failure === 'malformed-hash' ? 'unknown' : fx.digest);
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, {
+        'wrong-hash': /SHA-256 does not match/,
+        'malformed-hash': /64 lowercase hex/,
+        'dirty-project': /stage reviewed project and workflow edits first/,
+        'dirty-workflow': /stage reviewed project and workflow edits first/,
+        'duplicate-pin': /exactly one diagnostic project pin/,
+        'missing-pin': /exactly one diagnostic project pin/,
+        'staged-markers': /resolve staged conflict markers first/,
+        'short-staged-markers': /resolve staged conflict markers first/,
+        'crlf-staged-markers': /resolve staged conflict markers first/,
+        'pinned-drift': /pinned copy missing or changed/,
+        'source-conflict': /resolve source conflicts first/,
+        symlink: /refuses symlinks/,
+      }[failure]);
+      assert.deepEqual([fx.workflow, fx.output].map((name) => fs.readFileSync(path.join(fx.root, name), 'utf8')), before);
       assert.equal(git(fx.root, 'ls-files', '--stage'), index);
     } finally {
       fs.rmSync(fx.root, { recursive: true, force: true });
