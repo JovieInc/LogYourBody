@@ -47,17 +47,19 @@ only the updated workflow and source map. Other diagnostic pins and all trust
 checks remain intact. Ordinary repair and commit hooks never grant this review.
 
 The pre-commit hook runs `python3 scripts/resolve-repository-docs.py --staged`
-after formatting and correction classification. It refreshes the projection
-from indexed sources, preserves unstaged source edits, and refuses unstaged
-projection edits or pinned-source drift. Bot commits created outside local
-hooks still need this refresh during repair; CI continues to reject stale output.
+after formatting and correction classification, and before the merge ledger
+check. It refreshes the projection from indexed sources, preserves unstaged
+source edits, and refuses unstaged projection edits or pinned-source drift.
+Bot commits created outside local hooks still need this refresh during repair;
+CI continues to reject stale output.
 
 When the generated source map and correction ledger both conflict, resolve and
 stage the source inputs, then run the same `--staged` command before the ledger
-resolver. It rebuilds only the conflicted projection from stage-zero inputs and
-leaves unrelated conflicts untouched. A conflicted input still fails without
-changing the projection or index; ordinary unstaged projection edits remain
-protected.
+resolver. Pre-commit uses that order so a conflicted projection cannot make the
+ledger check fail closed before the projection is rebuilt. It rebuilds only the
+conflicted projection from stage-zero inputs and leaves unrelated conflicts
+untouched. A conflicted input still fails without changing the projection or
+index; ordinary unstaged projection edits remain protected.
 
 For dependency bumps with an already updated lockfile, run
 `python3 scripts/resolve-repository-docs.py --verify-lockfile`. It verifies the

@@ -385,12 +385,12 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `20607bbc13e8980c10505ef9a781cac117da83d3d5f3441f5e143562c3d415e9`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `892c10d7e7283250ebb7f6e487a3db34b0b6e9bffaf892a59192ab1cec6ec0a1`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `799147eb379a33b6318f867109ba4a98f80c64824145986c1de1665badf718b4`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
 - `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `f375949ac858686d615be7e2664a53572244c9df9b6321a65bfcfda9bb5c9075`)
+- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `0a5f50c006e2386535e309918c9f8635ca52ea0193dc14b216849d6e756e3ff5`)
 - `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `06c7ea820c1b1d4ed949201b839f4ba8b89e2b5bf51cd885b9bef36f9c3e4ca4`)
 
 ## Pinned shared sources
