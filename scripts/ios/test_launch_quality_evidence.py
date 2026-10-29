@@ -587,7 +587,7 @@ xcodebuild() {
 }
 run_with_timeout() {
   echo "$1" >> "$ARTIFACT_DIR/build-attempts"
-  # A virtual elapsed clock exercises the real budget without a 15-minute sleep.
+  # A virtual elapsed clock exercises the original budget without a 10-minute sleep.
   if (( BUILD_DURATION > $1 )); then return 124; fi
   shift
   "$@"
@@ -597,8 +597,9 @@ build_for_testing_once
 echo 'ready for native tests'
 """
         cases = [
-            ('cold', '', 650, 0, 0),
-            ('hung', '', 901, 0, 124),
+            ('within-budget', '', 550, 0, 0),
+            ('at-original-bound', '', 600, 0, 0),
+            ('beyond-original-bound', '', 601, 0, 124),
             ('compiler-error', '', 100, 65, 65),
             ('override-timeout', '20', 21, 0, 124),
             ('override-success', '20', 19, 0, 0),
@@ -612,7 +613,8 @@ echo 'ready for native tests'
                          'BUILD_FOR_TESTING_TIMEOUT_SECONDS': override,
                          'BUILD_DURATION': str(duration), 'COMPILER_STATUS': str(compiler_status)})
                 self.assertEqual(result.returncode, expected, result.stderr)
-                self.assertEqual(len((artifact / 'build-attempts').read_text().splitlines()), 1)
+                self.assertEqual((artifact / 'build-attempts').read_text().splitlines(),
+                                 [override or '600'])
                 self.assertEqual('ready for native tests' in result.stdout, expected == 0)
                 log = (artifact / 'launch-quality-build-for-testing.log').read_text()
                 if expected == 124:

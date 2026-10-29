@@ -2074,7 +2074,8 @@ def test_focused_diagnostic_one_ui_command_even_for_infrastructure_failure_and_d
 
 def test_full_launch_cold_build_budget_reaches_the_complete_unit_target(tmp_path: Path) -> None:
     for name, overrides, expected in [
-            ('default', {'BUILD_DURATION_SECONDS': '750'}, '900s'),
+            ('default', {'BUILD_DURATION_SECONDS': '550'}, '600s'),
+            ('original-boundary', {'BUILD_DURATION_SECONDS': '600'}, '600s'),
             ('override', {'BUILD_FOR_TESTING_TIMEOUT_SECONDS': '37', 'BUILD_DURATION_SECONDS': '25'}, '37s')]:
         result, calls, receipt = _run_diagnostic_dispatch(tmp_path / name, mode='', **overrides)
         assert result.returncode == 88 and receipt is None, result.stdout + result.stderr
@@ -2092,7 +2093,7 @@ def test_full_launch_build_failure_or_timeout_stops_without_retry_or_qualificati
     for name, overrides, status in [
             ('compiler-error', {'BUILD_EXIT': '65'}, 65),
             ('timeout-exit', {'BUILD_EXIT': '124'}, 124),
-            ('elapsed-timeout', {'BUILD_DURATION_SECONDS': '901'}, 124)]:
+            ('elapsed-timeout', {'BUILD_DURATION_SECONDS': '601'}, 124)]:
         result, calls, receipt = _run_diagnostic_dispatch(tmp_path / name, mode='', **overrides)
         assert result.returncode == status and receipt is None, result.stdout + result.stderr
         timed = [json.loads(c) for c in calls if c.startswith('["fake-timeout"')]
@@ -2105,7 +2106,7 @@ def test_full_launch_build_failure_or_timeout_stops_without_retry_or_qualificati
         artifacts = tmp_path / name / 'artifacts'
         log = (artifacts / 'launch-quality-build-for-testing.log').read_text()
         if status == 124:
-            assert 'build-for-testing timed out after 900s' in log
+            assert 'build-for-testing timed out after 600s' in log
         assert not list(artifacts.glob('*.xcresult'))
         assert not list(artifacts.glob('*.evidence.json'))
         assert not list(artifacts.glob('*.coverage.json'))
