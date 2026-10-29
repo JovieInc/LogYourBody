@@ -789,8 +789,13 @@ export function queryExerciseLibrary(
 
 export function isEligibleVariant(
   variant: CatalogVariant,
-  input: { available: ReadonlySet<CatalogEquipment>; excludedConcerns?: readonly string[] },
+  input: {
+    available: ReadonlySet<CatalogEquipment>;
+    excludedConcerns?: readonly string[];
+    excludedExerciseIds?: readonly string[];
+  },
 ): boolean {
+  if (input.excludedExerciseIds?.includes(variant.id)) return false;
   if (missingEquipment(variant, input.available).length > 0) return false;
   const excluded = new Set(input.excludedConcerns ?? []);
   return !variant.exclusions.some((concern) => excluded.has(concern));
@@ -818,6 +823,7 @@ export function substitutionCandidates(input: {
   currentContribution: MuscleContribution;
   available: ReadonlySet<CatalogEquipment>;
   excludedConcerns?: readonly string[];
+  excludedExerciseIds?: readonly string[];
   preferTorsoSupport?: boolean;
   maxTrunkDemand?: TrunkDemandLevel;
 }): CatalogVariant[] {
@@ -831,6 +837,7 @@ export function substitutionCandidates(input: {
       isEligibleVariant(variant, {
         available: input.available,
         excludedConcerns: input.excludedConcerns,
+        excludedExerciseIds: input.excludedExerciseIds,
       }),
   ).sort((a, b) => {
     if (input.preferTorsoSupport && a.torsoSupport !== b.torsoSupport) {

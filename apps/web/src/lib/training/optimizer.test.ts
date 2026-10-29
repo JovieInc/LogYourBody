@@ -250,7 +250,7 @@ describe('mesocycle optimizer golden fixtures', () => {
     const overlap = proposal.findings.find((item) => item.code === 'same_day_local_overlap');
     expect(overlap?.muscle).toBe('quads');
     expect(overlap?.message).toMatch(/wednesday/i);
-    expect(overlap?.message).toMatch(/no recovery opportunity/i);
+    expect(overlap?.message).toMatch(/not assumed recovered/i);
     expect(overlap?.message).toMatch(/reported readiness/i);
     expect(overlap?.message).not.toMatch(/heart rate|bpm/i);
     expect(changesOf(proposal, 'limitation').map((change) => change.code)).toContain(
@@ -682,7 +682,7 @@ describe('optimizer properties, mutated rules, and promotion', () => {
         proposal: valid,
         decision: 'apply',
         currentFingerprint: valid.baseFingerprint,
-        currentEvidenceVersion: 'mesocycle-optimizer-rules-v2',
+        currentEvidenceVersion: 'mesocycle-optimizer-rules-v0',
         enabled: true,
       }),
     ).toEqual({ kind: 'stale_evidence' });
