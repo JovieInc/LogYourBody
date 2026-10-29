@@ -36,6 +36,94 @@ class MetricsInterpolationService {
     static let shared = MetricsInterpolationService()
     private init() {}
 
+    // MARK: - Context memo (main-thread hang fix)
+    //
+    // Production App Hanging events (Sentry, 2026-10-11..21) all sit in
+    // View.body getters that call `estimateTrendWeight` / `estimateBodyFat` /
+    // `estimateFFMI` once per rendered value. Each call used to filter + sort
+    // the whole history and walk the EMA from the first weigh-in, so a single
+    // render did that work dozens of times on the main thread. The convenience
+    // APIs now share contexts keyed by a content fingerprint of exactly the
+    // fields interpolation reads, so repeated calls for unchanged data reuse
+    // one sorted history and its EMA checkpoints. Values are unchanged
+    // (MetricsInterpolationMemoTests compares against freshly built contexts).
+    //
+    // Contexts hold mutable EMA caches, so every memoized context is only used
+    // while `memoLock` is held. Calls never nest, so a plain lock suffices.
+    private struct MemoEntry {
+        let key: Int
+        var weight: WeightInterpolationContext??
+        var bodyFat: BodyFatInterpolationContext??
+    }
+
+    private static let memoCapacity = 4
+    private let memoLock = NSLock()
+    private var memoEntries: [MemoEntry] = []
+
+    /// Content fingerprint over the fields the interpolation contexts read.
+    static func interpolationFingerprint(for metrics: [BodyMetrics]) -> Int {
+        var hasher = Hasher()
+        // Contexts capture Calendar.current (day boundaries), so a time-zone
+        // change must not reuse a context built for the old zone.
+        hasher.combine(Calendar.current.timeZone.identifier)
+        hasher.combine(metrics.count)
+        for metric in metrics {
+            hasher.combine(metric.id)
+            hasher.combine(metric.date)
+            hasher.combine(metric.isExcluded)
+            hasher.combine(metric.weight)
+            hasher.combine(metric.bodyFatPercentage)
+            if metric.bodyFatPercentage != nil {
+                hasher.combine(metric.attributedBodyFatMethod)
+                hasher.combine(metric.measurementSource(for: .bodyFat).rawValue)
+            }
+        }
+        return hasher.finalize()
+    }
+
+    /// Runs `body` with the memo entry for `metrics` while holding the lock.
+    private func withMemo<T>(for metrics: [BodyMetrics], _ body: (inout MemoEntry) -> T) -> T {
+        let key = Self.interpolationFingerprint(for: metrics)
+        memoLock.lock()
+        defer { memoLock.unlock() }
+        var entry: MemoEntry
+        if let index = memoEntries.firstIndex(where: { $0.key == key }) {
+            entry = memoEntries.remove(at: index)
+        } else {
+            entry = MemoEntry(key: key, weight: nil, bodyFat: nil)
+        }
+        let result = body(&entry)
+        memoEntries.append(entry)
+        if memoEntries.count > Self.memoCapacity {
+            memoEntries.removeFirst(memoEntries.count - Self.memoCapacity)
+        }
+        return result
+    }
+
+    private func memoWeightContext(_ entry: inout MemoEntry, metrics: [BodyMetrics]) -> WeightInterpolationContext? {
+        if let cached = entry.weight { return cached }
+        let context = makeWeightInterpolationContext(for: metrics)
+        entry.weight = .some(context)
+        return context
+    }
+
+    private func memoBodyFatContext(_ entry: inout MemoEntry, metrics: [BodyMetrics]) -> BodyFatInterpolationContext? {
+        if let cached = entry.bodyFat { return cached }
+        let context = makeBodyFatInterpolationContext(
+            for: metrics,
+            weightContext: memoWeightContext(&entry, metrics: metrics)
+        )
+        entry.bodyFat = .some(context)
+        return context
+    }
+
+    /// Test hook: drop memoized contexts.
+    func resetInterpolationMemo() {
+        memoLock.lock()
+        memoEntries.removeAll()
+        memoLock.unlock()
+    }
+
     // Maximum gap in days for interpolation (matching web implementation)
     private let maxInterpolationGapDays = 30
 
@@ -567,13 +655,20 @@ class MetricsInterpolationService {
     }
 
     func makeBodyFatInterpolationContext(for metrics: [BodyMetrics]) -> BodyFatInterpolationContext? {
+        makeBodyFatInterpolationContext(for: metrics, weightContext: makeWeightInterpolationContext(for: metrics))
+    }
+
+    private func makeBodyFatInterpolationContext(
+        for metrics: [BodyMetrics],
+        weightContext: WeightInterpolationContext?
+    ) -> BodyFatInterpolationContext? {
         let filtered = metrics.filter { !$0.isExcluded && $0.bodyFatPercentage != nil }.sorted { $0.date < $1.date }
         guard !filtered.isEmpty else { return nil }
         return BodyFatInterpolationContext(
             metrics: filtered,
             maxGapDays: maxInterpolationGapDays,
             maxDexaGapDays: maxDexaInterpolationGapDays,
-            weightContext: makeWeightInterpolationContext(for: metrics)
+            weightContext: weightContext
         )
     }
 
@@ -661,7 +756,9 @@ class MetricsInterpolationService {
     /// Returns nil if gap is >30 days unless both anchors are measured DEXA
     /// scans, in which case scale weight carries the estimate between them.
     func estimateBodyFat(for date: Date, metrics: [BodyMetrics]) -> InterpolatedMetric? {
-        makeBodyFatInterpolationContext(for: metrics)?.estimate(for: date)
+        withMemo(for: metrics) { entry in
+            memoBodyFatContext(&entry, metrics: metrics)?.estimate(for: date)
+        }
     }
 
     // MARK: - Lean Mass Calculation
@@ -670,8 +767,7 @@ class MetricsInterpolationService {
     /// Lean mass = weight * (1 - bodyFat% / 100)
     func estimateLeanMass(for date: Date, metrics: [BodyMetrics]) -> InterpolatedMetric? {
         // Use trend (EMA-smoothed) weight combined with body fat (actual or interpolated)
-        guard let weightContext = makeWeightInterpolationContext(for: metrics),
-              let trendWeightResult = weightContext.trendWeight(for: date),
+        guard let trendWeightResult = estimateTrendWeight(for: date, metrics: metrics),
               let bodyFatResult = estimateBodyFat(for: date, metrics: metrics) else {
             return nil
         }
@@ -709,10 +805,9 @@ class MetricsInterpolationService {
     /// This builds on the WeightInterpolationContext so that callers can
     /// access the same trend series used for FFMI/lean-mass calculations.
     func estimateTrendWeight(for date: Date, metrics: [BodyMetrics]) -> InterpolatedMetric? {
-        guard let context = makeWeightInterpolationContext(for: metrics) else {
-            return nil
+        withMemo(for: metrics) { entry in
+            memoWeightContext(&entry, metrics: metrics)?.trendWeight(for: date)
         }
-        return context.trendWeight(for: date)
     }
 
     // MARK: - FFMI Calculation

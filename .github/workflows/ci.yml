@@ -398,6 +398,13 @@ jobs:
         with:
           persist-credentials: false
 
+      # Swift architecture ratchet (JovieInc/Jovie ADR swift-architecture-adr-2026-10-29):
+      # fails on new main-thread / data-flow violations and on a stale-high baseline.
+      - name: Swift architecture guard
+        run: |
+          node --test scripts/ios/swift-arch/guard.test.mjs
+          node scripts/ios/swift-arch/guard.mjs
+
       # SwiftLint's SourceKit rules (statement_position, ...) need a Swift toolchain; the static
       # binary silently skips them, which would weaken the gate.
       - uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a # v2.4.0
