@@ -20,7 +20,7 @@ def exclude_rest_timer_extension_from_release_archive(project_path = nil)
   app.copy_files_build_phases.each do |phase|
     phase.files.delete_if do |file|
       # xcodeproj's PBXBuildFile accessor is file_ref, never fileRef.
-      file.file_ref == extension.productReference ||
+      file.file_ref == extension.product_reference ||
         file.display_name.to_s.include?('LogYourBodyRestTimer')
     end
   end
