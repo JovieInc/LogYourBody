@@ -777,10 +777,25 @@ export function missingEquipment(
   return variant.requires.filter((item) => !available.has(item));
 }
 
+/** `equipment === null` means no gym is confirmed, so every variant stays available.
+ * A set is the active gym's saved equipment. An empty set matches nothing that requires an item.
+ * Specialty equipment is included only when the user saved it on that gym. */
+export function queryExerciseLibrary(
+  equipment: ReadonlySet<CatalogEquipment> | null,
+): CatalogVariant[] {
+  if (equipment === null) return [...EXERCISE_CATALOG];
+  return EXERCISE_CATALOG.filter((variant) => missingEquipment(variant, equipment).length === 0);
+}
+
 export function isEligibleVariant(
   variant: CatalogVariant,
-  input: { available: ReadonlySet<CatalogEquipment>; excludedConcerns?: readonly string[] },
+  input: {
+    available: ReadonlySet<CatalogEquipment>;
+    excludedConcerns?: readonly string[];
+    excludedExerciseIds?: readonly string[];
+  },
 ): boolean {
+  if (input.excludedExerciseIds?.includes(variant.id)) return false;
   if (missingEquipment(variant, input.available).length > 0) return false;
   const excluded = new Set(input.excludedConcerns ?? []);
   return !variant.exclusions.some((concern) => excluded.has(concern));
@@ -808,6 +823,7 @@ export function substitutionCandidates(input: {
   currentContribution: MuscleContribution;
   available: ReadonlySet<CatalogEquipment>;
   excludedConcerns?: readonly string[];
+  excludedExerciseIds?: readonly string[];
   preferTorsoSupport?: boolean;
   maxTrunkDemand?: TrunkDemandLevel;
 }): CatalogVariant[] {
@@ -821,6 +837,7 @@ export function substitutionCandidates(input: {
       isEligibleVariant(variant, {
         available: input.available,
         excludedConcerns: input.excludedConcerns,
+        excludedExerciseIds: input.excludedExerciseIds,
       }),
   ).sort((a, b) => {
     if (input.preferTorsoSupport && a.torsoSupport !== b.torsoSupport) {

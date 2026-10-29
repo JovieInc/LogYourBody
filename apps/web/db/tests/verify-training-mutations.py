@@ -78,7 +78,7 @@ def main():
             sql("create table schema_migrations(version text primary key); create table chat_usage_limits(user_subject text); create table chat_conversations(user_subject text);")
             for migration in ['20260714183000_create_app_users.sql','20260714213000_add_app_user_profile.sql',
                               '20260715040000_create_body_metrics.sql','20260813120000_native_body_metrics_sync.sql',
-                              '20261025120000_weight_lifecycle.sql',
+                              '20261025120000_weight_lifecycle.sql','20261025190000_gym_registry.sql',
                               '20260813130000_native_product_records.sql','20260927102000_training_record_collections.sql']:
                 run(client + ['-f', str(web/'db/migrations'/migration)])
             run(client + ['-f', str(args.migration or web / 'db/migrations/20261010090000_training_revision_foundation.sql')])
@@ -260,6 +260,7 @@ def main():
                 'delete from public.metrics_agent_grants where user_subject = ${subject}',
                 'delete from public.body_metrics where user_subject = ${subject}',
                 'delete from public.native_records where user_subject = ${subject}',
+                'select public.lyb_delete_my_gyms(${subject})',
                 "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ${subject}",
             ]
             assert [re.sub(r'\s+', ' ', s).strip() for s in statements] == expected_cleanup
@@ -272,6 +273,26 @@ def main():
                 assert owner_id
                 guard=guards[0].replace('$1',quote(subject)).replace('$2',quote(owner_id))
                 return guard+';'+ ';'.join(s.replace('${subject}',quote(subject)) for s in statements)+';'
+
+            def gym_count(subject):
+                return int(sql(f'select count(*) from gyms where user_subject={quote(subject)};'))
+
+            subject,other=owner(),owner()
+            for gym_subject in [subject,other]:
+                # Account erasure must remove both active gyms and sync tombstones.
+                for deleted_at in ['null', 'now()']:
+                    sql(f"insert into gyms(id,user_subject,name,deleted_at) values('{uuid.uuid4()}',{quote(gym_subject)},'Synthetic gym',{deleted_at});")
+            assert gym_count(subject)==gym_count(other)==2
+            sql(f"create function fail_gym_account_cleanup() returns trigger language plpgsql as $$ begin if old.identity_subject={quote(subject)} then raise exception 'injected gym account cleanup failure'; end if; return old; end; $$; create trigger injected_gym_account_cleanup before delete on app_users for each row execute function fail_gym_account_cleanup();")
+            try: sql('begin;'+deletion(subject)+'commit;'); raise AssertionError('expected gym cleanup failure')
+            except RuntimeError as error: assert 'injected gym account cleanup failure' in str(error)
+            assert gym_count(subject)==gym_count(other)==2
+            assert sql(f"select count(*) from app_users where identity_subject={quote(subject)};")=='1'
+            sql('drop trigger injected_gym_account_cleanup on app_users;')
+            sql('begin;'+deletion(subject)+'commit;')
+            assert gym_count(subject)==0 and gym_count(other)==2
+            assert sql(f"select count(*) from app_users where identity_subject={quote(subject)};")=='0'
+            check('gym account erasure rolls back on later failure, retries active and deleted rows, and preserves the other owner')
 
             def seed_weight(subject):
                 owner_id=sql(f"select id from app_users where identity_subject={quote(subject)};")

@@ -28,6 +28,32 @@ export const MUSCLE_GROUPS = [
 ] as const;
 
 export type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
+/** Regional goals do not rewrite the legacy fractional-volume muscle groups. */
+export const MUSCLE_TARGETS = [
+  ...MUSCLE_GROUPS,
+  'side_delts',
+  'anterior_delts',
+  'upper_chest',
+  'lats',
+  'forearms',
+] as const;
+export type MuscleTarget = (typeof MUSCLE_TARGETS)[number];
+export type MuscleIntent = 'emphasize' | 'grow' | 'maintain';
+export type PreferenceScope = { kind: 'persistent' } | { kind: 'block'; blockId: string };
+
+export type ProgrammingDecision = {
+  variable: 'sequencing';
+  observations: string[];
+  ruleId: string;
+  ruleVersion: string;
+  evidenceClass: 'reviewed_product_policy';
+  evidenceIds: string[];
+  approvalScope: 'proposal_only';
+  uncertainty: 'individual_response_unknown';
+  exceptions: string[];
+  rationale: string;
+  regressionFixture: string;
+};
 export type Equipment = 'dumbbells' | 'full_gym';
 export type ExercisePattern = 'A' | 'B';
 export type ProgressionAction = 'hold' | 'add_reps' | 'increase_load';

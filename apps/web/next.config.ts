@@ -60,6 +60,8 @@ const nextConfig: NextConfig = {
   // Environment variables
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
+    // ops.health/v1 deployedAt: the instant this build ran.
+    OPS_BUILD_TIME: process.env.OPS_BUILD_TIME || new Date().toISOString(),
     // Release identity for Sentry events and sourcemap upload: the deployed commit.
     NEXT_PUBLIC_SENTRY_RELEASE: sentryRelease,
     // Lets browser analytics derive its tier from the Vercel environment.

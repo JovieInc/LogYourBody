@@ -15,9 +15,7 @@ it('requires verified native text entry before testing draft preservation', () =
   expect(typing).toContain('guard XCTWaiter.wait(for: [entered], timeout: 2) == .completed else');
   expect(typing).not.toMatch(/XCUIKeyboardKey.delete|UIPasteboard/);
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
-  expect(turbo.tasks.test.inputs).toContain(
-    '$TURBO_ROOT$/apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift',
-  );
+  expect(turbo.tasks.test.inputs).toContain('$TURBO_ROOT$/apps/ios/LogYourBodyUITests/**/*.swift');
 
   const probe = source
     .split('func testKeyboardDismissalPreservesDraftWithoutSending()')[1]
@@ -37,8 +35,16 @@ it('requires verified native text entry before testing draft preservation', () =
   expect(action).not.toContain('field.typeText(');
 });
 
-it('checks Stats composition and real card styling through the launch audit with executed coverage', () => {
+it('checks Stats composition, card styling and provenance dismissal through the launch audit with executed coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
+  for (const input of [
+    '$TURBO_ROOT$/scripts/ios/launch-ui-regression-audit.py',
+    '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
+    '$TURBO_ROOT$/apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift',
+  ]) {
+    expect(turbo.tasks.test.inputs).toContain(input);
+  }
   const coverage = mkdtempSync(`${tmpdir()}/lyb-ui-audit-coverage-`);
   try {
     const pythonLibrary = execFileSync('python3', ['-c', 'import sys; print(sys.prefix)'], {
@@ -47,16 +53,23 @@ it('checks Stats composition and real card styling through the launch audit with
     const output = execFileSync(
       'python3',
       [
-        '-m',
-        'trace',
-        '--count',
-        '--summary',
-        '--missing',
-        '--ignore-dir',
-        pythonLibrary,
-        '--coverdir',
-        coverage,
+        '-c',
+        `import runpy, sys, trace
+test, library, coverage = sys.argv[1:]
+runner = trace.Trace(count=True, trace=False, ignoredirs=[library])
+status = 0
+sys.argv = [test]
+try:
+    runner.runctx("runpy.run_path(test, run_name='__main__')", {"runpy": runpy, "test": test}, {})
+except SystemExit as error:
+    status = error.code
+finally:
+    runner.results().write_results(show_missing=True, summary=True, coverdir=coverage)
+sys.exit(status)
+`,
         `${root}/scripts/ios/test_launch_ui_regression_audit.py`,
+        pythonLibrary,
+        coverage,
       ],
       { encoding: 'utf8', cwd: root, timeout: 30_000 },
     );
@@ -66,7 +79,7 @@ it('checks Stats composition and real card styling through the launch audit with
         .filter((line) => /launch-ui-regression-audit|behavior tests executed/.test(line))
         .join('\n'),
     );
-    expect(output).toContain('Launch UI audit behavior tests executed: 7');
+    expect(output).toContain('Launch UI audit behavior tests executed: 21');
     expect(output).toContain('launch-ui-regression-audit');
   } finally {
     rmSync(coverage, { recursive: true, force: true });

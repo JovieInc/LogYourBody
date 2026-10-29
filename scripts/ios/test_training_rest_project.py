@@ -1,4 +1,5 @@
-"""Check the actual Xcode graph used to build and embed the rest Live Activity."""
+"""Check native unit-test membership and the rest Live Activity Xcode graph."""
+from collections import Counter
 import json
 import pathlib
 import plistlib
@@ -38,8 +39,43 @@ def read_project(path):
     return result
 
 
+def check_test_source_membership(project, source_root):
+    """Every native unit test must remain reachable and compile exactly once."""
+    objects = project['objects']
+    paths = {}
+
+    def visit(key, parent):
+        obj = objects[key]
+        tree = obj.get('sourceTree', '<group>')
+        if tree not in ('<group>', 'SOURCE_ROOT'):
+            return
+        path = (parent if tree == '<group>' else pathlib.Path('.')) / obj.get('path', '')
+        if obj['isa'] == 'PBXGroup':
+            for child in obj['children']:
+                visit(child, path)
+        elif obj['isa'] == 'PBXFileReference':
+            paths[key] = path.as_posix()
+
+    visit(objects[project['rootObject']]['mainGroup'], pathlib.Path('.'))
+    target_name = 'LogYourBodyTests'
+    targets = [objects[key] for key in objects[project['rootObject']]['targets']
+               if objects[key]['name'] == target_name]
+    assert len(targets) == 1, 'Native unit-test target must exist exactly once'
+    compiled = Counter(
+        paths.get(objects[item]['fileRef'])
+        for phase in targets[0]['buildPhases'] if objects[phase]['isa'] == 'PBXSourcesBuildPhase'
+        for item in objects[phase]['files']
+    )
+    expected = {path.relative_to(source_root).as_posix()
+                for path in (source_root / target_name).rglob('*.swift')}
+    assert expected, 'Native unit-test sources must exist'
+    invalid = sorted(path for path in expected if compiled[path] != 1)
+    assert not invalid, 'Native test source membership must compile exactly once: ' + ', '.join(invalid)
+
+
 def check_project(path):
     project = read_project(path)
+    check_test_source_membership(project, ROOT / 'apps/ios')
     objects = project['objects']
     targets = {objects[key]['name']: objects[key] for key in objects[project['rootObject']]['targets']}
     app = targets['LogYourBody']
