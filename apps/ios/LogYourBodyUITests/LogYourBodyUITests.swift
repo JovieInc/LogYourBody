@@ -3507,6 +3507,7 @@ final class LogYourBodyUITests: XCTestCase {
                     } else {
                         prefix.append(character)
                     }
+                    if prefix.isEmpty { continue }
                     let received = XCTNSPredicateExpectation(
                         predicate: NSPredicate(format: "value == %@", prefix), object: composer
                     )
