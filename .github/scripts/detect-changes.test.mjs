@@ -771,6 +771,39 @@ test('staged source-map repair refuses a conflicted input without changing the i
   }
 });
 
+for (const state of ['conflicted', 'existing', 'new']) {
+  test(`staged source-map repair restores ${state} projection on staging failure and permits retry`, () => {
+    const fx = state === 'conflicted' ? sourceMapConflict({ ledgerConflict: true }) : stagedSourceMap();
+    try {
+      if (state === 'new') {
+        fx.config.output = fx.output = 'docs/NEW.md';
+        fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+        git(fx.root, 'add', 'repository-docs.json');
+      }
+      const output = path.join(fx.root, fx.output);
+      const before = fs.existsSync(output) ? fs.readFileSync(output) : null;
+      const index = git(fx.root, 'ls-files', '--stage');
+      const lock = path.join(fx.root, '.git/index.lock');
+      fs.writeFileSync(lock, 'another writer\n');
+      const result = fx.resolve({ staged: true });
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /index\.lock/);
+      assert.deepEqual(fs.existsSync(output) ? fs.readFileSync(output) : null, before);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      assert.equal(fs.readFileSync(lock, 'utf8'), 'another writer\n');
+      fs.unlinkSync(lock);
+      const retry = fx.resolve({ staged: true });
+      assert.equal(retry.status, 0, retry.stderr);
+      const projection = fs.readFileSync(output, 'utf8');
+      assert.equal(git(fx.root, 'show', `:${fx.output}`), projection.trim());
+      assert.doesNotMatch(projection, /<<<<<<<|=======|>>>>>>>/);
+      assert.equal(fx.resolve({ staged: true }).status, 0, 'retry is idempotent');
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
 for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
   test(`source-map merge repair refuses ${failure} without changing the projection or index`, () => {
     const fx = sourceMapConflict({ sourceConflict: failure === 'source-conflict' });

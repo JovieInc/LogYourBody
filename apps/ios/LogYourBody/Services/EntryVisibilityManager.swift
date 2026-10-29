@@ -67,7 +67,7 @@ final class EntryVisibilityManager {
     }
 
     func resolvedVisibleMetrics(_ metrics: [BodyMetrics], userId: String) -> [BodyMetrics] {
-        resolveConflicts(filterVisibleMetrics(metrics, userId: userId))
+        resolveConflicts(filterVisibleMetrics(metrics.filter { !$0.isExcluded }, userId: userId))
     }
 
     private func updateHiddenState(_ hidden: Bool, entryId: String, userId: String) {

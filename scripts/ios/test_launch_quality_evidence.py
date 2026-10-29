@@ -321,6 +321,50 @@ class EvidenceTests(unittest.TestCase):
                                          'nodeIdentifier': 'Optional/testKeychain()'})
         self.assertEqual([case['result'] for case in self.validate()], ['Passed'] * len(evidence.REQUIRED_TESTS) + ['Skipped'])
 
+    def test_unit_command_requires_passing_metric_overlay_regression(self):
+        source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
+        start = source.index('assert_xcresult_evidence \\\n  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult"')
+        command = source[start:source.index('\n\npython3 ', start)]
+        setup_start = source.index('CHAT_QUALIFICATION_UNIT_TESTS=(')
+        setup = source[setup_start:source.index('\n# StoreKitPurchaseRestoreTests', setup_start)]
+        # Replay the real, populated argument construction. Bash3 treats an empty
+        # array as unset under nounset; the former synthetic empty array failed
+        # before exercising the command on hosted macOS.
+        result = run_shell(['-c', 'set -euo pipefail\nARTIFACT_DIR=/tmp\n' + setup +
+                            '\nassert_xcresult_evidence() { printf "%s\\n" "$@"; }\n' + command])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = result.stdout.splitlines()
+        self.assertIn('--require-biometric-coverage', output, 'The full Unit profile must stay selected')
+        expected = [output[index + 1] for index, argument in enumerate(output) if argument == '--expected-test']
+        self.assertGreater(len(expected), 0, 'Retain the real chat qualification arguments')
+        required = [
+            'MetricCorrectionTests/testExcludedReadingsRemainInFetchButNotLatestStatsTrendOrHero()',
+            'CoreDataModelMigrationTests/testPopulatedV4StoreMigratesOverlayDefaultsAndRetainsImportAfterReopen()',
+            'CoreDataModelMigrationTests/testPopulatedV5StoreRetainsWorkoutReconciliationAndImportsWhenMigratingToV7()',
+            'CoreDataModelMigrationTests/testPopulatedV6StoreRetainsDatedOutcomeAndImportsWhenMigratingToV7()']
+        cases = [{'nodeType': 'Test Case', 'nodeIdentifier': identifier, 'result': 'Passed'}
+                 for identifier in required]
+        self.payload = {'testNodes': cases}
+        coverage = {'targets': [{'name': 'LogYourBody.app', 'files': [{
+            'name': 'BiometricLockView.swift',
+            'path': '/checkout/apps/ios/LogYourBody/Views/BiometricLockView.swift',
+            'functions': [{'name': 'static BiometricLockPolicy.shouldDisableForUITests(arguments:environment:userId:)',
+                           'executableLines': 3, 'coveredLines': 3}]}]}]}
+        with patch.object(evidence, 'run_json', return_value=self.payload), \
+             patch.object(evidence.subprocess, 'check_output', return_value=json.dumps(coverage)):
+            self.assertEqual(self.run_main(critical=False, expected=False, biometric=True), 0)
+            for case in cases:
+                for result in ('Skipped', 'Failed', None):
+                    case['result'] = result
+                    with self.subTest(identifier=case['nodeIdentifier'], result=result):
+                        self.assertEqual(self.run_main(critical=False, expected=False, biometric=True), 65)
+                        self.assertFalse(self.bundle.with_suffix('.evidence.json').exists())
+                case['result'] = 'Passed'
+                self.payload['testNodes'] = [other for other in cases if other is not case]
+                with self.subTest(missing=case['nodeIdentifier']):
+                    self.assertEqual(self.run_main(critical=False, expected=False, biometric=True), 65)
+                self.payload['testNodes'] = cases
+
     def test_every_capture_is_required(self):
         for group_index, group in enumerate(self.manifest):
             for index in range(len(group['attachments'])):
@@ -368,7 +412,7 @@ class EvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.captures()
 
-    def run_main(self, critical=True, expected=True, canvas=False):
+    def run_main(self, critical=True, expected=True, canvas=False, biometric=False):
         args = ['validator', '--bundle', str(self.bundle), '--started-at', '100']
         if expected:
             for identifier in evidence.REQUIRED_TESTS:
@@ -377,6 +421,8 @@ class EvidenceTests(unittest.TestCase):
             args += ['--critical-captures']
         if canvas:
             args += ['--require-canvas-coverage']
+        if biometric:
+            args += ['--require-biometric-coverage']
         with patch.object(sys, 'argv', args):
             return evidence.main()
 

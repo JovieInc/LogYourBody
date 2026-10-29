@@ -274,7 +274,10 @@ function ledgerAtRevision(root, revision) {
 }
 
 function readGuardFromRevisions(root, revisions) {
+  // Cache immutable guard reads only within this recursive merge resolution.
+  const sources = new Map();
   return (path) => {
+    if (sources.has(path)) return sources.get(path);
     const chunks = [];
     for (const revision of revisions) {
       try {
@@ -283,7 +286,9 @@ function readGuardFromRevisions(root, revisions) {
         // A one-sided guard does not exist in every ancestor revision.
       }
     }
-    return chunks.join('\n');
+    const source = chunks.join('\n');
+    sources.set(path, source);
+    return source;
   };
 }
 

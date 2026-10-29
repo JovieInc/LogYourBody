@@ -27,7 +27,7 @@ function getDatabase(): NeonQueryFunction<false, false> {
 const columns = `
   id, date, local_date, measured_at, weight, weight_unit, waist, hip, waist_unit,
   body_fat_percentage, body_fat_method, muscle_mass, bone_mass, photo_url, notes,
-  data_source, source_metadata, client_created_at, client_updated_at, deleted_at,
+  data_source, source_metadata, is_excluded, corrected_value, client_created_at, client_updated_at, deleted_at,
   updated_at
 `;
 
@@ -49,6 +49,8 @@ type NativeBodyMetricRow = {
   notes: string | null;
   data_source: string;
   source_metadata: Record<string, unknown> | string | null;
+  is_excluded: boolean;
+  corrected_value: NativeBodyMetricSyncRecord['corrected_value'];
   client_created_at: string | Date;
   client_updated_at: string | Date;
   deleted_at: string | Date | null;
@@ -109,6 +111,8 @@ function mapRecord(row: NativeBodyMetricRow): NativeBodyMetricSyncRecord {
     notes: row.notes,
     data_source: row.data_source,
     source_metadata: asMetadata(row.source_metadata),
+    is_excluded: row.is_excluded ?? false,
+    corrected_value: row.corrected_value ?? null,
     created_at: iso(row.client_created_at),
     updated_at: iso(row.client_updated_at),
     deleted_at: optionalIso(row.deleted_at),
@@ -137,6 +141,9 @@ function pushParams(subject: string, record: NativeBodyMetricPushInput) {
     JSON.stringify(record.source_metadata),
     record.created_at,
     record.updated_at,
+    record.is_excluded ?? null,
+    record.corrected_value == null ? null : JSON.stringify(record.corrected_value),
+    record.corrected_value !== undefined,
   ];
 }
 
@@ -191,7 +198,10 @@ export function createNeonNativeBodyMetricsSync(
                $16::text as data_source,
                $17::jsonb as source_metadata,
                $18::timestamptz as client_created_at,
-               $19::timestamptz as client_updated_at
+               $19::timestamptz as client_updated_at,
+               $20::boolean as is_excluded,
+               $21::jsonb as corrected_value,
+               $22::boolean as has_corrected_value
            ),
            current_row as (
              select user_subject, ${columns}
@@ -207,7 +217,9 @@ export function createNeonNativeBodyMetricsSync(
                when current_row.weight is not distinct from incoming.weight
                  and current_row.weight_unit is not distinct from incoming.weight_unit
                  and current_row.measured_at is not distinct from incoming.measured_at
-                 and current_row.local_date is not distinct from incoming.local_date then 'replay'
+                 and current_row.local_date is not distinct from incoming.local_date
+                 and (incoming.is_excluded is null or current_row.is_excluded is not distinct from incoming.is_excluded)
+                 and (not incoming.has_corrected_value or current_row.corrected_value is not distinct from incoming.corrected_value) then 'replay'
                when current_row.client_updated_at > incoming.client_updated_at then 'stale_write'
                else 'payload_conflict'
              end as outcome
@@ -220,7 +232,7 @@ export function createNeonNativeBodyMetricsSync(
                weight, weight_unit, body_fat_percentage, body_fat_method,
                muscle_mass, bone_mass, waist, hip, waist_unit, notes, photo_url,
                data_source, source_metadata, client_created_at, client_updated_at,
-               deleted_at
+               deleted_at, is_excluded, corrected_value
              )
              select
                incoming.id, incoming.user_subject, incoming.local_date, incoming.measured_at,
@@ -228,7 +240,8 @@ export function createNeonNativeBodyMetricsSync(
                incoming.weight, incoming.weight_unit, incoming.body_fat_percentage, incoming.body_fat_method,
                incoming.muscle_mass, incoming.bone_mass, incoming.waist, incoming.hip, incoming.waist_unit,
                incoming.notes, incoming.photo_url, incoming.data_source, incoming.source_metadata,
-               incoming.client_created_at, incoming.client_updated_at, null
+               incoming.client_created_at, incoming.client_updated_at, null,
+               coalesce(incoming.is_excluded, false), incoming.corrected_value
              from incoming
              where (select outcome from decision) in ('insert', 'accept', 'replay')
              on conflict (id) do update set
@@ -249,6 +262,10 @@ export function createNeonNativeBodyMetricsSync(
                photo_url = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.photo_url else public.body_metrics.photo_url end,
                data_source = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.data_source else public.body_metrics.data_source end,
                source_metadata = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.source_metadata else public.body_metrics.source_metadata end,
+               is_excluded = case when excluded.client_updated_at > public.body_metrics.client_updated_at
+                 then coalesce($20, public.body_metrics.is_excluded) else public.body_metrics.is_excluded end,
+               corrected_value = case when excluded.client_updated_at > public.body_metrics.client_updated_at and $22::boolean
+                 then excluded.corrected_value else public.body_metrics.corrected_value end,
                client_updated_at = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.client_updated_at else public.body_metrics.client_updated_at end,
                updated_at = case when excluded.client_updated_at > public.body_metrics.client_updated_at then now() else public.body_metrics.updated_at end,
                revision = case
@@ -271,6 +288,8 @@ export function createNeonNativeBodyMetricsSync(
                    and public.body_metrics.weight_unit is not distinct from excluded.weight_unit
                    and public.body_metrics.measured_at is not distinct from excluded.measured_at
                    and public.body_metrics.local_date is not distinct from excluded.local_date
+                   and ($20::boolean is null or public.body_metrics.is_excluded is not distinct from excluded.is_excluded)
+                   and (not $22::boolean or public.body_metrics.corrected_value is not distinct from excluded.corrected_value)
                  )
                )
              returning ${columns}

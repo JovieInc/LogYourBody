@@ -30,7 +30,8 @@ final class MetricChartDataHelperTests: XCTestCase {
         userId: String,
         daysAgo: Int,
         weight: Double? = nil,
-        waistCm: Double? = nil
+        waistCm: Double? = nil,
+        source: String = "manual"
     ) -> BodyMetrics {
         let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
         return BodyMetrics(
@@ -47,7 +48,7 @@ final class MetricChartDataHelperTests: XCTestCase {
             waistCm: waistCm,
             notes: nil,
             photoUrl: nil,
-            dataSource: BodyMetricSource.manual.rawValue,
+            dataSource: source,
             createdAt: date,
             updatedAt: date
         )
@@ -252,5 +253,34 @@ extension MetricChartDataHelperTests {
         }
         XCTAssertFalse(deleted)
         XCTAssertFalse(called)
+    }
+}
+
+
+extension MetricChartDataHelperTests {
+    @MainActor
+    func testImportedOverlayUpdatesChartsAndUndoRestoresExcludedReading() async throws {
+        let manager = CoreDataManager.shared
+        let owner = "overlay-chart-\(UUID().uuidString)"
+        let earlier = makeMetric(id: UUID().uuidString, userId: owner, daysAgo: 2, weight: 81, source: "healthkit")
+        let latest = makeMetric(id: UUID().uuidString, userId: owner, daysAgo: 1, weight: 200, source: "healthkit")
+        try await manager.saveBodyMetricsAndWait(earlier, userId: owner)
+        try await manager.saveBodyMetricsAndWait(latest, userId: owner)
+        let cached = await manager.fetchBodyMetrics(for: owner)
+        let stored = try XCTUnwrap(cached.first { $0.id == latest.id }?.toBodyMetrics())
+        let service = MetricCorrectionService(
+            coreDataManager: manager, isEnabled: { true }, admission: { _ in {} }, syncTrigger: {}
+        )
+        func weights() -> [Double] {
+            MetricChartDataHelper.generateChartData(for: owner, days: 7, metricType: .weight, useMetric: true)
+                .map(\.value).sorted()
+        }
+        XCTAssertEqual(weights(), [81, 200])
+        let corrected = try await service.correct(stored, to: .init(weight: 80))
+        XCTAssertEqual(weights(), [80, 81])
+        let excluded = try await service.exclude(corrected.metrics)
+        XCTAssertEqual(weights(), [81])
+        _ = try await service.undo(excluded)
+        XCTAssertEqual(weights(), [80, 81])
     }
 }

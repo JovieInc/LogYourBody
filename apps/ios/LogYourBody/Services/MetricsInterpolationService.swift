@@ -561,13 +561,13 @@ class MetricsInterpolationService {
     }
 
     func makeWeightInterpolationContext(for metrics: [BodyMetrics]) -> WeightInterpolationContext? {
-        let filtered = metrics.filter { $0.weight != nil }.sorted { $0.date < $1.date }
+        let filtered = metrics.filter { !$0.isExcluded && $0.weight != nil }.sorted { $0.date < $1.date }
         guard !filtered.isEmpty else { return nil }
         return WeightInterpolationContext(metrics: filtered, maxGapDays: maxInterpolationGapDays)
     }
 
     func makeBodyFatInterpolationContext(for metrics: [BodyMetrics]) -> BodyFatInterpolationContext? {
-        let filtered = metrics.filter { $0.bodyFatPercentage != nil }.sorted { $0.date < $1.date }
+        let filtered = metrics.filter { !$0.isExcluded && $0.bodyFatPercentage != nil }.sorted { $0.date < $1.date }
         guard !filtered.isEmpty else { return nil }
         return BodyFatInterpolationContext(
             metrics: filtered,
@@ -594,7 +594,7 @@ class MetricsInterpolationService {
     /// Estimate weight for a given date based on nearby entries
     /// Returns nil if gap is >30 days or no data available
     func estimateWeight(for date: Date, metrics: [BodyMetrics]) -> InterpolatedMetric? {
-        let sortedMetrics = metrics.filter { $0.weight != nil }.sorted { $0.date < $1.date }
+        let sortedMetrics = metrics.filter { !$0.isExcluded && $0.weight != nil }.sorted { $0.date < $1.date }
         guard !sortedMetrics.isEmpty else { return nil }
         guard let lastMetric = sortedMetrics.last else { return nil }
 

@@ -334,7 +334,32 @@ final class WorkoutReconciliationPromptTests: XCTestCase {
         XCTAssertNil(old.entitiesByName["CachedWorkoutReconciliationDay"])
         XCTAssertNotNil(current.entitiesByName["CachedWorkoutReconciliationDay"])
         for entity in old.entities {
-            XCTAssertEqual(entity.versionHash, current.entitiesByName[try XCTUnwrap(entity.name)]?.versionHash)
+            let retained = try XCTUnwrap(current.entitiesByName[try XCTUnwrap(entity.name)])
+            if entity.name == "CachedBodyMetrics" {
+                // V7 adds exactly two overlays; all retained properties and entity
+                // metadata still describe the same imported measurements.
+                let overlays: Set<String> = ["isExcluded", "correctedValueJSON"]
+                XCTAssertEqual(Set(retained.propertiesByName.keys), Set(entity.propertiesByName.keys).union(overlays))
+                for property in entity.properties {
+                    XCTAssertEqual(property.versionHash, retained.propertiesByName[property.name]?.versionHash)
+                }
+                XCTAssertEqual(retained.managedObjectClassName, entity.managedObjectClassName)
+                XCTAssertEqual(retained.isAbstract, entity.isAbstract)
+                XCTAssertEqual(retained.superentity?.name, entity.superentity?.name)
+                XCTAssertEqual(retained.versionHashModifier, entity.versionHashModifier)
+                XCTAssertEqual(retained.renamingIdentifier, entity.renamingIdentifier)
+                XCTAssertEqual(retained.uniquenessConstraints as NSArray, entity.uniquenessConstraints as NSArray)
+                let excluded = try XCTUnwrap(retained.attributesByName["isExcluded"])
+                XCTAssertEqual(excluded.attributeType, .booleanAttributeType)
+                XCTAssertFalse(excluded.isOptional)
+                XCTAssertEqual(excluded.defaultValue as? NSNumber, NSNumber(value: false))
+                let correction = try XCTUnwrap(retained.attributesByName["correctedValueJSON"])
+                XCTAssertEqual(correction.attributeType, .stringAttributeType)
+                XCTAssertTrue(correction.isOptional)
+                XCTAssertNil(correction.defaultValue)
+            } else {
+                XCTAssertEqual(entity.versionHash, retained.versionHash)
+            }
         }
         XCTAssertNoThrow(try NSMappingModel.inferredMappingModel(forSourceModel: old, destinationModel: current))
 

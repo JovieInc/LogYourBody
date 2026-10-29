@@ -58,7 +58,7 @@ extension DashboardViewLiquid {
         }
         let metrics = viewModel.bodyMetrics
         guard !metrics.isEmpty, selectedIndex >= 0, selectedIndex < metrics.count else { return nil }
-        return metrics[selectedIndex]
+        return metrics[selectedIndex].isExcluded ? metrics.first { !$0.isExcluded } : metrics[selectedIndex]
     }
 
     var greeting: String {

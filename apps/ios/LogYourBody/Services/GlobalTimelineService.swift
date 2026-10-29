@@ -148,7 +148,7 @@ final class GlobalTimelineService {
         heightInches: Double?
     ) -> GlobalTimelineMetricsSnapshot {
         let weight = makeBodyMetricValue(
-            directValues: bucketMetrics.compactMap { $0.weight },
+            directValues: bucketMetrics.filter { !$0.isExcluded }.compactMap { $0.weight },
             interpolated: contexts.weight?.estimate(for: midpoint)
         )
         let bodyFat = makeBodyFatMetricValue(
@@ -193,7 +193,7 @@ final class GlobalTimelineService {
         bucketMetrics: [BodyMetrics],
         interpolated: InterpolatedMetric?
     ) -> GlobalTimelineMetricValue {
-        let directMetrics = bucketMetrics.filter { $0.bodyFatPercentage != nil }
+        let directMetrics = bucketMetrics.filter { !$0.isExcluded && $0.bodyFatPercentage != nil }
         if let directValue = median(directMetrics.compactMap { $0.bodyFatPercentage }) {
             let includesVisualEstimate = directMetrics.contains {
                 $0.attributedBodyFatMethod == "visual_estimate"

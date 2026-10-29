@@ -91,7 +91,7 @@ extension DashboardViewLiquid {
     func generateFullScreenBodyScoreChartData() -> [MetricChartDataPoint] {
         guard !sortedBodyMetricsAscending.isEmpty else { return [] }
 
-        return sortedBodyMetricsAscending
+        return sortedBodyMetricsAscending.filter { !$0.isExcluded }
             .compactMap { metric in
                 guard let result = bodyScoreResult(for: metric) else {
                     return nil
@@ -367,7 +367,7 @@ private func buildFullScreenWeightChartData(
     from sortedBodyMetricsAscending: [BodyMetrics],
     measurementSystem: MeasurementSystem
 ) -> [MetricChartDataPoint] {
-    return sortedBodyMetricsAscending
+    return sortedBodyMetricsAscending.filter { !$0.isExcluded }
         .compactMap { metric in
             guard let weight = metric.weight else { return nil }
 
@@ -395,7 +395,7 @@ private func buildFullScreenWeightTrendChartData(
         return []
     }
 
-    return sortedBodyMetricsAscending.compactMap { metric in
+    return sortedBodyMetricsAscending.filter { !$0.isExcluded }.compactMap { metric in
         guard HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight),
               let trend = interpolationContext.trendWeight(for: metric.date) else {
             return nil
@@ -433,7 +433,7 @@ private func buildFullScreenBodyFatChartData(
     let interpolationContext = MetricsInterpolationService.shared
         .makeBodyFatInterpolationContext(for: bodyMetrics)
 
-    return sortedBodyMetrics
+    return sortedBodyMetrics.filter { !$0.isExcluded }
         .compactMap { metric in
             if let bf = metric.bodyFatPercentage {
                 return MetricChartDataPoint(
@@ -465,7 +465,7 @@ private func buildFullScreenFFMIChartData(
         return []
     }
 
-    return sortedBodyMetrics
+    return sortedBodyMetrics.filter { !$0.isExcluded }
         .compactMap { metric in
             guard let ffmiResult = interpolationContext.estimate(for: metric.date) else {
                 return nil

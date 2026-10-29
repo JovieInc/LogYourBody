@@ -70,8 +70,17 @@ def resolve_staged(root):
             raise ValueError("; ".join(errors))
         projection = repository_docs.local(snapshot, config["output"]).read_bytes()
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_bytes(projection)
-    subprocess.run(["git", "add", "--", config["output"]], cwd=root, check=True)
+    original = output.read_bytes() if output.exists() else None
+    try:
+        output.write_bytes(projection)
+        subprocess.run(["git", "add", "--", config["output"]], cwd=root, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        # Keep failed staging retryable, including the original conflict markers.
+        if original is None:
+            output.unlink(missing_ok=True)
+        else:
+            output.write_bytes(original)
+        raise
     print("repository-docs: regenerated and staged " + config["output"] + " from index")
 
 

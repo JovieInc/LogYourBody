@@ -11,6 +11,7 @@ import {
   coverageReport,
   LEDGER_PATH,
   mergeCorrectionLedgers,
+  readGitMergeLedgers,
   readSource,
   renderCoverage,
   runCoverage,
@@ -628,6 +629,20 @@ test('ledger merge rebuilds a conflicted recursive ancestor from both merge base
   const ancestor = git(['show', `:1:${LEDGER_PATH}`]);
   assert.throws(() => JSON.parse(ancestor));
   assert.match(ancestor, /^<{3} /m);
+  const tracePath = join(root, 'guard-reads.trace');
+  const previousTrace = process.env.GIT_TRACE;
+  try {
+    process.env.GIT_TRACE = tracePath;
+    readGitMergeLedgers(root);
+  } finally {
+    if (previousTrace === undefined) delete process.env.GIT_TRACE;
+    else process.env.GIT_TRACE = previousTrace;
+  }
+  const reads = readFileSync(tracePath, 'utf8')
+    .split('\n')
+    .filter((line) => /built-in: git show [a-f0-9]+:guard\.mjs$/.test(line));
+  assert.equal(reads.length, 3, 'read each immutable guard blob once per resolution');
+  assert.equal(new Set(reads.map((line) => line.split('git show ')[1])).size, 3);
   const report = runCoverage(['--merge-ledger'], { root, env: {} });
   assert.deepEqual(
     JSON.parse(readFileSync(join(root, LEDGER_PATH), 'utf8')).map((item) => item.fingerprint),

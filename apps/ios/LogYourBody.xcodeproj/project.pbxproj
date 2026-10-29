@@ -36,6 +36,7 @@
 		0183C845E0301D4B10100ACE /* BodyMetricAppIntentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC71479CEEDEAD772518C5E9 /* BodyMetricAppIntentsTests.swift */; };
 		022D79AC5B1840BC58FB7D70 /* BodyMetricContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB121088934BE398599BE39A /* BodyMetricContractTests.swift */; };
 		04BF4BAC82CF6B37F817592F /* CoreDataModelMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA050E7DCEBA5BAF62341363 /* CoreDataModelMigrationTests.swift */; };
+		FD71CEB96B1A1959B789CA37 /* MetricCorrectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10BDBAAE4BF70910951F5D2B /* MetricCorrectionTests.swift */; };
 		04EB1D7AD1947D32BDE7AD70 /* BodyMetricSourceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EBD5BF3F1671BC8D17ABE5D /* BodyMetricSourceContractTests.swift */; };
 		050A49949BCAA09D23C66035 /* DashboardViewModelHealthSyncWiringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1C56EE58FC0F4BEFDA1345 /* DashboardViewModelHealthSyncWiringTests.swift */; };
 		B7E4D91A06C34815F02A6C32 /* DashboardStepPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E4D91A06C34815F02A6C31 /* DashboardStepPersistenceTests.swift */; };
@@ -92,6 +93,7 @@
 		52551D9E4C3D6B89BAE63FA2 /* AccountDeletionConfirmationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C400E664F1B03F8C2556C9 /* AccountDeletionConfirmationPolicyTests.swift */; };
 		527D9570EA2700047C7D4A0E /* LRUCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF59EF3CF408329727452481 /* LRUCacheTests.swift */; };
 		5346F8338497DE5F23D6F20D /* CoreDataManager+Part05.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CD612A21566CB070FFC0086 /* CoreDataManager+Part05.swift */; };
+		358D4BBFF3F6CE77D413CAA8 /* CoreDataManager+Part06.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E16C72765C3594224554EF2 /* CoreDataManager+Part06.swift */; };
 		534844CE827E427810B5B337 /* ErrorReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CE7640AD9F476ABF4DC7366 /* ErrorReporterTests.swift */; };
 		53C8F67CE6082C23B391B357 /* OnboardingFlowViewModel+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B90BFF4D5A1EE512C980386 /* OnboardingFlowViewModel+Part01.swift */; };
 		53E6E3304F26E6A2FDD435A5 /* AuthLegacyStorageMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A593DE7333C6FAE0E20815A /* AuthLegacyStorageMigrationTests.swift */; };
@@ -179,6 +181,7 @@
 		AD0B7BFB2EC6930D008B29E7 /* PeriodSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */; };
 		AD1036332F00000100ABCDEF /* BodyMetricAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */; };
 		AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */; };
+		C3A33981B636CF792D2C0688 /* MetricCorrectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4885B7AB7A8A7A8978CFFF5D /* MetricCorrectionService.swift */; };
 		AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */; };
 		AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134002F01313400D134A1 /* NotificationManager.swift */; };
 		AD3134032F01313400D134A1 /* DailyWeighInReminderPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */; };
@@ -672,6 +675,7 @@
 		4C3BCDDCDB314367722653A8 /* ValidationServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ValidationServiceTests.swift; sourceTree = "<group>"; };
 		4C87F359CE5509C2457AB583 /* PaywallSavingsPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaywallSavingsPolicyTests.swift; sourceTree = "<group>"; };
 		4CD612A21566CB070FFC0086 /* CoreDataManager+Part05.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "CoreDataManager+Part05.swift"; path = "CoreDataManager+Part05.swift"; sourceTree = "<group>"; };
+		1E16C72765C3594224554EF2 /* CoreDataManager+Part06.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CoreDataManager+Part06.swift"; sourceTree = "<group>"; };
 		4E493B38B586CB7B2C6FB452 /* ErrorTrackingServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ErrorTrackingServiceTests.swift; sourceTree = "<group>"; };
 		4F614C8BD21F414268DB7829 /* BodySpecAuthManagerPKCETests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodySpecAuthManagerPKCETests.swift; sourceTree = "<group>"; };
 		4FE602CA4F092CAB186EE952 /* RevenueCatFlowTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RevenueCatFlowTests.swift; sourceTree = "<group>"; };
@@ -773,6 +777,7 @@
 		AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PeriodSelector.swift; path = Components/PeriodSelector.swift; sourceTree = "<group>"; };
 		AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetricAppIntents.swift; sourceTree = "<group>"; };
 		AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetricLoggingService.swift; sourceTree = "<group>"; };
+		4885B7AB7A8A7A8978CFFF5D /* MetricCorrectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricCorrectionService.swift; sourceTree = "<group>"; };
 		AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetricSpotlightIndexer.swift; sourceTree = "<group>"; };
 		AD1B2C3F2E15A00300123456 /* OnboardingContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingContainerView.swift; sourceTree = "<group>"; };
 		AD1B2C402E15A00400123456 /* WelcomeStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeStepView.swift; sourceTree = "<group>"; };
@@ -1066,6 +1071,7 @@
 		C7E0D5025A2839599F4E281D /* PhotoMetadataAndImportPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoMetadataAndImportPolicyTests.swift; sourceTree = "<group>"; };
 		C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SkeletonLoaders.swift; path = Components/SkeletonLoaders.swift; sourceTree = "<group>"; };
 		CA050E7DCEBA5BAF62341363 /* CoreDataModelMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoreDataModelMigrationTests.swift; sourceTree = "<group>"; };
+		10BDBAAE4BF70910951F5D2B /* MetricCorrectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricCorrectionTests.swift; sourceTree = "<group>"; };
 		CA338579090538FBCCA21785 /* SyncIntegrationImportAndMappingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncIntegrationImportAndMappingTests.swift; sourceTree = "<group>"; };
 		CA50D84A24CA405046D5EAFA /* HomeV2PhotoViewer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2PhotoViewer.swift; sourceTree = "<group>"; };
 		CB9A3103FAF35316B5451267 /* HomeV2TimelapseView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2TimelapseView.swift; sourceTree = "<group>"; };
@@ -1133,8 +1139,10 @@
 		F7A2B3C4D5E6F70809101113 /* LogYourBodyV2.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV2.xcdatamodel; sourceTree = "<group>"; };
 		F7A2B3C4D5E6F70809101114 /* LogYourBodyV3.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV3.xcdatamodel; sourceTree = "<group>"; };
 		F7A2B3C4D5E6F70809101116 /* LogYourBodyV4.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV4.xcdatamodel; sourceTree = "<group>"; };
+		F7A2B3C4D5E6F70809101118 /* LogYourBodyV7.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV7.xcdatamodel; sourceTree = "<group>"; };
 		F7A2B3C4D5E6F70809101115 /* LogYourBodyV3.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV3.xcdatamodel; sourceTree = "<group>"; };
 		F7A2B3C4D5E6F70809101117 /* LogYourBodyV4.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV4.xcdatamodel; sourceTree = "<group>"; };
+		F7A2B3C4D5E6F70809101119 /* LogYourBodyV7.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV7.xcdatamodel; sourceTree = "<group>"; };
 		F8E9499CD258290C5363D52A /* AuthManagerSessionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthManagerSessionTests.swift; sourceTree = "<group>"; };
 		FA535A0684FDFFAF479F14AB /* HomeV2OnboardingPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2OnboardingPolicyTests.swift; sourceTree = "<group>"; };
 		FB947FE422689993FD02B4F6 /* AuthHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthHeader.swift; path = DesignSystem/Molecules/AuthHeader.swift; sourceTree = "<group>"; };
@@ -1469,6 +1477,7 @@
 				AD9E00122F20001100ABCDEF /* BulkImportManagerBoundsTests.swift */,
 				07AFDB2060EF2522DE93E10D /* CachedPaywallOfferingDisplayTests.swift */,
 				CA050E7DCEBA5BAF62341363 /* CoreDataModelMigrationTests.swift */,
+				10BDBAAE4BF70910951F5D2B /* MetricCorrectionTests.swift */,
 				095D9694F1EA5B5091B0AE8B /* DailyReminderPolicyTests.swift */,
 				D0211D1493A398942561196F /* DashboardDataVizPolicyTests.swift */,
 				2B95EB9919EA722470321074 /* DashboardTimelineAndPolicyTests.swift */,
@@ -1675,6 +1684,7 @@
 				AD3150A12F15000100ABCDEF /* LogWeightFormValidator.swift */,
 				AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */,
 				AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */,
+				4885B7AB7A8A7A8978CFFF5D /* MetricCorrectionService.swift */,
 				2E6CF428B39B066C378F12CD /* BodyRecordReviewConsumer.swift */,
 				AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */,
 				AD3134002F01313400D134A1 /* NotificationManager.swift */,
@@ -1714,6 +1724,7 @@
 				62F02AB81FF64BBC27043BB9 /* CoreDataManager+Part04.swift */,
 				12CA473A353C45778799E228 /* CoreDataManager+BodySpecImport.swift */,
 				4CD612A21566CB070FFC0086 /* CoreDataManager+Part05.swift */,
+				1E16C72765C3594224554EF2 /* CoreDataManager+Part06.swift */,
 				3B8B5B2EBD6BD4427633C2F5 /* HealthKitManager+Part01.swift */,
 				7A1DE682AE51BF7A3EFF75FF /* HealthKitManager+Part02.swift */,
 				656A7105DE085AFF17E796C8 /* HealthKitManager+Part03.swift */,
@@ -2451,6 +2462,7 @@
 				AD9E00132F20001100ABCDEF /* BulkImportManagerBoundsTests.swift in Sources */,
 				BC360577C7E72F397010D7B1 /* CachedPaywallOfferingDisplayTests.swift in Sources */,
 				04BF4BAC82CF6B37F817592F /* CoreDataModelMigrationTests.swift in Sources */,
+				FD71CEB96B1A1959B789CA37 /* MetricCorrectionTests.swift in Sources */,
 				42B0784EAF04F40C031D0186 /* DailyReminderPolicyTests.swift in Sources */,
 				CC4917DEC8E46FACECDF3424 /* DashboardDataVizPolicyTests.swift in Sources */,
 				98DAEAD9993013F8C7C81764 /* DashboardTimelineAndPolicyTests.swift in Sources */,
@@ -2615,6 +2627,7 @@
 				ADDC47AB2E2D89F3003C97E7 /* LogYourBody.xcdatamodeld in Sources */,
 				AD1036332F00000100ABCDEF /* BodyMetricAppIntents.swift in Sources */,
 				AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */,
+				C3A33981B636CF792D2C0688 /* MetricCorrectionService.swift in Sources */,
 				80341C4DDED4231D4589ED47 /* BodyRecordReviewConsumer.swift in Sources */,
 				AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */,
 				AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */,
@@ -2866,6 +2879,7 @@
 				DC51280D16A74D3E38D4B798 /* CoreDataManager+Part04.swift in Sources */,
 				5A1AE51CD34B4A8E812811B2 /* CoreDataManager+BodySpecImport.swift in Sources */,
 				5346F8338497DE5F23D6F20D /* CoreDataManager+Part05.swift in Sources */,
+				358D4BBFF3F6CE77D413CAA8 /* CoreDataManager+Part06.swift in Sources */,
 				841527E772D0CA94BE0D3F96 /* HealthKitManager+Part01.swift in Sources */,
 				CB4A7A11426D64B74959C447 /* HealthKitManager+Part02.swift in Sources */,
 				73AAD5D6EADA5C5A7BEB0D4B /* HealthKitManager+Part03.swift in Sources */,
@@ -3428,8 +3442,9 @@
 				F7A2B3C4D5E6F70809101116 /* LogYourBodyV4.xcdatamodel */,
 				E24920261025000500000001 /* LogYourBodyV5.xcdatamodel */,
 				26820261025000000000009 /* LogYourBodyV6.xcdatamodel */,
+				F7A2B3C4D5E6F70809101118 /* LogYourBodyV7.xcdatamodel */,
 			);
-			currentVersion = 26820261025000000000009 /* LogYourBodyV6.xcdatamodel */;
+			currentVersion = F7A2B3C4D5E6F70809101118 /* LogYourBodyV7.xcdatamodel */;
 			path = LogYourBody.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;
@@ -3443,8 +3458,9 @@
 				F7A2B3C4D5E6F70809101117 /* LogYourBodyV4.xcdatamodel */,
 				E24920261025000500000002 /* LogYourBodyV5.xcdatamodel */,
 				2682026102500000000000A /* LogYourBodyV6.xcdatamodel */,
+				F7A2B3C4D5E6F70809101119 /* LogYourBodyV7.xcdatamodel */,
 			);
-			currentVersion = 2682026102500000000000A /* LogYourBodyV6.xcdatamodel */;
+			currentVersion = F7A2B3C4D5E6F70809101119 /* LogYourBodyV7.xcdatamodel */;
 			path = LogYourBody.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;
