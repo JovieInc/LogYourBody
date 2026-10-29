@@ -59,7 +59,7 @@ struct DatedOutcome: Codable, Equatable, Sendable {
     func validate() throws {
         let availability = constraints.availability
         guard outcome.targetValue.isFinite, outcome.targetValue > 0,
-              Self.isCalendarDate(outcomeDate),
+              Self.calendarDate(outcomeDate) != nil,
               availability.experience.map({ ["new", "returning", "experienced"].contains($0) }) ?? true,
               availability.sessionsPerWeek.map({ (2...6).contains($0) }) ?? true,
               availability.minutesPerSession.map({ (15...180).contains($0) }) ?? true,
@@ -69,7 +69,7 @@ struct DatedOutcome: Codable, Equatable, Sendable {
               Self.validTags(availability.limitations, limit: 20),
               constraints.travel.count <= 100, constraints.maintenance.count <= 100,
               (constraints.travel + constraints.maintenance).allSatisfy({
-                  Self.isCalendarDate($0.start) && Self.isCalendarDate($0.end) && $0.start <= $0.end
+                  Self.calendarDate($0.start) != nil && Self.calendarDate($0.end) != nil && $0.start <= $0.end
               }) else { throw DatedOutcomeError.invalidValue }
     }
 
@@ -78,15 +78,15 @@ struct DatedOutcome: Codable, Equatable, Sendable {
         return values.count <= limit && values.allSatisfy { !$0.isEmpty && $0.count <= 100 }
     }
 
-    private static func isCalendarDate(_ value: String) -> Bool {
+    static func calendarDate(_ value: String) -> Date? {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.isLenient = false
-        guard let date = formatter.date(from: value) else { return false }
-        return formatter.string(from: date) == value
+        guard let date = formatter.date(from: value), formatter.string(from: date) == value else { return nil }
+        return date
     }
 }
 

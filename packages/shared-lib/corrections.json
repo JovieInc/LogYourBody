@@ -4755,5 +4755,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-logout-action-must-be-uniquely-interactive",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40866009010/job/123421170062",
+    "correction": "At bc91, the named logout alert appeared with two copies of each expected identifier and label. The label-first Cancel lookup existed but was not hittable, failing before cancellation or sign-out. This proves the test selected a noninteractive node; it does not prove a production authentication failure or that another node is hittable.",
+    "mechanization": "Within the exact alert, enumerate the exact action identifier, require its expected label and enabled/hittable state, and fail closed unless exactly one action meets those conditions within five seconds. Retain cancellation/session-preservation and actual sign-out postconditions. Publish live enabled/hittable/frame diagnostics through XCTest activities. Existing required native runtime execution remains the acceptance check; no product source, selector, overall deadline or retry-budget changes.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The required logout runtime regression now rejects zero or multiple interactive targets and verifies actual cancellation and sign-out. Exact-host execution is still required; local static qualification does not prove this candidate passes."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "private func hittableLogoutAction(in alert: XCUIElement, identifier: String, label: String) throws -> XCUIElement"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
