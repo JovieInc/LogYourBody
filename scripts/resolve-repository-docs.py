@@ -10,6 +10,12 @@ import repository_docs
 
 
 def staged_bytes(root, name):
+    entry = subprocess.run(
+        ["git", "ls-files", "--stage", "-z", "--", ":(literal)" + name],
+        cwd=root, check=True, capture_output=True,
+    ).stdout
+    if entry.split(b" ", 1)[0] not in (b"100644", b"100755"):
+        raise ValueError("expected staged regular file: " + name)
     return subprocess.run(
         ["git", "show", ":" + name], cwd=root, check=True, capture_output=True,
     ).stdout
@@ -20,6 +26,8 @@ def resolve_staged(root):
     registry = staged_bytes(root, "repository-docs.json")
     config = json.loads(registry)
     output = repository_docs.local(root, config["output"])
+    if output != root / Path(config["output"]):
+        raise ValueError("symlinked projection output: " + config["output"])
     dirty = subprocess.run(
         ["git", "diff", "--name-only", "-z", "--", config["output"]],
         cwd=root, check=True, capture_output=True,

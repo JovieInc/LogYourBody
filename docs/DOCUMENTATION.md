@@ -36,7 +36,7 @@ stages only the generated output; review the source diff before committing.
 The pre-commit hook runs `python3 scripts/resolve-repository-docs.py --staged`
 after formatting and correction classification. It refreshes the projection
 from indexed sources, preserves unstaged source edits, and refuses unstaged
-projection edits or pinned-source drift. Bot commits created outside local
+projection edits, symlinked inputs or output, or pinned-source drift. Bot commits created outside local
 hooks still need this refresh during repair; CI continues to reject stale output.
 
 The default check verifies local copies against declared hashes offline. It does

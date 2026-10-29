@@ -768,7 +768,7 @@ test('commit source-map repair uses staged dependencies and preserves unstaged s
   }
 });
 
-for (const failure of ['unstaged-output', 'untracked-output', 'pinned-drift', 'missing-source', 'unsafe-output']) {
+for (const failure of ['unstaged-output', 'untracked-output', 'pinned-drift', 'missing-source', 'unsafe-output', 'symlink-source', 'symlink-output']) {
   test(`commit source-map repair refuses ${failure} without changing the projection or index`, () => {
     const fx = stagedSourceMap();
     try {
@@ -785,6 +785,16 @@ for (const failure of ['unstaged-output', 'untracked-output', 'pinned-drift', 'm
       }
       if (failure === 'missing-source') git(fx.root, 'rm', '--cached', 'package.json');
       if (failure === 'unsafe-output') fx.config.output = '../escape.md';
+      if (failure === 'symlink-source') {
+        fs.symlinkSync('policy.md', path.join(fx.root, 'policy-alias.md'));
+        git(fx.root, 'add', 'policy-alias.md');
+        fx.config.sources.push({ path: 'policy-alias.md', purpose: 'Symlink input' });
+      }
+      if (failure === 'symlink-output') {
+        fs.rmSync(path.join(fx.root, fx.output));
+        fs.symlinkSync('../README.md', path.join(fx.root, fx.output));
+        git(fx.root, 'add', fx.output);
+      }
       fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
       git(fx.root, 'add', 'repository-docs.json');
       const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
@@ -797,6 +807,8 @@ for (const failure of ['unstaged-output', 'untracked-output', 'pinned-drift', 'm
         'pinned-drift': /pinned copy missing or changed: policy.md/,
         'missing-source': /package.json/,
         'unsafe-output': /unsafe repository path/,
+        'symlink-source': /expected staged regular file: policy-alias.md/,
+        'symlink-output': /symlinked projection output/,
       }[failure]);
       assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
       assert.equal(git(fx.root, 'ls-files', '--stage'), index);
