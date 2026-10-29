@@ -1,19 +1,22 @@
-import type { MuscleGroup } from './types';
+import { catalogVariantById } from './catalog';
+import type { MuscleGroup, MuscleTarget } from './types';
 
 /**
  * Reviewed constraints for mesocycle optimization.
  * Confidence is qualitative. Nothing here is a measured individual fatigue score,
  * a universal minimum set count, or a heart-rate readiness model.
  */
-export const OPTIMIZER_EVIDENCE_VERSION = 'mesocycle-optimizer-rules-v1';
+export const OPTIMIZER_EVIDENCE_VERSION = 'mesocycle-optimizer-rules-v2';
 
-export type GripRole = 'none' | 'support' | 'direct';
+export type GripRole = 'none' | 'support' | 'direct' | 'unknown';
 export type ConstraintTier = 'safety' | 'bounds' | 'preference';
 
 export type ExerciseAnnotation = {
   grip: GripRole;
   /** Same class means the movements can share a setup. Different classes need known geography. */
   stationClass: string;
+  targets?: readonly MuscleTarget[];
+  assisting?: readonly MuscleTarget[];
 };
 
 export type OptimizerRule = {
@@ -46,6 +49,14 @@ export const OPTIMIZER_RULES: OptimizerRuleSet = {
   calvesSameDayException: false,
   rules: [
     {
+      id: 'priority_sequence_v1',
+      tier: 'preference',
+      confidence: 'low',
+      evidenceIds: ['rule:priority-sequence-v1'],
+      summary:
+        'Eligible specialization work leads remaining working sets after warm-up. This is a product default, not a claim of superior hypertrophy.',
+    },
+    {
       id: 'pain_pause_v1',
       tier: 'safety',
       confidence: 'moderate',
@@ -75,7 +86,7 @@ export const OPTIMIZER_RULES: OptimizerRuleSet = {
       confidence: 'low',
       evidenceIds: RECOVERY_EVIDENCE,
       summary:
-        'A later same-day session that repeats a primary muscle has no recovery opportunity. Calves are not exempt.',
+        'A later same-day session that repeats a primary muscle is not assumed recovered. Calves are not exempt; there is no universal recovery-time threshold.',
     },
     {
       id: 'readiness_report_v1',
@@ -134,13 +145,80 @@ export const OPTIMIZER_RULES: OptimizerRuleSet = {
   ],
   annotations: {
     wrist_curl: { grip: 'direct', stationClass: 'dumbbell' },
-    pull_up: { grip: 'support', stationClass: 'pullup_bar' },
+    pull_up: {
+      grip: 'support',
+      stationClass: 'pullup_bar',
+      targets: ['lats'],
+      assisting: ['biceps'],
+    },
+    lat_pulldown: {
+      grip: 'support',
+      stationClass: 'cable_column',
+      targets: ['lats'],
+      assisting: ['biceps'],
+    },
     seated_calf_raise: { grip: 'none', stationClass: 'calf_machine' },
     standing_calf_raise: { grip: 'none', stationClass: 'calf_station' },
-    cable_lateral_raise: { grip: 'none', stationClass: 'cable_column' },
-    dumbbell_lateral_raise: { grip: 'none', stationClass: 'dumbbell' },
-    smith_incline_press: { grip: 'none', stationClass: 'smith' },
-    incline_dumbbell_press: { grip: 'none', stationClass: 'bench' },
+    cable_lateral_raise: {
+      grip: 'none',
+      stationClass: 'cable_column',
+      targets: ['side_delts'],
+      assisting: [],
+    },
+    dumbbell_lateral_raise: {
+      grip: 'none',
+      stationClass: 'dumbbell',
+      targets: ['side_delts'],
+      assisting: [],
+    },
+    smith_incline_press: {
+      grip: 'none',
+      stationClass: 'smith',
+      targets: ['upper_chest'],
+      assisting: ['anterior_delts', 'triceps'],
+    },
+    incline_dumbbell_press: {
+      grip: 'none',
+      stationClass: 'bench',
+      targets: ['upper_chest'],
+      assisting: ['anterior_delts', 'triceps'],
+    },
+    dumbbell_curl: {
+      grip: 'support',
+      stationClass: 'dumbbell',
+      targets: ['biceps'],
+      assisting: [],
+    },
+    cable_curl: {
+      grip: 'support',
+      stationClass: 'cable_column',
+      targets: ['biceps'],
+      assisting: [],
+    },
+    lying_dumbbell_curl: {
+      grip: 'support',
+      stationClass: 'bench',
+      targets: ['biceps'],
+      assisting: [],
+    },
+    incline_dumbbell_curl: {
+      grip: 'support',
+      stationClass: 'bench',
+      targets: ['biceps'],
+      assisting: [],
+    },
+    supported_cable_curl: {
+      grip: 'support',
+      stationClass: 'cable_column',
+      targets: ['biceps'],
+      assisting: [],
+    },
+    preacher_machine_curl: {
+      grip: 'support',
+      stationClass: 'machine',
+      targets: ['biceps'],
+      assisting: [],
+    },
   },
 };
 
@@ -151,10 +229,29 @@ export function ruleById(rules: OptimizerRuleSet, id: string): OptimizerRule | u
 export function annotationFor(rules: OptimizerRuleSet, exerciseId: string): ExerciseAnnotation {
   return (
     rules.annotations[exerciseId] ?? {
-      grip: 'none',
+      grip: 'unknown',
       stationClass: `exercise:${exerciseId}`,
     }
   );
+}
+
+/** Acute activation observations distinguish regions; they are not fatigue doses.
+ * Legacy shoulder fractions remain accounting conventions, never side-delt tags. */
+export function exerciseDemands(rules: OptimizerRuleSet, exerciseId: string) {
+  const annotation = annotationFor(rules, exerciseId);
+  const variant = catalogVariantById(exerciseId);
+  const targets: readonly MuscleTarget[] =
+    exerciseId === 'wrist_curl'
+      ? ['forearms']
+      : (annotation.targets ?? (variant ? [variant.primaryMuscle] : []));
+  return {
+    targets,
+    assisting: annotation.assisting ?? null,
+    grip: annotation.grip,
+    trunk: variant?.trunkDemand ?? null,
+    torsoSupport: variant?.torsoSupport ?? null,
+    jointTolerability: 'unknown' as const,
+  };
 }
 
 export function gripConflict(

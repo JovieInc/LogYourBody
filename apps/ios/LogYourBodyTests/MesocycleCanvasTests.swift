@@ -3,6 +3,30 @@ import XCTest
 
 @MainActor
 final class MesocycleCanvasTests: XCTestCase {
+    func testLostResponseRetryRetainsCanvasCommandIdentity() async throws {
+        let readback = CanvasReadback(
+            version: 1, write: 7, generation: 1, plan: nil, goals: [], weeklyTotals: [:],
+            execution: [], proposal: nil, narration: ""
+        )
+        let service = FixedCanvasService(
+            response: CanvasCommandResponse(version: 1, kind: "read", readback: readback, missing: nil)
+        )
+        let model = MesocycleCanvasModel(
+            service: service, store: MemoryCanvasStore(), accessToken: { "token" }, reduceMotion: true
+        )
+        await model.refresh()
+        XCTAssertNil(service.requests[0].jsonObject()["requestId"])
+        service.failNext = true
+        await model.submit("Put side delts first")
+        XCTAssertEqual(model.narration, "The plan could not be updated.")
+        await model.resendLast()
+        let original = try XCTUnwrap(service.requests.dropFirst().first)
+        let retry = try XCTUnwrap(service.requests.last)
+        XCTAssertNotNil(UUID(uuidString: original.requestId))
+        XCTAssertEqual(original.jsonObject()["requestId"] as? String, retry.jsonObject()["requestId"] as? String)
+        XCTAssertEqual(retry.jsonObject()["expectedWrite"] as? Int, 7)
+    }
+
     func testCanvasGateIsDefaultOffUntilTheFlagIsEnabled() {
         var checked: String?
         XCTAssertFalse(MesocycleCanvasPolicy.isEnabled { checked = $0; return false })
@@ -148,9 +172,16 @@ final class MesocycleCanvasTests: XCTestCase {
 
 private final class FixedCanvasService: MesocycleCanvasServicing {
     var response: CanvasCommandResponse
+    var requests: [CanvasClientRequest] = []
+    var failNext = false
     init(response: CanvasCommandResponse) { self.response = response }
     func perform(_ request: CanvasClientRequest, accessToken: String) async throws -> CanvasCommandResponse {
-        _ = (request, accessToken)
+        _ = accessToken
+        requests.append(request)
+        if failNext {
+            failNext = false
+            throw URLError(.timedOut)
+        }
         return response
     }
 }

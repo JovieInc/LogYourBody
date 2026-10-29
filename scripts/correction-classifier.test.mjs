@@ -669,7 +669,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     }
     if (scenario === 'binary-marker') {
       // Binary attributes must not hide markers from either resolver mode.
-      writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
+      writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} binary\n`);
       await git('add', '.gitattributes');
     }
     if (scenario === 'textconv-marker') {
@@ -984,6 +984,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       await git('config', 'diff.conceal.textconv', 'echo hidden-by-textconv');
       for (const [attribute, marker] of [
         ...scenarioMarkers.map((marker) => ['-diff', marker]),
+        ...markers.slice(0, 4).map((marker) => ['binary', marker]),
         ['', '<<<<<<< HEAD'],
         ['', '||||||| base'],
         ['', '======='],
