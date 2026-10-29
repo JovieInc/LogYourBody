@@ -4165,6 +4165,78 @@
     "ruleId": "ci-invariant"
   },
   {
+    "fingerprint": "synthetic-chat-replay-acknowledges-keyboard-input",
+    "correction": "PR #1534 Launch Quality failed before cancellation coverage because the simulator accepted only S from a burst of Synthetic full-turn question while its keyboard service timed out. Synchronize input without accepting or submitting a partial question.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40153702079/job/121050481329",
+    "mechanization": "The existing required synthetic chat UI cases wait for the keyboard and acknowledge each exact typed prefix before continuing. The complete-question predicate still gates Send, and the full-turn, cancellation, original-identity retry and persistence assertions remain required. Native runtime proof remains required from Launch Quality.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The UI test driver controls input delivery and can prevent a typing burst from outrunning keyboard initialization. The existing failed native case is the regression; no product behavior or CI gate needs to change."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "guard XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "training-priority-order-retains-warmup-volume-and-completed-work",
+    "correction": "LYB-37 October 14 dogfood acceptance: specialization work precedes generic compound-first templates only when eligible; preserve warm-up, approved allocation and completed work across split segments, and distinguish anterior from medial delts.",
+    "source": "https://linear.app/jovie/issue/LYB-37",
+    "mechanization": "The existing optimizer computes priority order with scoped intent and qualitative demand metadata. Its certifier compares the complete deterministic result, including ordered changes and narration. The existing required web Jest suite runs golden regressions for warm-up, readiness, grip, shoulder regions, inventory/exclusions, segment continuity, scope expiry and tampered proposals. Canvas regressions require explicit apply, persisted readback, replay and undo without volume changes.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Priority sequencing and certification are deterministic domain behavior. Reuse the existing optimizer and canvas proposal ledger; never let coach prose authorize a reorder or volume edit. This guard covers the sequencing slice, not full native session certification or unfinished-work reconciliation."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/sequencing.test.ts",
+      "anchor": "priority sequencing golden scenarios"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "correction": "PR #1534 recurring conflict repair: merge origin/main while retaining deterministic priority sequencing, native training cards and every correction receipt. Binary Git attributes must not hide staged conflict markers from the merge resolver.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1534#conflict-repair-20261027",
+    "mechanization": "Extend the existing ledger merge readiness guard with forced text inspection, retaining disabled external diff drivers, text conversion and color. The existing required shared-lib classifier suite uses real Git repositories with binary attributes to verify refusal before ledger resolution and on staged retries, preserving the ledger, index and unrelated edits. The new binary-marker regression fails without --text and passes with it. Use --resolve-merge . --stage and --check-merge . for this repair. The lanes harness remains the sole push and PR owner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-readiness-large-staged-diff-buffer",
+    "correction": "PR #1534 repair (fix-red-1a39536f40 occurrence 6): origin/main integration produced a 1,086,207-byte staged diff. The shared merge readiness guard failed with spawnSync git ENOBUFS before the correction ledger could be resolved or checked.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1534#repair-20261029",
+    "mechanization": "Extend the existing shared merge readiness guard with a bounded 16 MiB staged-diff buffer. The required correction-coverage behavior suite now stages a diff above 1 MiB, requires clean acceptance, then places each of the four conflict markers at its end and requires refusal with unchanged ledger, index and working bytes. The regression fails with ENOBUFS before the change and passes afterward. Use the extended correction-classifier --resolve-merge . --stage and --check-merge . on this actual merge, retaining every parent receipt, classifier deadline and coverage gate. Preserve the literal binary attribute cases in the generated classifier matrix. The lanes harness retains all push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared readiness implementation owns Git diff capture for all ledger resolvers and pre-commit merge verification. An explicit bounded buffer permits complete inspection of routine large integrations while failures still stop resolution rather than accepting truncated output."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.behavior.mjs",
+      "anchor": "test('ledger merge readiness handles large staged diffs without hiding trailing markers'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
     "correction": "PR #1571 / LYB-260: Adding the Home focus selector and its regression tests to their Xcode targets changed the project manifest without refreshing its diagnostic dependency pin, failing Mac Runner Routing Tests.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40204727038/job/121203140455",

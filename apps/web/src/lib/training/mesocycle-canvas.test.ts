@@ -73,6 +73,66 @@ async function accept(
 }
 
 describe('mesocycle canvas revisions', () => {
+  it('persists a reviewable priority reorder without changing volume, then undoes it', async () => {
+    const port = memoryCanvasPort();
+    const drafted = await accept(
+      port,
+      { kind: 'draft', goal: 'Growth', equipment: 'full_gym', weekCount: 4 },
+      IDS[0],
+      IDS[1],
+    );
+    const before = drafted.readback;
+    const operation = interpretPlanUtterance('Put side delts first');
+    expect(operation).toEqual({ kind: 'order_priority', muscles: ['side_delts'] });
+    const proposed = await proposeCanvasEdit(port, 'owner', {
+      requestId: IDS[2],
+      expectedWrite: before.write,
+      operation: operation!,
+      now: NOW,
+    });
+    expect(proposed.kind).toBe('proposed');
+    if (proposed.kind !== 'proposed') return;
+    expect(proposed.proposal.changes.some((row) => row.kind === 'reordered')).toBe(true);
+    expect((await readCanvas(port, 'owner')).readback.plan).toEqual(before.plan);
+    const amended = await amendCanvasProposal(port, 'owner', {
+      proposalId: IDS[2],
+      instanceId: proposed.proposal.preview.sessions[0]!.exercises[0]!.instanceId,
+      sets: 8,
+      expectedWrite: proposed.readback.write,
+    });
+    expect(amended.kind).toBe('unsupported_or_invalid_intent');
+    const decided = await decideCanvasProposal(port, 'owner', {
+      requestId: IDS[3],
+      proposalId: IDS[2],
+      decision: 'apply',
+      expectedWrite: proposed.readback.write,
+      now: NOW,
+    });
+    expect(decided.kind).toBe('decided');
+    expect(decided.readback.weeklyTotals).toEqual(before.weeklyTotals);
+    expect(decided.readback.plan?.policy).toEqual(before.plan?.policy);
+    for (const session of decided.readback.plan!.sessions) {
+      const lateral = session.exercises.find((row) => row.variantId.includes('lateral_raise'));
+      if (lateral) expect(session.exercises[0]).toEqual(lateral);
+    }
+    expect((await readCanvas(port, 'owner')).readback.execution).toEqual(
+      decided.readback.execution,
+    );
+    const replay = await decideCanvasProposal(port, 'owner', {
+      requestId: IDS[3],
+      proposalId: IDS[2],
+      decision: 'apply',
+      expectedWrite: proposed.readback.write,
+      now: NOW,
+    });
+    expect(replay.kind).toBe('decided');
+    if (replay.kind === 'decided' && decided.kind === 'decided')
+      expect(replay.receipt).toEqual(decided.receipt);
+    expect(replay.readback.plan).toEqual(decided.readback.plan);
+    const undo = await accept(port, { kind: 'undo' }, IDS[4], IDS[5]);
+    expect(undo.readback.plan?.sessions).toEqual(before.plan?.sessions);
+    expect(undo.readback.weeklyTotals).toEqual(before.weeklyTotals);
+  });
   it('keeps the canvas flag off unless it is exactly true', () => {
     expect(mesocycleCanvasEnabled({} as NodeJS.ProcessEnv)).toBe(false);
     expect(mesocycleCanvasEnabled({ LYB_MESOCYCLE_CANVAS_ENABLED: '1' } as NodeJS.ProcessEnv)).toBe(

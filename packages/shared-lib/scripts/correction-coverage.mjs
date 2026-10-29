@@ -351,7 +351,13 @@ export function assertLedgerMergeReady(root) {
       '.',
       `:!${LEDGER_PATH}`,
     ],
-    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      // Main integration can exceed Node's default 1 MiB diff buffer.
+      maxBuffer: 16 * 1024 * 1024,
+    },
   );
   // Staging a file does not prove its conflict markers were resolved.
   // Read staged bytes as text so binary attributes cannot conceal conflict markers.
