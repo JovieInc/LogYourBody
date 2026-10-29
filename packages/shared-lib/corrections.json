@@ -4387,6 +4387,24 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "ledger-staged-scan-retains-complete-large-merge-output",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1561#repair-20261029-occurrence38",
+    "correction": "PR #1561 recurring conflict repair (fix-red-e3b0c44298 occurrence 38): retain both parents and all dated-outcome storage changes. Main and the branch independently expanded staged-patch capture, but Git check diagnostics can exceed the default buffer even when the staged patch does not.",
+    "mechanization": "Retain both reviewed buffer anchors and the branch’s bounded 16 MiB Git-check capture in the existing shared readiness guard. Extend its required behavior suite with a real staged patch whose whitespace diagnostics exceed 1 MiB, accept clean whitespace, reject all four single-character markers at the diagnostic tail, and preserve ledger, index and unrelated working bytes. The new regression fails with ENOBUFS against main’s default diagnostic buffer and passes with the retained bound. Use --resolve-merge . --stage to preserve all 222 parent receipts, then --check-merge . and the staged retry. Keep marker refusal, oversized failure, all coverage gates and native deadlines. The harness owns pushing and PR edits and must supply exactly Machine: built packages/shared-lib/scripts/correction-coverage.mjs in the PR body.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared preflight can read the complete ordinary merge under its explicit source-output bound, preventing default-buffer failure by construction while retaining a fail-closed oversized result."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Ordinary main integrations can exceed Node's 1 MiB output default."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "xcode-file-paths-use-valid-openstep-strings",
     "correction": "PR #1564 / LYB-243: Quote the CoreDataManager+Part06.swift project path. Its unquoted plus sign prevents Xcode project loading, so Launch Quality and StoreKit exit with code 74 before tests run.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40202027853/job/121195099171",
@@ -4545,5 +4563,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "recursive-ledger-resolution-reuses-immutable-guard-reads",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1564#repair-20261029-occurrence40",
+    "correction": "Recurring conflict repair fix-red-e3b0c44298 occurrence 40: preserve imported metric overlays, the merged dated-outcome prerequisite, and every parent receipt. Recursive ledger reconstruction repeatedly launches Git for the same immutable guard blobs.",
+    "mechanization": "Extend the existing recursive ledger resolver with a per-resolution immutable guard cache. The required shared-lib real-Git regression traces the recursive merge and fails before the change with 24 guard reads instead of three; it passes afterward with exactly one read per revision and guard path. Replay the actual ledger conflict through --resolve-merge . --stage, then verify both parents through --check-merge . and the coverage report. Retain all refusal, coverage and native gates. The harness owns pushing and PR edits and must supply exactly Machine: built packages/shared-lib/scripts/correction-coverage.mjs in the PR body.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can retain immutable guard text within one reconstruction, preventing redundant subprocess work by construction without sharing mutable index evidence or changing merge policy."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Cache immutable guard reads only within this recursive merge resolution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

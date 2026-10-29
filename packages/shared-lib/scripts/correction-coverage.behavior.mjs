@@ -11,6 +11,7 @@ import {
   coverageReport,
   LEDGER_PATH,
   mergeCorrectionLedgers,
+  readGitMergeLedgers,
   readSource,
   renderCoverage,
   runCoverage,
@@ -469,6 +470,47 @@ test('ledger merge readiness checks raw staged bytes despite Git diff attributes
   }
 });
 
+test('ledger merge readiness scans large Git check diagnostics before accepting the index', (t) => {
+  const { root } = fixtureRepo(t, []);
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+  const path = join(root, guard.path);
+  const ledger = readFileSync(join(root, LEDGER_PATH), 'utf8');
+  writeFileSync(join(root, '.gitattributes'), `${guard.path} conflict-marker-size=1\n`);
+  git('config', 'core.whitespace', 'blank-at-eol');
+  git('add', '.gitattributes');
+  const large = `${anchor}\n${'const retained = true;  \n'.repeat(30_000)}`;
+  writeFileSync(path, large);
+  git('add', guard.path);
+  const cleanIndex = git('ls-files', '--stage');
+  assert.throws(
+    () =>
+      execFileSync('git', ['diff', '--cached', '--check'], {
+        cwd: root,
+        maxBuffer: 16 * 1024 * 1024,
+      }),
+    (error) => error.status === 2 && error.stdout.length > 1024 * 1024,
+    'exercise diagnostics larger than the default child-process buffer',
+  );
+  assertLedgerMergeReady(root);
+  assert.equal(git('ls-files', '--stage'), cleanIndex);
+  for (const marker of ['< HEAD', '| base', '=', '> incoming']) {
+    writeFileSync(path, `${large}${marker}\n`);
+    git('add', guard.path);
+    writeFileSync(path, anchor);
+    const index = git('ls-files', '--stage');
+    assert.throws(
+      () => assertLedgerMergeReady(root),
+      /ledger merge: resolve staged conflict markers first/,
+    );
+    assert.equal(git('ls-files', '--stage'), index, 'refusal preserves the index');
+    assert.equal(readFileSync(join(root, LEDGER_PATH), 'utf8'), ledger);
+    assert.equal(readFileSync(path, 'utf8'), anchor);
+  }
+  writeFileSync(path, large);
+  git('add', guard.path);
+  assertLedgerMergeReady(root);
+});
+
 test('ledger merge readiness rejects Git single-character conflict markers', (t) => {
   const { root } = fixtureRepo(t, []);
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
@@ -544,6 +586,20 @@ test('ledger merge rebuilds a conflicted recursive ancestor from both merge base
   const ancestor = git(['show', `:1:${LEDGER_PATH}`]);
   assert.throws(() => JSON.parse(ancestor));
   assert.match(ancestor, /^<{3} /m);
+  const tracePath = join(root, 'guard-reads.trace');
+  const previousTrace = process.env.GIT_TRACE;
+  try {
+    process.env.GIT_TRACE = tracePath;
+    readGitMergeLedgers(root);
+  } finally {
+    if (previousTrace === undefined) delete process.env.GIT_TRACE;
+    else process.env.GIT_TRACE = previousTrace;
+  }
+  const reads = readFileSync(tracePath, 'utf8')
+    .split('\n')
+    .filter((line) => /built-in: git show [a-f0-9]+:guard\.mjs$/.test(line));
+  assert.equal(reads.length, 3, 'read each immutable guard blob once per resolution');
+  assert.equal(new Set(reads.map((line) => line.split('git show ')[1])).size, 3);
   const report = runCoverage(['--merge-ledger'], { root, env: {} });
   assert.deepEqual(
     JSON.parse(readFileSync(join(root, LEDGER_PATH), 'utf8')).map((item) => item.fingerprint),

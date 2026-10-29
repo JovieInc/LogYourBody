@@ -119,6 +119,9 @@ merge bases and their shared parent before applying the same union. The pre-comm
 file cannot hide an unresolved staged source. Resolve and stage the source, then
 retry the same command. Unrelated unstaged edits remain untouched.
 
+Recursive reconstruction reads each immutable guard blob once per resolution;
+the cache ends with that invocation, so retries never reuse mutable index evidence.
+
 The readiness check forces text inspection even when Git attributes mark a staged
 file as binary, so those attributes cannot conceal unresolved conflict markers.
 It accepts up to 16 MiB of staged diff output, including markers at the end of a
