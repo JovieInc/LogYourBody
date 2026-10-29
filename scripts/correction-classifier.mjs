@@ -9,6 +9,7 @@ import {
   assertNoRegression,
   coverageReport,
   guardCoverageReport,
+  indexCorrectionReceipts,
   LEDGER_PATH,
   LEVELS,
   mergeCorrectionLedgers,
@@ -238,6 +239,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
           regularGuards,
         ));
       const verifyMerge = (receipts) => {
+        indexCorrectionReceipts(receipts);
         assert.deepEqual(
           receipts,
           classifyLedger(receipts),
@@ -326,10 +328,11 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
     } else {
       path = args[0] ?? resolve(ROOT, LEDGER_PATH);
       const receipts = JSON.parse(readFileSync(path, 'utf8'));
-      result =
-        args.length === 3
-          ? mergeLedgers(receipts, JSON.parse(readFileSync(args[2], 'utf8')))
-          : classifyLedger(receipts);
+      // Ordinary commits enforce unique identities; only parent snapshots consolidate replays.
+      indexCorrectionReceipts(receipts);
+      const incoming = args.length === 3 ? JSON.parse(readFileSync(args[2], 'utf8')) : null;
+      if (incoming) indexCorrectionReceipts(incoming);
+      result = args.length === 3 ? mergeLedgers(receipts, incoming) : classifyLedger(receipts);
     }
     const original = readFileSync(path, 'utf8');
     const formatted = `${JSON.stringify(result, null, 2)}\n`;
@@ -341,7 +344,13 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
     ) {
       writeFileSync(path, formatted);
     }
-    stageResolution?.();
+    try {
+      stageResolution?.();
+    } catch (error) {
+      // Failed staging must preserve the original ledger for an unattended retry.
+      writeFileSync(path, original);
+      throw error;
+    }
     logger.log(`correction-classifier: classified ${result.length} receipts`);
     return 0;
   } catch (error) {

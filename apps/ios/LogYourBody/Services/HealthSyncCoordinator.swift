@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import HealthKit
 
 enum HealthKitAccountSyncPolicy {
     static let accountIdKey = "healthKitSyncAccountId"
@@ -44,14 +45,14 @@ protocol HealthKitSyncManaging: AnyObject {
     func syncStepsFromHealthKit() async throws
     func fetchTodayStepCount() async throws -> Int?
     func forceFullHealthKitSync() async -> Bool
-    func refreshSmartScaleSamplesIfEnabled() async
+    func refreshSmartScaleSamplesIfEnabled() async -> HealthKitSmartScaleRefreshResult
 }
 
 extension HealthKitSyncManaging {
     func suspendAutomaticImportAfterSignOut() async {}
     func admitsAutomaticImportForCurrentAccount() -> Bool { true }
     func claimAutomaticImportAccount() async {}
-    func refreshSmartScaleSamplesIfEnabled() async {}
+    func refreshSmartScaleSamplesIfEnabled() async -> HealthKitSmartScaleRefreshResult { .inactive }
 }
 
 extension HealthKitManager: HealthKitSyncManaging {}
@@ -81,10 +82,17 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
     static let shared = HealthSyncCoordinator()
 
     private let healthKitManager: HealthKitSyncManaging
+    private let now: () -> Date
     private var hasBootstrappedObservers = false
+    private var refreshID = UUID()
 
-    init(healthKitManager: HealthKitSyncManaging = HealthKitManager.shared) {
+    @Published private(set) var syncStatus = HealthSyncStateReducer()
+    var syncState: HealthSyncState { syncStatus.state }
+    var lastSuccessfulSync: Date? { syncStatus.lastSuccessfulSync }
+
+    init(healthKitManager: HealthKitSyncManaging = HealthKitManager.shared, now: @escaping () -> Date = Date.init) {
         self.healthKitManager = healthKitManager
+        self.now = now
     }
 
     /// Idempotent bootstrap for HealthKit observers and background delivery.
@@ -102,20 +110,29 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
         )
 
         guard syncEnabled else { return }
-        guard healthKitManager.isHealthKitAvailable else { return }
+        guard healthKitManager.isHealthKitAvailable else {
+            syncStatus.reduce(.refreshFailed)
+            return
+        }
         guard healthKitManager.admitsAutomaticImportForCurrentAccount() else { return }
 
         if hasBootstrappedObservers {
             healthKitManager.checkAuthorizationStatus()
             if healthKitManager.isAuthorized {
-                scheduleSmartScaleForegroundRefresh()
+                if syncState != .permissionNeeded { scheduleSmartScaleForegroundRefresh() }
+            } else {
+                recordPermissionLoss()
             }
             return
         }
 
         healthKitManager.checkAuthorizationStatus()
 
-        guard healthKitManager.isAuthorized else { return }
+        guard healthKitManager.isAuthorized else {
+            recordPermissionLoss()
+            return
+        }
+        guard syncState != .permissionNeeded else { return }
 
         hasBootstrappedObservers = true
 
@@ -124,15 +141,41 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
         healthKitManager.observeStepChanges()
 
         Task {
-            try? await healthKitManager.setupBackgroundDelivery()
-            try? await healthKitManager.setupStepCountBackgroundDelivery()
+            guard healthKitManager.isAuthorized, syncState != .permissionNeeded else { return }
+            do {
+                try await healthKitManager.setupBackgroundDelivery()
+                try await healthKitManager.setupStepCountBackgroundDelivery()
+            } catch {
+                let event = failureEvent(for: error)
+                if event == .authorizationDenied || event == .authorizationRevoked { recordPermissionLoss() }
+            }
         }
         scheduleSmartScaleForegroundRefresh()
     }
 
     /// Foreground entry. The manager no-ops while `healthkit_smart_scale_sync_v1` is off.
     private func scheduleSmartScaleForegroundRefresh() {
-        Task { await healthKitManager.refreshSmartScaleSamplesIfEnabled() }
+        let attempt = refreshID
+        Task {
+            guard healthKitManager.isAuthorized, syncState != .permissionNeeded else { return }
+            let result = await healthKitManager.refreshSmartScaleSamplesIfEnabled()
+            guard refreshID == attempt else { return }
+            guard healthKitManager.isAuthorized else {
+                recordPermissionLoss()
+                return
+            }
+            switch result.outcome {
+            case .refreshed:
+                syncStatus.reduce(.refreshStarted)
+                syncStatus.reduce(result.imported == 0 ? .noNewData(at: now()) : .refreshFinished(at: now()))
+            case .denied:
+                recordPermissionLoss()
+            case .unavailable, .failed:
+                syncStatus.reduce(.refreshFailed)
+            case .inactive, .busy:
+                break
+            }
+        }
     }
 
     /// Reset all HealthKit-related state for the current user and clear
@@ -140,6 +183,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
     /// signing out completely.
     func resetForCurrentUser() async {
         hasBootstrappedObservers = false
+        resetSyncState()
         await healthKitManager.resetForCurrentUser()
     }
 
@@ -148,6 +192,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
     /// account cannot inherit this device's HealthKit sync.
     func suspendAutomaticImportAfterSignOut() async {
         hasBootstrappedObservers = false
+        resetSyncState()
         await healthKitManager.suspendAutomaticImportAfterSignOut()
     }
 
@@ -161,12 +206,16 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
         )
 
         await healthKitManager.claimAutomaticImportAccount()
-        guard healthKitManager.isAuthorized else { return }
+        guard healthKitManager.isAuthorized else {
+            recordPermissionLoss()
+            return
+        }
+        syncStatus.reduce(.authorizationGranted)
 
         bootstrapIfNeeded(syncEnabled: true)
 
-        Task.detached(priority: .background) { [healthKitManager] in
-            try? await healthKitManager.syncWeightFromHealthKit()
+        Task(priority: .background) {
+            try? await self.syncWeightFromHealthKit()
         }
     }
 
@@ -181,14 +230,18 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
         )
 
         await healthKitManager.claimAutomaticImportAccount()
-        guard healthKitManager.isAuthorized else { return }
+        guard healthKitManager.isAuthorized else {
+            recordPermissionLoss()
+            return
+        }
+        syncStatus.reduce(.authorizationGranted)
 
         bootstrapIfNeeded(syncEnabled: true)
 
-        Task.detached(priority: .background) { [healthKitManager] in
+        Task(priority: .background) {
             do {
-                try await healthKitManager.syncWeightFromHealthKit()
-                try await healthKitManager.syncStepsFromHealthKit()
+                try await self.syncWeightFromHealthKit()
+                try await self.syncStepsFromHealthKit()
             } catch {
                 // Best-effort initial sync; errors are intentionally swallowed here.
             }
@@ -205,11 +258,15 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
 
         healthKitManager.checkAuthorizationStatus()
 
-        guard healthKitManager.isAuthorized else { return }
+        guard healthKitManager.isAuthorized else {
+            recordPermissionLoss()
+            return
+        }
 
-        let manager = healthKitManager
-        Task.detached {
-            try? await manager.fetchTodayStepCount()
+        Task {
+            try? await self.refresh {
+                try await self.healthKitManager.fetchTodayStepCount() != nil
+            }
         }
     }
 
@@ -223,11 +280,19 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
         )
 
         await healthKitManager.claimAutomaticImportAccount()
+        guard healthKitManager.isAuthorized else {
+            recordPermissionLoss()
+            return
+        }
+        syncStatus.reduce(.authorizationGranted)
         bootstrapIfNeeded(syncEnabled: true)
-        try await healthKitManager.setupBackgroundDelivery()
-        try await healthKitManager.setupStepCountBackgroundDelivery()
-        try await healthKitManager.syncWeightFromHealthKit()
-        _ = try await healthKitManager.fetchTodayStepCount()
+        try await refresh {
+            try await self.healthKitManager.setupBackgroundDelivery()
+            try await self.healthKitManager.setupStepCountBackgroundDelivery()
+            try await self.healthKitManager.syncWeightFromHealthKit()
+            _ = try await self.healthKitManager.fetchTodayStepCount()
+            return true
+        }
     }
 
     /// Run a deferred onboarding weight sync in the background if HealthKit
@@ -243,12 +308,15 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
         )
 
         await healthKitManager.claimAutomaticImportAccount()
-        guard healthKitManager.isAuthorized else { return }
+        guard healthKitManager.isAuthorized else {
+            recordPermissionLoss()
+            return
+        }
 
         bootstrapIfNeeded(syncEnabled: true)
 
         do {
-            try await healthKitManager.syncWeightFromHealthKit()
+            try await syncWeightFromHealthKit()
         } catch {
             // Intentionally swallow errors; user can sync later from settings.
         }
@@ -262,18 +330,23 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
             category: "healthKitCoordinator"
         )
 
-        try await healthKitManager.syncWeightFromHealthKit()
+        try await refresh {
+            try await self.healthKitManager.syncWeightFromHealthKit()
+            return true
+        }
     }
 
-    /// Thin wrapper around the full step history sync. Callers are
-    /// responsible for checking authorization and handling errors.
+    /// Full step history sync. Permission failures remain silent; other errors reach callers.
     func syncStepsFromHealthKit() async throws {
         ErrorTrackingService.shared.addBreadcrumb(
             message: "HealthSyncCoordinator.syncStepsFromHealthKit",
             category: "healthKitCoordinator"
         )
 
-        try await healthKitManager.syncStepsFromHealthKit()
+        try await refresh {
+            try await self.healthKitManager.syncStepsFromHealthKit()
+            return true
+        }
     }
 
     /// Trigger a full historical HealthKit import. This is used by manual
@@ -285,6 +358,74 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
             category: "healthKitCoordinator"
         )
 
-        return await healthKitManager.forceFullHealthKitSync()
+        var succeeded = false
+        try? await refresh {
+            succeeded = await self.healthKitManager.forceFullHealthKitSync()
+            guard succeeded else { throw HealthKitError.syncFailed }
+            return true
+        }
+        return succeeded
+    }
+
+    /// One attempt only. Permission failures are silent and never cause a retry or an access request.
+    private func refresh(_ operation: () async throws -> Bool) async throws {
+        guard healthKitManager.isHealthKitAvailable else {
+            syncStatus.reduce(.refreshFailed)
+            return
+        }
+        guard healthKitManager.isAuthorized else {
+            recordPermissionLoss()
+            return
+        }
+        guard syncState != .permissionNeeded else { return }
+
+        let attempt = UUID()
+        refreshID = attempt
+        syncStatus.reduce(.refreshStarted)
+        do {
+            let hasNewData = try await operation()
+            guard refreshID == attempt else { return }
+            guard healthKitManager.isAuthorized else {
+                recordPermissionLoss()
+                return
+            }
+            syncStatus.reduce(hasNewData ? .refreshFinished(at: now()) : .noNewData(at: now()))
+        } catch {
+            let event = failureEvent(for: error)
+            if refreshID == attempt { syncStatus.reduce(event) }
+            if event == .authorizationDenied || event == .authorizationRevoked { return }
+            throw error
+        }
+    }
+
+    private func failureEvent(for error: Error) -> HealthSyncState.Event {
+        let nsError = error as NSError
+        let permissionError: Bool
+        switch error {
+        case HealthKitError.notAuthorized:
+            permissionError = true
+        default:
+            permissionError = nsError.domain == HKErrorDomain &&
+                (nsError.code == HKError.Code.errorAuthorizationDenied.rawValue ||
+                    nsError.code == HKError.Code.errorAuthorizationNotDetermined.rawValue)
+        }
+        if permissionError || !healthKitManager.isAuthorized {
+            return lastSuccessfulSync == nil ? .authorizationDenied : .authorizationRevoked
+        }
+        if nsError.domain == NSURLErrorDomain,
+           nsError.code == URLError.notConnectedToInternet.rawValue || nsError.code == URLError.networkConnectionLost.rawValue {
+            return .noNetwork
+        }
+        return .refreshFailed
+    }
+
+    private func recordPermissionLoss() {
+        refreshID = UUID()
+        syncStatus.reduce(lastSuccessfulSync == nil ? .authorizationDenied : .authorizationRevoked)
+    }
+
+    private func resetSyncState() {
+        refreshID = UUID()
+        syncStatus = HealthSyncStateReducer()
     }
 }
