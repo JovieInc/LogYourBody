@@ -197,12 +197,13 @@ final class HeroMetricInterpolationCacheTests: XCTestCase {
         let metrics = Self.mixedMetrics()
         // Query newest-first, then oldest-first, so reused EMA checkpoints are
         // exercised in both directions.
-        let orders = [metrics.reversed().map { $0 }, metrics]
+        let orders = [Array(metrics.reversed()), metrics]
         for order in orders {
             for metric in order {
                 let freshWeight = service.makeWeightInterpolationContext(for: metrics)?.trendWeight(for: metric.date)
                 XCTAssertEqual(service.estimateTrendWeight(for: metric.date, metrics: metrics)?.value, freshWeight?.value)
-                XCTAssertEqual(service.estimateTrendWeight(for: metric.date, metrics: metrics)?.isInterpolated, freshWeight?.isInterpolated)
+                let memoized = service.estimateTrendWeight(for: metric.date, metrics: metrics)
+                XCTAssertEqual(memoized?.isInterpolated, freshWeight?.isInterpolated)
                 let freshBodyFat = service.makeBodyFatInterpolationContext(for: metrics)?.estimate(for: metric.date)
                 XCTAssertEqual(service.estimateBodyFat(for: metric.date, metrics: metrics)?.value, freshBodyFat?.value)
             }
@@ -236,7 +237,11 @@ final class HeroMetricInterpolationCacheTests: XCTestCase {
     func testRepeatedTrendQueriesOnLongHistoryReuseTheContext() throws {
         service.resetInterpolationMemo()
         let history = (0..<730).map { day in
-            Self.metric(daysAgo: day * 2, weight: 80 + Double(day % 7) * 0.1, bodyFat: day % 30 == 0 ? 18 : nil)
+            Self.metric(
+                daysAgo: day * 2,
+                weight: 80 + Double(day % 7) * 0.1,
+                bodyFat: day.isMultiple(of: 30) ? 18 : nil
+            )
         }
         _ = service.estimateFFMI(for: history[0].date, metrics: history, heightInches: heightInches)
         let start = Date()
