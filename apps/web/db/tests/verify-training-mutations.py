@@ -494,6 +494,11 @@ def main():
                 str(web / 'db/tests/verify-training-recovery.ts'), json.dumps(client)], canvas_env), flush=True)
             check('recovery actual adapter/engine apply review revert and prescription replay')
 
+            print(run_command(['node', '--conditions=react-server', '--import',
+                str(web / 'node_modules/tsx/dist/loader.mjs'),
+                str(web / 'db/tests/verify-dated-outcomes.ts'), json.dumps(client)], canvas_env), flush=True)
+            check('dated outcome additive migration, actual adapter, exactly-once recompute and account isolation')
+
             print(json.dumps({'passed':len(checks),'checks':checks,'postgresTools':versions,'scope':'disposable PostgreSQL16; actual migrations, observed owner locks, synthetic rows only'}))
         finally:
             run(control + ['-m','immediate','-w','stop'])

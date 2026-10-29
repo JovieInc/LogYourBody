@@ -334,6 +334,9 @@ function stagedDiffHasConflictMarker(root) {
   try {
     fd = openSync(join(directory, 'staged.diff'), 'w+', 0o600);
     // Read staged bytes as text so binary attributes cannot conceal conflict markers.
+    // Ordinary main integrations can exceed Node's 1 MiB output default.
+    // Keep the entire scan, with the same bounded ceiling as guard reads.
+    // Main integration can exceed Node's default 1 MiB diff buffer.
     execFileSync(
       'git',
       ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--text', '--no-color', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
@@ -416,6 +419,7 @@ export function assertLedgerMergeReady(root) {
         cwd: root,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
+        // Check diagnostics can exceed the staged patch when whitespace repeats.
         maxBuffer: 16 * 1024 * 1024,
         env: { ...process.env, LC_ALL: 'C' },
       },

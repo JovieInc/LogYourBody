@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { classifyLedger, runClassifier } from './correction-classifier.mjs';
+import { assertLedgerMergeReady } from '../packages/shared-lib/scripts/correction-coverage.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const script = fileURLToPath(new URL('./correction-classifier.mjs', import.meta.url));
@@ -322,6 +323,52 @@ test('committed ledger is classified and the default CLI run is idempotent', () 
   const result = runCli([], tmpdir());
   assert.equal(result.status, 0, result.stderr);
   assert.equal(readFileSync(path, 'utf8'), before);
+});
+
+test('staged preflight scans complete normal merges above the default buffer and fails closed above its bound', () => {
+  const repository = mkdtempSync(join(tmpdir(), 'lyb-large-staged-preflight-'));
+  const git = (...args) => execFileSync('git', args, {
+    cwd: repository,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_AUTHOR_NAME: 'Fixture',
+      GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
+      GIT_COMMITTER_NAME: 'Fixture',
+      GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
+    },
+  });
+  try {
+    git('init', '-q');
+    const ledger = join(repository, 'packages/shared-lib/corrections.json');
+    mkdirSync(join(repository, 'packages/shared-lib'), { recursive: true });
+    writeFileSync(ledger, '[]\n');
+    writeFileSync(join(repository, 'large-merge.txt'), 'original source\n');
+    git('add', '.');
+    git('commit', '-qm', 'test: retained source');
+    const payload = 'clean staged merge\n'.repeat(130_000);
+    assert.ok(Buffer.byteLength(payload) > 1024 * 1024);
+    writeFileSync(join(repository, 'large-merge.txt'), payload);
+    git('add', 'large-merge.txt');
+    const cleanIndex = git('ls-files', '--stage');
+    assert.doesNotThrow(() => assertLedgerMergeReady(repository));
+    assert.equal(git('ls-files', '--stage'), cleanIndex);
+    writeFileSync(join(repository, 'large-merge.txt'), `${payload}<<<<<<< HEAD\n`);
+    git('add', 'large-merge.txt');
+    const markedIndex = git('ls-files', '--stage');
+    assert.throws(() => assertLedgerMergeReady(repository), /resolve staged conflict markers first/);
+    assert.equal(git('ls-files', '--stage'), markedIndex);
+    writeFileSync(join(repository, 'large-merge.txt'), 'x'.repeat(17 * 1024 * 1024));
+    git('add', 'large-merge.txt');
+    const oversizedIndex = git('ls-files', '--stage');
+    assert.throws(() => assertLedgerMergeReady(repository), (error) => error.code === 'ENOBUFS');
+    assert.equal(git('ls-files', '--stage'), oversizedIndex);
+    assert.equal(readFileSync(ledger, 'utf8'), '[]\n');
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
 });
 
 test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {

@@ -536,6 +536,10 @@
 		E26220261025000100000001 /* MeasurementValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000002 /* MeasurementValue.swift */; };
 		E26220261025000100000003 /* MeasurementValueConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000004 /* MeasurementValueConstants.swift */; };
 		E26220261025000100000005 /* MeasurementValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000006 /* MeasurementValueTests.swift */; };
+		26820261025000000000002 /* DatedOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26820261025000000000001 /* DatedOutcome.swift */; };
+		26820261025000000000004 /* DatedOutcomeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26820261025000000000003 /* DatedOutcomeStore.swift */; };
+		26820261025000000000006 /* ProductAPIClient+DatedOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26820261025000000000005 /* ProductAPIClient+DatedOutcome.swift */; };
+		26820261025000000000008 /* DatedOutcomeStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26820261025000000000007 /* DatedOutcomeStoreTests.swift */; };
 		F1B241000000000000000002 /* HealthSyncState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B241000000000000000001 /* HealthSyncState.swift */; };
 		F1B241000000000000000004 /* HealthSyncStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B241000000000000000003 /* HealthSyncStateTests.swift */; };
 /* End PBXBuildFile section */
@@ -1187,6 +1191,12 @@
 		E26220261025000100000002 /* MeasurementValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValue.swift; sourceTree = "<group>"; };
 		E26220261025000100000004 /* MeasurementValueConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValueConstants.swift; sourceTree = "<group>"; };
 		E26220261025000100000006 /* MeasurementValueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValueTests.swift; sourceTree = "<group>"; };
+		26820261025000000000001 /* DatedOutcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcome.swift; sourceTree = "<group>"; };
+		26820261025000000000003 /* DatedOutcomeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStore.swift; sourceTree = "<group>"; };
+		26820261025000000000005 /* ProductAPIClient+DatedOutcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProductAPIClient+DatedOutcome.swift"; sourceTree = "<group>"; };
+		26820261025000000000007 /* DatedOutcomeStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStoreTests.swift; sourceTree = "<group>"; };
+		26820261025000000000009 /* LogYourBodyV6.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV6.xcdatamodel; sourceTree = "<group>"; };
+		2682026102500000000000A /* LogYourBodyV6.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV6.xcdatamodel; sourceTree = "<group>"; };
 		F1B241000000000000000001 /* HealthSyncState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSyncState.swift; sourceTree = "<group>"; };
 		F1B241000000000000000003 /* HealthSyncStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSyncStateTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -1593,6 +1603,7 @@
 				AD050C422EBFFEE50082A313 /* DashboardDisplayMode.swift */,
 				ADDC48642E2D8A33003C97E7 /* LogYourBody.xcdatamodeld */,
 				AD85525F2E19DC44003552EE /* Changelog.swift */,
+				26820261025000000000001 /* DatedOutcome.swift */,
 				AD723AD52E15FA5C002376C6 /* BodyMetrics.swift */,
 				A26100000000000000000004 /* SignalFreshness.swift */,
 				ADFC6A2C2E188FD5004FCE40 /* HKRawSample.swift */,
@@ -1637,6 +1648,7 @@
 				D0C0DE000000000000000002 /* VoiceCaptureService.swift */,
 				E4172D019C9F4A30A881C001 /* TrainingService.swift */,
 				E11020261025000100000001 /* TrainingProgress.swift */,
+				26820261025000000000003 /* DatedOutcomeStore.swift */,
 				A24720261025000100000001 /* WorkoutAttendancePolicy.swift */,
 				F00720261007000100000001 /* TrainingDraftStore.swift */,
 				A248B1000000000000000001 /* GymRegistry.swift */,
@@ -1681,6 +1693,7 @@
 				AD8552932E1CC15B003552EE /* BackgroundRemovalService.swift */,
 				ADF5C1B32E1CDB9C00E3FB4D /* PhotoMetadataService.swift */,
 				75034CADEA1D4697BDCB5555 /* ImageCacheService.swift */,
+				26820261025000000000005 /* ProductAPIClient+DatedOutcome.swift */,
 				ADFC6A232E187717004FCE40 /* ProductAPIClient.swift */,
 				AD85527E2E1C3653003552EE /* PhotoUploadManager.swift */,
 				AD723AE42E15FA5C002376C6 /* AuthManager.swift */,
@@ -1904,6 +1917,7 @@
 				153A00000000000000000003 /* TrainingNumericScrubTests.swift */,
 				F00720261007000100000005 /* TrainingSessionDraftTests.swift */,
 				E11020261025000100000005 /* TrainingProgressTests.swift */,
+				26820261025000000000007 /* DatedOutcomeStoreTests.swift */,
 				A24720261025000100000003 /* WorkoutAttendancePolicyTests.swift */,
 				E41302026025000000000003 /* DelegatedTrainingTests.swift */,
 				FE06A6A600000000000000F6 /* Glp1CardAndCatalogTests.swift */,
@@ -2386,6 +2400,7 @@
 				F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */,
 				E24920261025000400000002 /* WorkoutReconciliationPromptTests.swift in Sources */,
 				E11020261025000100000006 /* TrainingProgressTests.swift in Sources */,
+				26820261025000000000008 /* DatedOutcomeStoreTests.swift in Sources */,
 				A24720261025000100000004 /* WorkoutAttendancePolicyTests.swift in Sources */,
 				E41302026025000000000004 /* DelegatedTrainingTests.swift in Sources */,
 				FE06A6A600000000000000B6 /* Glp1CardAndCatalogTests.swift in Sources */,
@@ -2584,6 +2599,7 @@
 				FE05A5A500000000000000B5 /* Glp1DoseCardData.swift in Sources */,
 				ADDC47A32E2D89F3003C97E7 /* SettingsComponents.swift in Sources */,
 				ADDC47A72E2D89F3003C97E7 /* Changelog.swift in Sources */,
+				26820261025000000000002 /* DatedOutcome.swift in Sources */,
 				ADDC47A82E2D89F3003C97E7 /* BodyMetrics.swift in Sources */,
 				A26100000000000000000003 /* SignalFreshness.swift in Sources */,
 				ADFC6A2D2E188FD5004FCE40 /* HKRawSample.swift in Sources */,
@@ -2606,6 +2622,7 @@
 				D0C0DE000000000000000001 /* VoiceCaptureService.swift in Sources */,
 				E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */,
 				E11020261025000100000002 /* TrainingProgress.swift in Sources */,
+				26820261025000000000004 /* DatedOutcomeStore.swift in Sources */,
 				A24720261025000100000002 /* WorkoutAttendancePolicy.swift in Sources */,
 				F00720261007000100000002 /* TrainingDraftStore.swift in Sources */,
 				A248B1000000000000000002 /* GymRegistry.swift in Sources */,
@@ -2668,6 +2685,7 @@
 				ADDC47BD2E2D89F3003C97E7 /* BackgroundRemovalService.swift in Sources */,
 				ADDC47BE2E2D89F3003C97E7 /* PhotoMetadataService.swift in Sources */,
 				9B5611E2F8314E22A5BF7889 /* ImageCacheService.swift in Sources */,
+				26820261025000000000006 /* ProductAPIClient+DatedOutcome.swift in Sources */,
 				ADDC47BF2E2D89F3003C97E7 /* ProductAPIClient.swift in Sources */,
 				ADDC47C02E2D89F3003C97E7 /* PhotoUploadManager.swift in Sources */,
 				ADDC47C12E2D89F3003C97E7 /* AuthManager.swift in Sources */,
@@ -3401,8 +3419,9 @@
 				F7A2B3C4D5E6F70809101114 /* LogYourBodyV3.xcdatamodel */,
 				F7A2B3C4D5E6F70809101116 /* LogYourBodyV4.xcdatamodel */,
 				E24920261025000500000001 /* LogYourBodyV5.xcdatamodel */,
+				26820261025000000000009 /* LogYourBodyV6.xcdatamodel */,
 			);
-			currentVersion = E24920261025000500000001 /* LogYourBodyV5.xcdatamodel */;
+			currentVersion = 26820261025000000000009 /* LogYourBodyV6.xcdatamodel */;
 			path = LogYourBody.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;
@@ -3415,8 +3434,9 @@
 				F7A2B3C4D5E6F70809101115 /* LogYourBodyV3.xcdatamodel */,
 				F7A2B3C4D5E6F70809101117 /* LogYourBodyV4.xcdatamodel */,
 				E24920261025000500000002 /* LogYourBodyV5.xcdatamodel */,
+				2682026102500000000000A /* LogYourBodyV6.xcdatamodel */,
 			);
-			currentVersion = E24920261025000500000002 /* LogYourBodyV5.xcdatamodel */;
+			currentVersion = 2682026102500000000000A /* LogYourBodyV6.xcdatamodel */;
 			path = LogYourBody.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;
