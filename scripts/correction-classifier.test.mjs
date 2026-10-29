@@ -241,6 +241,12 @@ test('pre-commit classifies a staged correction ledger', () => {
     hook,
     /if git rev-parse -q --verify MERGE_HEAD >\/dev\/null; then\s+node scripts\/correction-classifier\.mjs --check-merge \. \|\| exit \$\?/,
   );
+  const repair = hook.indexOf('python3 scripts/resolve-repository-docs.py --staged');
+  const check = hook.indexOf('node scripts/correction-classifier.mjs --check-merge .');
+  assert.ok(
+    repair > 0 && check > repair,
+    'rebuild a conflicted source map before the merge ledger check',
+  );
 });
 
 test('CLI merges parent ledgers without losing receipts or accepting conflicting evidence', (t) => {
