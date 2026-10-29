@@ -14,7 +14,7 @@ require 'tmpdir'
 
 ROOT = File.expand_path('../..', __dir__)
 RELEASE_FILE = File.expand_path('apps/ios/fastlane/Fastfile.release', ROOT)
-PROJECT_DIR = File.expand_path('../LogYourBody.xcodeproj', RELEASE_FILE)
+PROJECT_DIR = File.expand_path('../LogYourBody.xcodeproj', File.dirname(RELEASE_FILE))
 FAILURES = []
 
 def fail_unless(condition, message)
