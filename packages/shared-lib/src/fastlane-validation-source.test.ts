@@ -277,6 +277,13 @@ print(json.dumps({'accepted': 1, 'rejected': len(failures)}))
     const result = JSON.parse(execFileSync('ruby', [script], { encoding: 'utf8' }));
     expect(result.cases).toBe(2);
   });
+  it('resolves the rest-timer exclusion project path absolutely from the release Fastfile', () => {
+    const script = fileURLToPath(
+      new URL('../../../scripts/ios/test_rest_timer_exclusion_path.rb', import.meta.url),
+    );
+    const result = JSON.parse(execFileSync('ruby', [script], { encoding: 'utf8' }));
+    expect(result.failures).toEqual([]);
+  });
   it.each(['ci_ios', 'build_check'])(
     '%s compiles without changing tracked metadata or docs',
     (lane) => {
