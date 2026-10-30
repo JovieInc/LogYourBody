@@ -4871,5 +4871,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "rolling-training-retains-set-identities-and-reviewed-dose-context",
+    "correction": "LYB-174 October 14 clarification: timestamped AM/PM opportunities must consume reviewed recovery decisions and actual completed direct/overlapping work; partial sessions must not create duplicate sets, catch-up debt, extra visits or invented exact-hour recovery physiology.",
+    "source": "https://linear.app/jovie/issue/LYB-174",
+    "mechanization": "Extend the existing LYB-165 optimizer/certifier with finite identity-preserving rolling allocations, explicit uncertainty and tradeoffs, and the existing duration/recovery policies. The authenticated endpoint rebuilds owned engine work and recovery evidence at propose and accept. Existing required web Jest tests cover timestamp and DST arithmetic, partial/continued/new visits, reductions/revert, split interference, attendance patterns, constraints, no writes and tampered/stale receipts. This guards proposal behavior; canonical execution binding, persisted slots and native TestFlight acceptance remain incomplete.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The canonical optimizer can prevent duplicated approved identities and fabricated scheduling authority by construction. Reuse its certification and source hashing rather than adding a second progression engine or allowing conversational numeric prescriptions."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/rolling-schedule.test.ts",
+      "anchor": "describe('rolling schedule certification (LYB-174)'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

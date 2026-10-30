@@ -23,6 +23,14 @@ export type RollingSessionId = (typeof ROLLING_SESSION_IDS)[number];
 const HOUR_MS = 60 * 60 * 1000;
 const REQUESTED_EXPOSURES = [2, 3, 4, 5, 6] as const;
 
+/** A deferred template stays pending even when another eligible template goes
+ * first. Both the selector and optimizer use the same completion cursor. */
+export function rollingSessionOrder<T extends string>(ids: readonly T[], last?: string): T[] {
+  const index = last === undefined ? -1 : ids.indexOf(last as T);
+  const start = (index + 1) % ids.length;
+  return [...ids.slice(start), ...ids.slice(0, start)];
+}
+
 export type RollingSessionTemplate = {
   id: RollingSessionId;
   muscles: readonly MuscleGroup[];
@@ -179,9 +187,11 @@ export function nextEligibleSession(
   const rows = completions(program, history, nowMs);
   const last = rows[rows.length - 1];
   const sessions = program.sessions;
-  const start = last
-    ? (sessions.findIndex((session) => session.id === last.sessionId) + 1) % sessions.length
-    : 0;
+  const nextId = rollingSessionOrder(
+    sessions.map((session) => session.id),
+    last?.sessionId,
+  )[0];
+  const start = sessions.findIndex((session) => session.id === nextId);
   let index = start;
   let reason: RollingSelectionReason = last ? 'next_after_last_completion' : 'first_exposure';
   const recoveryMs = program.muscleRecoveryHours * HOUR_MS;

@@ -52,6 +52,8 @@ export const trainingRevisionHandlers = createTrainingRevisionHandlers({
 });
 
 export const trainingOptimizerHandlers = createTrainingOptimizerHandlers({
+  records: neonNativeProductRecords,
+  recoveryEnabled: adaptiveRecoveryEnabled,
   authenticate,
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
   coachEnabled: () => process.env.LYB_HYPERTROPHY_COACH_API_ENABLED === 'true',
