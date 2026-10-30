@@ -1,6 +1,9 @@
 /** @jest-environment node */
 import { NextRequest } from 'next/server';
 import { createTrainingOptimizerHandlers } from '../optimizer-route-handlers';
+import { MemoryTrainingRecords } from '@/lib/training/memory-records.testing';
+import { getOrCreateNextWorkout, storeProgramSetup } from '@/lib/training/service';
+import { logTrainingSet } from '@/lib/training/commands';
 
 const body = {
   sessions: [
@@ -38,6 +41,138 @@ function handlers(overrides: { coach?: boolean; optimizer?: boolean } = {}) {
 }
 
 describe('mesocycle optimizer HTTP boundary', () => {
+  async function rollingHarness() {
+    const records = new MemoryTrainingRecords();
+    await storeProgramSetup({
+      records,
+      subject: 'owner',
+      now: new Date('2026-10-20T08:00:00Z'),
+      createId: () => '11111111-1111-4111-8111-111111111111',
+      setup: {
+        adultConfirmed: true,
+        safetyConfirmed: true,
+        sessionsPerWeek: 2,
+        equipment: 'dumbbells',
+      },
+    });
+    const open = createTrainingOptimizerHandlers({
+      authenticate: async () => ({ sub: 'owner' }) as never,
+      reserveRequest: async () =>
+        ({ allowed: true, remainingInWindow: 9, remainingToday: 99 }) as const,
+      coachEnabled: () => true,
+      optimizerEnabled: () => true,
+      records,
+    });
+    const source = {
+      ...body,
+      rollingSchedule: {
+        programSetupId: 'claimed-setup',
+        blockId: 'claimed-block',
+        rotationId: 'claimed-rotation',
+        asOf: '2026-10-26T08:00:00Z',
+        attendanceSince: '2020-01-01T00:00:00Z',
+        requestedVisitsPerWeek: 6,
+        slots: [
+          {
+            id: 'offered',
+            scheduledAt: '2026-10-26T20:00:00Z',
+            timeZone: 'UTC',
+            locationId: 'gym',
+            groupId: 'offered',
+            visitId: 'offered',
+            kind: 'visit',
+            availableEquipment: ['dumbbells', 'bench'],
+            priorityTargets: [],
+          },
+        ],
+        history: [],
+        observations: [],
+        trials: [],
+        timing: { warmUpSeconds: 300, setSeconds: 60, restSeconds: 120, transitionSeconds: 60 },
+      },
+    };
+    return { records, open, source };
+  }
+
+  it('rebuilds rolling proposals from owned approved work, detects new logs at acceptance, and never writes a plan', async () => {
+    const { records, open, source } = await rollingHarness();
+    const workout = await getOrCreateNextWorkout({
+      records,
+      subject: 'owner',
+      now: new Date('2026-10-25T08:00:00Z'),
+    });
+    if (workout.kind !== 'workout') throw new Error('Expected workout');
+    const before = await records.listAll('owner');
+    const createdResponse = await open.POST(request('POST', source));
+    expect(createdResponse.status).toBe(200);
+    const created = await createdResponse.json();
+    expect(created.proposal.rollingSchedule.allocations[0].work.length).toBeGreaterThan(2);
+    expect(
+      created.proposal.rollingSchedule.allocations[0].work.map(
+        (set: { exerciseId: string }) => set.exerciseId,
+      ),
+    ).toContain('dumbbell_lateral_raise');
+    const decide = () =>
+      open.PATCH(
+        request('PATCH', {
+          source,
+          proposal: created.proposal,
+          decision: 'apply',
+          currentFingerprint: created.proposal.baseFingerprint,
+        }),
+      );
+    const accepted = await decide();
+    expect(accepted.status).toBe(200);
+    expect(await accepted.json()).toMatchObject({
+      persisted: false,
+      rollingSchedule: expect.any(Object),
+      receipt: { writesPerformed: false, enrollment: false },
+    });
+    expect(await records.listAll('owner')).toEqual(before);
+    expect(
+      await logTrainingSet({
+        records,
+        subject: 'owner',
+        now: new Date('2026-10-25T09:00:00Z'),
+        set: {
+          sessionId: workout.session.id,
+          exerciseId: workout.session.exercises[0]!.id,
+          setNumber: 1,
+          reps: 10,
+          loadKg: 10,
+          rir: 3,
+        },
+      }),
+    ).toMatchObject({ kind: 'logged' });
+    const stale = await decide();
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ error: 'not_certified' });
+    const refreshed = await (await open.POST(request('POST', source))).json();
+    expect(refreshed.proposal.rollingSchedule.completedSetIds).toHaveLength(1);
+    expect(refreshed.proposal.rollingSchedule.trailingVolume.days7.quads).toBe(1);
+  });
+
+  it("fails closed if owned evidence is unavailable and keeps another owner's work out of the receipt", async () => {
+    const { records, open, source } = await rollingHarness();
+    const closed = handlers({ optimizer: true });
+    expect((await closed.POST(request('POST', source))).status).toBe(503);
+    const before = await (await open.POST(request('POST', source))).json();
+    await records.push('other-owner', 'logged_sets', [
+      {
+        id: 'foreign',
+        record_type: 'set_log',
+        sessionId: 'foreign-session',
+        exerciseId: 'goblet_squat',
+        setNumber: 1,
+        reps: 10,
+        loadKg: 10,
+        rir: 2,
+        completedAt: '2026-10-25T09:00:00Z',
+      },
+    ]);
+    const after = await (await open.POST(request('POST', source))).json();
+    expect(after).toEqual(before);
+  });
   it('rejects malformed nested proposals instead of trusting their claimed certification', async () => {
     const open = handlers({ optimizer: true });
     const created = await (await open.POST(request('POST', body))).json();

@@ -56,14 +56,15 @@ function fixture(run) {
   }
 }
 
-function conflict({ git, write }, path) {
+function conflict({ git, write }, paths) {
+  const files = [paths].flat();
   git('switch', '-c', 'incoming');
-  write(path, 'incoming\n');
-  git('add', path);
+  for (const path of files) write(path, 'incoming\n');
+  git('add', '--', ...files);
   git('commit', '-m', 'incoming');
   git('switch', 'base');
-  write(path, 'branch\n');
-  git('add', path);
+  for (const path of files) write(path, 'branch\n');
+  git('add', '--', ...files);
   git('commit', '-m', 'branch');
   assert.throws(() => git('merge', '--no-commit', 'incoming'));
 }
@@ -112,6 +113,28 @@ test('merge repair refuses unresolved sources before writing any output', () =>
     assert.equal(readFileSync(join(f.root, output), 'utf8'), before);
     assert.equal(f.git('ls-files', '--stage'), index);
     assert.equal(f.git('diff', '--name-only', '--diff-filter=U').trim(), 'unresolved.txt');
+  }));
+
+test('merge repair resolves generated outputs before an independent correction ledger conflict', () =>
+  fixture((f) => {
+    const ledger = 'packages/shared-lib/corrections.json';
+    conflict(f, [output, ledger]);
+    const originalLedger = readFileSync(join(f.root, ledger), 'utf8');
+    const ledgerStages = f.git('ls-files', '--stage', '--', ledger);
+    const expectedOutput = f.git('show', `incoming~1:${output}`);
+    const result = f.generate('--resolve-merge');
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(f.git('diff', '--name-only', '--diff-filter=U').trim(), ledger);
+    assert.equal(f.git('show', `:${output}`), expectedOutput);
+    assert.equal(f.git('ls-files', '--stage', '--', ledger), ledgerStages);
+    assert.equal(readFileSync(join(f.root, ledger), 'utf8'), originalLedger);
+    const index = f.git('ls-files', '--stage');
+    assert.equal(f.generate('--resolve-merge').status, 0);
+    assert.equal(f.git('ls-files', '--stage'), index, 'retry must leave the ledger unresolved');
+    assert.equal(readFileSync(join(f.root, ledger), 'utf8'), originalLedger);
+    f.write(ledger, '[]\n');
+    f.git('add', ledger);
+    assert.equal(f.generate('--check').status, 0);
   }));
 
 test('merge repair requires an active merge and rejects check mode', () =>

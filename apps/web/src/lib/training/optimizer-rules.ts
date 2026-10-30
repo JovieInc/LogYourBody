@@ -6,7 +6,7 @@ import type { MuscleGroup, MuscleTarget } from './types';
  * Confidence is qualitative. Nothing here is a measured individual fatigue score,
  * a universal minimum set count, or a heart-rate readiness model.
  */
-export const OPTIMIZER_EVIDENCE_VERSION = 'mesocycle-optimizer-rules-v2';
+export const OPTIMIZER_EVIDENCE_VERSION = 'mesocycle-optimizer-rules-v3';
 
 export type GripRole = 'none' | 'support' | 'direct' | 'unknown';
 export type ConstraintTier = 'safety' | 'bounds' | 'preference';
@@ -48,6 +48,14 @@ export const OPTIMIZER_RULES: OptimizerRuleSet = {
   ignoreHeartRate: true,
   calvesSameDayException: false,
   rules: [
+    {
+      id: 'rolling_schedule_v1',
+      tier: 'bounds',
+      confidence: 'low',
+      evidenceIds: RECOVERY_EVIDENCE,
+      summary:
+        'Allocate existing work into offered timestamped opportunities. Completed identities, applied reductions and split interference constrain the proposal; readiness remains conditional and unavailable work is an explicit tradeoff.',
+    },
     {
       id: 'priority_sequence_v1',
       tier: 'preference',

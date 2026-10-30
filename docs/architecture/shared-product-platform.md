@@ -55,6 +55,9 @@ During a merge, resolve and stage source conflicts first, retaining independent
 registry additions from both parents. Then run
 `pnpm --filter @jovieinc/product-registry generate:resolve-merge`. The generator
 refuses unresolved source paths, regenerates and stages only its conflicted
-outputs, and preserves other staged and unstaged edits. Retrying after resolution
+outputs, and preserves other staged and unstaged edits. An independent conflict
+in `packages/shared-lib/corrections.json` remains untouched, so resolve projections
+first, then run `node scripts/correction-classifier.mjs --resolve-merge . --stage`
+to validate guards and retain both parents' receipts. Retrying after resolution
 does not write or stage anything. Run `pnpm product:check` afterward to verify all
 generated consumers against the merged registry.

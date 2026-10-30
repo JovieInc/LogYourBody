@@ -32,9 +32,12 @@ if (resolveMerge) {
     ),
   );
   const conflicts = git('diff', '--name-only', '--diff-filter=U', '-z').split('\0').filter(Boolean);
-  const sources = conflicts.filter((path) => !generated.has(path));
+  // Resolve projections before the independent ledger, whose resolver validates their guards.
+  const sources = conflicts.filter(
+    (path) => !generated.has(path) && path !== 'packages/shared-lib/corrections.json',
+  );
   if (sources.length) throw new Error(`resolve source conflicts first: ${sources.join(', ')}`);
-  conflictedOutputs = conflicts;
+  conflictedOutputs = conflicts.filter((path) => generated.has(path));
 }
 
 const swiftString = (value) => `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;

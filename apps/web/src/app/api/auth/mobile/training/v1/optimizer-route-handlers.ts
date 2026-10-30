@@ -6,12 +6,16 @@ import {
   proposeMesocycleOptimization,
 } from '@/lib/training/optimizer-review';
 import type { OptimizationProposal } from '@/lib/training/optimizer';
+import type { NativeProductRecordsPort } from '@/lib/ports/native-product-records';
+import { ownedRollingScheduleSource } from '@/lib/training/rolling-schedule-source';
 
 type Dependencies = {
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   reserveRequest: (subject: string) => Promise<ChatRateLimitResult>;
   coachEnabled: () => boolean;
   optimizerEnabled: () => boolean;
+  records?: NativeProductRecordsPort;
+  recoveryEnabled?: () => boolean;
 };
 
 function json(value: unknown, status = 200) {
@@ -27,6 +31,16 @@ function json(value: unknown, status = 200) {
  * a program and does not write over the user's plan.
  */
 export function createTrainingOptimizerHandlers(deps: Dependencies) {
+  async function sourceForOwner(source: unknown, subject: string) {
+    if (!source || typeof source !== 'object' || !('rollingSchedule' in source)) return source;
+    if (!deps.records) throw new Error('training_records_unavailable');
+    return ownedRollingScheduleSource({
+      source,
+      records: deps.records,
+      subject,
+      recoveryEnabled: deps.recoveryEnabled?.() === true,
+    });
+  }
   async function authorized(request: NextRequest) {
     const owner = await deps.authenticate(request);
     if (!owner) return { response: json({ error: 'unauthorized' }, 401) };
@@ -56,7 +70,13 @@ export function createTrainingOptimizerHandlers(deps: Dependencies) {
       const gate = await authorized(request);
       if (gate.response) return gate.response;
       const body = await request.json().catch(() => null);
-      const result = proposeMesocycleOptimization(body, true);
+      let source: unknown;
+      try {
+        source = await sourceForOwner(body, gate.owner!.sub);
+      } catch {
+        return json({ error: 'training_unavailable' }, 503);
+      }
+      const result = proposeMesocycleOptimization(source, true);
       if (result.kind === 'proposal') return json({ proposal: result.proposal, persisted: false });
       if (result.kind === 'not_certified') {
         return json({ error: 'not_certified', violations: result.violations }, 409);
@@ -80,15 +100,26 @@ export function createTrainingOptimizerHandlers(deps: Dependencies) {
       ) {
         return json({ error: 'invalid_request' }, 400);
       }
+      let source: unknown;
+      try {
+        source = await sourceForOwner(body.source, gate.owner!.sub);
+      } catch {
+        return json({ error: 'training_unavailable' }, 503);
+      }
       const result = decideMesocycleOptimization({
-        source: body.source,
+        source,
         proposal: body.proposal,
         decision: body.decision,
         currentFingerprint: body.currentFingerprint,
         enabled: true,
       });
       if (result.kind === 'accepted') {
-        return json({ receipt: result.receipt, changes: result.changes, persisted: false });
+        return json({
+          receipt: result.receipt,
+          changes: result.changes,
+          ...(result.rollingSchedule ? { rollingSchedule: result.rollingSchedule } : {}),
+          persisted: false,
+        });
       }
       if (result.kind === 'rejected') return json({ receipt: result.receipt, persisted: false });
       if (result.kind === 'not_certified') {

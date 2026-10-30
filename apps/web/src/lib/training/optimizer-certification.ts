@@ -181,8 +181,11 @@ export function certifyOptimization(
     'rationale',
     'findings',
     'resolvedLocation',
+    'rollingSchedule',
   ] as const) {
-    if (trainingRequestHash(proposal[field] ?? null) !== trainingRequestHash(expected[field])) {
+    if (
+      trainingRequestHash(proposal[field] ?? null) !== trainingRequestHash(expected[field] ?? null)
+    ) {
       violations.push(`${field}_mismatch`);
     }
   }
