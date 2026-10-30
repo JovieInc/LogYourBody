@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { neonTrainingRevisions } from '@/lib/neon/training-revisions-adapter';
 import { delegatedProgrammingEnabled } from '@/lib/flags/delegated-programming';
 import { delegatedMetricsEnabled } from '@/lib/flags/delegated-metrics';
+import { healthVaultEnabled } from '@/lib/flags/health-vault';
+import { healthVaultService } from '../health-vault/dependencies';
 import { neonWeightLifecycle } from '@/lib/neon/weight-lifecycle-adapter';
 import { oauthIssuer } from '@/lib/auth/jovie-oauth';
 import { endpoints } from '@/lib/generated/endpoints.generated';
@@ -25,6 +27,8 @@ export const mcpHandlers = createMcpRouteHandlers({
   revisions: neonTrainingRevisions,
   delegatedEnabled: delegatedProgrammingEnabled,
   metricsEnabled: () => delegatedMetricsEnabled(),
+  vaultEnabled: () => healthVaultEnabled(),
+  vault: healthVaultService,
   weight: neonWeightLifecycle,
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
   now: () => new Date(),

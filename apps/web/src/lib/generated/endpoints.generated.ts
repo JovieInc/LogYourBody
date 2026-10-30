@@ -66,6 +66,8 @@ export const endpoints = {
     'progress_photos_old',
     'weight_logs_old',
     'email_subscriptions_old',
+    'health_vault_grants',
+    'health_vault_consent_log',
   ],
   buckets: ['photos'],
   vendor: {
@@ -220,6 +222,11 @@ export const endpoints = {
       value: 'https://chatgpt.com',
       reason:
         'ChatGPT OAuth redirect for the LogYourBody MCP connector (docs/integrations/chatgpt-app).',
+    },
+    {
+      value: 'https://web-sandbox.oaiusercontent.com',
+      reason:
+        'OpenAI Apps SDK widget sandbox origin for the LYB-330 health vault view. Measurements are fetched from LogYourBody, not from this host.',
     },
     {
       value: 'https://apps.apple.com',

@@ -42,6 +42,13 @@ iPhone app.
 **Icon:** `apps/web/public/brand/logyourbody-app-icon.png`
 **Countries:** United States first (matches the US compliance corpus); expand after review.
 
+## Health vault listing hold (LYB-330)
+
+Do not add vault, scan, photo, or weigh-in language to the listing above. The vault gate
+ships off. Wording is blocked on legal review. The data-use table below describes this
+training listing only. Republish only after the payload audit named in the ChatGPT app README
+passes and legal approves the wording.
+
 ## MCP connectivity
 
 - Server URL: `https://www.logyourbody.com/api/mcp`

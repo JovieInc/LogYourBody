@@ -151,6 +151,8 @@ export const neonUserDirectory: UserDirectoryPort = {
       database`delete from public.metrics_agent_grants where user_subject = ${subject}`,
       database`delete from public.body_metrics where user_subject = ${subject}`,
       database`delete from public.native_records where user_subject = ${subject}`,
+      database`delete from public.health_vault_grants where user_subject = ${subject}`,
+      database`delete from public.health_vault_consent_log where user_subject = ${subject}`,
       database`select public.lyb_delete_my_gyms(${subject})`,
       database`delete from public.app_users
         where identity_provider = 'jovie' and identity_subject = ${subject}`,

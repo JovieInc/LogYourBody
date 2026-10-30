@@ -13,6 +13,8 @@ export const LYB_MCP_SCOPES = {
   /** Enforced here. Not registered at the Jovie issuer until JOV-7796 is extended. */
   metricsRead: 'lyb:metrics.read',
   metricsWrite: 'lyb:metrics.write',
+  /** Enforced here. Advertised only while the health vault gate is open. */
+  vaultRead: 'lyb:vault.read',
 } as const;
 export type LybMcpScope = (typeof LYB_MCP_SCOPES)[keyof typeof LYB_MCP_SCOPES];
 
@@ -33,9 +35,11 @@ export function protectedResourceMetadata(input: {
   resourceUrl: string;
   issuer: string;
   metrics?: boolean;
+  vault?: boolean;
 }) {
   const scopes: string[] = [LYB_MCP_SCOPES.trainingRead, LYB_MCP_SCOPES.trainingWrite];
   if (input.metrics) scopes.push(LYB_MCP_SCOPES.metricsRead, LYB_MCP_SCOPES.metricsWrite);
+  if (input.vault) scopes.push(LYB_MCP_SCOPES.vaultRead);
   return {
     resource: input.resourceUrl,
     authorization_servers: [input.issuer],
