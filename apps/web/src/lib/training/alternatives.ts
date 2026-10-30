@@ -15,11 +15,16 @@ export type AlternativeReport = {
   excludedConcerns?: readonly string[];
   /** A request alone is not evidence of tolerance and never changes eligibility. */
   beltRequested?: boolean;
+  /** First-use options are proposals to try, never evidence of individual tolerance. */
+  allowTrials?: boolean;
+  gymId?: string;
 };
 
 export const ALTERNATIVE_REASONS = [
   'supported_exercise_previously_tolerated',
   'supported_setup_previously_tolerated',
+  'supported_exercise_trial',
+  'supported_setup_trial',
 ] as const;
 
 export type AlternativeOption = {
@@ -28,7 +33,7 @@ export type AlternativeOption = {
 };
 
 export type AlternativeSuggestions = {
-  status: 'suggested' | 'not_enough_evidence' | 'no_eligible_alternative';
+  status: 'suggested' | 'not_enough_evidence' | 'no_eligible_alternative' | 'symptom_safety';
   differentExercise: AlternativeOption | null;
   sameExerciseSetup: AlternativeOption | null;
 };
@@ -55,10 +60,49 @@ function repeatedResponse(
         !item.interpretations?.some(
           (claim) => claim.timeframe === 'historical' || claim.conflictsWithObservationIds?.length,
         ) &&
-        (item.jointPain ?? 0) === 0 &&
+        item.jointPain === 0 &&
         !item.symptomFlags?.length &&
         response(item),
     )
+  );
+}
+
+/** Explicit observations in independent sessions, not a safety certification. */
+export function hasRepeatedVariantResponse(
+  feedback: TrainingFeedback[],
+  exerciseId: string,
+  gymId?: string,
+): boolean {
+  const latest = latestFeedbackPerSession(
+    feedback.filter((item) => item.context?.exerciseId === exerciseId),
+  )[0];
+  if (latest && adverseVariantResponse(latest)) return false;
+  return repeatedResponse(
+    effectiveTrainingFeedback(feedback).filter((item) => !gymId || item.context?.gymId === gymId),
+    exerciseId,
+    (item) =>
+      item.trunkFatigue === 0 &&
+      item.supportingReadiness?.trunk !== 'limited' &&
+      item.stability === 'stable' &&
+      item.targetMuscleQuality === 'good' &&
+      item.context?.romRestriction === 'none' &&
+      item.performance !== 'down',
+  );
+}
+
+export function hasSelectionSymptoms(item: TrainingFeedback): boolean {
+  return (item.jointPain !== undefined && item.jointPain > 0) || Boolean(item.symptomFlags?.length);
+}
+
+function adverseVariantResponse(item: TrainingFeedback): boolean {
+  return (
+    hasSelectionSymptoms(item) ||
+    (item.trunkFatigue !== undefined && item.trunkFatigue > 0) ||
+    item.supportingReadiness?.trunk === 'limited' ||
+    item.stability === 'unstable' ||
+    item.context?.romRestriction === 'blocked' ||
+    item.context?.romRestriction === 'limited' ||
+    item.targetMuscleQuality === 'poor'
   );
 }
 
@@ -77,7 +121,23 @@ export function suggestAlternatives(
     sameExerciseSetup: null,
   };
   const feedback = effectiveTrainingFeedback([...report.feedback]);
+  const scoped = feedback.filter((item) => item.context?.exerciseId === report.exerciseId);
+  const latest = latestFeedbackPerSession(scoped)[0];
+  if (report.allowTrials && latest && hasSelectionSymptoms(latest)) {
+    return { ...result, status: 'symptom_safety' };
+  }
+  const trialReport =
+    report.allowTrials &&
+    latest &&
+    !latest.transcriptionUncertain &&
+    !hasConflictingFeedbackAtSameTime(latest, scoped) &&
+    !latest.interpretations?.some(
+      (claim) => claim.timeframe === 'historical' || claim.conflictsWithObservationIds?.length,
+    ) &&
+    ((latest.trunkFatigue !== undefined && latest.trunkFatigue > 0) ||
+      latest.supportingReadiness?.trunk === 'limited');
   if (
+    !trialReport &&
     !repeatedResponse(
       feedback,
       report.exerciseId,
@@ -104,30 +164,49 @@ export function suggestAlternatives(
         variant.torsoSupport === 'supported' &&
         variant.trunkDemand.level === 'low' &&
         variant.trunkDemand.basis === 'reviewed' &&
-        previousSwaps.has(variant.id) &&
+        (!report.allowTrials || Boolean(variant.variantMetadata)) &&
         isEligibleVariant(variant, {
           available: equipment,
           excludedConcerns: report.excludedConcerns,
         }) &&
-        repeatedResponse(
-          feedback,
-          variant.id,
-          (item) => item.trunkFatigue === 0 && item.supportingReadiness?.trunk !== 'limited',
-        ),
+        (report.allowTrials ||
+          (previousSwaps.has(variant.id) &&
+            repeatedResponse(
+              feedback,
+              variant.id,
+              (item) => item.trunkFatigue === 0 && item.supportingReadiness?.trunk !== 'limited',
+            ))) &&
+        (!report.allowTrials ||
+          !latestFeedbackPerSession(
+            feedback.filter((item) => item.context?.exerciseId === variant.id),
+          )
+            .slice(0, 1)
+            .some(adverseVariantResponse)),
     )
     // Code-point ordering is independent of the host's locale and input ordering.
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    .sort((a, b) => {
+      const preferred = (id: string) =>
+        Number(previousSwaps.has(id) && hasRepeatedVariantResponse(feedback, id, report.gymId));
+      return (
+        (report.allowTrials ? preferred(b.id) - preferred(a.id) : 0) ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+      );
+    });
 
   for (const variant of candidates) {
+    const tolerated =
+      !report.allowTrials ||
+      (previousSwaps.has(variant.id) &&
+        hasRepeatedVariantResponse(feedback, variant.id, report.gymId));
     if ((variant.setupOf ?? variant.id) === baseExerciseId) {
       result.sameExerciseSetup ??= {
         variantId: variant.id,
-        reason: 'supported_setup_previously_tolerated',
+        reason: tolerated ? 'supported_setup_previously_tolerated' : 'supported_setup_trial',
       };
     } else {
       result.differentExercise ??= {
         variantId: variant.id,
-        reason: 'supported_exercise_previously_tolerated',
+        reason: tolerated ? 'supported_exercise_previously_tolerated' : 'supported_exercise_trial',
       };
     }
   }

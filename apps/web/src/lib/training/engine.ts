@@ -23,6 +23,7 @@ import {
 } from './types';
 import {
   catalogVariantById,
+  CATALOG_EQUIPMENT,
   EXERCISE_CATALOG,
   isEligibleVariant,
   resolveAvailableEquipment,
@@ -500,6 +501,8 @@ function observationPayload(observation: TrainingFeedback) {
       : undefined,
     trunkFatigue: observation.trunkFatigue,
     generalExhaustion: observation.generalExhaustion,
+    targetMuscleQuality: observation.targetMuscleQuality,
+    stability: observation.stability,
     symptomFlags: observation.symptomFlags ? [...observation.symptomFlags].sort() : undefined,
     symptomNote: observation.symptomNote,
     originalStatement: observation.originalStatement,
@@ -1159,6 +1162,13 @@ export function validTrainingFeedback(
           context.restSeconds >= 0 &&
           context.restSeconds <= 3600)) &&
       validOptionalString(context.setup, 160) &&
+      validOptionalString(context.gymId, 80) &&
+      (context.availableEquipment === undefined ||
+        (Array.isArray(context.availableEquipment) &&
+          context.availableEquipment.length <= CATALOG_EQUIPMENT.length &&
+          context.availableEquipment.every((item) => CATALOG_EQUIPMENT.includes(item)))) &&
+      (context.romRestriction === undefined ||
+        ['none', 'limited', 'blocked'].includes(context.romRestriction)) &&
       (context.rangeOfMotion === undefined ||
         context.rangeOfMotion === 'full' ||
         context.rangeOfMotion === 'partial' ||
@@ -1217,6 +1227,8 @@ export function validTrainingFeedback(
     supporting !== undefined ||
     feedback.trunkFatigue !== undefined ||
     feedback.generalExhaustion !== undefined ||
+    feedback.targetMuscleQuality !== undefined ||
+    feedback.stability !== undefined ||
     feedback.symptomFlags !== undefined ||
     feedback.symptomNote !== undefined ||
     feedback.originalStatement !== undefined ||
@@ -1238,6 +1250,9 @@ export function validTrainingFeedback(
     validSupporting &&
     validOptionalScore(feedback.trunkFatigue) &&
     validOptionalScore(feedback.generalExhaustion) &&
+    (feedback.targetMuscleQuality === undefined ||
+      ['poor', 'adequate', 'good'].includes(feedback.targetMuscleQuality)) &&
+    (feedback.stability === undefined || ['stable', 'unstable'].includes(feedback.stability)) &&
     validSymptoms &&
     validOptionalString(feedback.symptomNote, 500) &&
     validOptionalString(feedback.originalStatement, 1_000) &&

@@ -48,6 +48,56 @@ final class TrainingProgressTests: XCTestCase {
         XCTAssertEqual(feedback.originalStatement, "Less back fatigue today")
     }
 
+    func testMovementResponsePreservesIndependentDimensionsAndUnknownValues() throws {
+        var request = TrainingFeedbackRequest(sessionId: "session-a")
+        request.context = .init(exerciseId: "cable_curl", setNumber: 1, gymId: "Gym", romRestriction: "blocked")
+        request.trunkFatigue = 6
+        request.generalExhaustion = 1
+        request.targetMuscleQuality = "good"
+        request.stability = "unstable"
+        let data = try JSONEncoder().encode(request)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(payload["trunkFatigue"] as? Int, 6)
+        XCTAssertEqual(payload["generalExhaustion"] as? Int, 1)
+        XCTAssertNil(payload["jointPain"])
+        XCTAssertNil(payload["symptomFlags"])
+        XCTAssertEqual(try JSONDecoder().decode(TrainingFeedbackRequest.self, from: data), request)
+    }
+
+    func testSelectionReviewUsesAuthenticatedRequestAndRejectsMismatchedContext() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [TrainingProgressURLProtocol.self]
+        let urlSession = URLSession(configuration: configuration)
+        defer { urlSession.invalidateAndCancel() }
+        let service = URLSessionTrainingService(urlSession: urlSession, baseURL: URL(string: "https://training.example"))
+        let context = TrainingSelectionContext(gymId: "Gym", availableEquipment: ["cable"], excludedConcerns: [])
+        let request = TrainingSelectionRequest(sessionId: "session-a", exerciseId: "cable_curl", context: context)
+        func payload(gym: String = "Gym") -> Data {
+            Data("""
+            {"version":1,"review":{"sessionId":"session-a","exerciseId":"cable_curl","revision":0,
+            "status":"no_eligible_alternative","context":{"gymId":"\(gym)","availableEquipment":["cable"],
+            "excludedConcerns":[]},"options":[],"message":"Check the current station."}}
+            """.utf8)
+        }
+        let response = payload()
+        TrainingProgressURLProtocol.install { request in
+            XCTAssertEqual(request.url?.path, TrainingAPIContract.rootPath + "/alternatives")
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cache-Control"), "no-store")
+            return (200, response)
+        }
+        let loaded = try await service.reviewSelection(accessToken: "test-token", request: request)
+        XCTAssertTrue(loaded.review.options.isEmpty)
+        XCTAssertEqual(loaded.review.context, context)
+        let mismatched = payload(gym: "Old gym")
+        TrainingProgressURLProtocol.install { _ in (200, mismatched) }
+        do {
+            _ = try await service.reviewSelection(accessToken: "test-token", request: request)
+            XCTFail("A different gym context cannot authorize an option")
+        } catch { XCTAssertEqual(error as? TrainingServiceError, .invalidResponse) }
+    }
+
     func testSessionReviewRetainsOriginalVariantAndExplicitSkip() {
         let exercise = TrainingExercisePrescription(
             id: "exact-variant", name: "Recorded curl", primaryMuscle: "biceps",

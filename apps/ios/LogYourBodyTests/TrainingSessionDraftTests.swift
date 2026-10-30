@@ -56,6 +56,33 @@ final class TrainingSessionDraftTests: XCTestCase {
         TrainingSessionDraft(session: session(), ownerId: owner, store: store, isCurrent: { true })
     }
 
+    func testMovementResponseJournalRetainsIndependentObservationsAcrossOfflineReopen() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        let draft = model(store)
+        var request = TrainingFeedbackRequest(sessionId: "fixture-session")
+        request.context = .init(exerciseId: exercise.id, setNumber: 1, gymId: "Gym", romRestriction: "limited")
+        request.trunkFatigue = 6
+        request.generalExhaustion = 1
+        request.stability = "stable"
+        request.targetMuscleQuality = "good"
+        let saved = await draft.recordFeedback(request) { _ in throw URLError(.notConnectedToInternet) }
+        XCTAssertFalse(saved)
+        let journaled = try XCTUnwrap(draft.feedback?.request)
+        let reopened = model(store)
+        XCTAssertEqual(reopened.feedback?.request, journaled)
+        let retried = await reopened.retryFeedback { replay in
+            XCTAssertEqual(replay, journaled)
+            XCTAssertNil(replay.jointPain, "Unknown joint symptoms cannot become zero during persistence")
+            XCTAssertEqual(replay.trunkFatigue, 6)
+            XCTAssertEqual(replay.generalExhaustion, 1)
+            return self.feedbackResponse(replay, action: .clarify)
+        }
+        XCTAssertTrue(retried)
+        XCTAssertEqual(reopened.feedback?.response?.feedback.observation, journaled)
+    }
+
     func testRestDefaultsUseExerciseMetadataAndCountdownClampsAtZero() {
         let compound = TrainingExercisePrescription(
             id: "press", name: "Press", primaryMuscle: "chest",

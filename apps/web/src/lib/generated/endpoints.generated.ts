@@ -439,6 +439,11 @@ export const endpoints = {
       reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-176',
+      reason:
+        'Source receipt for distinct exercise/setup selection, observed tolerability, approval and correction regression guards.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-189',
       reason:
         'LYB-189 source evidence and Tim/legal review handoff for the Apple Health privacy disclosure.',

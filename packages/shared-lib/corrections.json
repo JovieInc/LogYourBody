@@ -4871,5 +4871,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "lyb-176-exercise-and-setup-are-distinct-selection-levers",
+    "source": "https://linear.app/jovie/issue/LYB-176",
+    "correction": "October 14 clarification: selection must compare distinct exercises and same-exercise setups, preserve observed trunk fatigue separately from joint symptoms, general fatigue, stability and ROM, and require user approval rather than excluding a whole muscle. A single comfortable session must not establish repeated tolerance.",
+    "mechanization": "Extend the existing catalog alternatives helper with explicit untested trials and distinct base-exercise identity. The native review saves separate optional LYB-114 observations; the canonical workout action re-evaluates eligibility before a revision-checked approved swap. Preserve logged sets and own load histories. Retain only approved choices with repeated explicit positive response; corrections and undo retract the preference. Existing required Jest suites exercise first report, pain, equipment, ROM, belt, missing feedback, replay and single-session uncertainty.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Deterministic selection and the existing session CAS prevent automatic or stale swaps; native/API observation fields preserve unknown dimensions instead of converting missing values to zero."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/selection.test.ts",
+      "anchor": "it('requires approval, preserves completed identities and starts a separate load history'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

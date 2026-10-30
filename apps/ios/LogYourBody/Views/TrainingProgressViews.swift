@@ -354,12 +354,19 @@ struct TrainingVariantSetupView: View {
         VStack(alignment: .leading, spacing: JovieTokens.tightGap) {
             Text("Variant: \(variantId)").textSelection(.enabled)
             if let setup {
-                Text("Setup: \(setup.bodyPosition) · \(setup.torsoSupport) torso")
+                Text("Setup: \(setup.bodyPosition)")
                 Text("Equipment: \(setup.requires.joined(separator: ", "))")
                 if let angle = setup.benchAngleDeg { Text("Bench: \(angle.formatted())°") }
                 if let pulley = setup.pulley { Text("Pulley: \(pulley.height) · \(pulley.attachment)") }
                 Text("Expected trunk demand: \(setup.trunkDemand.level) · \(setup.trunkDemand.basis)")
                 Text(setup.trunkDemand.note)
+                if let metadata = setup.variantMetadata {
+                    Text("Torso contact: \(metadata.support)")
+                    Text("Target: \(metadata.targetRegion.replacingOccurrences(of: "_", with: " "))")
+                    Text(metadata.romSetupCaveat)
+                } else {
+                    Text("Support: \(setup.torsoSupport). Confirm which body segment is supported.")
+                }
                 ForEach(setup.cues, id: \.self) { Text($0) }
             } else {
                 Text("Setup detail unavailable. Confirm the exact variant before lifting.")

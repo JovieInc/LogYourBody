@@ -30,9 +30,14 @@ import {
   TRAINING_CONSENT_VERSION,
   TRAINING_SESSIONS_PER_WEEK,
 } from '@/lib/training/types';
-import { catalogVariantById } from '@/lib/training/catalog';
+import { CATALOG_EQUIPMENT, catalogVariantById } from '@/lib/training/catalog';
 import type { Session } from '@/lib/training/types';
 import { summarizeTrainingProgress } from '@/lib/training/progress';
+import {
+  exerciseSelectionEnabled,
+  reviewExerciseSelection,
+  selectionContextSchema,
+} from '@/lib/training/selection';
 
 export const TRAINING_API_VERSION = 1;
 
@@ -53,6 +58,7 @@ function nativeSession<T extends Session>(session: T) {
             benchAngleDeg: variant.benchAngleDeg,
             pulley: variant.pulley,
             cues: variant.cues,
+            variantMetadata: variant.variantMetadata,
           }
         : null,
     };
@@ -136,6 +142,8 @@ const FeedbackBodySchema = z
       .optional(),
     trunkFatigue: FeedbackScoreSchema.optional(),
     generalExhaustion: FeedbackScoreSchema.optional(),
+    targetMuscleQuality: z.enum(['poor', 'adequate', 'good']).optional(),
+    stability: z.enum(['stable', 'unstable']).optional(),
     symptomFlags: z
       .array(z.enum(['pain', 'neurologic', 'other_concerning']))
       .min(1)
@@ -194,6 +202,12 @@ const FeedbackBodySchema = z
         restSeconds: z.number().int().min(0).max(3600).optional(),
         setup: z.string().trim().min(1).max(160).optional(),
         rangeOfMotion: z.enum(['full', 'partial', 'unknown']).optional(),
+        romRestriction: z.enum(['none', 'limited', 'blocked']).optional(),
+        gymId: z.string().trim().min(1).max(80).optional(),
+        availableEquipment: z
+          .array(z.enum(CATALOG_EQUIPMENT))
+          .max(CATALOG_EQUIPMENT.length)
+          .optional(),
         setFormat: z.literal('straight').optional(),
       })
       .strict()
@@ -225,8 +239,10 @@ const WorkoutActionBodySchema = z
           kind: z.literal('swap'),
           exerciseId: z.string().min(1).max(64),
           replacementExerciseId: z.string().min(1).max(64),
+          selectionContext: selectionContextSchema.optional(),
         })
         .strict(),
+      z.object({ kind: z.literal('restore_swap'), swapEventId: z.string().uuid() }).strict(),
       z
         .object({ kind: z.literal('equipment_unavailable'), exerciseId: z.string().min(1).max(64) })
         .strict(),
@@ -241,6 +257,7 @@ const WorkoutActionBodySchema = z
   .strict();
 
 type RouteDependencies = {
+  selectionEnabled?: () => boolean;
   delegatedEnabled?: () => boolean;
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   records: NativeProductRecordsPort;
@@ -297,6 +314,41 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
   }
 
   return {
+    async alternatives(request: NextRequest) {
+      const identity = await authorized(request);
+      if (!identity) return apiError('unauthorized', 401);
+      if (!featureEnabled() || !(dependencies.selectionEnabled ?? exerciseSelectionEnabled)())
+        return apiError('not_found', 404);
+      const denied = await allowed(identity.sub);
+      if (denied) return denied;
+      const parsed = z
+        .object({
+          sessionId: z.string().uuid(),
+          exerciseId: z.string().min(1).max(64),
+          context: selectionContextSchema,
+        })
+        .strict()
+        .safeParse(await request.json().catch(() => null));
+      if (!parsed.success) return apiError('invalid_request', 400);
+      try {
+        const snapshot = await loadTrainingRecords(dependencies.records, identity.sub);
+        const record = snapshot.sessions.find(
+          (item) => item.id === parsed.data.sessionId && item.programSetupId === snapshot.setup?.id,
+        );
+        if (!record?.prescription || !snapshot.setup) return apiError('session_not_found', 404);
+        const review = reviewExerciseSelection(
+          snapshot,
+          record.prescription as Session,
+          parsed.data.exerciseId,
+          parsed.data.context,
+        );
+        if (!review) return apiError('exercise_not_found', 404);
+        return json(withVersion({ review }));
+      } catch {
+        return apiError('training_unavailable', 503);
+      }
+    },
+
     async progress(request: NextRequest) {
       const identity = await authorized(request);
       if (!identity) return apiError('unauthorized', 401);
@@ -678,6 +730,12 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       if (denied) return denied;
       const parsed = WorkoutActionBodySchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) return apiError('invalid_request', 400);
+      if (
+        (parsed.data.action.kind === 'restore_swap' ||
+          (parsed.data.action.kind === 'swap' && parsed.data.action.selectionContext)) &&
+        !(dependencies.selectionEnabled ?? exerciseSelectionEnabled)()
+      )
+        return apiError('not_found', 404);
       try {
         const result = await applyWorkoutAction({
           records: dependencies.records,

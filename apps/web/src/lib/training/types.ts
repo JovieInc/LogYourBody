@@ -104,11 +104,29 @@ export type ExerciseSubstitution = Omit<
 export type WorkoutSessionEvent = {
   id: string;
   kind:
-    'reordered' | 'substituted' | 'shortened' | 'skipped' | 'paused' | 'resumed' | 'ended' | 'pain';
+    | 'reordered'
+    | 'substituted'
+    | 'swap_restored'
+    | 'shortened'
+    | 'skipped'
+    | 'paused'
+    | 'resumed'
+    | 'ended'
+    | 'pain';
   createdAt: string;
   exerciseId?: string;
   replacementExerciseId?: string;
   minutes?: number;
+  selectionContext?: ExerciseSelectionContext;
+  previousExercise?: ExercisePrescription;
+  restoresEventId?: string;
+};
+
+export type ExerciseSelectionContext = {
+  gymId: string;
+  availableEquipment: import('./catalog').CatalogEquipment[];
+  excludedConcerns: string[];
+  setupNote?: string;
 };
 
 export type Session = {
@@ -178,6 +196,9 @@ export type TrainingSetContext = {
   restSeconds?: number;
   setup?: string;
   rangeOfMotion?: 'full' | 'partial' | 'unknown';
+  romRestriction?: 'none' | 'limited' | 'blocked';
+  gymId?: string;
+  availableEquipment?: import('./catalog').CatalogEquipment[];
   setFormat?: 'straight';
 };
 
@@ -243,6 +264,8 @@ export type TrainingFeedback = {
   supportingReadiness?: SupportingReadinessObservation;
   trunkFatigue?: number;
   generalExhaustion?: number;
+  targetMuscleQuality?: 'poor' | 'adequate' | 'good';
+  stability?: 'stable' | 'unstable';
   symptomFlags?: Array<'pain' | 'neurologic' | 'other_concerning'>;
   symptomNote?: string;
   /** Original user wording is retained separately from claim-specific interpretations. */

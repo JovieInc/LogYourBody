@@ -1,4 +1,5 @@
 import type { TrainingMutationAdmission } from '@/lib/ports/training-mutations';
+import { reviewExerciseSelection, selectionContextSchema } from './selection';
 import { eligibleForProgram } from './delegated-planning';
 import {
   captureTrainingAdmission,
@@ -39,6 +40,7 @@ import {
 } from './service';
 import type {
   ExercisePrescription,
+  ExerciseSelectionContext,
   Session,
   SetLog,
   TrainingFeedback,
@@ -285,6 +287,7 @@ export async function recordTrainingFeedback(input: {
     };
   }
   const isSessionSummary =
+    normalized.context?.exerciseId === undefined &&
     normalized.context?.setId === undefined &&
     normalized.context?.setNumber === undefined &&
     normalized.targetMuscleReadiness === undefined &&
@@ -295,6 +298,7 @@ export async function recordTrainingFeedback(input: {
     snapshot.feedback.filter(
       (item) =>
         item.sessionId === normalized.sessionId &&
+        item.context?.exerciseId === undefined &&
         item.context?.setId === undefined &&
         item.context?.setNumber === undefined &&
         item.targetMuscleReadiness === undefined &&
@@ -764,7 +768,13 @@ export async function undoTrainingSet(input: {
 
 export type WorkoutActionInput =
   | { kind: 'equipment_unavailable'; exerciseId: string }
-  | { kind: 'swap'; exerciseId: string; replacementExerciseId: string }
+  | {
+      kind: 'swap';
+      exerciseId: string;
+      replacementExerciseId: string;
+      selectionContext?: ExerciseSelectionContext;
+    }
+  | { kind: 'restore_swap'; swapEventId: string }
   | { kind: 'shorten'; minutes: number }
   | { kind: 'skip'; exerciseId: string }
   | { kind: 'pain'; exerciseId: string }
@@ -889,31 +899,57 @@ export async function applyWorkoutAction(input: {
     case 'swap': {
       if (!current || current.id !== input.action.exerciseId)
         return { kind: 'stale_current_exercise' };
-      if (sessionLogs.some((log) => log.exerciseId === current.id))
-        return { kind: 'no_eligible_substitution' };
+      const context = input.action.selectionContext;
+      const completed = sessionLogs.filter((log) => log.exerciseId === current.id);
+      if (completed.length && !context) return { kind: 'no_eligible_substitution' };
       const replacementId = input.action.replacementExerciseId;
-      const replacement = (current.substitutions ?? []).find(
-        (candidate) =>
-          candidate.id === replacementId &&
-          !exercises.some((exercise) => exercise.id === candidate.id) &&
-          isEligibleExerciseSubstitution({
-            exercise: current,
-            candidate,
-            equipment: setup.equipment,
-            constraints: setup.delegated?.inputs,
-          }),
-      );
+      const review =
+        context && selectionContextSchema.safeParse(context).success
+          ? reviewExerciseSelection(snapshot, session, current.id, context)
+          : null;
+      const option = review?.options.find((item) => item.variantId === replacementId);
+      if (context && (!option || review?.status !== 'suggested'))
+        return { kind: 'no_eligible_substitution' };
+      const variant = option?.setup;
+      const replacement = variant
+        ? {
+            ...current,
+            id: variant.id,
+            name: variant.name,
+            muscleContribution: variant.muscleContribution,
+            targetLoadKg: null,
+            progression: 'hold' as const,
+            targetReps: current.repRange.min,
+            loadInstruction: 'Establish a comfortable starting load for this variant.',
+          }
+        : (current.substitutions ?? []).find(
+            (candidate) =>
+              candidate.id === replacementId &&
+              !exercises.some((exercise) => exercise.id === candidate.id) &&
+              isEligibleExerciseSubstitution({
+                exercise: current,
+                candidate,
+                equipment: setup.equipment,
+                constraints: setup.delegated?.inputs,
+              }),
+          );
       if (!replacement) return { kind: 'no_eligible_substitution' };
-      exercises = exercises.map((exercise) =>
+      // Preserve every completed identity; only remaining sets move to the trial.
+      if (completed.some((log) => log.setNumber > completed.length))
+        return { kind: 'no_eligible_substitution' };
+      exercises = exercises.flatMap((exercise) =>
         exercise.id === current.id
-          ? {
-              ...replacement,
-              sets: current.sets,
-              substitutions: current.substitutions.filter(
-                (candidate) => candidate.id !== replacement.id,
-              ),
-            }
-          : exercise,
+          ? [
+              ...(completed.length ? [{ ...current, sets: completed.length }] : []),
+              {
+                ...replacement,
+                sets: current.sets - completed.length,
+                substitutions: current.substitutions.filter(
+                  (candidate) => candidate.id !== replacement.id,
+                ),
+              },
+            ]
+          : [exercise],
       );
       event = {
         id: input.eventId,
@@ -921,6 +957,37 @@ export async function applyWorkoutAction(input: {
         exerciseId: current.id,
         replacementExerciseId: replacement.id,
         createdAt: input.now.toISOString(),
+        ...(context ? { selectionContext: context, previousExercise: current } : {}),
+      };
+      break;
+    }
+    case 'restore_swap': {
+      const prior = (session.executionEvents ?? []).find(
+        (item) => input.action.kind === 'restore_swap' && item.id === input.action.swapEventId,
+      );
+      if (
+        !prior?.selectionContext ||
+        !prior.previousExercise ||
+        !prior.replacementExerciseId ||
+        session.executionEvents.some((item) => item.restoresEventId === prior.id) ||
+        sessionLogs.some((log) => log.exerciseId === prior.replacementExerciseId) ||
+        !session.exercises.some((item) => item.id === prior.replacementExerciseId)
+      )
+        return { kind: 'no_eligible_substitution' };
+      exercises = exercises.flatMap((exercise) =>
+        exercise.id === prior.exerciseId
+          ? []
+          : exercise.id === prior.replacementExerciseId
+            ? [prior.previousExercise!]
+            : [exercise],
+      );
+      event = {
+        id: input.eventId,
+        kind: 'swap_restored',
+        createdAt: input.now.toISOString(),
+        exerciseId: prior.replacementExerciseId,
+        replacementExerciseId: prior.exerciseId,
+        restoresEventId: prior.id,
       };
       break;
     }

@@ -926,7 +926,12 @@ struct ChatTabView: View {
                     },
                     onLoadProgress: {
                         try await loadTrainingProgress(ownership: ownership)
-                    }
+                    },
+                    onReviewSelection: AppServicePorts.analyticsTracker.isFeatureEnabled(
+                        flagKey: TrainingSelectionPolicy.featureGate
+                    ) ? { request in
+                        try await reviewTrainingSelection(ownership: ownership, request: request)
+                    } : nil
                 )
             case .voiceSetReview(let session, let heard):
                 VoiceSetReviewView(session: session, heard: heard) { proposal in
@@ -1429,6 +1434,22 @@ struct ChatTabView: View {
             getToken: { await chatAccessToken() },
             send: { accessToken in
                 response = try await trainingService.loadProgress(accessToken: accessToken)
+            }
+        )
+        guard let response else { throw TrainingServiceError.invalidResponse }
+        return response
+    }
+
+    private func reviewTrainingSelection(
+        ownership: AuthManager.ProfileSessionOwnership,
+        request: TrainingSelectionRequest
+    ) async throws -> TrainingSelectionResponse {
+        var response: TrainingSelectionResponse?
+        try await TrainingOwnedRequest.perform(
+            isCurrent: { authManager.ownsAccountSession(ownership) },
+            getToken: { await chatAccessToken() },
+            send: { accessToken in
+                response = try await URLSessionTrainingService().reviewSelection(accessToken: accessToken, request: request)
             }
         )
         guard let response else { throw TrainingServiceError.invalidResponse }
