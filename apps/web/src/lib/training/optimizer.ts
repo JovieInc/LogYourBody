@@ -17,12 +17,8 @@ import {
 } from './optimizer-rules';
 import { trainingRequestHash } from './revisions';
 import { stableTrainingUuid, swappedPrescription } from './service';
-import { reviewSessionSequence, sequencingContextSchema, type SequenceReview } from './sequencing';
-import {
-  rollingScheduleSchema,
-  reviewRollingSchedule,
-  type RollingScheduleReview,
-} from './rolling-schedule';
+import { reviewSessionSequence, type SequenceReview } from './sequencing';
+import { reviewRollingSchedule, type RollingScheduleReview } from './rolling-schedule';
 import {
   MUSCLE_GROUPS,
   type ExercisePrescription,

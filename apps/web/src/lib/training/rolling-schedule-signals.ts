@@ -6,7 +6,6 @@ import type {
   Observation,
   RollingScheduleContext,
   RollingScheduleReview,
-  ScheduledWork,
 } from './rolling-schedule-schema';
 
 export const emptyVolume = () =>

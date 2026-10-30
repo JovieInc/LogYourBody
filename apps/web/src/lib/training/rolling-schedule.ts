@@ -5,7 +5,7 @@ import { exerciseDemands, OPTIMIZER_RULES } from './optimizer-rules';
 import { rollingSessionOrder } from './rolling-session';
 import { planSessionDuration } from './session-duration';
 import { MUSCLE_GROUPS, type Session, type SetLog } from './types';
-import type { PlanExercise, PlanSession } from './optimizer';
+import type { PlanSession } from './optimizer';
 import {
   affects,
   attendanceChoice,
@@ -15,7 +15,6 @@ import {
   WEEK,
 } from './rolling-schedule-signals';
 import {
-  rollingScheduleSchema,
   type Observation,
   type RollingScheduleContext,
   type RollingScheduleReview,

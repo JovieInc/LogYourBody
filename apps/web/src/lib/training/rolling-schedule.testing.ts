@@ -1,4 +1,4 @@
-import { optimizeMesocycle, type OptimizerInput } from './optimizer';
+import type { OptimizerInput } from './optimizer';
 import type { RollingScheduleContext } from './rolling-schedule';
 import { RECOVERY_POLICY } from './recovery';
 import type { RecoveryTrial } from './recovery-contract';
