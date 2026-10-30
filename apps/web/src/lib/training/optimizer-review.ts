@@ -30,7 +30,12 @@ export type OptimizationDecision =
   | { kind: 'stale_evidence' }
   | { kind: 'user_edit_conflict' }
   | { kind: 'not_certified'; violations: string[] }
-  | { kind: 'accepted'; receipt: OptimizationReceipt; changes: OptimizationChange[] };
+  | {
+      kind: 'accepted';
+      receipt: OptimizationReceipt;
+      changes: OptimizationChange[];
+      rollingSchedule?: OptimizationProposal['rollingSchedule'];
+    };
 
 function receipt(
   proposal: OptimizationProposal,
@@ -104,6 +109,7 @@ export function decideMesocycleOptimization(input: {
     kind: 'accepted',
     receipt: receipt(input.proposal, 'apply', input.currentFingerprint),
     changes: input.proposal.changes,
+    ...(input.proposal.rollingSchedule ? { rollingSchedule: input.proposal.rollingSchedule } : {}),
   };
 }
 

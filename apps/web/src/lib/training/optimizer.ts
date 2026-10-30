@@ -20,6 +20,11 @@ import { trainingRequestHash } from './revisions';
 import { stableTrainingUuid, swappedPrescription } from './service';
 import { reviewSessionSequence, sequencingContextSchema, type SequenceReview } from './sequencing';
 import {
+  rollingScheduleSchema,
+  reviewRollingSchedule,
+  type RollingScheduleReview,
+} from './rolling-schedule';
+import {
   MUSCLE_GROUPS,
   type ExercisePrescription,
   type MuscleContribution,
@@ -56,6 +61,7 @@ const planExerciseSchema = z
     name: z.string().min(1),
     primaryMuscle: z.enum(MUSCLE_GROUPS),
     sets: z.number().int().positive().max(50),
+    targetRir: z.number().int().min(0).max(6).optional(),
     userEdited: z.boolean().optional(),
     phase: z.enum(['warmup', 'working']).optional(),
     muscleContribution: z.record(z.string(), z.number().finite().nonnegative()).optional(),
@@ -132,6 +138,7 @@ export const optimizerInputSchema = z
     targetRir: z.number().int().min(0).max(6).optional(),
     baseFingerprint: z.string().min(1).optional(),
     sequencingContext: sequencingContextSchema.optional(),
+    rollingSchedule: rollingScheduleSchema.optional(),
     declineSupersets: z
       .object({
         scope: z.enum(['durable', 'location']),
@@ -150,7 +157,33 @@ export const optimizerInputSchema = z
           new Set(session.exercises.map((row) => row.id)).size === session.exercises.length,
       ),
     'ambiguous_session_or_exercise_identity',
-  );
+  )
+  .superRefine((input, ctx) => {
+    if (!input.rollingSchedule) return;
+    if (input.requestedSwaps?.length || input.pain?.length)
+      ctx.addIssue({ code: 'custom', message: 'review_variant_or_pain_change_before_scheduling' });
+    const ids = new Set(input.sessions.map((session) => session.id));
+    const setIds = new Set<string>();
+    const setKeys = new Set<string>();
+    for (const log of input.logs ?? []) {
+      const key = JSON.stringify([log.sessionId, log.exerciseId, log.setNumber]);
+      if (setIds.has(log.id) || setKeys.has(key) || !Number.isFinite(Date.parse(log.completedAt)))
+        ctx.addIssue({ code: 'custom', message: 'ambiguous_completed_set_identity' });
+      setIds.add(log.id);
+      setKeys.add(key);
+    }
+    for (const row of input.rollingSchedule.history) {
+      if (row.rotationId === input.rollingSchedule.rotationId && !ids.has(row.templateId))
+        ctx.addIssue({ code: 'custom', message: 'unknown_rotation_template' });
+    }
+    for (const session of input.sessions) {
+      for (const exercise of session.exercises) {
+        const variant = catalogVariantById(exercise.id);
+        if (variant && variant.primaryMuscle !== exercise.primaryMuscle)
+          ctx.addIssue({ code: 'custom', message: 'exercise_muscle_mismatch' });
+      }
+    }
+  });
 
 export type OptimizerInput = z.infer<typeof optimizerInputSchema>;
 export type PlanExercise = z.infer<typeof planExerciseSchema>;
@@ -277,6 +310,7 @@ export type OptimizationProposal = {
   tradeoff: OptimizationTradeoff;
   rationale: string[];
   sequencing: SequenceReview[];
+  rollingSchedule?: RollingScheduleReview;
   persisted: false;
 };
 
@@ -287,6 +321,7 @@ export type OptimizerEvaluation = {
   tradeoff: OptimizationTradeoff;
   rationale: string[];
   sequencing: SequenceReview[];
+  rollingSchedule?: RollingScheduleReview;
 };
 
 export const PAIN_PAUSE_MESSAGE =
@@ -304,6 +339,7 @@ export function optimizationPlanFingerprint(sessions: readonly PlanSession[]): s
       exercises: session.exercises.map((exercise) => ({
         id: exercise.id,
         sets: exercise.sets,
+        ...(exercise.targetRir !== undefined ? { targetRir: exercise.targetRir } : {}),
         userEdited: exercise.userEdited === true,
         ...(exercise.phase ? { phase: exercise.phase } : {}),
       })),
@@ -408,7 +444,7 @@ function asPrescription(exercise: PlanExercise, targetRir: number): ExercisePres
     sets: exercise.sets,
     repRange: { min: 8, max: 12 },
     targetReps: 8,
-    targetRir,
+    targetRir: exercise.targetRir ?? targetRir,
     targetLoadKg: null,
     loadInstruction: null,
     progression: 'hold',
@@ -509,6 +545,33 @@ export function evaluateMesocycle(
   const findings: OptimizationFinding[] = [];
   const changes: OptimizationChange[] = [];
   const handled = new Set<string>();
+  const rollingSchedule = input.rollingSchedule
+    ? reviewRollingSchedule({
+        sessions: input.sessions,
+        context: input.rollingSchedule,
+        logs: input.logs,
+        targetRir: input.targetRir,
+        excludedExerciseIds: input.sequencingContext?.excludedExerciseIds,
+        excludedConcerns: input.sequencingContext?.excludedConcerns,
+      })
+    : undefined;
+  if (rollingSchedule) {
+    findings.push(
+      finding(rules, 'rolling_schedule_v1', {
+        code: 'rolling_readiness_conditional',
+        message:
+          'Timestamped allocations remain conditional on current dose, completed work and tolerability. Template-volume totals describe the original rotation; the rolling receipt identifies completed, dropped and pending work.',
+      }),
+    );
+    if (rollingSchedule.unallocated.length || rollingSchedule.dropped.length)
+      findings.push(
+        finding(rules, 'rolling_schedule_v1', {
+          code: 'rolling_allocation_tradeoff',
+          message:
+            'Some approved work is dropped by a reviewed recovery reduction or remains unallocated. Review the explicit move, reduce, rest or opportunity tradeoff; it is not catch-up debt.',
+        }),
+      );
+  }
 
   const sequencing = input.sessions.map((session) =>
     reviewSessionSequence({
@@ -946,7 +1009,15 @@ export function evaluateMesocycle(
     noCompromise: timeSavedMinutes !== null && compromises.length === 0,
   };
   const rationale = [...notes, tradeoffSentence(tradeoff)];
-  return { resolvedLocation, findings, changes, tradeoff, rationale, sequencing };
+  return {
+    resolvedLocation,
+    findings,
+    changes,
+    tradeoff,
+    rationale,
+    sequencing,
+    ...(rollingSchedule ? { rollingSchedule } : {}),
+  };
 }
 
 export function reviewedSwapPrescription(
@@ -955,7 +1026,12 @@ export function reviewedSwapPrescription(
   logs: readonly SetLog[],
   targetRir: number,
 ): ExercisePrescription | null {
-  return swappedPrescription(asPrescription(exercise, targetRir), variantId, [...logs], targetRir);
+  return swappedPrescription(
+    asPrescription(exercise, targetRir),
+    variantId,
+    [...logs],
+    exercise.targetRir ?? targetRir,
+  );
 }
 
 export function optimizeMesocycle(
