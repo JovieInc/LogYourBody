@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "account-erasure-verifiers-load-canonical-cleanup-migrations",
+    "correction": "PR #1636 / LYB-330 (fix-red-1a39536f40 occurrence 7): JavaScript/TypeScript run 41130955586 failed because both training SQL verifiers retained a fixed cleanup inventory and omitted the new health vault tables.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41130955586/job/124321693545",
+    "mechanization": "Extend the existing mutation verifier with a shared cleanup extractor used by both transaction verifiers. Preserve the required ordered cleanup and identity predicates, admit only unique exact subject-scoped additions, and load each missing table from its unique canonical migration. Five behavior regressions exercise future tables, migration reuse and all refusals through the existing required shared-lib suite with complete statement execution of the helper. The original PostgreSQL16 run reproduces the reported assertion; repaired mutation and revision runs pass 54 and 28 checks. Removing either vault cleanup statement in isolated source snapshots fails the new real-SQL erasure assertion. Vault-specific SQL seeds every grant kind, expired and live grants, and consent logs for two owners, injects a later identity-delete failure, proves complete rollback, retries erasure and retains the other owner. The harness retains push and PR-body ownership, including the single Machine line supplied in the handoff.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared fixture loader derives new subject-scoped cleanup tables from production SQL and resolves their actual defining migration, preventing duplicated verifier inventories and missing fixture schema by construction without weakening required cleanup predicates or transaction assertions."
+      }
+    },
+    "guard": {
+      "path": "apps/web/db/tests/account_cleanup.py",
+      "anchor": "# Resolve additions from canonical DDL, once per missing table, in both verifiers."
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
     "fingerprint": "diagnostic-main-admission-uses-current-project",
     "correction": "LYB-214: Scheduled diagnostic run 40952105110 on main rejected the current Xcode project against a stale reviewed digest, while Mac Runner Routing Tests passed using a frozen older project as their positive fixture.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40952105110/job/123722593353",

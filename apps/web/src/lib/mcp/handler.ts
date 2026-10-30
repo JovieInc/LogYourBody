@@ -2,7 +2,14 @@ import { TrainingMutationError } from '@/lib/training/mutation-admission';
 import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
 import type { AccessTokenPrincipal } from './access-token';
 import { bearerChallenge, LYB_MCP_PROTOCOL_VERSIONS, LYB_MCP_SERVER_INFO } from './contract';
-import { findTool, listTools, type McpToolDependencies } from './tools';
+import {
+  HEALTH_VAULT_MODEL_INSTRUCTIONS,
+  HEALTH_VAULT_WIDGET_URI,
+  isHealthVaultWidgetSurface,
+} from './health-vault/constants';
+import { healthVaultResourceDescriptor, healthVaultWidgetResource } from './health-vault/widget';
+import { findTool, listTools } from './list-tools';
+import type { McpToolDependencies } from './tools';
 
 type JsonRpcId = string | number | null;
 
@@ -26,6 +33,23 @@ const rpcError = (id: JsonRpcId, code: number, message: string) => ({
 
 const INSTRUCTIONS =
   'LogYourBody logs hypertrophy training. Use get_todays_workout before logging so exercise names match the plan. Repeat engine numbers exactly; never invent sets, reps, loads or reps in reserve. Do not give medical advice.';
+
+const WEIGHT_INSTRUCTIONS =
+  "Manual weight tools change only this user's weight entries. A receipt does not mean Apple Health was changed.";
+
+function instructionsFor(deps: McpHandlerDependencies): string {
+  const parts = [INSTRUCTIONS];
+  if (deps.metricsEnabled?.() === true) parts.push(WEIGHT_INSTRUCTIONS);
+  if (deps.vaultEnabled?.() === true) parts.push(HEALTH_VAULT_MODEL_INSTRUCTIONS);
+  return parts.join(' ');
+}
+
+function toolListOptions(principal: AccessTokenPrincipal, deps: McpHandlerDependencies) {
+  return {
+    vault: deps.vaultEnabled?.() === true,
+    widgetSurface: isHealthVaultWidgetSurface(principal.clientId),
+  };
+}
 
 function negotiateVersion(params: unknown): string {
   const requested = (params as { protocolVersion?: unknown } | null)?.protocolVersion;
@@ -62,30 +86,62 @@ export async function handleMcpRequest(input: {
   if (message.id === undefined) return { status: 202, body: null };
 
   switch (message.method) {
-    case 'initialize':
+    case 'initialize': {
+      const vaultOn = deps.vaultEnabled?.() === true;
       return {
         status: 200,
         body: rpcOk(id, {
           protocolVersion: negotiateVersion(message.params),
-          capabilities: { tools: { listChanged: false } },
+          capabilities: vaultOn
+            ? { tools: { listChanged: false }, resources: { listChanged: false } }
+            : { tools: { listChanged: false } },
           serverInfo: LYB_MCP_SERVER_INFO,
-          instructions:
-            deps.metricsEnabled?.() === true
-              ? `${INSTRUCTIONS} Manual weight tools change only this user's weight entries. A receipt does not mean Apple Health was changed.`
-              : INSTRUCTIONS,
+          instructions: instructionsFor(deps),
         }),
       };
+    }
     case 'ping':
       return { status: 200, body: rpcOk(id, {}) };
     case 'tools/list':
       return {
         status: 200,
         body: rpcOk(id, {
-          tools: listTools(deps.delegatedEnabled?.() === true, deps.metricsEnabled?.() === true),
+          tools: listTools(
+            deps.delegatedEnabled?.() === true,
+            deps.metricsEnabled?.() === true,
+            toolListOptions(principal, deps),
+          ),
         }),
       };
     case 'tools/call':
       return { status: 200, body: rpcOk(id, await callTool(message.params, principal, deps)) };
+    case 'resources/list':
+      return {
+        status: 200,
+        body: rpcOk(id, {
+          resources: deps.vaultEnabled?.() === true ? [healthVaultResourceDescriptor()] : [],
+        }),
+      };
+    case 'resources/read': {
+      const uri = (message.params as { uri?: unknown } | null)?.uri;
+      if (deps.vaultEnabled?.() !== true || uri !== HEALTH_VAULT_WIDGET_URI) {
+        return { status: 200, body: rpcError(id, -32002, 'Resource not found') };
+      }
+      const resource = healthVaultWidgetResource(new URL(deps.resourceUrl).origin);
+      return {
+        status: 200,
+        body: rpcOk(id, {
+          contents: [
+            {
+              uri: resource.uri,
+              mimeType: resource.mimeType,
+              text: resource.text,
+              _meta: resource._meta,
+            },
+          ],
+        }),
+      };
+    }
     default:
       return { status: 200, body: rpcError(id, -32601, 'Method not found') };
   }
@@ -98,7 +154,14 @@ async function callTool(
 ) {
   const { name, arguments: args } = (params ?? {}) as { name?: unknown; arguments?: unknown };
   const tool = findTool(name);
-  if (!tool || (tool.gate === 'metrics' && deps.metricsEnabled?.() !== true)) {
+  const widgetSurface = isHealthVaultWidgetSurface(principal.clientId);
+  // A widget-only tool on a client without a widget is unknown, not a scope error.
+  if (
+    !tool ||
+    (tool.gate === 'metrics' && deps.metricsEnabled?.() !== true) ||
+    (tool.gate === 'vault' && deps.vaultEnabled?.() !== true) ||
+    (tool.widgetOnly === true && !widgetSurface)
+  ) {
     return { content: [{ type: 'text', text: 'Unknown tool.' }], isError: true };
   }
   if (!principal.scopes.has(tool.scope)) {
@@ -141,6 +204,14 @@ async function callTool(
   try {
     return await tool.run(principal.subject, parsed.data as never, deps);
   } catch (error) {
+    if (tool.gate === 'vault') {
+      return {
+        content: [
+          { type: 'text', text: 'LogYourBody vault is unavailable right now. Try again shortly.' },
+        ],
+        isError: true,
+      };
+    }
     if (tool.gate === 'metrics') {
       return {
         content: [

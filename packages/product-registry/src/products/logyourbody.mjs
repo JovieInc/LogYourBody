@@ -18,11 +18,7 @@ export const logYourBody = {
       'Weight, body fat, lean mass, HealthKit data, and progress photos in one private timeline that shows the trend.',
     voice: ['clear', 'concise', 'evidence-based', 'non-judgmental', 'private'],
     colors: { background: '#08090A', foreground: '#F7F8F8', accent: '#5E6AD2' },
-    logos: {
-      appIcon: '/brand/logyourbody-app-icon.png',
-      wordmark: null,
-      mark: null,
-    },
+    logos: { appIcon: '/brand/logyourbody-app-icon.png', wordmark: null, mark: null },
   },
   links: {
     home: 'https://www.logyourbody.com',
@@ -91,6 +87,8 @@ export const logYourBody = {
       'progress_photos_old',
       'weight_logs_old',
       'email_subscriptions_old',
+      'health_vault_grants',
+      'health_vault_consent_log',
     ],
     buckets: ['photos'],
     vendor: {
@@ -141,6 +139,7 @@ export const logYourBody = {
       { value: 'https://help.bevel.health/en/articles/10437057', reason: 'LYB-179 primary reference teardown; documentation only, no integration.' },
       { value: 'https://edpb.europa.eu', reason: 'Legal-doc link (EDPB) referenced by privacy copy.' },
       { value: 'https://chatgpt.com', reason: 'ChatGPT OAuth redirect for the LogYourBody MCP connector (docs/integrations/chatgpt-app).' },
+      { value: 'https://web-sandbox.oaiusercontent.com', reason: 'OpenAI Apps SDK widget sandbox origin for the LYB-330 health vault view. Measurements are fetched from LogYourBody, not from this host.' },
       { value: 'https://apps.apple.com', reason: 'Apple storefront links.' },
       { value: 'https://appstoreconnect.apple.com', reason: 'App Store Connect links in release docs.' },
       { value: 'https://api.appstoreconnect.apple.com', reason: 'App Store Connect API base used by CI scripts.' },

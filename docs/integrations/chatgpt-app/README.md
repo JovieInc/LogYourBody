@@ -46,7 +46,7 @@ responses, but cannot establish a confirmed multi-session decline until the reco
 feedback is clarified. This does not freeze progression from logged sets. Identical
 duplicate scores are not ambiguous evidence.
 
-Every number the tools return comes from the deterministic training engine or from the
+Every number the training tools return comes from the deterministic training engine or from the
 user's own logs. Enrollment, adult confirmation and the safety consent stay in the iOS app;
 an unenrolled account gets a pointer to the app instead of a plan.
 
@@ -108,7 +108,8 @@ the PR description.
 
 ## Grok
 
-Grok calls the same server; nothing in the server is ChatGPT-specific.
+Grok calls the same training server. The health vault view is ChatGPT-only. On Grok the vault
+surface is the opt-in share tool, and only after a confirmation minted in the vault view.
 
 - Consumer: grok.com, Connectors, New Connector, Custom, paste the endpoint URL. xAI joined
   Voice Mode to Connectors in August 2026 (third-party report; verify on device).
@@ -122,15 +123,52 @@ Grok calls the same server; nothing in the server is ChatGPT-specific.
 
 Muse is an agent in the Jovie fleet (agent mesh roster). Its runtime spec is unverified. If
 it has a remote MCP client it adds the same endpoint and runs the same per-user OAuth flow.
+Without a widget it gets the opt-in share tool only, same as Grok.
 It must never use a shared service token to log on a user's behalf. Tracked in LYB-122.
 
 ## What stays out
 
-GLP-1 data, body-fat and other body composition, photos and anything medical stay out of
-this server. The one bounded exception is manual weight in the
-[first implementation slice](#first-implementation-slice-manual-weight-lifecycle).
+GLP-1 data and anything medical stay out of this server. Body composition and progress
+photos are not in MCP tool results. When the health vault gate is on, a ChatGPT widget can
+open a view that loads those measurements directly from LogYourBody, and
+`share_summary_with_chatgpt` returns only the fields the user confirms. The manual weight
+lifecycle below is a separate write and read of weights the user submits. It is not the vault.
 OpenAI bans protected health information, limits sensitive data to what the app strictly
 needs, and lists Ozempic under prohibited commerce.
+
+## Health vault (LYB-330)
+
+Default off. `LYB_HEALTH_VAULT_ENABLED` and `LYB_CHATGPT_MCP_ENABLED` must both be true, and
+either `LYB_HEALTH_VAULT_GATE_OVERRIDE=on` or an injected evaluation of `health_vault_chatgpt`
+must be open. A missing evaluation stays closed. Training and weight flags do not open it.
+
+`open_health_vault` is listed only for the ChatGPT widget client (`azp` `chatgpt`). Its tool
+result is readiness, item counts, and a single-use five-minute handle in tool-result
+`_meta`. Measurements are not in `content`, `structuredContent`, or `_meta`. The widget
+exchanges that handle with `POST /api/health-vault/view` on this host and loads images from
+LogYourBody. Grok, Muse, and Claude list only `share_summary_with_chatgpt`. That tool returns
+a summary after the user confirms the fields in the vault view. The confirmation is a consent
+event. The model cannot mint the confirmation itself.
+
+`_meta` is hidden from the model and still passes through the assistant host. A handle there
+does not mean the host never saw it. Counts in the tool result are included because the
+product example uses them, and legal has not accepted them yet.
+
+Listing and marketing copy are blocked on legal review. Do not publish either sentence until
+that review lands:
+
+- Candidate, only if the payload, network, and transcript audits pass: "Your scans, photos and weigh-ins load straight from your LYB vault. They never pass through OpenAI, and ChatGPT's AI never sees them unless you choose to share."
+- Otherwise, and on any surface without a widget: "Your scans and photos stay in your LYB vault. ChatGPT only sees what you choose to share."
+
+The sentence "OpenAI never sees your health data" is not approved. Typed messages and
+confirmed shares do reach the assistant host.
+
+Before every listing republish, run:
+
+`pnpm --filter apps/web exec jest src/lib/mcp/health-vault/payload-audit.node.test.ts src/lib/mcp/health-vault/widget.test.ts --coverage=false`
+
+The live transcript export (ChatGPT developer mode, ten conversations) needs a developer
+login and is not part of CI. The checked-in fixtures cover the same assertion.
 
 ## First implementation slice: manual weight lifecycle
 

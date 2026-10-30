@@ -6,11 +6,14 @@ import type { WeightLifecyclePort } from '@/lib/metrics/weight-lifecycle';
 import { verifyAccessToken, type JwksSource } from '@/lib/mcp/access-token';
 import { mcpResourceUrl, protectedResourceMetadata } from '@/lib/mcp/contract';
 import { handleMcpRequest, unauthenticatedResult, type McpHttpResult } from '@/lib/mcp/handler';
+import type { HealthVaultService } from '@/lib/mcp/health-vault/types';
 
 type McpRouteDependencies = {
   revisions?: TrainingRevisionsPort;
   delegatedEnabled?: () => boolean;
   metricsEnabled?: () => boolean;
+  vaultEnabled?: () => boolean;
+  vault?: HealthVaultService;
   weight?: WeightLifecyclePort;
   enabled: () => boolean;
   issuer: string;
@@ -68,6 +71,8 @@ export function createMcpRouteHandlers(dependencies: McpRouteDependencies) {
             revisions: dependencies.revisions,
             delegatedEnabled: dependencies.delegatedEnabled,
             metricsEnabled: dependencies.metricsEnabled,
+            vaultEnabled: dependencies.vaultEnabled,
+            vault: dependencies.vault,
             weight: dependencies.weight,
             reserveRequest: dependencies.reserveRequest,
             now: dependencies.now,
@@ -94,6 +99,7 @@ export function createMcpRouteHandlers(dependencies: McpRouteDependencies) {
           resourceUrl: resourceFor(request),
           issuer: dependencies.issuer,
           metrics: dependencies.metricsEnabled?.() === true,
+          vault: dependencies.vaultEnabled?.() === true,
         }),
         { headers: { ...CORS, 'cache-control': 'no-store' } },
       );
