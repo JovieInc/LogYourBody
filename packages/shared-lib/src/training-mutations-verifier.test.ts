@@ -6,12 +6,18 @@ import { expect, it } from 'vitest';
 
 const root = fileURLToPath(new URL('../../..', import.meta.url)).replace(/\/$/, '');
 const production = root + '/apps/web/db/tests/verify-training-mutations.py';
-const safetyFunctions = ['isolated_environment', 'run_command', 'verify_postgres_tools'];
+const safetyFunctions = [
+  'isolated_environment',
+  'run_command',
+  'verify_postgres_tools',
+  'account_cleanup_statements',
+];
 // trace's CLI can swallow SystemExit; preserve the actual unittest result.
 const driver = `
 import ast, json, pathlib, runpy, sys, trace
 tracer = trace.Trace(count=True, trace=False, ignoredirs=[sys.prefix])
 test_path, coverage_dir, production = sys.argv[1:]
+sys.path.insert(0, str(pathlib.Path(production).parent))
 sys.argv = [test_path]
 status = 0
 try:
@@ -22,20 +28,20 @@ except SystemExit as error:
 finally:
     results = tracer.results()
     results.write_results(show_missing=True, summary=True, coverdir=coverage_dir)
-    path = pathlib.Path(production).resolve()
     safety = {}
-    for node in ast.parse(path.read_text()).body:
-        if isinstance(node, ast.FunctionDef) and node.name in (
-                "isolated_environment", "run_command", "verify_postgres_tools"):
-            statements = {item.lineno for item in ast.walk(node)
-                          if isinstance(item, ast.stmt) and item is not node
-                          and not (isinstance(item, ast.Expr)
-                                   and isinstance(item.value, ast.Constant)
-                                   and isinstance(item.value.value, str))}
-            executed = {line for (file, line), count in results.counts.items()
-                        if pathlib.Path(file).resolve() == path and count > 0}
-            safety[node.name] = {"executedStatements": len(statements & executed),
-                                 "statements": len(statements)}
+    for path in (pathlib.Path(production).resolve(), pathlib.Path(production).with_name("account_cleanup.py").resolve()):
+        for node in ast.parse(path.read_text()).body:
+            if isinstance(node, ast.FunctionDef) and node.name in (
+                    "isolated_environment", "run_command", "verify_postgres_tools", "account_cleanup_statements"):
+                statements = {item.lineno for item in ast.walk(node)
+                              if isinstance(item, ast.stmt) and item is not node
+                              and not (isinstance(item, ast.Expr)
+                                       and isinstance(item.value, ast.Constant)
+                                       and isinstance(item.value.value, str))}
+                executed = {line for (file, line), count in results.counts.items()
+                            if pathlib.Path(file).resolve() == path and count > 0}
+                safety[node.name] = {"executedStatements": len(statements & executed),
+                                     "statements": len(statements)}
     print("Training verifier safety execution: " + json.dumps(safety), flush=True)
 sys.exit(status)
 `;
@@ -46,7 +52,7 @@ function checkedTrace(test: string, coverage: string) {
     cwd: root,
     timeout: 30_000,
   });
-  expect(output).toContain('Training verifier behavior tests executed: 7');
+  expect(output).toContain('Training verifier behavior tests executed: 12');
   const row = output
     .split('\n')
     .find((line) => line.startsWith('Training verifier safety execution: '));
@@ -107,7 +113,7 @@ it('rejects import-only production coverage despite a passing suite marker', () 
       test,
       'import runpy\nrunpy.run_path(' +
         JSON.stringify(production) +
-        ')\nprint("Training verifier behavior tests executed: 7")\n',
+        ')\nprint("Training verifier behavior tests executed: 12")\n',
     );
     expect(() => checkedTrace(test, directory)).toThrow(/isolated_environment/);
   } finally {

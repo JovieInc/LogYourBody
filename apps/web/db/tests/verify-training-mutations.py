@@ -14,6 +14,8 @@ import tempfile
 import time
 import uuid
 
+from account_cleanup import account_cleanup_statements, verify_vault_erasure
+
 
 def isolated_environment(environment):
     """Do not inherit a production endpoint, credential or connection option."""
@@ -304,21 +306,7 @@ def main():
             assert json.loads(sql(recovery_sql(subject, admission, other_applied, 0)))['kind'] == 'saved'
             checks.append('recovery_source_cas_immutable_proposal_history_review_revert_single_active')
 
-            import re
-            adapter=(web/'src/lib/neon/user-directory-adapter.ts').read_text().split('async deleteUser(admission)')[1]
-            statements=re.findall(r'database`([^`]+)`',adapter)
-            expected_cleanup = [
-                'delete from public.chat_usage_limits where user_subject = ${subject}',
-                'delete from public.chat_conversations where user_subject = ${subject}',
-                'delete from public.weight_operation_receipts where user_subject = ${subject}',
-                'delete from public.body_metric_audit where user_subject = ${subject}',
-                'delete from public.metrics_agent_grants where user_subject = ${subject}',
-                'delete from public.body_metrics where user_subject = ${subject}',
-                'delete from public.native_records where user_subject = ${subject}',
-                'select public.lyb_delete_my_gyms(${subject})',
-                "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ${subject}",
-            ]
-            assert [re.sub(r'\s+', ' ', s).strip() for s in statements] == expected_cleanup
+            statements = account_cleanup_statements(web, sql, lambda path: run(client + ['-f', str(path)]))
             guard_source=(web/'src/lib/neon/native-account-admission.ts').read_text()
             guards=re.findall(r"database.query\('(select public.lyb_native_account_admit\(\$1, \$2::uuid\))'",guard_source)
             assert len(guards)==1, 'Expected the unique actual account guard SQL'
@@ -376,6 +364,9 @@ def main():
             assert weight_counts(subject)==[0,0,0,0] and weight_counts(other)==[1,1,1,1]
             assert sql(f"select count(*) from app_users where identity_subject={quote(subject)};")=='0'
             check('weight account erasure rolls back on failure, retries completely, and preserves the other owner')
+
+            verify_vault_erasure(sql, owner, deletion, quote)
+            check('vault account erasure rolls back on later failure, retries every grant kind and consent log, and preserves the other owner')
 
             for boundary in ['revoke','delete']:
                 for action in ['session_insert','session_update','completion','set_insert','feedback_insert','swap_insert','set_correct','recovery_trial']:

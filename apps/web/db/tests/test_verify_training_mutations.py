@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -32,6 +33,86 @@ class VerifierContracts(unittest.TestCase):
                           f'if "--version" in sys.argv:\n print("{name} (PostgreSQL) {major}.15");sys.exit(0)\n' + body)
         binary.chmod(0o700)
         return binary
+
+    def cleanup_fixture(self):
+        web = self.root / 'web'
+        adapter = web / 'src/lib/neon/user-directory-adapter.ts'
+        adapter.parent.mkdir(parents=True)
+        migrations = web / 'db/migrations'
+        migrations.mkdir(parents=True)
+        actual = SCRIPT.resolve().parents[2]
+        adapter.write_text((actual / 'src/lib/neon/user-directory-adapter.ts').read_text())
+        migration = migrations / '20261030120000_health_vault_grants.sql'
+        migration.write_text((actual / 'db/migrations' / migration.name).read_text())
+        return web, adapter, migration
+
+    def test_cleanup_loads_future_tables_from_real_migrations_once(self):
+        web, adapter, migration = self.cleanup_fixture()
+        for path in (adapter, migration):
+            path.write_text(path.read_text().replace('health_vault_grants', 'future_grants')
+                            .replace('health_vault_consent_log', 'future_audit'))
+        loaded = []
+        tables = set()
+
+        def sql(statement):
+            table = re.search(r"public\.(\w+)'", statement)[1]
+            return 't' if table in tables else 'f'
+
+        def load(path):
+            loaded.append(path)
+            tables.update(re.findall(r'create table if not exists public\.(\w+)', path.read_text()))
+
+        statements = verifier.account_cleanup_statements(web, sql, load)
+        self.assertEqual(loaded, [migration])
+        self.assertEqual(statements[7:9], [
+            'delete from public.future_grants where user_subject = ${subject}',
+            'delete from public.future_audit where user_subject = ${subject}',
+        ])
+        # A populated schema must not replay a migration over deliberate SQL mutants.
+        verifier.account_cleanup_statements(web, lambda _: 't', load)
+        self.assertEqual(loaded, [migration])
+
+    def test_cleanup_preserves_required_order_and_identity_predicates(self):
+        web, adapter, _ = self.cleanup_fixture()
+        original = adapter.read_text()
+        first = 'database`delete from public.chat_usage_limits where user_subject = ${subject}`,'
+        for changed in [original.replace(first, ''),
+                        original.replace('public.chat_usage_limits', 'public.chat_conversations', 1),
+                        original.replace('lyb_delete_my_gyms(${subject})', 'lyb_delete_my_gyms(null)'),
+                        original.replace("identity_provider = 'jovie'", "identity_provider = 'other'")]:
+            with self.subTest(changed=changed):
+                adapter.write_text(changed)
+                with self.assertRaisesRegex(AssertionError, 'required account cleanup'):
+                    verifier.account_cleanup_statements(web, lambda _: 't', lambda _: None)
+
+    def test_cleanup_rejects_unsafe_or_duplicate_extensions(self):
+        web, adapter, _ = self.cleanup_fixture()
+        original = adapter.read_text()
+        statement = 'delete from public.health_vault_grants where user_subject = ${subject}'
+        for replacement in ['delete from public.health_vault_grants',
+                            statement.replace('${subject}', "'other'"),
+                            statement + ' or true',
+                            statement + '` , database`' + statement]:
+            with self.subTest(replacement=replacement):
+                adapter.write_text(original.replace(statement, replacement))
+                with self.assertRaisesRegex(AssertionError, 'subject-scoped cleanup|duplicate account cleanup'):
+                    verifier.account_cleanup_statements(web, lambda _: 't', lambda _: None)
+
+    def test_cleanup_requires_unique_canonical_migration(self):
+        web, _, migration = self.cleanup_fixture()
+        contents = migration.read_text()
+        migration.unlink()
+        with self.assertRaisesRegex(AssertionError, 'unique migration.*health_vault_grants'):
+            verifier.account_cleanup_statements(web, lambda _: 'f', lambda _: None)
+        migration.write_text(contents)
+        migration.with_name('duplicate.sql').write_text(contents)
+        with self.assertRaisesRegex(AssertionError, 'unique migration.*health_vault_grants'):
+            verifier.account_cleanup_statements(web, lambda _: 'f', lambda _: None)
+
+    def test_cleanup_fails_when_migration_does_not_create_table(self):
+        web, _, _ = self.cleanup_fixture()
+        with self.assertRaisesRegex(AssertionError, 'migration did not create.*health_vault_grants'):
+            verifier.account_cleanup_statements(web, lambda _: 'f', lambda _: None)
 
     def test_connection_credentials_and_options_are_removed(self):
         env = verifier.isolated_environment({'DATABASE_URL': 'synthetic', 'PGHOST': 'remote',
