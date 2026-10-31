@@ -35,15 +35,16 @@ private final class TrainingRestAlertSpy: TrainingRestAlerting {
 
 @MainActor
 final class TrainingSessionDraftTests: XCTestCase {
+    private let sessionId = UUID().uuidString
     private let exercise = TrainingExercisePrescription(
         id: "fixture_press", name: "Fixture press", primaryMuscle: "chest", muscleContribution: ["chest": 1],
         sets: 2, repRange: .init(min: 8, max: 12), targetReps: 10, targetRir: 3, targetLoadKg: 60,
         loadInstruction: "Repeat last session's load.", progression: "hold", evidenceIds: []
     )
 
-    private func session(id: String = "fixture-session", saved: [TrainingSavedSet] = []) -> TrainingSession {
+    private func session(id: String? = nil, saved: [TrainingSavedSet] = []) -> TrainingSession {
         TrainingSession(
-            id: id, week: 2, slot: 0, pattern: "A", title: "Fixture session", exercises: [exercise],
+            id: id ?? sessionId, week: 2, slot: 0, pattern: "A", title: "Fixture session", exercises: [exercise],
             safetyStop: false, explanation: nil, evidenceIds: [], loggedSets: saved
         )
     }
@@ -82,6 +83,25 @@ final class TrainingSessionDraftTests: XCTestCase {
         }
     }
 
+    func testSessionFixtureCachesOneIdentityAndRejectsInvalidReplacement() throws {
+        let directory = root()
+        let store = TrainingDraftStore(rootURL: directory)
+        let saved = TrainingSavedSet(
+            sessionId: sessionId, exerciseId: exercise.id, setNumber: 1,
+            reps: 12, loadKg: 60, rir: 2, revision: 0, corrections: []
+        )
+        let current = session(saved: [saved])
+        XCTAssertEqual(session().id, current.id)
+        try store.cacheActiveSession(current, ownerId: "owner-A")
+        let reopened = TrainingDraftStore(rootURL: directory)
+        XCTAssertEqual(try reopened.activeSession(ownerId: "owner-A"), current)
+        XCTAssertNil(try reopened.activeSession(ownerId: "owner-B"))
+        XCTAssertThrowsError(try reopened.cacheActiveSession(session(id: "invalid-session"), ownerId: "owner-A")) { error in
+            XCTAssertEqual(error as? TrainingCardContractError, .invalidIdentity)
+        }
+        XCTAssertEqual(try reopened.activeSession(ownerId: "owner-A"), current)
+    }
+
     private func model(_ store: TrainingDraftStore, owner: String = "owner-A") -> TrainingSessionDraft {
         TrainingSessionDraft(session: session(), ownerId: owner, store: store, isCurrent: { true })
     }
@@ -90,7 +110,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         let directory = root()
         let store = TrainingDraftStore(rootURL: directory)
         let draft = model(store)
-        var request = TrainingFeedbackRequest(sessionId: "fixture-session")
+        var request = TrainingFeedbackRequest(sessionId: self.sessionId)
         request.context = .init(exerciseId: exercise.id, setNumber: 1, gymId: "Gym", romRestriction: "limited")
         request.trunkFatigue = 6
         request.generalExhaustion = 1
@@ -237,16 +257,16 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertEqual(restored.rest.countdown, timer)
         XCTAssertEqual(restored.undoAffordance, receipt)
         restored.adjustRest(by: 15)
-        XCTAssertEqual(try store.loadUndo(ownerId: "owner-A", sessionId: "fixture-session"), receipt)
+        XCTAssertEqual(try store.loadUndo(ownerId: "owner-A", sessionId: self.sessionId), receipt)
         XCTAssertEqual(
-            try store.loadRest(ownerId: "owner-A", sessionId: "fixture-session").countdown,
+            try store.loadRest(ownerId: "owner-A", sessionId: self.sessionId).countdown,
             timer.adjusted(by: 15)
         )
         var paused = session(saved: Array(draft.loggedSets.values))
         paused.executionPaused = true
         restored.replaceSession(paused)
         XCTAssertNil(restored.rest.countdown)
-        XCTAssertEqual(try store.loadUndo(ownerId: "owner-A", sessionId: "fixture-session"), receipt)
+        XCTAssertEqual(try store.loadUndo(ownerId: "owner-A", sessionId: self.sessionId), receipt)
     }
 
     func testOlderAcknowledgementDoesNotRestartAdjustedRestAfterSessionRefresh() async throws {
@@ -363,7 +383,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         ))
         for pixel in 1...60 { edit.move(horizontal: Double(pixel), vertical: 0) }
         XCTAssertTrue(draft.rows.isEmpty, "Provisional frames must not write the journal")
-        XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: "fixture-session").isEmpty)
+        XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: self.sessionId).isEmpty)
         let canonical = try XCTUnwrap(edit.committedText(current: "60"))
         draft.update(exercise, setNumber: 1) { $0.loadText = canonical; $0.repsText = "12"; $0.rir = 2 }
         let restored = model(store)
@@ -414,7 +434,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         var corrections = 0
         await draft.correct(position) { request in
             corrections += 1
-            XCTAssertEqual(request.sessionId, "fixture-session")
+            XCTAssertEqual(request.sessionId, self.sessionId)
             XCTAssertEqual(request.exerciseId, self.exercise.id)
             XCTAssertEqual(request.setNumber, 1)
             return TrainingSavedSet(
@@ -430,7 +450,7 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testFeedbackRequestEncodesOptionalMuscleDetailAndTouchSource() throws {
         let request = TrainingFeedbackRequest(
-            sessionId: "fixture-session",
+            sessionId: self.sessionId,
             jointPain: 0,
             muscles: [
                 "chest": TrainingMuscleFeedbackRequest(
@@ -460,7 +480,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         _ intent: TrainingWorkoutFeedback.Intent, set: Int = 1, statement: String = "reported observation"
     ) -> TrainingWorkoutFeedback {
         TrainingWorkoutFeedback(
-            sessionId: "fixture-session", exerciseId: exercise.id, setNumber: set,
+            sessionId: self.sessionId, exerciseId: exercise.id, setNumber: set,
             intent: intent, originalStatement: statement
         )
     }
@@ -468,13 +488,13 @@ final class TrainingSessionDraftTests: XCTestCase {
     func testReadinessVoiceWireContractAndFlattenedCanonicalReceiptDecode() throws {
         let data = Data("""
         {"version":1,"kind":"workout_feedback","requiresConfirmation":true,
-         "feedback":{"sessionId":"fixture-session","exerciseId":"fixture_press","setNumber":1,
+         "feedback":{"sessionId":"\(sessionId)","exerciseId":"fixture_press","setNumber":1,
                      "intent":"breathing_limited","originalStatement":"still out of breath"}}
         """.utf8)
         let voice = try JSONDecoder().decode(VoiceIntentResponse.self, from: data)
         XCTAssertEqual(voice.feedback?.intent, .breathingLimited)
         XCTAssertEqual(voice.feedback?.setNumber, 1)
-        var request = TrainingFeedbackRequest(sessionId: "fixture-session", source: "voice")
+        var request = TrainingFeedbackRequest(sessionId: self.sessionId, source: "voice")
         request.breathingReadiness = "limited"
         request.sourceObservationId = "utterance-1"
         request.context = TrainingFeedbackContext(exerciseId: exercise.id, setNumber: 1)
@@ -529,7 +549,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         var attempts: [TrainingFeedbackRequest] = []
         await draft.recordWorkoutFeedback(feedbackProposal(.breathingLimited, set: 2), source: "voice") { request in
             attempts.append(request)
-            XCTAssertEqual(try store.loadFeedback(ownerId: "owner-A", sessionId: "fixture-session")?.request, request)
+            XCTAssertEqual(try store.loadFeedback(ownerId: "owner-A", sessionId: self.sessionId)?.request, request)
             throw URLError(.notConnectedToInternet)
         }
         XCTAssertEqual(draft.currentPosition, intended)
@@ -574,7 +594,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertNil(draft.nextSetRecommendation)
         XCTAssertNotNil(draft.errorMessage)
         XCTAssertNil(draft.feedback?.response)
-        XCTAssertNil(try store.loadFeedback(ownerId: "owner-B", sessionId: "fixture-session"))
+        XCTAssertNil(try store.loadFeedback(ownerId: "owner-B", sessionId: self.sessionId))
         let stale = model(store)
         await draft.retryFeedback { request in self.feedbackResponse(request, action: .proceed) }
         await stale.retryFeedback { request in self.feedbackResponse(request, action: .extendRest) }
@@ -761,7 +781,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         var attempts: [TrainingSetLogRequest] = []
         var serverRows: [String: TrainingSetLogRequest] = [:]
         await original.save(exercise, setNumber: 1) { request in
-            let pending = try store.load(ownerId: "owner-A", sessionId: "fixture-session")["fixture_press-1"]
+            let pending = try store.load(ownerId: "owner-A", sessionId: self.sessionId)["fixture_press-1"]
             XCTAssertEqual(pending?.pendingRequest, request)
             attempts.append(request)
             serverRows["fixture_press-1"] = request
@@ -782,7 +802,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertEqual(attempts[0], attempts[1])
         XCTAssertEqual(serverRows.count, 1)
         XCTAssertEqual(restored.loggedSets.count, 1)
-        XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: "fixture-session").isEmpty)
+        XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: self.sessionId).isEmpty)
         var extraSends = 0
         await restored.save(exercise, setNumber: 1) { _ in extraSends += 1 }
         XCTAssertEqual(extraSends, 0)
@@ -823,7 +843,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         var sends = 0
         await draft.save(exercise, setNumber: 1) { _ in sends += 1 }
         XCTAssertEqual(sends, 0)
-        XCTAssertNil(try store.load(ownerId: "owner-A", sessionId: "fixture-session")["fixture_press-1"]?.pendingRequest)
+        XCTAssertNil(try store.load(ownerId: "owner-A", sessionId: self.sessionId)["fixture_press-1"]?.pendingRequest)
     }
 
     func testAcknowledgementCannotRemoveNewerRevisionOrOtherOwner() async throws {
@@ -832,15 +852,15 @@ final class TrainingSessionDraftTests: XCTestCase {
         let draft = model(store)
         model(store, owner: "owner-B").update(exercise, setNumber: 1) { $0.loadText = "80" }
         await draft.save(exercise, setNumber: 1) { _ in
-            var newer = try XCTUnwrap(store.load(ownerId: "owner-A", sessionId: "fixture-session")["fixture_press-1"])
+            var newer = try XCTUnwrap(store.load(ownerId: "owner-A", sessionId: self.sessionId)["fixture_press-1"])
             newer.revision = UUID()
             newer.pendingRequest = nil
             newer.loadText = "75"
-            try store.put(newer, ownerId: "owner-A", sessionId: "fixture-session")
+            try store.put(newer, ownerId: "owner-A", sessionId: self.sessionId)
         }
         XCTAssertTrue(draft.loggedSets.isEmpty)
-        XCTAssertEqual(try store.load(ownerId: "owner-A", sessionId: "fixture-session")["fixture_press-1"]?.loadText, "75")
-        XCTAssertEqual(try store.load(ownerId: "owner-B", sessionId: "fixture-session")["fixture_press-1"]?.loadText, "80")
+        XCTAssertEqual(try store.load(ownerId: "owner-A", sessionId: self.sessionId)["fixture_press-1"]?.loadText, "75")
+        XCTAssertEqual(try store.load(ownerId: "owner-B", sessionId: self.sessionId)["fixture_press-1"]?.loadText, "80")
     }
 
     func testDifferentNextSessionRetainsOldPendingWithoutReplayingOrRetargeting() async throws {
@@ -854,8 +874,8 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertTrue(next.loggedSets.isEmpty)
         XCTAssertTrue(next.rows.isEmpty)
         XCTAssertEqual(sends, 1)
-        let oldAttempt = try store.load(ownerId: "owner-A", sessionId: "fixture-session")["fixture_press-1"]?.pendingRequest
-        XCTAssertEqual(oldAttempt?.sessionId, "fixture-session")
+        let oldAttempt = try store.load(ownerId: "owner-A", sessionId: self.sessionId)["fixture_press-1"]?.pendingRequest
+        XCTAssertEqual(oldAttempt?.sessionId, self.sessionId)
     }
 
     func testAuthoritativeSavedSetWinsAndUnknownPrescriptionRowsDoNotRestore() throws {
@@ -865,9 +885,9 @@ final class TrainingSessionDraftTests: XCTestCase {
         let unknown = TrainingSetDraft(
             exerciseId: "obsolete", setNumber: 1, repsText: "10", loadText: "35", rir: 3
         )
-        try store.put(unknown, ownerId: "owner-A", sessionId: "fixture-session")
+        try store.put(unknown, ownerId: "owner-A", sessionId: self.sessionId)
         let saved = TrainingSavedSet(
-            sessionId: "fixture-session",
+            sessionId: self.sessionId,
             exerciseId: exercise.id,
             setNumber: 1,
             reps: 12,
@@ -880,8 +900,8 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertEqual(restored.row(for: exercise, setNumber: 1).loadText, "45")
         XCTAssertEqual(restored.loggedSets["fixture_press-1"], saved)
         XCTAssertTrue(restored.rows.isEmpty)
-        XCTAssertNil(try store.load(ownerId: "owner-A", sessionId: "fixture-session")["fixture_press-1"])
-        let remaining = try store.load(ownerId: "owner-A", sessionId: "fixture-session")
+        XCTAssertNil(try store.load(ownerId: "owner-A", sessionId: self.sessionId)["fixture_press-1"])
+        let remaining = try store.load(ownerId: "owner-A", sessionId: self.sessionId)
         XCTAssertNotNil(remaining["obsolete-1"], "Unresolved rows are not silently deleted")
     }
 
@@ -892,8 +912,8 @@ final class TrainingSessionDraftTests: XCTestCase {
         model(store, owner: "owner-B").update(exercise, setNumber: 1) { $0.loadText = "80" }
         try store.purge(ownerId: "owner-A")
         try store.purge(ownerId: "owner-A")
-        XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: "fixture-session").isEmpty)
-        XCTAssertEqual(try store.load(ownerId: "owner-B", sessionId: "fixture-session")["fixture_press-1"]?.loadText, "80")
+        XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: self.sessionId).isEmpty)
+        XCTAssertEqual(try store.load(ownerId: "owner-B", sessionId: self.sessionId)["fixture_press-1"]?.loadText, "80")
     }
 
     func testStalePrepareCannotOverwriteNewerDraftIncludingInitiallyAbsentRow() async throws {
@@ -904,11 +924,11 @@ final class TrainingSessionDraftTests: XCTestCase {
             let stale = model(store)
             let newer = model(store)
             newer.update(exercise, setNumber: 1) { $0.loadText = "75" }
-            let before = try store.load(ownerId: "owner-A", sessionId: "fixture-session")
+            let before = try store.load(ownerId: "owner-A", sessionId: self.sessionId)
             var sends = 0
             await stale.save(exercise, setNumber: 1) { _ in sends += 1 }
             XCTAssertEqual(sends, 0)
-            XCTAssertEqual(try store.load(ownerId: "owner-A", sessionId: "fixture-session"), before)
+            XCTAssertEqual(try store.load(ownerId: "owner-A", sessionId: self.sessionId), before)
             XCTAssertNotNil(stale.errorMessage)
             XCTAssertTrue(stale.loggedSets.isEmpty)
         }
@@ -921,9 +941,9 @@ final class TrainingSessionDraftTests: XCTestCase {
         let saving = model(store)
         let stale = model(store)
         await saving.save(exercise, setNumber: 1) { _ in throw URLError(.networkConnectionLost) }
-        let pending = try store.load(ownerId: "owner-A", sessionId: "fixture-session")
+        let pending = try store.load(ownerId: "owner-A", sessionId: self.sessionId)
         stale.update(exercise, setNumber: 1) { $0.loadText = "75" }
-        XCTAssertEqual(try store.load(ownerId: "owner-A", sessionId: "fixture-session"), pending)
+        XCTAssertEqual(try store.load(ownerId: "owner-A", sessionId: self.sessionId), pending)
         XCTAssertEqual(stale.row(for: exercise, setNumber: 1).loadText, "22,5")
         XCTAssertNotNil(stale.errorMessage)
         var sends = 0
@@ -940,7 +960,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         let corrupt = Data("invalid-journal".utf8)
         try corrupt.write(to: file, options: .atomic)
         let saved = TrainingSavedSet(
-            sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 1, reps: 12, loadKg: 45, rir: 2
+            sessionId: self.sessionId, exerciseId: exercise.id, setNumber: 1, reps: 12, loadKg: 45, rir: 2
         )
         let restored = TrainingSessionDraft(
             session: session(saved: [saved]), ownerId: "owner-A", store: store, isCurrent: { true }
@@ -961,10 +981,10 @@ final class TrainingSessionDraftTests: XCTestCase {
         let draft = model(store)
         draft.update(exercise, setNumber: 1) { $0.loadText = "22,5" }
         draft.update(exercise, setNumber: 2) { $0.loadText = "35" }
-        let before = try store.load(ownerId: "owner-A", sessionId: "fixture-session")
+        let before = try store.load(ownerId: "owner-A", sessionId: self.sessionId)
         let saved = (1...2).map { number in
             TrainingSavedSet(
-                sessionId: "fixture-session",
+                sessionId: self.sessionId,
                 exerciseId: exercise.id,
                 setNumber: number,
                 reps: 12,
@@ -984,7 +1004,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertEqual(restored.row(for: exercise, setNumber: 1).loadText, "45")
         XCTAssertEqual(restored.row(for: exercise, setNumber: 2).loadText, "45")
         XCTAssertEqual(cleanupWrites, 2, "A failed cleanup must not interrupt the remaining acknowledgements")
-        XCTAssertEqual(try store.load(ownerId: "owner-A", sessionId: "fixture-session"), before)
+        XCTAssertEqual(try store.load(ownerId: "owner-A", sessionId: self.sessionId), before)
         XCTAssertNotNil(restored.errorMessage)
     }
 
@@ -995,16 +1015,16 @@ final class TrainingSessionDraftTests: XCTestCase {
             let draft = model(store)
             draft.update(exercise, setNumber: 1) { $0.loadText = "22,5" }
             await draft.save(exercise, setNumber: 1) { _ in throw URLError(.networkConnectionLost) }
-            let before = try store.load(ownerId: "owner-A", sessionId: "fixture-session")
+            let before = try store.load(ownerId: "owner-A", sessionId: self.sessionId)
             let saved = TrainingSavedSet(
-                sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 1, reps: 10,
+                sessionId: self.sessionId, exerciseId: exercise.id, setNumber: 1, reps: 10,
                 loadKg: matches ? 22.5 : 75, rir: 3
             )
             let restored = TrainingSessionDraft(
                 session: session(saved: [saved]), ownerId: "owner-A", store: store, isCurrent: { true }
             )
             XCTAssertEqual(restored.loggedSets["fixture_press-1"], saved)
-            let after = try store.load(ownerId: "owner-A", sessionId: "fixture-session")
+            let after = try store.load(ownerId: "owner-A", sessionId: self.sessionId)
             if matches { XCTAssertTrue(after.isEmpty) } else {
                 XCTAssertEqual(after, before, "A different payload does not acknowledge the immutable attempted values")
                 XCTAssertNotNil(restored.errorMessage)
@@ -1060,7 +1080,7 @@ final class TrainingSessionDraftTests: XCTestCase {
             response.release()
             await operation.value
             XCTAssertTrue(draft.loggedSets.isEmpty)
-            XCTAssertNotNil(try store.load(ownerId: "owner-A", sessionId: "fixture-session")["fixture_press-1"]?.pendingRequest)
+            XCTAssertNotNil(try store.load(ownerId: "owner-A", sessionId: self.sessionId)["fixture_press-1"]?.pendingRequest)
         }
     }
 
@@ -1116,7 +1136,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         let directory = root()
         let store = TrainingDraftStore(rootURL: directory)
         let original = TrainingSavedSet(
-            sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 1,
+            sessionId: self.sessionId, exerciseId: exercise.id, setNumber: 1,
             reps: 10, loadKg: 60, rir: 3, revision: 0, corrections: []
         )
         let draft = TrainingSessionDraft(
@@ -1159,7 +1179,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertEqual(attempts[0], attempts[1])
         XCTAssertEqual(restored.loggedSets[position.id]?.reps, 9)
         XCTAssertEqual(restored.loggedSets[position.id]?.revision, 1)
-        XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: "fixture-session").isEmpty)
+        XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: self.sessionId).isEmpty)
     }
 
     func testFreshLogHasNoUndoAndALaterAcknowledgementCannotEraseACorrection() async throws {
@@ -1176,7 +1196,7 @@ final class TrainingSessionDraftTests: XCTestCase {
 
         draft.update(exercise, setNumber: 1) { $0.repsText = "12"; $0.loadText = "60"; $0.rir = 2 }
         let audited = TrainingSavedSet(
-            sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 1,
+            sessionId: self.sessionId, exerciseId: exercise.id, setNumber: 1,
             reps: 12, loadKg: 60, rir: 2, revision: 2,
             corrections: [
                 TrainingSetCorrectionAudit(
@@ -1199,7 +1219,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         let again = model(TrainingDraftStore(rootURL: directory))
         again.update(exercise, setNumber: 2) { $0.repsText = "8"; $0.loadText = "60"; $0.rir = 1 }
         let corrected = TrainingSavedSet(
-            sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 2,
+            sessionId: self.sessionId, exerciseId: exercise.id, setNumber: 2,
             reps: 10, loadKg: 60, rir: 1, revision: 2, corrections: audited.corrections
         )
         await again.saveAcknowledged(exercise, setNumber: 2) { request in
@@ -1218,7 +1238,7 @@ final class TrainingSessionDraftTests: XCTestCase {
         let store = TrainingDraftStore(rootURL: directory)
         var clock = Date(timeIntervalSince1970: 1_700_000_000)
         let original = TrainingSavedSet(
-            sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 1,
+            sessionId: self.sessionId, exerciseId: exercise.id, setNumber: 1,
             reps: 12, loadKg: 60, rir: 2, revision: 0, corrections: []
         )
         try store.cacheActiveSession(session(saved: [original]), ownerId: "owner-A")

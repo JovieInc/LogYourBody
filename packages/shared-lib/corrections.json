@@ -5023,5 +5023,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "training-draft-fixture-uses-canonical-session-identity",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41159088652/job/124412563962",
+    "correction": "PR #1639 (LYB-176), work fingerprint fix-red-5df69c1e5f: Launch Quality fails testUndoReceiptSurvivesRelaunchUntilExpiryAndRetriesOneId at cacheActiveSession with invalidIdentity because the shared session fixture uses the non-UUID fixture-session ID.",
+    "mechanization": "Extend the existing draft session factory to use one UUID per test instance and route saved sets, journal keys, feedback and identity assertions through that same value. All default fixture sessions now meet the canonical card identity requirement by construction. Add a native regression that caches the generated session with a saved set, reopens it with identical identity and receipts, isolates another owner, and rejects an invalid replacement without losing the valid cache. Preserve the existing undo/relaunch assertions and production validation. The recorded native failure proves the old fixture is rejected; exact-head XCTest execution and coverage remain required on macOS CI because this Linux host cannot run them. Machine: built apps/ios/LogYourBodyTests/TrainingSessionDraftTests.swift. The harness retains push and PR-body ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared fixture factory can generate a canonical UUID once per test instance and supply that same identity to every default session and associated record, preventing invalid cache fixtures by construction without relaxing the production contract."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/TrainingSessionDraftTests.swift",
+      "anchor": "private let sessionId = UUID().uuidString"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
