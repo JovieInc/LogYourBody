@@ -1303,12 +1303,6 @@ final class ChaosMonkeyUITests: XCTestCase {
     /// so geometry is checked before ever calling it -- own simulator
     /// evidence: a "What changed recently?" button crashed a layout scan
     /// this way under AccessibilityXXXL.
-    private func hasFiniteNonZeroFrame(_ element: XCUIElement) -> Bool {
-        let frame = element.frame
-        return frame.width.isFinite && frame.height.isFinite
-            && frame.origin.x.isFinite && frame.origin.y.isFinite
-            && frame.width > 0 && frame.height > 0
-    }
 
     private func isDenylisted(_ element: XCUIElement) -> Bool {
         if Self.denylistedIdentifiers.contains(element.identifier) {
@@ -1318,18 +1312,6 @@ final class ChaosMonkeyUITests: XCTestCase {
         return Self.denylistedLabelFragments.contains { haystack.contains($0) }
     }
 
-    /// A cheap fingerprint of the candidate set `StuckDetector` compares
-    /// across steps: identifier + label + enabled state for each element,
-    /// order-sensitive (the query order is stable for an unchanged tree).
-    private func treeFingerprint(_ elements: [XCUIElement]) -> Int {
-        var hasher = Hasher()
-        for element in elements {
-            hasher.combine(element.identifier)
-            hasher.combine(element.label)
-            hasher.combine(element.isEnabled)
-        }
-        return hasher.finalize()
-    }
 
     func testActiveSessionsScreenShowsCurrentDeviceWithoutRevoke() throws {
         continueAfterFailure = false
