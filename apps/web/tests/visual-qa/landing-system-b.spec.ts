@@ -91,7 +91,9 @@ test('waitlist has stable hover, keyboard and async states without writing real 
     route.fulfill({ status: 202, contentType: 'application/json', body: '{"success":true}' }),
   );
   await button.click();
-  await expect(page.getByText('Your early-access request was received.')).toBeVisible();
+  await expect(
+    page.getByText("You're on the early-access list. We'll email you when your invite is ready."),
+  ).toBeVisible();
   await expect(button).toBeDisabled();
   expect(await page.locator('#features-heading').boundingBox()).toEqual(anchor);
 });

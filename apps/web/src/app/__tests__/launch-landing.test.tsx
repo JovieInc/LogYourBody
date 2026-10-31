@@ -46,10 +46,10 @@ describe('LaunchLanding', () => {
     }
     expect(launchLandingFeatures.length).toBeGreaterThanOrEqual(3);
 
-    expect(screen.getByText(launchLandingCopy.pricingLine)).toHaveTextContent('Reference pricing:');
+    expect(screen.getByRole('heading', { name: 'Pricing at launch' })).toBeInTheDocument();
     expect(screen.getByText(launchLandingCopy.pricingNote)).toHaveTextContent('trial eligibility');
-    expect(screen.getByText(launchLandingCopy.pricingLine)).toHaveTextContent('$9.99');
-    expect(screen.getByText(launchLandingCopy.pricingLine)).toHaveTextContent('$69.99');
+    expect(screen.getByText(launchLandingCopy.prelaunchPricingLine)).toHaveTextContent('$9.99');
+    expect(screen.getByText(launchLandingCopy.prelaunchPricingLine)).toHaveTextContent('$69.99');
   });
 
   it('asks for the waitlist while the App Store listing is not live', async () => {

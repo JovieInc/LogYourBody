@@ -36,6 +36,8 @@ export const launchLandingCopy = {
   ],
   featuresHeading: 'What it keeps',
   pricingHeading: proPlan.name,
+  prelaunchPricingHeading: 'Pricing at launch',
+  prelaunchPricingLine: `${formatPrice(proPlan.pricing.monthly.amount)} a month or ${formatPrice(proPlan.pricing.annual.amount)} a year (${proPlan.pricing.currency}), with a ${proPlan.trialDays}-day trial. Early access is a free TestFlight beta: you are not charged while you test.`,
   monthlyReferencePrice: formatPrice(proPlan.pricing.monthly.amount),
   annualReferencePrice: formatPrice(proPlan.pricing.annual.amount),
   pricingLine: `Reference pricing: ${formatPrice(proPlan.pricing.monthly.amount)} a month or ${formatPrice(proPlan.pricing.annual.amount)} a year (USD).`,
