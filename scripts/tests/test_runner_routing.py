@@ -1373,7 +1373,18 @@ def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_d
         restarted = any(e[1:3] == ['simctl', 'shutdown'] for e in events)
         if command == 'xcodebuild':
             assert '-showdestinations' in args
-            print('{ platform:iOS Simulator, arch:arm64, id:selected, OS:26.2, name:iPhone 16 }')
+        elif args == ['simctl', 'list', '--json']:
+            if scenario == 'inventory-failure':
+                sys.exit(72)
+            print(os.environ['SIMULATOR_INVENTORY'])
+        elif args == ['simctl', 'list', 'runtimes', '--json']:
+            print(json.dumps({'runtimes': [] if scenario == 'no-destination' else [
+                {'identifier': 'runtime', 'platform': 'iOS', 'version': '26.2', 'isAvailable': True}]}))
+        elif args == ['simctl', 'list', 'devicetypes', '--json']:
+            print(json.dumps({'devicetypes': [] if scenario == 'no-destination' else [
+                {'name': 'iPhone 16', 'identifier': 'iphone'}]}))
+        elif args == ['simctl', 'create', 'LYB CI iPhone', 'iphone', 'runtime']:
+            print('selected')
         elif args == ['simctl', 'boot', 'selected']:
             if scenario == 'already-booted' or (scenario == 'restart-boot-failure' and restarted):
                 sys.exit(149)
@@ -1387,7 +1398,7 @@ def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_d
                 sys.exit(0)
             if scenario == 'regular-file':
                 print(os.environ['REGULAR_FILE'])
-            elif scenario in ['healthy', 'already-booted'] or (scenario == 'stale-recovered' and restarted):
+            elif scenario in ['healthy', 'already-booted', 'discovered', 'created'] or (scenario == 'stale-recovered' and restarted):
                 print(os.environ['LIVE_SOCKET'])
             else:
                 print(os.environ['LIVE_SOCKET'] + '.missing')
@@ -1405,7 +1416,28 @@ def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_d
     scenarios = {'stale-persistent': 70, 'healthy': 0, 'already-booted': 0,
                  'stale-recovered': 0, 'empty-socket': 70, 'getenv-failure': 70,
                  'regular-file': 70, 'bootstatus-failure': 71, 'shutdown-failure': 73,
-                 'restart-boot-failure': 149, 'restart-status-failure': 71}
+                 'restart-boot-failure': 149, 'restart-status-failure': 71,
+                 'discovered': 0, 'created': 0, 'no-destination': 70,
+                 'inventory-failure': 1, 'inventory-malformed': 1}
+    runtime_prefix = 'com.apple.CoreSimulator.SimRuntime.'
+    runtimes = [('iOS-26-9', '26.9', True), ('iOS-26-10', '26.10', True),
+                ('iOS-27-0', '27.0', False), ('tvOS-26-10', '26.10', True)]
+    inventory = {'runtimes': [
+        {'identifier': runtime_prefix + name, 'version': version, 'isAvailable': available}
+        for name, version, available in runtimes
+    ], 'devices': {}}
+    def device(name, udid, available=True, state='Shutdown'):
+        return {'name': name, 'udid': udid, 'isAvailable': available, 'state': state}
+    inventory['devices'] = {
+        runtime_prefix + 'iOS-26-9': [device('iPhone 16', 'older')],
+        runtime_prefix + 'iOS-26-10': [
+            device('iPhone 16', 'unavailable', False), device('iPad Pro', 'ipad'),
+            device('iPhone 17', 'newer-model'), device('iPhone 16 Pro', 'pro'),
+            device('iPhone 16', 'cold'), device('iPhone 16', 'selected', state='Booted'),
+        ],
+        runtime_prefix + 'iOS-27-0': [device('iPhone 16', 'unavailable-runtime')],
+        runtime_prefix + 'tvOS-26-10': [device('iPhone 16', 'wrong-platform')],
+    }
     # A real socket distinguishes healthy launchd state from missing paths or regular files.
     for scenario, expected in scenarios.items():
         calls = tmp_path / f'{scenario}.calls'
@@ -1413,14 +1445,25 @@ def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_d
             ['bash', str(_REPO_ROOT / 'scripts/ios/resolve-simulator-destination.sh')],
             env={**os.environ, 'PATH': f'{binaries}:{os.environ["PATH"]}', 'IOS_DIR': str(tmp_path),
                  'NATIVE_CALLS': str(calls), 'NATIVE_SCENARIO': scenario,
+                 'SIMULATOR_INVENTORY': (
+                     'invalid-json' if scenario == 'inventory-malformed' else
+                     '{"runtimes": [], "devices": {}}' if scenario in ['created', 'no-destination'] else
+                     json.dumps(inventory)),
                  'LIVE_SOCKET': str(live_testmanager_socket), 'REGULAR_FILE': str(regular)},
             text=True, capture_output=True, check=False, pass_fds=_coverage_fds(), timeout=10)
         assert result.returncode == expected, (scenario, result.stdout, result.stderr)
         events = [json.loads(line) for line in calls.read_text().splitlines()]
         shutdowns = [e for e in events if e[1:3] == ['simctl', 'shutdown']]
-        assert len(shutdowns) == (0 if scenario in ['healthy', 'already-booted', 'bootstatus-failure'] else 1)
-        assert all(e[3] == 'selected' for e in events if e[0] == 'xcrun')
+        assert len(shutdowns) == (0 if scenario in ['healthy', 'already-booted', 'bootstatus-failure',
+                                                  'discovered', 'created', 'no-destination',
+                                                  'inventory-failure', 'inventory-malformed'] else 1)
+        assert all(e[3] == 'selected' for e in events if e[0] == 'xcrun' and e[2] in [
+            'boot', 'bootstatus', 'getenv', 'shutdown'])
         assert all(e[0] != 'xcodebuild' or '-showdestinations' in e for e in events)
+        assert events[0] == ['xcrun', 'simctl', 'list', '--json']
+        if scenario != 'no-destination':
+            assert not any(e[0] == 'xcodebuild' for e in events), 'Discovery must not resolve Swift packages'
+        assert sum(e[1:3] == ['simctl', 'create'] for e in events) == (1 if scenario == 'created' else 0)
         if expected == 0:
             assert result.stdout == 'platform=iOS Simulator,id=selected\n'
             assert events[-1] == ['xcrun', 'simctl', 'getenv', 'selected', 'TESTMANAGERD_SIM_SOCK']
@@ -1483,6 +1526,11 @@ def test_storekit_lifecycles_use_fresh_devices_and_preserve_failure_evidence(
                 if scenario == 'test-failure' or (scenario == 'fourth-test-failure' and 'MonthlyTrialPurchaseRestoreRefund' in case):
                     print('No active subscriptions found', flush=True)
                     sys.exit(65)
+        elif args == ['simctl', 'list', '--json']:
+            print(json.dumps({'runtimes': [{'identifier': 'com.apple.CoreSimulator.SimRuntime.iOS-26-2',
+                'version': '26.2', 'isAvailable': True}], 'devices': {
+                'com.apple.CoreSimulator.SimRuntime.iOS-26-2': [
+                    {'name': 'iPhone 16', 'udid': 'seed', 'isAvailable': True}]}}))
         elif args[:4] == ['simctl', 'list', 'devices', 'available']:
             print(json.dumps({'devices': {'runtime': [{'udid': 'seed', 'deviceTypeIdentifier': 'iphone'}]}}))
         elif args[:2] == ['simctl', 'getenv']:
@@ -2370,6 +2418,11 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     # Refreshing the policy digest remains an explicit review of the project diff.
     reviewed_project = (_REPO_ROOT / project_name).read_bytes()
     assert hashlib.sha256(reviewed_project).hexdigest() == dependencies[project_name]
+    # Routine resolver changes do not authorize new diagnostic tooling either.
+    resolver_name = 'scripts/ios/resolve-simulator-destination.sh'
+    reviewed_resolver = gzip.decompress(
+        (_REPO_ROOT / 'scripts/tests/fixtures/reviewed-diagnostic-resolver.sh.gz').read_bytes())
+    assert hashlib.sha256(reviewed_resolver).hexdigest() == dependencies[resolver_name]
     # Keep the prior reviewed project immutable as a refusal fixture in shallow CI.
     previous_project = gzip.decompress(
         (_REPO_ROOT / 'scripts/tests/fixtures/reviewed-diagnostic-project.pbxproj.gz').read_bytes())
@@ -2449,13 +2502,14 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
 
     fixtures = ['positive', 'previous-reviewed-project', 'frozen-main-audit', 'frozen-branch-audit', 'previous-main-audit', 'previous-branch-audit', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
-                'dependency-symlink', 'changed-project', 'wrong-resolver']
+                'dependency-symlink', 'changed-project', 'wrong-resolver', 'current-resolver']
     for scenario in fixtures:
         root = (tmp_path / scenario / 'repo').resolve()
         root.mkdir(parents=True)
         for name, digest in dependencies.items():
             source = _REPO_ROOT / name
-            data = reviewed_project if name == project_name else source.read_bytes()
+            data = (reviewed_project if name == project_name else
+                    reviewed_resolver if name == resolver_name else source.read_bytes())
             assert source.is_file() and not source.is_symlink()
             assert hashlib.sha256(data).hexdigest() == digest
             target = root / name
@@ -2494,6 +2548,8 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         elif scenario == 'wrong-resolver':
             resolver = root / 'scripts/ios/resolve-simulator-destination.sh'
             resolver.write_bytes(resolver.read_bytes() + b'\n')
+        elif scenario == 'current-resolver':
+            (root / resolver_name).write_bytes((_REPO_ROOT / resolver_name).read_bytes())
         elif scenario == 'missing-dependency':
             helper.unlink()
         elif scenario == 'dependency-symlink':
