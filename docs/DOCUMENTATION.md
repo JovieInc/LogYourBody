@@ -74,8 +74,10 @@ repair first verifies the existing lockfile offline with pinned Corepack pnpm.
 Only a confirmed manifest mismatch (`ERR_PNPM_OUTDATED_LOCKFILE`) triggers
 regeneration without lifecycle scripts and a second frozen offline check.
 Valid lockfiles keep their resolutions; other installation failures stop repair.
-If resolution or frozen verification fails, the helper restores the original
-lockfile bytes so the same command can be retried without manual cleanup.
+If resolution, frozen verification, projection generation or Git staging fails,
+the helper restores the original lockfile and projection bytes (or absence) so
+the same command can be retried without manual cleanup. Another writer's index
+lock and unrelated edits remain untouched.
 It then stages the lockfile and source map, refusing unresolved source conflicts,
 unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift. It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.

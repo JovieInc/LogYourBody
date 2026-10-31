@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1667 (fix-red-1423773703): The glob 14.0.2 dependency update left the source map stale, failing Detect Changes, parity and CI Summary. Repeated dependency repairs must remain retryable when Git staging fails after dependency verification.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1667",
+    "mechanization": "Extend the existing verify-first dependency repair helper to restore both the lockfile and source projection after any generation or staging failure. Four real-Git regressions in the existing required Detect Changes pre-commit suite fail before the extension and pass afterward for refresh and verify modes with existing and absent projections. Assert unchanged index, preservation of another writer's lock and unstaged instructions, successful retry and idempotence. Use --refresh-lockfile on this update to preserve the valid bot lockfile and regenerate source parity. Retain every frozen-install and parity gate. Machine: built scripts/resolve-repository-docs.py. The harness retains push and PR-body ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-d5dac7802d",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41188544023/job/124500510040",
     "correction": "PR #1658, occurrence 3: Detect Changes rejects the new consumer health policy route as unlisted, which also fails CI Summary. Merging main conflicts in the canonical endpoint allowlist and its generated projection.",
