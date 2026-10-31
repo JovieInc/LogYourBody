@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `97183dde1bd829add9dbedeec0387b0c18ca1f32fc9b51c6d3aa2fdf0148d3bf`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `9bc7b407391f7f787fae4bbb1bb04b98bdb28a0be484a88733419a5299b08cdd`)
 
 ### `apps/web/package.json`: engines
 
@@ -55,8 +55,8 @@ A changed fingerprint requires review of its related documentation; it does not 
   "prepush": "pnpm run check",
   "start": "next start",
   "sync:marketing-assets": "node ../../scripts/marketing/sync-ios-marketing-assets.mjs",
-  "test": "jest --coverage && tsx --test scripts/voice-adapters.test.ts",
-  "test:ci": "jest --coverage --runInBand && tsx --test scripts/voice-adapters.test.ts",
+  "test": "jest --coverage && tsx --test scripts/voice-adapters.test.ts && tsx --conditions=react-server --test scripts/customer-voice.test.ts",
+  "test:ci": "jest --coverage --runInBand && tsx --test scripts/voice-adapters.test.ts && tsx --conditions=react-server --test scripts/customer-voice.test.ts",
   "test:coverage": "jest --coverage",
   "test:e2e": "playwright test",
   "test:e2e:ui": "playwright test --ui",
@@ -127,6 +127,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "glob": "^11.1.0",
   "idb": "^8.0.3",
   "input-otp": "^1.5.0",
+  "jose": "^6.2.14",
   "js-yaml": "5.4.3",
   "lodash": "^4.18.1",
   "lucide-react": "^1.55.0",
@@ -383,7 +384,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `20607bbc13e8980c10505ef9a781cac117da83d3d5f3441f5e143562c3d415e9`)
+- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `c6b2b766c4d28efeed9b2fd85e64b43391cbd3f20887a5783cb93bf4bb25f82e`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
 - `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `214d4bf11915f32aab3defcd11961992b518fa6c49ad0212f29ba3ce311b40cd`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)

@@ -1,0 +1,14 @@
+name = "logyourbody-customer-voice-email"
+main = "index.js"
+compatibility_date = "2026-10-31"
+
+[observability]
+enabled = false
+
+# Set both values for your deployment; FORWARD_TO must be an existing verified
+# Cloudflare Email Routing destination. This template contains no credentials.
+[vars]
+INBOUND_URL = "https://www.logyourbody.com/api/customer-voice/inbound"
+# FORWARD_TO = "existing verified destination"
+
+# Supply CUSTOMER_VOICE_INBOUND_SECRET with `wrangler secret put`, never here.

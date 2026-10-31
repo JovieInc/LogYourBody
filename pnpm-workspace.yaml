@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "workers/*"
 
 # Dependabot's pnpm updater applies a mature-release gate. These providers are kept
 # current deliberately and are reviewed through their Dependabot PRs.
