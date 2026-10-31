@@ -72,11 +72,19 @@ final class TrainingProgressTests: XCTestCase {
         let service = URLSessionTrainingService(urlSession: urlSession, baseURL: URL(string: "https://training.example"))
         let context = TrainingSelectionContext(gymId: "Gym", availableEquipment: ["cable"], excludedConcerns: [])
         let request = TrainingSelectionRequest(sessionId: "session-a", exerciseId: "cable_curl", context: context)
-        func payload(gym: String = "Gym") -> Data {
-            Data("""
-            {"version":1,"review":{"sessionId":"session-a","exerciseId":"cable_curl","revision":0,
-            "status":"no_eligible_alternative","context":{"gymId":"\(gym)","availableEquipment":["cable"],
-            "excludedConcerns":[]},"options":[],"message":"Check the current station."}}
+        func payload(gym: String = "Gym", version: Int = 1, sessionId: String = "session-a",
+                     exerciseId: String = "cable_curl", optionCount: Int = 0) -> Data {
+            let option = """
+            {"variantId":"supported_cable_curl","reason":"supported_setup_trial","name":"Supported curl",
+            "setup":{"requires":["cable"],"bodyPosition":"seated","torsoSupport":"bench",
+            "trunkDemand":{"level":"low","basis":"setup","note":"Supported"},"cues":[]}}
+            """
+            let options = Array(repeating: option, count: optionCount).joined(separator: ",")
+            let status = optionCount == 0 ? "no_eligible_alternative" : "suggested"
+            return Data("""
+            {"version":\(version),"review":{"sessionId":"\(sessionId)","exerciseId":"\(exerciseId)","revision":0,
+            "status":"\(status)","context":{"gymId":"\(gym)","availableEquipment":["cable"],
+            "excludedConcerns":[]},"options":[\(options)],"message":"Check the current station."}}
             """.utf8)
         }
         let response = payload()
@@ -90,11 +98,35 @@ final class TrainingProgressTests: XCTestCase {
         let loaded = try await service.reviewSelection(accessToken: "test-token", request: request)
         XCTAssertTrue(loaded.review.options.isEmpty)
         XCTAssertEqual(loaded.review.context, context)
-        let mismatched = payload(gym: "Old gym")
-        TrainingProgressURLProtocol.install { _ in (200, mismatched) }
+        let suggested = payload(optionCount: 2)
+        TrainingProgressURLProtocol.install { _ in (200, suggested) }
+        let options = try await service.reviewSelection(accessToken: "test-token", request: request)
+        XCTAssertEqual(options.review.options.count, 2)
+        for invalid in [payload(gym: "Old gym"), payload(version: 2), payload(sessionId: "other"),
+                        payload(exerciseId: "other"), payload(optionCount: 3)] {
+            TrainingProgressURLProtocol.install { _ in (200, invalid) }
+            do {
+                _ = try await service.reviewSelection(accessToken: "test-token", request: request)
+                XCTFail("Only a current version, matching context and at most two options can authorize a review")
+            } catch { XCTAssertEqual(error as? TrainingServiceError, .invalidResponse) }
+        }
+    }
+
+    func testSharedTransportValidatesVersionOutsideThePlanningPayload() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [TrainingProgressURLProtocol.self]
+        let urlSession = URLSession(configuration: configuration)
+        defer { urlSession.invalidateAndCancel() }
+        let service = URLSessionTrainingService(urlSession: urlSession, baseURL: URL(string: "https://training.example"))
+        let response = Data(#"{"version":1,"generation":3}"#.utf8)
+        TrainingProgressURLProtocol.install { _ in (200, response) }
+        let context = try await service.planningContext(accessToken: "test-token")
+        XCTAssertEqual(context.generation, 3)
+        let unsupported = Data(#"{"version":2,"generation":3}"#.utf8)
+        TrainingProgressURLProtocol.install { _ in (200, unsupported) }
         do {
-            _ = try await service.reviewSelection(accessToken: "test-token", request: request)
-            XCTFail("A different gym context cannot authorize an option")
+            _ = try await service.planningContext(accessToken: "test-token")
+            XCTFail("Payloads without a version property still require the supported API envelope")
         } catch { XCTAssertEqual(error as? TrainingServiceError, .invalidResponse) }
     }
 

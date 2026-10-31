@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "fix-red-5954829206",
+    "correction": "PR #1639 (LYB-176): Mac Runner Routing rejects a stale Xcode project digest, company guards reject thirteen oversized or growing source files, and the native selection review rejects a valid authenticated response because its payload omitted the private version protocol.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41146066463",
+    "mechanization": "Decode the required API version in a shared generic response envelope instead of relying on each payload to declare a private protocol conformance. Every typed training request now validates the real envelope by construction, including selection and delegated planning. Extend the existing authenticated selection regression to accept zero and two options and reject unsupported versions, foreign session/exercise/gym context and excess options; the original valid-response case failed in the recorded native run. Extract cohesive contracts, actions, signals, fixtures and view state to satisfy the unchanged company size ratchet, retaining test identities and Xcode target membership. Review the additive project membership changes and refresh only its exact diagnostic digest with the existing resolver; retain all other trust pins. The existing routing regression failed before that refresh and all 65 routing tests passed afterward. A second native transport regression verifies that a planning payload without a version property still requires the supported API envelope. Machine: built apps/ios/LogYourBody/Services/TrainingService.swift. Native execution and coverage on the repaired head remain required in hosted CI; this Linux host cannot supply them. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The common transport can decode the mandatory version directly from the response envelope for every Decodable payload, eliminating per-response opt-in and preventing the missing-conformance failure by construction. Coherent source extractions also remove the reported size growth without changing baselines or gates."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/TrainingService.swift",
+      "anchor": "private struct VersionedTrainingResponse<Payload: Decodable>: Decodable"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "account-erasure-verifiers-load-canonical-cleanup-migrations",
     "correction": "PR #1636 / LYB-330 (fix-red-1a39536f40 occurrence 7): JavaScript/TypeScript run 41130955586 failed because both training SQL verifiers retained a fixed cleanup inventory and omitted the new health vault tables.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41130955586/job/124321693545",

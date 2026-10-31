@@ -18,53 +18,6 @@ enum TrainingReadinessPolicy {
     static let featureGate = "workout_readiness_v1"
 }
 
-enum TrainingSelectionPolicy {
-    static let featureGate = "exercise_selection_v1"
-}
-
-struct TrainingSelectionContext: Codable, Equatable, Sendable {
-    var gymId: String
-    var availableEquipment: [String]
-    var excludedConcerns: [String]
-    var setupNote: String?
-}
-
-struct TrainingSelectionRequest: Encodable, Equatable, Sendable {
-    let sessionId: String
-    let exerciseId: String
-    let context: TrainingSelectionContext
-}
-
-struct TrainingSelectionResponse: Decodable, Equatable, Sendable {
-    struct Review: Decodable, Equatable, Sendable {
-        struct Option: Decodable, Equatable, Identifiable, Sendable {
-            let variantId: String
-            let reason: String
-            let name: String
-            let setup: TrainingVariantSetup
-            var id: String { variantId }
-            var reasonText: String {
-                switch reason {
-                case "supported_exercise_previously_tolerated": "Different exercise · repeatedly tolerated in this gym"
-                case "supported_setup_previously_tolerated": "Same exercise setup · repeatedly tolerated in this gym"
-                case "supported_exercise_trial": "Different exercise · supported option to try"
-                default: "Same exercise setup · supported option to try"
-                }
-            }
-        }
-        let sessionId: String
-        let exerciseId: String
-        let revision: Int
-        let status: String
-        let context: TrainingSelectionContext
-        let preferredContext: TrainingSelectionContext?
-        let options: [Option]
-        let message: String
-    }
-    let version: Int
-    let review: Review
-}
-
 enum TrainingRecoveryCopy {
     /// Matches `APPLIED_RECOVERY_NEXT_ACTION_PREFIX` in the training service.
     static let appliedPrefix = "Applied recovery trial:"
@@ -111,31 +64,6 @@ struct TrainingExerciseSubstitution: Codable, Equatable, Identifiable, Sendable 
     let progression: String
     let evidenceIds: [String]
     var setup: TrainingVariantSetup?
-}
-
-struct TrainingVariantSetup: Codable, Equatable, Sendable {
-    struct Metadata: Codable, Equatable, Sendable {
-        let targetRegion: String
-        let support: String
-        let romSetupCaveat: String
-    }
-    struct Demand: Codable, Equatable, Sendable {
-        let level: String
-        let basis: String
-        let note: String
-    }
-    struct Pulley: Codable, Equatable, Sendable {
-        let height: String
-        let attachment: String
-    }
-    let requires: [String]
-    let bodyPosition: String
-    let torsoSupport: String
-    let trunkDemand: Demand
-    let benchAngleDeg: Double?
-    let pulley: Pulley?
-    let cues: [String]
-    var variantMetadata: Metadata?
 }
 
 struct TrainingWorkoutEvent: Codable, Equatable, Identifiable, Sendable {
@@ -286,25 +214,6 @@ struct TrainingWorkoutAction: Encodable, Equatable, Sendable {
     static let pause = Self(kind: "pause", exerciseId: nil, minutes: nil)
     static let resume = Self(kind: "resume", exerciseId: nil, minutes: nil)
     static let end = Self(kind: "end", exerciseId: nil, minutes: nil)
-}
-
-struct TrainingWorkoutActionRequest: Encodable, Equatable, Sendable {
-    let sessionId: String
-    let eventId: String
-    let expectedRevision: Int
-    let action: TrainingWorkoutAction
-}
-
-struct TrainingFeedbackContext: Codable, Equatable, Sendable {
-    let exerciseId: String
-    let setNumber: Int
-    var reps: Int?
-    var loadKg: Double?
-    var rir: Int?
-    var gymId: String?
-    var availableEquipment: [String]?
-    var setup: String?
-    var romRestriction: String?
 }
 
 struct TrainingSupportingReadiness: Codable, Equatable, Sendable {
@@ -700,23 +609,28 @@ final class URLSessionTrainingService: TrainingServicing {
             let payload = try? JSONDecoder().decode(TrainingErrorResponse.self, from: data)
             throw TrainingServiceError.server(code: payload?.error ?? "training_unavailable")
         }
-        let decoded = try JSONDecoder().decode(Response.self, from: data)
-        guard (decoded as? VersionedTrainingResponse)?.version == TrainingAPIContract.version else {
+        let decoded = try JSONDecoder().decode(VersionedTrainingResponse<Response>.self, from: data)
+        guard decoded.version == TrainingAPIContract.version else {
             throw TrainingServiceError.invalidResponse
         }
-        return decoded
+        return decoded.payload
     }
 }
 
-private protocol VersionedTrainingResponse {
-    var version: Int { get }
-}
+/// Decode the required API envelope for every response, including new response models.
+/// Individual payloads cannot opt out of version validation by omitting a conformance.
+private struct VersionedTrainingResponse<Payload: Decodable>: Decodable {
+    let version: Int
+    let payload: Payload
 
-extension TrainingNextResponse: VersionedTrainingResponse {}
-extension TrainingProgressResponse: VersionedTrainingResponse {}
-extension TrainingProgramResponse: VersionedTrainingResponse {}
-extension TrainingRevokeResponse: VersionedTrainingResponse {}
-extension TrainingFeedbackResponse: VersionedTrainingResponse {}
+    private enum CodingKeys: String, CodingKey { case version }
+
+    init(from decoder: Decoder) throws {
+        let envelope = try decoder.container(keyedBy: CodingKeys.self)
+        version = try envelope.decode(Int.self, forKey: .version)
+        payload = try Payload(from: decoder)
+    }
+}
 
 private struct EnrollmentRequest: Encodable {
     let adultConfirmed = true
@@ -726,16 +640,16 @@ private struct EnrollmentRequest: Encodable {
 }
 
 private struct EmptyTrainingRequest: Encodable {}
-private struct TrainingSetLogResponse: Decodable, VersionedTrainingResponse {
+private struct TrainingSetLogResponse: Decodable {
     let version: Int
     let log: TrainingSavedSet?
     let sessionComplete: Bool?
 }
-private struct TrainingSetCorrectionResponse: Decodable, VersionedTrainingResponse {
+private struct TrainingSetCorrectionResponse: Decodable {
     let version: Int
     let log: TrainingSavedSet
 }
-private struct TrainingWorkoutActionResponse: Decodable, VersionedTrainingResponse {
+private struct TrainingWorkoutActionResponse: Decodable {
     let version: Int
     let decision: String
     let session: TrainingSession
@@ -831,7 +745,7 @@ struct TrainingCycleDraft: Decodable, Sendable {
     }
 }
 
-struct TrainingCycleProposalResponse: Decodable, VersionedTrainingResponse {
+struct TrainingCycleProposalResponse: Decodable {
     let version: Int
     let stored: Stored
 
@@ -847,7 +761,7 @@ struct TrainingCycleDecisionRequest: Encodable, Sendable {
     let decision: String
 }
 
-struct TrainingCycleDecisionResponse: Decodable, VersionedTrainingResponse {
+struct TrainingCycleDecisionResponse: Decodable {
     let version: Int
     let receipt: Receipt
 
@@ -874,7 +788,6 @@ protocol TrainingCycleServicing {
     func decideCycle(accessToken: String, request: TrainingCycleDecisionRequest) async throws
 }
 
-extension TrainingCycleContext: VersionedTrainingResponse {}
 
 extension URLSessionTrainingService: TrainingCycleServicing {
     func cycleContext(accessToken: String) async throws -> TrainingCycleContext {
