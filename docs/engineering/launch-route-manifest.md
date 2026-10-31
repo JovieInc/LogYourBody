@@ -40,6 +40,17 @@ Their local copies and SHA-256 receipt live in
 `scripts/fixtures/lyb-certification/`. Update all three from a reviewed Jovie
 revision together; formatting the policy JSON changes its certification digest.
 
+The separate `scripts/surface-reconciliation.mjs` guard accepts reviewed new
+static web routes in `scripts/fixtures/web-surface-additions.json` (schema
+`lyb.web-surface-additions/v1`, with a `surfaces` map using the existing
+`launch`, `repair`, `hide`, or `delete` dispositions). Declare new legal and
+support routes there instead of rewriting the pinned upstream contract or
+adding baseline debt. Local declarations cannot override a pinned disposition
+or add native surfaces. Unlisted routes and reachable hidden/deleted routes
+still fail; the immutable-base baseline ratchet remains enforced. Detect Changes
+runs this guard and its negative controls on every PR. These local declarations
+do not alter the native certification manifest or its digest.
+
 `pnpm test --filter=@logyourbody/shared-lib` runs the schema and negative-control
 tests through the existing test task. The scoped script command is:
 

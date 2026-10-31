@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "fix-red-d5dac7802d",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41188544023/job/124500510040",
+    "correction": "PR #1658, occurrence 3: Detect Changes rejects the new consumer health policy route as unlisted, which also fails CI Summary. Merging main conflicts in the canonical endpoint allowlist and its generated projection.",
+    "mechanization": "Extend the existing surface-reconciliation guard with reviewed local static-web declarations, preserving the pinned upstream contract, its digest and all baseline allowances. Register the consumer health data route through that mechanism. Negative controls reject undeclared future routes, malformed declarations, native additions, pinned disposition overrides and reachable hidden/deleted routes. Two new general regressions fail on the prior guard before the extension. The existing required Detect Changes step runs the extended suite and exact-base ratchet without workflow changes. Resolve the endpoint source by retaining both parents and use the existing registry merge generator for its projection. The harness retains push and PR-body ownership and must add exactly one machine line: Machine: built scripts/surface-reconciliation.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "New public surface classifications require an explicit reviewed policy decision. Automatically permitting every routable page would weaken launch scope, and application code cannot update the independent pinned upstream contract."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required surface guard can consume explicit local web declarations, reject changes to pinned dispositions and enforce the immutable-base ratchet while retaining every existing finding and negative control."
+      }
+    },
+    "guard": {
+      "path": "scripts/surface-reconciliation.mjs",
+      "anchor": "// Local web declarations cannot override any pinned disposition or add native surfaces."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "consumer-health-data-policy-homepage-publication",
     "correction": "Tim White, 2026-10-31: publish the supplied consumer health data policy as a distinct public route linked from every homepage footer; preserve its wording and skip iOS bundling when Xcode edits are required.",
     "source": "https://github.com/JovieInc/LogYourBody/tree/compounding/consumer-health-data-policy#tim-white-task-2026-10-31",
