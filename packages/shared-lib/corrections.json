@@ -4911,5 +4911,99 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "swift-geometry-nonfinite-overload-ambiguity",
+    "correction": "PR #1621 (fix-red-5df69c1e5f, occurrence 19): Launch Quality run 40756790962 failed to compile SubjectPlateRendererTests.swift because CGPoint(x: .infinity, y: 0) is ambiguous between CGFloat.infinity and Double.infinity.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40756790962/job/123058082407",
+    "mechanization": "Explicitly qualify the invalid translation fixture as CGFloat.infinity while preserving the non-finite rejection assertion and all product behavior. Extend the existing launch UI regression audit to reject untyped infinity and nan in geometry constructors across app, widget, unit-test and UI-test sources. The real audit behavior suite rejects 32 violating fixtures across those trees and accepts explicitly typed or contextually typed constants. The current regression fails against the original audit; batch all 32 fixtures into one invocation with exact per-file findings to retain the existing 30-second coverage-wrapper limit, which passes in about 10 seconds; the extended audit then rejects the original test at line 37 and passes after qualification. Add the widget sources to the existing shared-lib Turbo inputs, retain the executed Python coverage wrapper, and record this receipt with the existing classifier. SwiftLint on this Linux host skips custom rules without SourceKit, so use the existing Python audit instead of relying on a skipped rule. origin/main was already merged. Native XCTest execution and coverage require the macOS CI runner. The lanes harness owns push and PR-body updates and must supply Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Swift and the SDK own the overloaded geometry constructors; a product implementation cannot prevent future test or app source from using an ambiguous untyped constant."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required static launch audit can reject untyped non-finite geometry arguments in Swift sources before the native build while permitting explicit types and constants with an unambiguous context."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "check=\"swift.explicit_geometry_nonfinite\","
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40",
+    "correction": "PR #1621 recurrence 5: JavaScript/TypeScript job 123073336381 exhausted the correction-classifier wrapper deadline with ETIMEDOUT while native Launch Quality and static audits passed. Reduce repeated Git work without changing the weekly mirror selfie intent or weakening checks.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40761126054/job/123073336381",
+    "mechanization": "Extend the existing classifier batch reader to read index modes once per invocation and batch the staged ledger with both immutable parent ledgers. Reuse the same regular-file evidence for ledger and guard validation, refresh it on every retry, and retain all missing-source, symlink, executable-file, Unicode, binary, marker, parent-retention and worktree-preservation scenarios. The new real-Git command-count regression fails before the repair (two index reads instead of one) and passes afterward. Verification now uses four injected Git calls instead of seven; all 57 tests pass in 11.65 seconds with the existing 100% line, branch and function coverage gates. The 30-second wrapper and every child deadline remain unchanged. Run the extended classifier on this receipt. The required origin/main merge reported already up to date. The lanes harness owns pushing and PR-body updates and must include exactly one Machine line: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The reusable classifier batches staged and immutable parent guard reads per verification, removing per-guard Git startup by construction while retaining fresh index reads and the same repair semantics."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "// Batch guard blobs per verification; never cache the mutable index across retries."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-chaos-verified-text-entry-fast-path",
+    "correction": "PR #1621 (fix-red-5df69c1e5f, occurrence 20): Launch Quality run 40769266298 exceeded the two-minute execution allowance in testKeyboardDismissalPreservesDraftWithoutSending, then finished its assertions at 123.296 seconds. The shared typing helper waited for the keyboard and each exact prefix even when they were already present.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40769266298/job/123104269672",
+    "mechanization": "Extend the existing typeVerifiedText harness with immediate keyboard and exact-prefix checks. Only a missing keyboard triggers refocus and its bounded wait; only pending readback triggers the existing two-second predicate wait and failure diagnostic. Both random typing and the dismissal regression use this path. Extend the required shared-lib launch audit source guard to reject unconditional keyboard waits and missing immediate prefix readback, retaining every per-character assertion, mismatch failure, full draft, post-dismissal and no-send check. The added regression fails against the original helper and passes after repair. No test allowance, runner retry, selector, CI or coverage gate changes. Native execution remains unverified on Linux and requires the real macOS CI runner. The lanes harness owns pushes and PR-body edits and must include exactly one Machine line: Machine: built apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared native typing harness can prevent redundant polling for already-satisfied state by construction while preserving bounded recovery and exact readback of every prefix."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift",
+      "anchor": "if field.value as? String == expected { continue }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "correction": "PR #1621 conflict repair, fix-red-e3b0c44298 occurrence 34: merge origin/main without losing the weekly mirror selfie registration change, correction receipts, or either branch's launch UI audit behavior tests. Concurrent audit additions must not require manual edits to a hard-coded executed-test total.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1621",
+    "mechanization": "Reuse the existing correction classifier resolver and staged readiness guard to merge all 196 parent receipts and verify both immutable parents. Retain main's batched classifier and fixed Git process budget. Extend the existing Python launch UI behavior runner to discover all test cases, report executed/discovered totals and reject empty, skipped, incomplete or failed runs; the required shared-lib wrapper compares those totals instead of a merge-prone literal. The original merged wrapper failed with 23 executed tests against the expected 21. The extended runner passes all 24 tests; its failure-path regression rejects empty, skipped and incomplete runs when completeness enforcement is removed, and accepts a complete passing suite while rejecting a real failed suite. Existing Turbo inputs already cover both runner files. Regenerate the conflicted source map from staged inputs before resolving the ledger. The harness retains push and PR-body ownership and must add exactly one machine line: Machine: built scripts/ios/test_launch_ui_regression_audit.py. Native execution and coverage of this merged head remain required on macOS CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-destination-discovery-avoids-project-resolution",
+    "correction": "PR #1621 (fix-red-5df69c1e5f, occurrence 20): Launch Quality run 40785926339 reached the 52-minute step timeout after all selected unit and UI tests passed. Destination discovery loaded the project before the build, spent over a minute resolving destinations, and created a cold simulator.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40785926339/job/123159243715",
+    "mechanization": "Extend the existing shared simulator resolver to select available iPhones directly from CoreSimulator inventory, preserving model priority, numeric runtime ordering, boot readiness and one stale-socket repair. Reuse a booted device when otherwise equivalent; retain direct simulator creation when no available iPhone exists. Successful discovery and creation no longer invoke xcodebuild -showdestinations; the real build remains the scheme compatibility gate. Extend the existing required runner-routing suite with adversarial device/runtime inventory, no-device creation, malformed/failed inventory, no-destination and existing socket failure scenarios. The regression fails against the original resolver and all 55 routing tests pass after repair. Keep the separately reviewed diagnostic resolver as an inert gzip fixture with its unchanged policy hash, and prove the actual trusted CLI rejects the current resolver; do not reauthorize diagnostic tooling. Keep every native selector, test timeout, coverage floor and workflow unchanged. Native completion and measured runtime improvement require the macOS CI runner. The lanes harness owns pushing and PR-body edits and must supply exactly one machine line: Machine: built scripts/ios/resolve-simulator-destination.sh.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared resolver can avoid project loading and needless device creation by construction, removing this repeated setup work for every native audit invocation while retaining boot and socket admission checks."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/resolve-simulator-destination.sh",
+      "anchor": "# Discover reusable devices without loading the project or resolving packages."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

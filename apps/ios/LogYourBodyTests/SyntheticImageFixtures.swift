@@ -12,6 +12,25 @@ import CoreVideo
 enum SyntheticImage {
     typealias RGBA = (red: UInt8, green: UInt8, blue: UInt8, alpha: UInt8)
 
+    /// Drawn mirror selfie with a phone and asymmetric markers; no personal image data.
+    static func mirrorSelfie() -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: CGSize(width: 120, height: 200), format: format).image { context in
+            UIColor.darkGray.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 120, height: 200))
+            UIColor.lightGray.setFill()
+            context.fill(CGRect(x: 5, y: 5, width: 110, height: 190))
+            UIColor.cyan.setFill()
+            context.cgContext.fillEllipse(in: CGRect(x: 45, y: 20, width: 30, height: 30))
+            context.fill(CGRect(x: 35, y: 55, width: 50, height: 80))
+            context.fill(CGRect(x: 35, y: 135, width: 18, height: 50))
+            context.fill(CGRect(x: 67, y: 135, width: 18, height: 50))
+            UIColor.black.setFill()
+            context.fill(CGRect(x: 70, y: 40, width: 16, height: 28))
+        }
+    }
+
     /// Solid-color CGImage with exact pixel dimensions (8-bit RGBA, premultiplied-last).
     static func solidCGImage(
         width: Int,

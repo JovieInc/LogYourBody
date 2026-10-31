@@ -7,43 +7,37 @@ SCHEME="${SCHEME:-LogYourBody}"
 
 cd "$IOS_DIR"
 
+# Discover reusable devices without loading the project or resolving packages.
+# Run 40785926339 spent over a minute in -showdestinations, then migrated a new
+# device. The later build still verifies the selected destination against the scheme.
 SIMULATOR_ID="$(
-  xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showdestinations 2>/dev/null | ruby -e '
-    def version_parts(value)
-      value.to_s.scan(/\d+/).map(&:to_i)
+  xcrun simctl list --json | ruby -rjson -e '
+    inventory = JSON.parse(STDIN.read)
+    candidates = inventory.fetch("runtimes").flat_map do |runtime|
+      next [] unless runtime.fetch("identifier").start_with?("com.apple.CoreSimulator.SimRuntime.iOS-") &&
+                     runtime["isAvailable"] == true
+
+      inventory.fetch("devices").fetch(runtime.fetch("identifier"), []).map do |device|
+        name = device.fetch("name", "")
+        next unless device["isAvailable"] == true && name.start_with?("iPhone") && !device.fetch("udid", "").empty?
+
+        rank = if name == "iPhone 16"
+                 0
+               elsif name.include?("iPhone 16")
+                 1
+               elsif name.include?("iPhone 17")
+                 2
+               elsif name.include?("iPhone 15")
+                 3
+               else
+                 4
+               end
+        [device, [rank, runtime.fetch("version").scan(/\d+/).map { |part| -part.to_i },
+                  device["state"] == "Booted" ? 0 : 1, device.fetch("udid")]]
+      end.compact
     end
-
-    candidates = STDIN.read.lines.map do |line|
-      next unless line.include?("platform:iOS Simulator") && line.include?("name:iPhone")
-
-      fields = line.scan(/([A-Za-z]+):([^,}]+)/).each_with_object({}) do |(key, value), memo|
-        memo[key] = value.strip
-      end
-
-      next if fields["id"].to_s.empty? || fields["name"].to_s.empty?
-
-      fields
-    end.compact
-
-    preferred = candidates.min_by do |device|
-      name = device.fetch("name", "")
-      name_rank =
-        if name == "iPhone 16"
-          0
-        elsif name.include?("iPhone 16")
-          1
-        elsif name.include?("iPhone 17")
-          2
-        elsif name.include?("iPhone 15")
-          3
-        else
-          4
-        end
-
-      [name_rank, version_parts(device["OS"]).map { |part| -part }, device["arch"] == "arm64" ? 0 : 1]
-    end
-
-    puts preferred["id"] if preferred
+    preferred = candidates.min_by(&:last)
+    puts preferred.first.fetch("udid") if preferred
   '
 )"
 

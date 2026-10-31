@@ -14,6 +14,16 @@ it('requires verified native text entry before testing draft preservation', () =
   expect(typing).toContain('NSPredicate(format: "value == %@", expected)');
   expect(typing).toContain('guard XCTWaiter.wait(for: [entered], timeout: 2) == .completed else');
   expect(typing).not.toMatch(/XCUIKeyboardKey.delete|UIPasteboard/);
+  const loop = typing.split('for character in text {')[1] ?? '';
+  const [focus, readback] = loop.split('field.typeText(String(character))');
+  expect(focus).toMatch(
+    /if !keyboard\.exists \{\s*field\.tap\(\)\s*guard keyboard\.waitForExistence\(timeout: 1\.5\) else \{ return false \}\s*\}/,
+  );
+  expect(focus.match(/waitForExistence/g)).toHaveLength(1);
+  expect(readback).toMatch(
+    /expected\.append\(character\)\s*if field\.value as\? String == expected \{ continue \}\s*let entered = XCTNSPredicateExpectation/,
+  );
+  expect(readback).toContain('attachDiagnostics(app: app, name: "incomplete-native-text-entry")');
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
   expect(turbo.tasks.test.inputs).toContain('$TURBO_ROOT$/apps/ios/LogYourBodyUITests/**/*.swift');
 
@@ -41,6 +51,7 @@ it('checks Stats composition, card styling and provenance dismissal through the 
   for (const input of [
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-audit.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
+    '$TURBO_ROOT$/apps/ios/LogYourBodyWidget/**/*.swift',
     '$TURBO_ROOT$/apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift',
   ]) {
     expect(turbo.tasks.test.inputs).toContain(input);
@@ -79,7 +90,10 @@ sys.exit(status)
         .filter((line) => /launch-ui-regression-audit|behavior tests executed/.test(line))
         .join('\n'),
     );
-    expect(output).toContain('Launch UI audit behavior tests executed: 21');
+    const execution = output.match(/Launch UI audit behavior tests executed: (\d+)\/(\d+)/);
+    expect(execution).not.toBeNull();
+    expect(Number(execution?.[1])).toBeGreaterThan(0);
+    expect(execution?.[1]).toBe(execution?.[2]);
     expect(output).toContain('launch-ui-regression-audit');
   } finally {
     rmSync(coverage, { recursive: true, force: true });

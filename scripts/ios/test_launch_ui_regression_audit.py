@@ -4,6 +4,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 from pathlib import Path
 import shutil
 import sys
@@ -21,6 +22,31 @@ SPEC.loader.exec_module(AUDIT)
 
 
 class StatsCardCompositionTests(unittest.TestCase):
+    def test_behavior_runner_requires_complete_unskipped_execution(self):
+        class IncompleteSuite(unittest.TestSuite):
+            def countTestCases(self):
+                return 2
+
+        def passing():
+            pass
+
+        def failing():
+            self.fail("behavior regression")
+
+        cases = [
+            ("complete", unittest.TestSuite([unittest.FunctionTestCase(passing)]), 0),
+            ("empty", unittest.TestSuite(), 1),
+            ("failed", unittest.TestSuite([unittest.FunctionTestCase(failing)]), 1),
+            ("skipped", unittest.TestSuite([
+                unittest.FunctionTestCase(unittest.skip("missing evidence")(passing))
+            ]), 1),
+            ("incomplete", IncompleteSuite([unittest.FunctionTestCase(passing)]), 1),
+        ]
+        for name, suite, expected in cases:
+            with self.subTest(name=name), contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(run_behavior_suite(suite), expected)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -48,6 +74,42 @@ class StatsCardCompositionTests(unittest.TestCase):
         result, output = self.run_audit()
         self.assertEqual(result, 1)
         self.assertIn(check, "\n".join(path.read_text() for path in output.glob("*.json")))
+
+    def test_geometry_requires_typed_nonfinite_arguments_in_every_native_tree(self):
+        cases = [
+            "CGPoint(x: .infinity, y: 0)",
+            "CGPoint(x: 0, y: -.infinity)",
+            "CGPoint(\n  x: 0,\n  y: .nan\n)",
+            "CGSize(width: .nan, height: 1)",
+            "CGSize(width: 1, height: +.infinity)",
+            "CGRect(x: 0, y: 0, width: .infinity, height: 1)",
+            "CGVector(dx: 0, dy: .nan)",
+            "CGAffineTransform(a: 1, b: 0, c: .nan, d: 1, tx: 0, ty: 0)",
+        ]
+        expected = []
+        # Audit all fixtures together; retain exact per-file findings under tracing.
+        for directory in ("LogYourBody", "LogYourBodyTests", "LogYourBodyUITests", "LogYourBodyWidget"):
+            for index, source in enumerate(cases):
+                path = self.root / "apps/ios" / directory / f"GeometryFixture{index}.swift"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"let invalid = {source}\n")
+                expected.append(("swift.explicit_geometry_nonfinite", str(path.relative_to(self.root))))
+        result, output = self.run_audit()
+        self.assertEqual(result, 1)
+        findings = json.loads((output / "launch-ui-regression-audit.json").read_text())["violations"]
+        self.assertCountEqual([(finding["check"], finding["file"]) for finding in findings], expected)
+
+    def test_geometry_allows_explicit_types_and_contextually_typed_constants(self):
+        source = """
+let point = CGPoint(x: CGFloat.infinity, y: -CGFloat.infinity)
+let size = CGSize(width: Double.nan, height: 1)
+let rect = CGRect(origin: .zero, size: CGSize(width: CGFloat.infinity, height: 1))
+let transform = CGAffineTransform(translationX: 0, y: 1)
+let scales: [CGFloat] = [0, -1, .infinity, .nan]
+let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, scale: 1)
+"""
+        (self.app / "GeometryFixture.swift").write_text(source)
+        self.assertEqual(self.run_audit()[0], 0)
 
     def test_stats_container_can_delegate_themed_cards(self):
         page = (self.app / "Views/DashboardViewLiquid+PhotoTimelineAnalytics.swift").read_text()
@@ -181,7 +243,13 @@ class StatsCardCompositionTests(unittest.TestCase):
                 path.write_text(source)
 
 
+def run_behavior_suite(suite):
+    expected = suite.countTestCases()
+    result = unittest.TextTestRunner().run(suite)
+    print(f"Launch UI audit behavior tests executed: {result.testsRun}/{expected}")
+    complete = expected > 0 and result.testsRun == expected and not result.skipped
+    return 0 if complete and result.wasSuccessful() else 1
+
+
 if __name__ == "__main__":
-    result = unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(StatsCardCompositionTests))
-    print(f"Launch UI audit behavior tests executed: {result.testsRun}")
-    sys.exit(0 if result.wasSuccessful() else 1)
+    sys.exit(run_behavior_suite(unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__])))
