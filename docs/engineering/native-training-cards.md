@@ -84,7 +84,9 @@ review displays recorded results and meaningful engine changes only.
 Linux can run deterministic API tests and SwiftLint's available rules. It cannot
 supply Xcode execution, coverage, VoiceOver behavior, screenshot review or an
 installed-build receipt. The new XCTest cases live in the existing
-`TrainingSessionDraftTests` and `DelegatedTrainingTests` targets; the UI regression
+`TrainingNativeCardsTests`, `TrainingSessionDraftTests` and `DelegatedTrainingTests`
+suites. Keep test extensions in their suite's declaring file so extracted files
+cannot strand private fixtures. The UI regression
 `testApprovedCardsNavigateOfflineAndRetainPendingIdentityAfterRelaunch` uses the
 existing isolated native fixture, includes accessibility XXXL and attaches
 screenshots. Synthetic UI transport is a wiring fixture, not real-provider or

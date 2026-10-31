@@ -1225,10 +1225,10 @@ final class TrainingSessionDraftTests: XCTestCase {
         let store = TrainingDraftStore(rootURL: directory)
         var clock = Date(timeIntervalSince1970: 1_700_000_000)
         let original = TrainingSavedSet(
-            sessionId: sessionId, exerciseId: exercise.id, setNumber: 1,
+            sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 1,
             reps: 12, loadKg: 60, rir: 2, revision: 0, corrections: []
         )
-        try store.cacheActiveSession(session(id: sessionId, saved: [original]), ownerId: "owner-A")
+        try store.cacheActiveSession(session(saved: [original]), ownerId: "owner-A")
         let draft = TrainingSessionDraft(
             session: try XCTUnwrap(store.activeSession(ownerId: "owner-A")), ownerId: "owner-A", store: store,
             isCurrent: { true }, now: { clock }

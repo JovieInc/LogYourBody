@@ -1,7 +1,8 @@
 import XCTest
 @testable import LogYourBody
 
-extension TrainingSessionDraftTests {
+@MainActor
+final class TrainingNativeCardsTests: XCTestCase {
     private var sessionId: String { "11111111-1111-4111-8111-000000000001" }
 
     func testNativeCardsRequireBothDefaultOffPlatformGates() {

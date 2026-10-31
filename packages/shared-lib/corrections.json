@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "native-test-extraction-private-fixture-isolation",
+    "correction": "PR #1639 / LYB-176 (fix-red-5df69c1e5f occurrence 20): Launch Quality run 41153141133 cannot compile TrainingSessionDraftTests because its undo regression references sessionId after the private fixture moved into TrainingNativeCardsTests.swift.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41153141133/job/124394298150",
+    "mechanization": "Extend the existing parsed native project audit to require XCTestCase extensions to stay in the file that declares their suite. Extracted files use independent suites, keeping private fixtures local. The existing required shared-lib Fastlane suite exercises six accepted layouts and two rejected splits, including the reported moved-private-fixture layout. The real-source audit fails before the repair and passes afterward; all 17 Fastlane controls pass. Make the card tests an independent MainActor suite and use the undo test's existing local session fixture, retaining every test and assertion. No selector, native evidence requirement, coverage floor or workflow changes. The lanes harness retains push and PR-body ownership, including the single Machine line supplied in the handoff. Native XCTest execution remains required in CI because this Linux host has no Xcode.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "This correction concerns source organization and Swift private access in XCTest fixtures. Product runtime changes cannot prevent a later test extraction from moving a private helper away from its callers."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required native project audit can reject cross-file extensions of local XCTestCase suites before compilation, while allowing same-file extensions, independent suites and unrelated model extensions."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_training_rest_project.py",
+      "anchor": "Cross-file XCTestCase extension can strand private fixtures:"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
     "fingerprint": "account-erasure-verifiers-load-canonical-cleanup-migrations",
     "correction": "PR #1636 / LYB-330 (fix-red-1a39536f40 occurrence 7): JavaScript/TypeScript run 41130955586 failed because both training SQL verifiers retained a fixed cleanup inventory and omitted the new health vault tables.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41130955586/job/124321693545",

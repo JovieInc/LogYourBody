@@ -197,6 +197,53 @@ describe('Fastlane validation source preservation', () => {
       rmSync(directory, { recursive: true, force: true });
     }
   });
+  it('keeps extracted native suites independent of another file’s private fixtures', () => {
+    const script = fileURLToPath(
+      new URL('../../../scripts/ios/test_training_rest_project.py', import.meta.url),
+    );
+    const proof = execFileSync(
+      'python3',
+      [
+        '-c',
+        `
+import importlib.util, pathlib, sys, tempfile
+spec = importlib.util.spec_from_file_location('native_project_guard', sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+scenarios = {
+    'same-file': ('extension DraftTests { func testUndo() {} }', ''),
+    'independent': ('', '@MainActor final class CardTests: XCTestCase { private var sessionId = "card" }'),
+    'unrelated': ('', 'extension TrainingSession { func serialize() {} }'),
+    'comments': ('', '// extension DraftTests {}\\n/* extension DraftTests {} */'),
+    'strings': ('', 'let text = "extension DraftTests {}"\\nlet raw = #"extension DraftTests {}"#'),
+    'multiline': ('', 'let text = """\\nextension DraftTests {}\\n"""'),
+    'split-private': ('func testUndo() { _ = sessionId }',
+                      'extension DraftTests { private var sessionId: String { "card" } }'),
+    'split-multiline': ('', '@MainActor\\nextension\\nDraftTests { func testCard() {} }'),
+}
+rejected = []
+for name, (extra, extracted) in scenarios.items():
+    with tempfile.TemporaryDirectory(prefix='lyb-suite-isolation-') as directory:
+        root = pathlib.Path(directory)
+        (root / 'DraftTests.swift').write_text('final class DraftTests: XCTestCase {}\\n' + extra)
+        (root / 'CardTests.swift').write_text(extracted)
+        try:
+            module.check_test_suite_isolation(root)
+        except AssertionError as error:
+            assert name.startswith('split-'), str(error)
+            assert 'CardTests.swift: extension DraftTests belongs in DraftTests.swift' in str(error)
+            rejected.append(name)
+        else:
+            assert not name.startswith('split-'), 'Unsafe split accepted: ' + name
+assert rejected == ['split-private', 'split-multiline'], rejected
+print('Suite isolation: 6 accepted, 2 rejected')
+`,
+        script,
+      ],
+      { encoding: 'utf8' },
+    );
+    expect(proof).toContain('Suite isolation: 6 accepted, 2 rejected');
+  });
   it('rejects historical model rewrites and incomplete app/widget model graphs', () => {
     const script = fileURLToPath(
       new URL('../../../scripts/ios/test_training_rest_project.py', import.meta.url),
