@@ -7,9 +7,14 @@ export const LYB_MCP_PATH = '/api/mcp';
 export const LYB_MCP_PROTECTED_RESOURCE_METADATA_PATH =
   '/.well-known/oauth-protected-resource/api/mcp';
 
-export const LYB_MCP_SCOPES = {
+/** Exact training-only OAuth allowlist (LYB-280), issued by Jovie Better Auth. */
+export const LYB_TRAINING_MCP_SCOPES = Object.freeze({
   trainingRead: 'lyb:training.read',
   trainingWrite: 'lyb:training.write',
+} as const);
+
+export const LYB_MCP_SCOPES = {
+  ...LYB_TRAINING_MCP_SCOPES,
   /** Enforced here. Not registered at the Jovie issuer until JOV-7796 is extended. */
   metricsRead: 'lyb:metrics.read',
   metricsWrite: 'lyb:metrics.write',
@@ -37,7 +42,7 @@ export function protectedResourceMetadata(input: {
   metrics?: boolean;
   vault?: boolean;
 }) {
-  const scopes: string[] = [LYB_MCP_SCOPES.trainingRead, LYB_MCP_SCOPES.trainingWrite];
+  const scopes: string[] = Object.values(LYB_TRAINING_MCP_SCOPES);
   if (input.metrics) scopes.push(LYB_MCP_SCOPES.metricsRead, LYB_MCP_SCOPES.metricsWrite);
   if (input.vault) scopes.push(LYB_MCP_SCOPES.vaultRead);
   return {
