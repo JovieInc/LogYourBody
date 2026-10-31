@@ -56,6 +56,9 @@ final class StoreKitPurchaseRestoreTests: XCTestCase {
             guard session.allTransactions().contains(where: { $0.identifier == transaction.identifier }) else { continue }
             try session.deleteTransaction(identifier: transaction.identifier)
         }
+        // Deletion updates the test server; refresh StoreKit's app-side history before polling it.
+        // A failed refresh must stop setup rather than accepting stale transaction information.
+        try await AppStore.sync()
         for _ in 0..<50 {
             if session.allTransactions().isEmpty, !(await hasStoreKitHistory()) {
                 return

@@ -5269,5 +5269,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "storekit-cleanup-synchronizes-deleted-history-before-readiness",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41209937833",
+    "correction": "PR #1664, fix-red-e3b0c44298 occurrence 67: merge-group StoreKit failed setup and teardown for testMonthlyTrialPurchaseRestoreExpiration because post-warm-up cleanup did not reach empty history within five seconds. The lifecycle body never ran. origin/main was already an ancestor, so the required merge was a no-op.",
+    "mechanization": "Extend the existing shared cleanup helper used by setup, teardown and bounded warm-up with one throwing AppStore.sync after scoped transaction deletion and before polling both complete history views. This explicitly refreshes app-side transaction information instead of only rereading it. Preserve captured-ID deletion, the existing wait bound, all four lifecycle assertions and exact-case evidence gates. Extend the existing required shared-lib source regression to reject missing or misplaced synchronization and swallowed refresh errors; it fails against the recorded head before the fix and passes afterward. These are static prevention checks; native execution and coverage on the repaired head remain required in macOS merge-group CI. The harness retains pushing and PR-body ownership and must add exactly one machine line: Machine: built apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing cleanup helper owns every StoreKit fixture reset, so one throwing synchronization request orders server-side deletion before app-side readiness checks for every caller. A failed refresh cannot advance into a lifecycle purchase; polling and all entitlement assertions remain unchanged."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift",
+      "anchor": "try await AppStore.sync()\n        for _ in 0..<50"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
