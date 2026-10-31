@@ -438,3 +438,17 @@ final class LogYourBodyUITestsLaunchTests: XCTestCase {
         )
     }
 }
+
+extension XCUIApplication {
+    /// Forward native XCTest context without inventing a marker for ordinary launches.
+    func forwardActualXCTestContext() {
+        for key in ["XCTestConfigurationFilePath", "XCTestSessionIdentifier", "XCTestBundlePath"] {
+            if let value = ProcessInfo.processInfo.environment[key],
+               !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                launchEnvironment[key] = value
+            } else {
+                launchEnvironment.removeValue(forKey: key)
+            }
+        }
+    }
+}
