@@ -3,6 +3,7 @@ import { neonTrainingRevisions } from '@/lib/neon/training-revisions-adapter';
 import { delegatedProgrammingEnabled } from '@/lib/flags/delegated-programming';
 import { delegatedMetricsEnabled } from '@/lib/flags/delegated-metrics';
 import { healthVaultEnabled } from '@/lib/flags/health-vault';
+import { trainingMcpEnabled } from '@/lib/flags/training-mcp';
 import { healthVaultService } from '../health-vault/dependencies';
 import { neonWeightLifecycle } from '@/lib/neon/weight-lifecycle-adapter';
 import { oauthIssuer } from '@/lib/auth/jovie-oauth';
@@ -15,10 +16,7 @@ import { createMcpRouteHandlers } from './route-handlers';
 const issuer = oauthIssuer();
 
 export const mcpHandlers = createMcpRouteHandlers({
-  // Both switches: the MCP door and the training API it fronts.
-  enabled: () =>
-    process.env.LYB_CHATGPT_MCP_ENABLED === 'true' &&
-    process.env.LYB_HYPERTROPHY_COACH_API_ENABLED === 'true',
+  enabled: trainingMcpEnabled,
   issuer,
   canonicalApiOrigin: () =>
     process.env.VERCEL_ENV === 'production' ? endpoints.hosts.api.url : null,
