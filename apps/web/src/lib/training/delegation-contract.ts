@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { structuredTrainingRecord } from './outbound-policy';
 import { canvasPlanSchema } from './mesocycle-canvas';
 import { MUSCLE_GROUPS, TRAINING_CONSENT_VERSION } from './types';
 
@@ -172,7 +173,7 @@ export const steeringRequestSchema = z
   .strict()
   .refine((v) => Boolean(v.intent) !== Boolean(v.utterance));
 
-export const delegatedProposalSchema = z
+const delegatedProposalRecordSchema = z
   .object({
     version: z.literal(2),
     id: uuid,
@@ -233,8 +234,9 @@ export const delegatedProposalSchema = z
     createdAt: time,
   })
   .strict();
+export const delegatedProposalSchema = structuredTrainingRecord(delegatedProposalRecordSchema);
 export type DelegatedProposal = z.infer<typeof delegatedProposalSchema>;
-export const delegatedReceiptSchema = z
+const delegatedReceiptRecordSchema = z
   .object({
     version: z.literal(2),
     proposalId: uuid,
@@ -254,4 +256,5 @@ export const delegatedReceiptSchema = z
         v.setup?.programRevisionId === v.revisionId
       : v.status === 'rejected' && v.revisionId === null && v.setup === null,
   );
+export const delegatedReceiptSchema = structuredTrainingRecord(delegatedReceiptRecordSchema);
 export type DelegatedReceipt = z.infer<typeof delegatedReceiptSchema>;
