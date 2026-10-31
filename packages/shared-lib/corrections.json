@@ -4947,5 +4947,41 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-repair-preserves-additive-documentation-sections",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1639",
+    "correction": "PR #1639 (LYB-176), work fingerprint fix-red-e3b0c44298: main added the LYB-300 approval-presentation section to the same guide rewritten for native exercise selection, producing a merge conflict. Preserve both independently scoped contracts instead of choosing one parent.",
+    "mechanization": "Extend the existing repository-docs resolver with --merge-sections. It reads the three immutable unmerged index stages and prints the branch document plus incoming standalone level-two sections only when the incoming diff is insertion-only and headings are distinct. Refuse replacements, deletions, duplicate headings, unheaded/nested-only additions, conflict markers, symlink stages, non-doc paths and absent merges without changing the index or working tree. The existing required pre-commit-lint test entrypoint imports real-Git regressions; seven cases failed before the new mode and all pass afterward. Use the generator for the actual training-alternatives conflict. The harness retains push and PR ownership and must add the machine line to the PR body.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing offline merge-repair generator can preserve both documents by construction for this restricted additive-section class, leaving semantic review explicit and refusing ambiguous edits without mutation."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "def merge_sections(root, name):"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "selection-approval-copy-covers-every-engine-reason",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1639",
+    "correction": "Merging main into LYB-176 exposed TS2322 in ExerciseSwapApproval: the incoming copy map lacked supported_exercise_trial and supported_setup_trial. At runtime both first-use options rendered an empty accessible description.",
+    "mechanization": "Require the existing approval copy map to satisfy a Record of every AlternativeOption reason. Add explicit first-use exercise/setup copy without tolerance or zero-load claims. The existing required Jest UI suite now supplies a real first-observation selector result, checks both accessible descriptions and requires explicit approval before persistence. That regression failed with the merged component before the fix. Root typecheck rejects a future missing reason at the canonical copy map.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "An exhaustive type contract on the existing map prevents future selector reasons from reaching the approval view without copy, while the real-selector UI regression verifies accessible output and approval behavior."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/components/training/ExerciseSwapApproval.tsx",
+      "anchor": "as const satisfies Record<AlternativeOption['reason'], string>"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   }
 ]
