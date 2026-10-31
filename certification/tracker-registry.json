@@ -1,0 +1,21 @@
+{
+  "schema": "company.tracker-registry/v1",
+  "app": "logyourbody",
+  "canon": "gbrain decisions/company/privacy-tracking-compliance-guidelines-2026-10-31; JovieInc/ci canon/PUBLIC-APP-CERTIFICATION.md (health profile)",
+  "notes": "Health app: no pixel, ads, retargeting or session replay vendor on any surface without counsel sign-off. Health values (weight, body fat, lean mass, photos, DOB, HealthKit) never go to analytics vendors. Every third party needs an entry with a rationale before it ships.",
+  "first_party_domains": ["logyourbody.com", "jov.ie"],
+  "policies": {
+    "privacy": "https://www.logyourbody.com/privacy",
+    "consumer-health-data": "https://www.logyourbody.com/consumer-health-data"
+  },
+  "vendors": [
+    { "id": "statsig", "category": "processor", "hosts": ["statsig.com", "statsigapi.net", "featureassets.org", "prodregistryv2.org"], "status": "live", "rationale": "Feature flags and first-party funnel events (waitlist, CTA). Event properties are allowlisted ids, kinds and counts; no health values. Observed on /, /download/ios, /signup, /signin on 2026-10-31.", "healthData": false, "dpa": "verify (needs counsel: processor status under WA MHMDA)" },
+    { "id": "sentry", "category": "processor", "hosts": ["sentry.io"], "status": "live", "rationale": "Error and crash reporting (web and iOS). No session replay. Payloads must not carry health values.", "healthData": false, "dpa": "verify" },
+    { "id": "vercel", "category": "processor", "hosts": ["vercel-scripts.com", "vercel-insights.com", "vercel.live", "vercel.com"], "status": "live", "rationale": "Hosting and cookieless first-party Web Analytics (served from the site origin).", "healthData": false },
+    { "id": "revenuecat", "category": "processor", "hosts": ["revenuecat.com"], "status": "live", "rationale": "iOS subscription entitlements. Purchase data only.", "healthData": false },
+    { "id": "apple", "category": "processor", "hosts": ["apple.com", "appleid.apple.com", "icloud.com"], "status": "live", "rationale": "Sign in with Apple, App Store, HealthKit (on device).", "healthData": true },
+    { "id": "neon", "category": "processor", "hosts": ["neon.tech"], "status": "live", "rationale": "Database (server-side only; never loaded by pages).", "healthData": true },
+    { "id": "cloudflare-r2", "category": "processor", "hosts": ["r2.cloudflarestorage.com"], "status": "live", "rationale": "Progress-photo storage, served via photos.logyourbody.com.", "healthData": true },
+    { "id": "eve-dev", "category": "processor", "hosts": ["eve.dev"], "status": "live", "rationale": "Core coach chat backend (agent/). Receives chat text that can include health context; needs a processor contract with no training on data (needs counsel).", "healthData": true }
+  ]
+}
