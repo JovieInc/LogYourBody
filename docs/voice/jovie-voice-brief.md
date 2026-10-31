@@ -12,6 +12,40 @@ The voice should feel cooler, more confident, and unfazed; clear and concise, wi
 
 Spoken replies should be one short, direct imperative line, usually about 12 words or fewer. Avoid filler and explanations. A question from the user permits a longer answer when needed to answer it. Preferred example: “Stop here. Rack it. Two minutes.”
 
+## Action input and agent parity — October 13 direction
+
+Voice is an entry point to the same product read/create/correct/delete or
+device-handoff actions as native controls, product HTTP and MCP. Reuse the
+existing App Intents and `BodyMetricLoggingService` per the
+[canonical entry-point mapping](../integrations/chatgpt-app/README.md#entry-point-to-action-mapping--october-13-clarification).
+Preserve authenticated subject, measurement identity, validation, units,
+date/zone/provenance, stable retry IDs, correction revisions and permissions.
+An intentional repeat gets a new operation ID; a retry keeps the original.
+Correction/delete must never become another create.
+
+Action selection and argument extraction are distinct: choosing “log weight”
+does not establish the value, unit or date. Clarify ambiguous arguments before
+executing the validated action. Numeric training prescriptions come only from
+the deterministic engine; spoken replies may explain engine output and its
+supplied opaque evidence IDs.
+
+Spoken/dialog/structured results must distinguish local saved, sync pending,
+cloud committed, conflict and device effects. A local Siri dialog, recognized
+utterance or TTS playback is not cloud completion. Microphone permission,
+HealthKit, notifications, biometrics and purchases keep explicit device/system
+handoffs with real completion readback. Follow the
+[agent dogfood evidence contract](../USER_JOURNEYS.md#agent-parity-completion-evidence).
+
+Extend LYB-38 in its existing ownership/branch; first prove weight action/receipt
+fixtures, then existing weight/latest intents plus HTTP/MCP, then body-fat and
+correction/delete intents after their contracts pass. A CLI is optional for a
+demonstrated scripting gap. Mira Thud is a research candidate without an available
+public API or verified weights dependency; no runtime or model is selected.
+Full-duplex Siri through AirPods is a founder hypothesis, not a verified Apple
+announcement or a required dependency. This planning direction changes no voice,
+gate, Apple capability, signing or release configuration and does not gate the
+grandfathered beta or separate latest-main TestFlight delivery.
+
 ## Selection rounds
 
 - Round 1: all nine initial candidates were rejected. Their preview files are excluded from the repository.

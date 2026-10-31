@@ -1,8 +1,15 @@
-# LogYourBody MCP server (ChatGPT, Grok, Muse)
+# LogYourBody product API and MCP integration
 
 One remote MCP server lets assistants read the user's LogYourBody hypertrophy plan and log
 sets, including by voice. ChatGPT, Grok and any other MCP client call the same endpoint with
 the same OAuth flow. Tracking issue: LYB-108 (epic LYB-107).
+
+LYB-161 extends the planning contract to
+every iOS capability. The inventory below distinguishes checked-in adapters from
+pending parity and client qualification; it does not certify deployed access.
+The [roadmap feature contract](../../product-development-roadmap.md#product-api-and-mcp-parity--lyb-161)
+and release exception apply. This documentation-only intake grants no runtime,
+provider connection, release, or marketplace authority.
 
 ## Surface
 
@@ -17,12 +24,22 @@ the same OAuth flow. Tracking issue: LYB-108 (epic LYB-107).
 
 Tools:
 
-| Tool                    | Scope | readOnly | destructive | openWorld |
-| ----------------------- | ----- | -------- | ----------- | --------- |
-| `get_todays_workout`    | read  | true     | false       | false     |
-| `log_sets`              | write | false    | false       | false     |
-| `log_session_feedback`  | write | false    | false       | false     |
-| `get_training_progress` | read  | true     | false       | false     |
+| Tool                      | Scope | readOnly | destructive | openWorld |
+| ------------------------- | ----- | -------- | ----------- | --------- |
+| `get_todays_workout`      | read  | true     | false       | false     |
+| `log_sets`                | write | false    | false       | false     |
+| `log_session_feedback`    | write | false    | false       | false     |
+| `get_training_progress`   | read  | true     | false       | false     |
+| `control_workout`         | write | false    | false       | false     |
+| `correct_set`             | write | false    | false       | false     |
+| `swap_exercise`           | write | false    | false       | false     |
+| `revise_training_program` | write | false    | false       | false     |
+
+This is the training source inventory. `revise_training_program` additionally
+requires the delegated-programming gate. Weight and health-vault tools have
+separate gates, scopes and consent boundaries described below; training scopes
+do not authorize them. The executable list is
+[`list-tools.ts`](../../../apps/web/src/lib/mcp/list-tools.ts).
 
 `log_sets` only adds sets. It never overwrites a logged set and never logs beyond the
 engine's plan, so `destructiveHint: false` is accurate. It previews the plan before
@@ -209,3 +226,134 @@ and `POST /api/metrics/weight/deletions`. The gate answers 404 before authentica
 Account deletion removes `weight_operation_receipts`, `body_metric_audit`, and
 `metrics_agent_grants` before `body_metrics`. Acceptance is
 [agent parity acceptance — October 13, 2026](../../USER_JOURNEYS.md#agent-parity-acceptance--october-13-2026).
+
+## Canonical iOS capability inventory
+
+Original inventory anchor: main `bf05b7175bb3d8c8e8c6c24e29b11d301c70299e`.
+Reconciled against main `94d019ba1c0507cfe122a183e0c8df621e160b1f` on October 31, 2026. Paths below are source evidence, not deployment or successful user-journey
+receipts. “Gap” means a focused product contract or adapter is still needed; it
+does not authorize exposing a native sync collection as an agent tool. Keep this
+inventory current in each new/materially extended feature's specification and PR.
+
+Native service paths are relative to `apps/ios/LogYourBody/`; HTTP paths are under
+`apps/web/src/app/api/`. All proposed mappings inherit the roadmap's subject,
+consent, entitlement, provenance, revision, retry and completion requirements.
+
+| iOS capability and source anchor                                                                                                                                                                              | Existing HTTP/MCP source                                                           | Required product action or truthful boundary; remaining gap                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sign in, onboarding, consent, sign out: `Services/AuthManager.swift`, `Services/OnboardingStateManager.swift`                                                                                                 | `auth/mobile/session`, `auth/mobile/profile`; MCP bearer verification              | Read LYB connection/permissions; connect, revoke and reconnect through explicit per-client OAuth/user consent. Device sign-in and onboarding confirmations remain user handoffs. Identity is not consent; qualification pending.                                                                                                                         |
+| Manual weight history/create/edit/delete: `Services/BodyMetricLoggingService.swift`, `Services/BodyMetricAppIntents.swift`                                                                                    | `metrics/weight`, corrections/deletions; four weight tools above                   | LYB-162 source exists behind closed gates. Preserve owned record and operation IDs, atomic receipts, revisions/tombstones and native reconciliation. Real client/device acceptance remains pending.                                                                                                                                                      |
+| Body-fat and other composition records; imported-value correction/exclusion/undo: `Services/BodyMetricLoggingService.swift`, `Services/MetricCorrectionService.swift`                                         | `body-metrics`, native body-metrics sync; no equivalent delegated lifecycle        | Gap: typed read/create/correct/delete and overlay/undo contracts that retain original source evidence. `LogBodyFatIntent` is local; correction/delete intents are absent. Weight scopes do not grant composition access.                                                                                                                                 |
+| Latest metrics, history, deterministic trends, interpolation, body score: `Services/MetricsInterpolationService.swift`, `Services/BodyScoreRecalculationService.swift`, `Services/TimelineDataProvider.swift` | Weight listing; gated health-vault view/confirmed summary; no general trend tool   | Gap: deterministic read summaries with dates, units, method/version, missingness and provenance. `ShowLatestMetricsIntent` reads local state. Timeline navigation/visual rendering may hand off to the app; no invented calculations or automatic health disclosure.                                                                                     |
+| Profile, units, goals, dated outcomes and preferences: `Views/PreferencesView.swift`, `Services/DatedOutcomeStore.swift`                                                                                      | `auth/mobile/profile`, `auth/mobile/dated-outcome`; no equivalent MCP actions      | Gap: read/update/reset selected targets and preferences through validated domain actions with revisions and explicit units/timezone. Keep estimates and targets distinct; preserve safety restrictions and device-local settings boundaries.                                                                                                             |
+| Progress photos: capture/select, attach, review, edit/delete, bulk import: `Services/PhotoUploadManager.swift`, `Services/PhotoLibraryScanner.swift`, `Views/ProgressPhotoAttachSheet.swift`                  | `auth/mobile/photos`; gated vault media/view and confirmed shares                  | Gap: owned photo/import job actions, source/measurement association, retry and deletion/readback contracts. Camera/library selection and local processing need device permission and completion receipts. Never put raw photos into ordinary MCP results.                                                                                                |
+| DEXA/InBody/PDF and BodySpec imports: `Views/DexaPDFImportSheet.swift`, `Services/BodySpecDexaImporter.swift`, `Services/BulkImportManager.swift`                                                             | `parse-pdf`, `parse-pdf-v2`, native sync; no equivalent delegated import lifecycle | Extend LYB-80: explicit source authorization/upload, preview/confirm, dedup, correction and persisted import readback. Device-scoped BodySpec credentials do not prove a per-user cloud connection. Parsing/skipped counts alone are not successful ingestion.                                                                                           |
+| Apple Health weight/body-fat/steps import and supported writes: `Services/HealthKitManager.swift`, `Services/HealthSyncCoordinator.swift`                                                                     | Native sync; no remote HealthKit execution                                         | Device handoff for authorization, import/write and permission management. Report supported data, observed samples and individual effects; cloud mutation never proves Apple Health changed. Permission-request completion does not prove read access.                                                                                                    |
+| Daily records/steps and GLP-1 dose/check-in history: `Models/DailyMetrics.swift`, `Models/Glp1DoseLog.swift`                                                                                                  | Native collection sync; no delegated product actions                               | Gap: separate owned read/create/correct/delete contracts, units/observation times and provenance. GLP-1/medical records remain excluded from this MCP server; use an authorized native handoff until a separately approved health-data contract exists.                                                                                                  |
+| Training enrollment, plan, sets, corrections/undo, session control/feedback, swaps, progress and program steering: `Services/TrainingService.swift`                                                           | `auth/mobile/training/v1`; training tools above                                    | Extend LYB-108/123 using existing owners/branches and additive logging. Enrollment/safety consent stays in app. Audit remaining mobile-only actions (including alternatives, recovery trials and optimizer/canvas flows) before claiming full parity. Only engine-returned numeric prescriptions; explicit corrections never overwrite additive creates. |
+| Chat, voice input, spoken replies: `Services/ChatService.swift`, `Services/VoiceCaptureService.swift`                                                                                                         | `auth/mobile/chat/v1`, `auth/mobile/voice/v1`; MCP calls the underlying actions    | Extend LYB-38. Separate action selection from argument extraction; both use the same validated action boundary. Microphone permission/capture and audio playback need native/provider receipts; transcript or TTS delivery does not prove a mutation.                                                                                                    |
+| Reminders, training rest timers/alerts and system controls: `Services/NotificationManager.swift`, `Services/TrainingRestAlerts.swift`, `Services/TrainingRestTimer.swift`                                     | No equivalent delegated device executor                                            | Gap: read/set/cancel preference actions plus explicit device handoffs for notification authorization/scheduling and local timers. A saved preference is not delivered notification evidence; unavailable device effects remain pending.                                                                                                                  |
+| Purchases, restore, subscription/account management: `Services/RevenueCatManager.swift`, `Views/PreferencesView+SecuritySubscriptionSection.swift`                                                            | RevenueCat webhook and profile entitlement state; no MCP purchase                  | Read verified entitlement state where permitted; StoreKit purchase/restore and system subscription management are user/system handoffs. No agent purchase or entitlement bypass. Completion requires verified transaction/entitlement readback.                                                                                                          |
+| Biometrics and app lock: `Views/BiometricLockView.swift`                                                                                                                                                      | No remote biometric operation                                                      | Local authentication/settings handoff. Never report a remote token as device unlock or infer biometric success; require device confirmation without biometric data in the tool payload.                                                                                                                                                                  |
+| Export, metric/photo sharing, account deletion: `Views/ExportDataView.swift`, `Services/BodyScoreShareExport.swift`, `Views/PreferencesView+AccountSection.swift`                                             | `auth/mobile/export`, `auth/delete-account`; no delegated export/erasure tools     | Gap: explicit consent/confirmation, subject-scoped export or deletion request/status and durable completion receipts. Native share sheet/file delivery is a device handoff. Revoke/delete must prevent in-flight retries or offline pushes restoring erased data; respect retention and health-data policy.                                              |
+| Integration availability, connection, permissions, sync status, support: `Views/IntegrationsView.swift`, `Services/BugReportManager.swift`                                                                    | Native adapters; no MCP integration-status action                                  | Extend existing [integration-status semantics](../../architecture/native-integration-status.md): distinguish configuration, per-user connection, permission, history and last verified sync/error. Reconnect/revoke and support submission require explicit user action; opening a link is not provider completion.                                      |
+
+### Execution-boundary handoff contract
+
+For every device/system/user handoff, specify the requested action, authenticated
+subject and owned resource, necessary permission/confirmation, target surface and
+how the user resumes. A returned link or accepted request means only that the
+handoff was offered. Keep denied, cancelled, unavailable, pending and completed
+outcomes distinct. Claim completion only after a correlated device/provider
+receipt and persisted readback of the intended effect. If that readback is not
+available, say it remains unverified and give the user the next supported step.
+Do not invent a deep link, remote device executor or permission grant.
+
+Core Data remains the native/offline authority. Cloud results do not certify a
+device has reconciled; device saves do not certify cloud commitment. Carry record,
+operation and revision identities through sync, account switch, retries and
+tombstones. An intentional second entry gets a new operation ID even with the
+same value/date. A retry keeps its ID; correction/delete targets the owned
+measurement and expected revision, never another create.
+
+## Entry-point-to-action mapping — October 13 clarification
+
+Prefer cheap maintained adapters before knowing which entry point wins. Reuse
+`LogWeightIntent`, `LogBodyFatIntent` and `ShowLatestMetricsIntent` through
+[`BodyMetricLoggingService`](../../../apps/ios/LogYourBody/Services/BodyMetricLoggingService.swift);
+native controls, Siri, HTTP, MCP and any justified CLI must preserve the same
+product action semantics rather than introduce another runtime.
+
+| Product action level | Native/Siri source and gap                                                                                    | Product API / MCP mapping                                                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Read latest/history  | `ShowLatestMetricsIntent` reads local weight/body fat; freshness/cloud state needs explicit mapping           | Weight list with owned record/date filtering exists; broader latest/trend reads remain scoped gaps. Local body-fat access does not authorize MCP disclosure.                                         |
+| Create weight        | `LogWeightIntent` → `BodyMetricLoggingService`; source now assigns record/operation UUIDs per intent instance | `POST /api/metrics/weight` → `create_weight_entry`, same owned measurement/retry semantics. Intent reconstruction/resume must prove stable identity on device.                                       |
+| Create body fat      | Existing `LogBodyFatIntent` → same logging service                                                            | Future composition action only after its separate validation, identity, consent and receipt contract passes. No new metrics scope inferred.                                                          |
+| Correct / delete     | Native record editing exists; dedicated correction/delete App Intents are absent                              | Weight correction/deletion routes → `correct_weight_entry` / `delete_weight_entry`; use owned ID, expected revision and stable operation ID. Extend intents only after corresponding contracts pass. |
+| Device/system effect | Existing native permission, purchase and capture controls                                                     | Offer explicit handoff/status actions; report completion only at the actual execution boundary.                                                                                                      |
+
+At the October 13 anchor, intents lacked explicit date/operation inputs. Current
+weight source adds per-instance IDs; the intents still expose no measurement-date
+or operation-ID parameters, and body-fat has no equivalent explicit identity.
+Do not claim durable Siri retry/resume or cloud completion from a local dialog.
+Contracts must preserve authenticated subject, measurement identity, validation,
+units, date/zone/provenance and truthful local/pending/cloud/conflict/device states
+in UI, spoken dialog, structured result and JSON.
+
+“MCP events” adds no LYB standard. The
+[`handler`](../../../apps/web/src/lib/mcp/handler.ts) implements `initialize`,
+`ping`, `tools/list` and `tools/call`; current source also supports the gated vault
+resource view through `resources/list` and `resources/read`. It advertises
+`tools.listChanged=false` and returns stateless JSON POST results; GET is 405 when
+enabled. There is no SSE resume or domain-event subscription. `structuredContent`
+is a result payload. Protocol notifications are neither mutation commands nor
+durable completion receipts. Future notifications require negotiated capabilities
+and the same action/receipt identities.
+
+Order: weight action/receipt fixtures and boundary → existing weight/latest
+intent plus HTTP/MCP adapters → body-fat/correction/delete intents after their
+contracts pass → thin CLI only for a measured scripting gap. Independent adapters
+need not wait for every client. Full-duplex Siri through AirPods is a founder
+hypothesis, not a verified Apple announcement or an available dependency.
+
+## Client qualification and focused backlog contracts
+
+Extend LYB-162 for the weight lifecycle
+and LYB-163 for client qualification.
+Qualify **Claude Code, ChatGPT and Jovie independently**: supported transport,
+per-user OAuth/resource audience, explicit LYB connection/consent, read/write
+permissions, revoke/reconnect, lost-response retry, persisted mutation readback,
+and native reconciliation. A shared Jovie `sub`, local SDK harness or another
+client's success does not qualify a client. All three remain unverified here.
+Adopt the official MCP client/Inspector for protocol conformance and dogfood;
+record client/version, exact source revision, environment, action/receipt IDs,
+scope/grant state and privacy-safe readback evidence per the
+[completion evidence contract](../../USER_JOURNEYS.md#agent-parity-completion-evidence).
+
+Compose existing first-party routes, typed actions, ports and adapters. No new
+durable agent platform or universal runtime. A CLI is a thin optional adapter
+only when LYB-163 documents a reproducible scripting gap and maintenance value.
+Plugin/marketplace availability is packaging with separate provider approval;
+it neither grants OAuth access nor proves a working connection. Coordinate
+issuer audience, consent, scope and client registration with
+JOV-7796; do not register/connect accounts
+from this planning lane. Mira Thud remains an unverified research candidate with
+no available public API or verified weights dependency; no model/runtime is selected.
+
+Split the remaining gaps into focused contracts as the existing features are
+extended. These are backlog candidates, not newly dispatched issues or blockers:
+
+| Contract / existing lane                             | Trigger and KPI                                                                                           | Required acceptance before implementation is called complete                                                                                                                |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Weight lifecycle / LYB-162                           | First supported agent data entry; successful create/read/correct/delete, zero duplicate writes/disclosure | Atomic receipt and rollback tests, revision/tombstone conflicts, kg/lb/date/DST fixtures, owned native/Siri reconciliation and persisted readback.                          |
+| Client qualification / LYB-163                       | An agent becomes a customer's interface; supported journeys per client                                    | Separate OAuth, permissions, revoke/reconnect and real HTTP/MCP/native receipts for Claude Code, ChatGPT and Jovie; record a measured gap before CLI work.                  |
+| Goals/preferences and deterministic summaries        | Extend goal/trend behavior; correct goal-relative answer with minimal input                               | Typed read/update/reset and deterministic summary contracts; units/dates/provenance, revision conflicts, safety and offline readback.                                       |
+| Photo/import lifecycle / extend LYB-80               | Extend capture/import; owned confirmed imports without duplicates                                         | Device/source consent, preview/confirm, association, dedup, retry/correction/delete semantics, partial failures and persisted job/record readback.                          |
+| Daily/GLP-1 records                                  | Extend daily logging; correct owned history with truthful boundaries                                      | Separate daily vs medication permissions and lifecycle contracts; preserve medical exclusion from this server and prove the native handoff outcome.                         |
+| Export/deletion and integration status               | Extend account/integration controls; completed owned request without resurrection                         | Confirmation, subject isolation, in-flight/offline deletion safety, revoke/reconnect and export/delivery/provider readback; separate configuration, connection and history. |
+| Training and voice / extend LYB-108, LYB-123, LYB-38 | Extend existing coaching actions; engine-authorized journey completion                                    | Preserve current ownership, branches and additive logging; explicit correction, durable retry/receipt and device voice boundaries, engine-only numbers and evidence IDs.    |
+
+Retain Backlog/no-admission status and existing owners/branches. Do not dispatch,
+claim locks, add release-blocking relations or gate the grandfathered beta.
+No actual HTTP/MCP/native/provider acceptance or CI coverage is claimed by this
+documentation-only plan; those receipts belong to the implementation slices.

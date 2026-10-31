@@ -62,6 +62,12 @@ Manual weight create, read, correct, and delete. The contract is
 [the first implementation slice](integrations/chatgpt-app/README.md#first-implementation-slice-manual-weight-lifecycle).
 This slice does not gate TestFlight.
 
+The rows below identify source tests for the weight slice. They are not receipts
+of current-head CI, provider authorization, device execution or persisted
+cross-client completion. Broader parity is tracked in the
+[canonical capability inventory](integrations/chatgpt-app/README.md#canonical-ios-capability-inventory).
+Keep implementation evidence separate from prospective acceptance requirements.
+
 | Check                   | Expected outcome                                                                                                                                                                                                                                                                                                                                      | Asserting tests                                                                                                   |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | HTTP and MCP lifecycle  | Create, read, correct the same id, delete, then read the tombstone. The receipt says the cloud write committed and does not claim an Apple Health change.                                                                                                                                                                                             | `apps/web/src/app/api/metrics/weight/__tests__/route.node.test.ts`                                                |
@@ -69,3 +75,36 @@ This slice does not gate TestFlight.
 | Retries and conflicts   | Lost acknowledgement and a concurrent identical retry replay one receipt. A changed payload, a stale correction, and a delete replay do not duplicate or resurrect. A delayed native push onto a tombstone conflicts.                                                                                                                                 | `weight-lifecycle.test.ts`; `native-body-metrics-sync-adapter.test.ts`                                            |
 | Isolation and admission | Another subject, a guessed id, the wrong audience, an expired token, a training scope, a revoked or unconnected grant, and a closed gate do not write.                                                                                                                                                                                                | `route.node.test.ts`; `weight-lifecycle.test.ts`                                                                  |
 | Native and Siri         | The authenticated app subject reuses `LogWeightIntent` and `BodyMetricLoggingService`. A retry keeps the operation id. A second log gets a new id. Correction and delete require an owned id and expected revision and are not creates. Denied HealthKit still saves locally. Cloud completion stays unclaimed. A conflicted row is not pushed again. | `BodyMetricAppIntentsTests`; `BodyMetricLoggingServiceTests`; `SyncIntegrationBodyMetricSyncTests`                |
+
+## Agent parity completion evidence
+
+Every new/materially extended feature supplies the
+[roadmap specification contract](product-development-roadmap.md#feature-specification-and-completion-contract)
+and updates the canonical inventory. The following are prospective acceptance
+requirements, **pending real execution**, not additional passing journeys:
+
+| Journey / boundary          | Required semantic outcome                                                                                                                                             | Evidence needed                                                                                                                                                                                                 |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code qualification   | Connect explicitly to LYB, grant only required scopes, complete an owned weight lifecycle, revoke access, then reconnect without duplicate writes                     | Real per-user OAuth and official MCP client/Inspector conformance plus Claude Code dogfood receipts; persisted readback and denial after revoke. Pending.                                                       |
+| ChatGPT qualification       | The same supported lifecycle and permission outcomes in ChatGPT, with health-vault sharing consent kept distinct                                                      | Independent ChatGPT OAuth/tool transcript, receipt IDs and persisted readback; no inherited qualification from Claude Code or an SDK harness. Pending.                                                          |
+| Jovie qualification         | The same supported lifecycle with an explicit LYB connection, even when the subject already has Jovie identity                                                        | Independent Jovie connection/consent, scopes, revoke/reconnect, transcript and persisted readback. Pending.                                                                                                     |
+| Entry-point equivalence     | Native controls, weight/latest intents, HTTP and MCP preserve action, measurement identity, units/time/provenance, retries and revision conflicts                     | Named HTTP/MCP/native cases and device invocation/resume evidence; body-fat/correction/delete intents require their own passing contracts. Optional CLI only after a recorded gap. Pending beyond source tests. |
+| Device/system/user handoffs | HealthKit, camera/library, microphone, notifications, biometrics and StoreKit return truthful offered/pending/denied/cancelled/unavailable/completed outcomes         | Actual device/provider effect and correlated readback; local saved, sync pending, cloud committed, conflict and device state remain distinct. A link, dialog or HTTP 200 alone cannot pass. Pending.            |
+| Remaining capability gaps   | Goals/preferences, deterministic trends, photos/imports, daily/GLP-1 records, export/deletion and integration status have owned product actions or supported handoffs | Focused contracts from the inventory, actual failure-path/provider/native tests and current CI coverage. Generic table sync and training scopes cannot substitute for delegated product permissions. Pending.   |
+
+Each implementation receipt records exact Git revision, client/version,
+environment and timestamp, named journey/case, granted scopes and connection
+state, operation/measurement/revision IDs, expected versus observed result,
+persisted readback, native reconciliation/device effects, and links to real
+HTTP/MCP/native/provider tests and CI/coverage results. Use synthetic data and
+privacy-safe references; never commit tokens, customer health data or transcripts
+containing it. Missing, skipped, stale, simulated or unavailable relevant evidence
+stays unverified. A same-operation concurrent/lost-response retry, a new-operation
+intentional repeat, a stale correction, tombstone resurrection, account switch
+and another subject's guessed ID must be tested explicitly.
+
+KPI: successful supported journeys through an authorized agent, zero duplicate
+writes or cross-user disclosure, and truthful handoff outcomes. Report supported,
+passed, failed and pending cases per client/action; an empty or partial evidence
+set is not full parity. This planning contract does not gate the grandfathered
+TestFlight beta or authorize client registration, account connection or release.
