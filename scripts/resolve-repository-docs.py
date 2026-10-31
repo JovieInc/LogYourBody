@@ -6,24 +6,25 @@ import json
 import re
 import subprocess
 import tempfile
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 import repository_docs
 
 
 @contextmanager
-def restore_lockfile_on_failure(root):
-    lockfile = repository_docs.local(root, "pnpm-lock.yaml")
-    original = lockfile.read_bytes() if lockfile.exists() else None
+def restore_dependency_artifacts_on_failure(root, output):
+    paths = [repository_docs.local(root, name) for name in ("pnpm-lock.yaml", output)]
+    originals = {path: path.read_bytes() if path.exists() else None for path in paths}
     try:
         yield
-    except (OSError, subprocess.CalledProcessError):
-        # Failed dependency repairs must be retryable without manual lockfile cleanup.
-        if original is None:
-            lockfile.unlink(missing_ok=True)
-        else:
-            lockfile.write_bytes(original)
+    except (ValueError, OSError, subprocess.CalledProcessError):
+        # Failed dependency repairs restore both artifacts, including staging failures.
+        for path, original in originals.items():
+            if original is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(original)
         raise
 
 
@@ -182,27 +183,28 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
         errors = repository_docs.run(root)
         if errors and errors != ["source projection stale: " + output]:
             raise ValueError("; ".join(errors))
-    if refresh_lockfile or verify_lockfile:
-        inputs = ["package.json", "**/package.json", "pnpm-workspace.yaml",
-                  "pnpm-lock.yaml", ".npmrc", output]
-        dirty = subprocess.run(
-            ["git", "diff", "--name-only", "--", *inputs],
-            cwd=root, check=True, capture_output=True, text=True,
-        ).stdout.strip()
-        if dirty:
-            raise ValueError("unstaged dependency edits: " + dirty.replace("\n", ", "))
-        # Local-only manifests must not enter a lockfile destined for CI.
-        untracked = subprocess.run(
-            ["git", "ls-files", "--others", "--exclude-standard", "-z", "--", *inputs],
-            cwd=root, check=True, capture_output=True, text=True,
-        ).stdout.strip("\0")
-        if untracked:
-            raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
-        # Refuse pinned-source drift before invoking the dependency resolver.
-        errors = repository_docs.run(root)
-        if errors and errors != ["source projection stale: " + output]:
-            raise ValueError("; ".join(errors))
-        with restore_lockfile_on_failure(root):
+    with ExitStack() as rollback:
+        if refresh_lockfile or verify_lockfile:
+            inputs = ["package.json", "**/package.json", "pnpm-workspace.yaml",
+                      "pnpm-lock.yaml", ".npmrc", output]
+            dirty = subprocess.run(
+                ["git", "diff", "--name-only", "--", *inputs],
+                cwd=root, check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            if dirty:
+                raise ValueError("unstaged dependency edits: " + dirty.replace("\n", ", "))
+            # Local-only manifests must not enter a lockfile destined for CI.
+            untracked = subprocess.run(
+                ["git", "ls-files", "--others", "--exclude-standard", "-z", "--", *inputs],
+                cwd=root, check=True, capture_output=True, text=True,
+            ).stdout.strip("\0")
+            if untracked:
+                raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
+            # Refuse pinned-source drift before invoking the dependency resolver.
+            errors = repository_docs.run(root)
+            if errors and errors != ["source projection stale: " + output]:
+                raise ValueError("; ".join(errors))
+            rollback.enter_context(restore_dependency_artifacts_on_failure(root, output))
             # Verify valid bot lockfiles without re-resolving unrelated dependencies.
             modes = [["--frozen-lockfile", "--offline"]]
             # Explicit repair only: normal commit hooks and CI retain frozen installs.
@@ -224,16 +226,16 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                     ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
                     cwd=root, check=True,
                 )
-    if pin_update:
-        repository_docs.local(root, pin_update[0]).write_text(pin_update[1])
-    errors = repository_docs.run(root, write=True)
-    if errors:
-        raise ValueError("; ".join(errors))
-    outputs = [output, "pnpm-lock.yaml"] if refresh_lockfile else [output]
-    if pin_update:
-        outputs.append(pin_update[0])
-    subprocess.run(["git", "add", "--", *outputs], cwd=root, check=True)
-    print("repository-docs: regenerated and staged " + output)
+        if pin_update:
+            repository_docs.local(root, pin_update[0]).write_text(pin_update[1])
+        errors = repository_docs.run(root, write=True)
+        if errors:
+            raise ValueError("; ".join(errors))
+        outputs = [output, "pnpm-lock.yaml"] if refresh_lockfile else [output]
+        if pin_update:
+            outputs.append(pin_update[0])
+        subprocess.run(["git", "add", "--", *outputs], cwd=root, check=True)
+        print("repository-docs: regenerated and staged " + output)
 
 
 def main():

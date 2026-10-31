@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -92,3 +92,70 @@ test('documentation merge requires an active conflict and a regular documentatio
   f.git('merge', '--abort');
   assert.notEqual(f.resolve().status, 0, 'ordinary commits cannot generate a merge');
 });
+
+for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
+  for (const present of [true, false]) {
+    test(`dependency repair ${mode} restores ${present ? 'existing' : 'missing'} outputs after staging fails`, (t) => {
+      const root = mkdtempSync(join(tmpdir(), 'lyb-dependency-docs-'));
+      t.after(() => rmSync(root, { recursive: true, force: true }));
+      const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+      const output = 'SOURCES.md';
+      const lockfile = join(root, 'pnpm-lock.yaml');
+      const originalLock = mode === '--verify-lockfile' ? 'resolved lock\n' : 'old lock\n';
+      git('init', '-q', '-b', 'dependency');
+      git('config', 'core.hooksPath', '/dev/null');
+      writeFileSync(join(root, 'README.md'), 'Local instructions\n');
+      writeFileSync(join(root, 'package.json'), JSON.stringify({ dependencies: { glob: '11.1.0' } }));
+      writeFileSync(lockfile, originalLock);
+      writeFileSync(join(root, 'repository-docs.json'), JSON.stringify({
+        schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+        sources: [{ path: 'package.json', purpose: 'Dependencies' }], imports: [], output,
+      }));
+      if (present) execFileSync('python3', [
+        fileURLToPath(new URL('./repository_docs.py', import.meta.url)), '--root', root, '--write',
+      ], { env });
+      git('add', '.');
+      git('commit', '-qm', 'fixture');
+      writeFileSync(join(root, 'package.json'), JSON.stringify({ dependencies: { glob: '14.0.2' } }));
+      git('add', 'package.json');
+      writeFileSync(join(root, 'README.md'), 'Unstaged local instructions\n');
+      mkdirSync(join(root, 'bin'));
+      writeFileSync(join(root, 'bin/corepack'), `#!/usr/bin/env python3
+import sys
+from pathlib import Path
+lock = Path('pnpm-lock.yaml')
+if '--no-frozen-lockfile' in sys.argv:
+    lock.write_text('resolved lock\\n')
+elif lock.read_text() != 'resolved lock\\n':
+    print('ERR_PNPM_OUTDATED_LOCKFILE')
+    sys.exit(1)
+`, { mode: 0o755 });
+      const resolve = () => spawnSync('python3', [resolver, '--root', root, mode], {
+        env: { ...env, PATH: `${join(root, 'bin')}:${env.PATH}` }, encoding: 'utf8',
+      });
+      const projection = present ? readFileSync(join(root, output), 'utf8') : undefined;
+      const index = git('ls-files', '--stage');
+      const lock = join(root, '.git/index.lock');
+      writeFileSync(lock, 'another Git writer\n');
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const failed = resolve();
+        assert.notEqual(failed.status, 0, failed.stdout);
+        assert.match(failed.stderr, /index\.lock/);
+        assert.equal(git('ls-files', '--stage'), index);
+        assert.equal(readFileSync(lock, 'utf8'), 'another Git writer\n');
+        assert.equal(readFileSync(lockfile, 'utf8'), originalLock);
+        assert.equal(existsSync(join(root, output)), present);
+        if (present) assert.equal(readFileSync(join(root, output), 'utf8'), projection);
+      }
+      rmSync(lock);
+      const retry = resolve();
+      assert.equal(retry.status, 0, retry.stderr);
+      assert.match(git('show', `:${output}`), /"glob": "14\.0\.2"/);
+      assert.equal(readFileSync(lockfile, 'utf8'), 'resolved lock\n');
+      assert.equal(readFileSync(join(root, 'README.md'), 'utf8'), 'Unstaged local instructions\n');
+      const repairedIndex = git('ls-files', '--stage');
+      assert.equal(resolve().status, 0, 'successful repair remains idempotent');
+      assert.equal(git('ls-files', '--stage'), repairedIndex);
+    });
+  }
+}
