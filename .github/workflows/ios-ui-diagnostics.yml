@@ -102,7 +102,7 @@ jobs:
           REVIEWED_AUDIT_SHA256 = 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
           DEPENDENCIES = {
               'scripts/ios/bootstrap-local-config.sh': 'aad028c0eff7f9d2a043711a8735963dc66b9bd664f11bf98b7ada67a60ab8db',
-              'scripts/ios/resolve-simulator-destination.sh': 'd7c8e3a881c8fa4196270c7e8f9c90ad79f74f7c495de0b22f86246b042ce060',
+              'scripts/ios/resolve-simulator-destination.sh': 'f5b31c0a92c181a5cb025c42d6090e142bc2a2394fa05b5f58e1badd6f2693bc',
               'apps/ios/Scripts/import-joviekit.mjs': '35555f9ad251a0976a0bd0ee4ebf4293a4b8634ea61e60db254e53b9c196aa4b',
               'apps/ios/Vendor/JovieKit.source.json': 'aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2',
               'apps/ios/LogYourBody.xcodeproj/project.pbxproj': '214d4bf11915f32aab3defcd11961992b518fa6c49ad0212f29ba3ce311b40cd',

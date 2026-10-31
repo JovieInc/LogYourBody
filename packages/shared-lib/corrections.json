@@ -5341,5 +5341,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "diagnostic-main-admission-uses-current-dependencies",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41235249376/job/124637544181",
+    "correction": "LYB-214: Scheduled diagnostics on main reject the current simulator resolver against a stale reviewed digest while Mac Runner Routing Tests pass using the frozen old resolver as their positive fixture and explicitly reject current source.",
+    "mechanization": "Review the resolver change from xcodebuild destination discovery to available CoreSimulator inventory, retaining simulator creation, boot readiness and one stale-socket recovery. Refresh only its exact workflow digest. Extend the existing required trusted-CLI regression to construct every positive dependency from current repository bytes and reject the unchanged frozen resolver as historical evidence. The corrected regression fails against the stale pin and passes after repair, retaining all seven dependency pins, audit identity, stale-receipt removal, dirty/untracked/symlink refusals and no candidate execution before admission. Machine: built scripts/tests/test_runner_routing.py. The harness retains push and PR ownership; current-head macOS diagnostic execution remains required after merge.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Automatically deriving the trusted workflow digest from candidate bytes would remove independent review. Runtime application code cannot prevent a separately pinned diagnostic policy from becoming stale."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required Mac Runner Routing Tests can compare every explicit dependency pin with current source and exercise actual trusted CLI admission and historical refusals before any helper or native tool executes."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "# Every positive dependency comes from current source; stale pins must fail CI."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
