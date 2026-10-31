@@ -229,6 +229,34 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         path.write_text(source[:start] + card + source[end:])
         self.assert_rejected("dashboard.checkin_card_hit_region")
 
+    def test_header_swipe_isolates_buttons_and_keeps_a_usable_title_region(self):
+        self.assertEqual(self.run_audit()[0], 0)
+
+    def test_header_container_cannot_observe_button_touches(self):
+        path = self.app / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
+        source = path.read_text()
+        for gesture in ("gesture", "simultaneousGesture", "highPriorityGesture"):
+            for anchor in ("photoTimelineRootNavigation\n",
+                           ".frame(maxWidth: .infinity, alignment: .leading)\n",
+                           '.accessibilityIdentifier("photo_timeline_root_menu")\n'):
+                with self.subTest(gesture=gesture, anchor=anchor):
+                    self.assertIn(anchor, source)
+                    # Reject parent/child interception even when the title retains its swipe.
+                    mutated = source.replace(anchor, anchor + f"                .{gesture}(photoTimelineSwipe)\n", 1)
+                    path.write_text(mutated)
+                    self.assert_rejected("timeline.header_swipe_excludes_buttons")
+                    path.write_text(source)
+
+    def test_header_title_cannot_lose_navigation_or_its_hit_region(self):
+        for token in (".gesture(photoTimelineSwipe)", ".contentShape(Rectangle())",
+                      ", minHeight: JovieTokens.minimumHitTarget"):
+            with self.subTest(token=token):
+                path = self.app / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
+                source = path.read_text()
+                path.write_text(source.replace(token, ""))
+                self.assert_rejected("timeline.header_swipe_excludes_buttons")
+                path.write_text(source)
+
     def test_checkin_hit_region_must_include_padding_inside_the_button_label(self):
         for before, after in (
             (".padding(16)\n            .contentShape(Rectangle())",

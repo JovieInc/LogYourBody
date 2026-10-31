@@ -93,6 +93,18 @@ Smoke failure fails Deploy and is filed to Linear as `remediation:web-deploy` by
 ### `ios-release-loop.yml`
 
 Reusable/manual iOS release loop for TestFlight/App Store release paths.
+App Store submissions set `automatic_release:false`; the approved-release
+monitor owns the pre-release health decision. The already-submitted 1.2.0
+release setting is unchanged.
+
+### `ios-app-store-approved-release.yml`
+
+Every 30 minutes, checks exact-build Sentry production crash-free users/sessions
+before requesting release and during every active or paused phased rollout.
+BREACHED and UNVERIFIED outcomes block release, pause an active rollout through
+ASC, and create or reopen a GitHub remediation issue. Decisions and action results
+appear in the step summary. Pauses never automatically resume. See
+[the release-health policy and first-release handling](../../docs/RELEASE_APP_STORE.md#release-health-and-phased-rollout-lyb-139).
 
 ### `app-store-metadata-sync.yml`
 

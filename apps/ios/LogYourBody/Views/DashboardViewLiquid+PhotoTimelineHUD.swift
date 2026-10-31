@@ -64,9 +64,6 @@ extension DashboardViewLiquid {
                 .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.top, 8)
                 .padding(.bottom, 4)
-                .contentShape(Rectangle())
-                // Header swipes must coexist with menu and day-detail button taps.
-                .simultaneousGesture(photoTimelineSwipe)
 
             photoTimelineHomeContent
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? 0 : .infinity)
@@ -279,7 +276,10 @@ extension DashboardViewLiquid {
                     .foregroundStyle(theme.colors.text)
                     .lineLimit(1)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+            .contentShape(Rectangle())
+            // Keep navigation drags outside both header buttons' touch regions.
+            .gesture(photoTimelineSwipe)
 
             if isHomeV2CheckIn {
                 Button {

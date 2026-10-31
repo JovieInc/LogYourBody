@@ -57,6 +57,13 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         XCTAssertTrue(scrim.waitForExistence(timeout: 5), "Header swipes must still open the sidebar")
         scrim.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
         XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))
+        app.buttons["home_v2_context_button"].tap()
+        XCTAssertTrue(
+            app.staticTexts["home_v2_context"].waitForExistence(timeout: 5),
+            "A single detail tap must still open the selected day after header navigation"
+        )
+        app.buttons["home_v2_context_close"].tap()
+        XCTAssertTrue(stage.waitForExistence(timeout: 5))
         stage.tap()
         XCTAssertTrue(app.buttons["home_v2_viewer_close"].waitForExistence(timeout: 5))
     }

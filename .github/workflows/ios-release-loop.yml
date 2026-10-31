@@ -20,11 +20,6 @@ on:
         required: false
         type: boolean
         default: true
-      automatic_release:
-        description: 'Automatically release after Apple approval'
-        required: false
-        type: boolean
-        default: true
       phased_release:
         description: 'Use phased release for approved App Store builds'
         required: false
@@ -447,7 +442,6 @@ jobs:
           cd apps/ios
 
           SUBMIT_FOR_REVIEW="${{ github.event.inputs.submit_for_review || 'true' }}"
-          AUTOMATIC_RELEASE="${{ github.event.inputs.automatic_release || 'true' }}"
           PHASED_RELEASE="${{ github.event.inputs.phased_release || 'true' }}"
           PAYWALL_TESTFLIGHT_VERIFIED="${{ github.event.inputs.paywall_testflight_verified || 'false' }}"
 
@@ -470,7 +464,7 @@ jobs:
           bundle exec fastlane submit_app_store \
             ipa_path:"$IPA_PATH" \
             submit_for_review:$SUBMIT_FOR_REVIEW \
-            automatic_release:$AUTOMATIC_RELEASE \
+            automatic_release:false \
             phased_release:$PHASED_RELEASE 2>&1 | tee submit.log
 
           # Second check: name real fastlane failure lines, not changelog text.

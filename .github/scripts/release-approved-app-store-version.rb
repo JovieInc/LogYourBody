@@ -3,6 +3,7 @@
 
 require "json"
 require "jwt"
+require_relative "app-store-release-health"
 require "net/http"
 require "openssl"
 require "uri"
@@ -21,6 +22,7 @@ REVIEW_STATES = %w[
 
 SUCCESS_STATES = %w[
   READY_FOR_SALE
+  READY_FOR_DISTRIBUTION
   PREORDER_READY_FOR_SALE
 ].freeze
 
@@ -127,7 +129,8 @@ def request(method, path, token, body: nil)
   uri = URI("#{API_BASE}#{path}")
   request_class = {
     get: Net::HTTP::Get,
-    post: Net::HTTP::Post
+    post: Net::HTTP::Post,
+    patch: Net::HTTP::Patch
   }.fetch(method)
 
   req = request_class.new(uri)
@@ -135,20 +138,20 @@ def request(method, path, token, body: nil)
   req["Content-Type"] = "application/json"
   req.body = JSON.generate(body) if body
 
-  response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
+  response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true, open_timeout: 15, read_timeout: 30) do |http|
     http.request(req)
   end
 
-  [response.code.to_i, response.body.empty? ? {} : JSON.parse(response.body)]
+  [response.code.to_i, response.body.to_s.empty? ? {} : JSON.parse(response.body)]
 rescue JSON::ParserError => e
-  fail_with("App Store Connect returned invalid JSON for #{path}: #{e.message}")
+  raise "App Store Connect returned invalid JSON for #{path}: #{e.message}"
 end
 
 def expect(method, path, token, body: nil, expected: [200])
   status, parsed = request(method, path, token, body: body)
   return parsed if expected.include?(status)
 
-  fail_with("App Store Connect #{method.upcase} #{path} returned #{status}: #{JSON.pretty_generate(parsed)}")
+  raise "App Store Connect #{method.upcase} #{path} returned #{status}: #{api_error_message(parsed)}"
 end
 
 def app_by_bundle_id(token)
@@ -184,10 +187,17 @@ def app_store_versions(token, app_id)
   query = URI.encode_www_form(
     "filter[platform]" => PLATFORM,
     "fields[appStoreVersions]" => "versionString,appVersionState,platform",
-    "limit" => "20"
+    "limit" => "200"
   )
-  response = expect(:get, "/v1/apps/#{app_id}/appStoreVersions?#{query}", token)
-  response.fetch("data", [])
+  path = "/v1/apps/#{app_id}/appStoreVersions?#{query}"
+  versions = []
+  while path
+    response = expect(:get, path, token)
+    versions.concat(response.fetch("data"))
+    next_url = response.dig("links", "next")
+    path = next_url && URI(next_url).request_uri
+  end
+  versions
 end
 
 def selected_version(versions)
@@ -333,7 +343,23 @@ end
 
 token = bearer_token
 id = app_id(token)
-version = selected_version(app_store_versions(token, id))
+versions = app_store_versions(token, id)
+version = selected_version(versions)
+monitor = AppStoreReleaseHealth::Monitor.new(
+  versions: versions,
+  asc: lambda do |method, path, body|
+    expected = method == :get && path.end_with?("/appStoreVersionPhasedRelease") ? [200, 404] : [200]
+    expect(method, path, token, body: body, expected: expected)
+  end
+)
+health_verified = true
+# Monitor every live rollout, even if APP_VERSION/project points at a newer submission.
+versions.select { |item| SUCCESS_STATES.include?(item.dig("attributes", "appVersionState")) }.each do |live|
+  phase = monitor.phased_release(live)
+  next unless phase && %w[ACTIVE PAUSED].include?(phase.dig("attributes", "phasedReleaseState"))
+
+  health_verified = monitor.check(live, phase: phase) && health_verified
+end
 
 if version.nil?
   app_version = ENV["APP_VERSION"].to_s.strip
@@ -347,8 +373,13 @@ active_review_submission = active_review_submission_for_version(token, id, versi
 
 case state
 when "PENDING_DEVELOPER_RELEASE"
-  request_release(token, version_id)
-  puts "Released approved App Store version #{version_string} (#{version_id})."
+  if monitor.check(version, phase: monitor.phased_release(version))
+    request_release(token, version_id)
+    append_step_summary(["Action: requested release of #{version_string} (#{version_id})."])
+    puts "Released approved App Store version #{version_string} (#{version_id})."
+  else
+    health_verified = false
+  end
 when *SUCCESS_STATES
   puts "App Store version #{version_string} is already #{state}; no release action needed."
 when *REVIEW_STATES
@@ -374,3 +405,5 @@ when "PREPARE_FOR_SUBMISSION"
 else
   warn_with("App Store version #{version_string} is #{state}; no release action taken.")
 end
+
+fail_with("App Store release health requires remediation; see step summary.") unless health_verified

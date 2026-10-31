@@ -57,11 +57,20 @@ export and all four exact passing receipts remain mandatory. LYB-340 closeout
 requires two consecutive main CI runs with StoreKit green and a Release Loop
 that passes Validate Release after the fix lands.
 
-Cleanup deletes the existing transaction IDs once, then waits for both
+Cleanup deletes the existing transaction IDs once, calls `AppStore.sync()` once
+to refresh the app's transaction information, then waits for both
 `SKTestSession.allTransactions()` and `Transaction.all` to become empty. This
 includes expired and refunded history, which is absent from current entitlements.
 Setup, teardown and warm-up share this bounded cleanup; a timeout throws before
 another purchase can start. No repeated global clear can erase a later purchase.
+Synchronization errors also propagate before another purchase. Merge-group run
+[41209937833](https://github.com/JovieInc/LogYourBody/actions/runs/41209937833)
+timed out during post-warm-up cleanup before the monthly lifecycle started.
+[Apple documents synchronization](<https://developer.apple.com/documentation/storekit/appstore/sync()>)
+as forcing a transaction-information refresh; the existing shared-lib source guard
+requires it after deletion and before polling, without swallowing failures.
+This guard does not establish runtime behavior; the four native receipts on the
+repaired head remain required.
 
 On a Mac with the repo's Xcode toolchain, from a clean checkout:
 
