@@ -14,6 +14,8 @@ import tempfile
 import time
 import uuid
 
+from account_cleanup import account_cleanup_statements, verify_vault_erasure
+
 
 def isolated_environment(environment):
     """Do not inherit a production endpoint, credential or connection option."""
@@ -42,6 +44,57 @@ def verify_postgres_tools(directory, env):
             raise RuntimeError(f'PostgreSQL16 required for {name}: {version}')
         versions[name] = version
     return versions
+
+
+def verify_native_overlay_replays(web, sql, subject):
+    """Execute the actual native upsert, including composed overlay/replay fencing."""
+    source = (web / 'src/lib/neon/native-body-metrics-sync-adapter.ts').read_text()
+    columns = re.findall(r'const columns = `(.*?)`;', source, re.S)
+    statements = re.findall(r'`(with incoming as \(.*?and not exists \(select 1 from upserted\))`', source, re.S)
+    assert len(columns) == len(statements) == 1, 'Expected the unique actual native upsert'
+    statement = statements[0].replace('${columns}', columns[0])
+    record_id = str(uuid.uuid4())
+
+    def quote(value):
+        return 'null' if value is None else "'" + str(value).replace("'", "''") + "'"
+
+    def push(stamp, excluded=None, corrected=None, has_correction=False, weight=80, owner=subject):
+        values = [record_id, owner, '2026-10-25', '2026-10-25T10:00:00Z', weight, 'kg', 19,
+                  'dexa', None, 3, 81, 92, 'cm', 'original note', None, 'bodyspec_dexa', '{}',
+                  '2026-10-25T10:00:00Z', stamp, excluded,
+                  None if corrected is None else json.dumps(corrected), has_correction]
+        result = sql(re.sub(r'\$(\d+)', lambda match: quote(values[int(match[1]) - 1]), statement))
+        return result.split('|')[-1] if result else None
+
+    def row():
+        return json.loads(sql(f'select row_to_json(b) from body_metrics b where id={quote(record_id)};'))
+
+    assert push('2026-10-25T10:00:00Z') == 'insert'
+    assert push('2026-10-25T11:00:00Z', True, {'weight': 79}, True) == 'accept'
+    corrected = row()
+    assert corrected['weight'] == 80 and corrected['is_excluded'] is True
+    assert corrected['corrected_value'] == {'weight': 79}
+    assert push('2026-10-25T10:00:00Z', False, None, True) == 'stale_write'
+    assert row() == corrected, 'stale overlay cannot erase a newer correction'
+    assert push('2026-10-25T11:00:00Z', False, None, True) == 'payload_conflict'
+    assert row() == corrected, 'equal timestamp with different overlay must conflict'
+    assert push('2026-10-25T11:00:00Z', True, {'weight': 79}, True) == 'replay'
+    assert row() == corrected, 'exact replay must not move clocks or revision'
+    assert push('2026-10-25T12:00:00Z', weight=80.1) == 'accept'
+    omitted = row()
+    assert omitted['is_excluded'] is True and omitted['corrected_value'] == {'weight': 79}
+    assert omitted['weight'] == 80.1, 'old-client omission preserves overlays and updates originals'
+    assert push('2026-10-25T13:00:00Z', False, None, True, weight=80.1) == 'accept'
+    restored = row()
+    assert restored['weight'] == 80.1 and restored['is_excluded'] is False
+    assert restored['corrected_value'] is None, 'explicit undo clears only overlay state'
+    assert push('2026-10-25T14:00:00Z', True, {'weight': 70}, True,
+                owner='synthetic-foreign-' + str(uuid.uuid4())) is None
+    assert row() == restored, 'foreign subject cannot overwrite the same client id'
+    sql(f'update body_metrics set deleted_at=now() where id={quote(record_id)};')
+    tombstone = row()
+    assert push('2026-10-25T15:00:00Z', True, {'weight': 70}, True) == 'tombstone'
+    assert row() == tombstone, 'an overlay cannot resurrect a deleted measurement'
 
 
 def main():
@@ -78,7 +131,8 @@ def main():
             sql("create table schema_migrations(version text primary key); create table chat_usage_limits(user_subject text); create table chat_conversations(user_subject text);")
             for migration in ['20260714183000_create_app_users.sql','20260714213000_add_app_user_profile.sql',
                               '20260715040000_create_body_metrics.sql','20260813120000_native_body_metrics_sync.sql',
-                              '20261025120000_weight_lifecycle.sql','20261025190000_gym_registry.sql',
+                              '20261025120000_weight_lifecycle.sql','20261025140000_imported_metric_overlays.sql',
+                              '20261025190000_gym_registry.sql',
                               '20260813130000_native_product_records.sql','20260927102000_training_record_collections.sql']:
                 run(client + ['-f', str(web/'db/migrations'/migration)])
             run(client + ['-f', str(args.migration or web / 'db/migrations/20261010090000_training_revision_foundation.sql')])
@@ -96,6 +150,9 @@ def main():
                 subject = 'synthetic-' + str(uuid.uuid4())
                 sql(f"insert into app_users(id,identity_provider,identity_subject,profile_data) values('{uuid.uuid4()}','jovie',{quote(subject)},'{{\"date_of_birth\":\"1990-01-01\"}}');")
                 return subject
+
+            verify_native_overlay_replays(web, sql, owner())
+            checks.append('native overlays preserve originals, omitted fields, replay clocks, stale/conflicting writes, ownership and tombstones')
 
             def context(subject):
                 return json.loads(sql(f'select training_revision_context({quote(subject)});'))
@@ -249,21 +306,7 @@ def main():
             assert json.loads(sql(recovery_sql(subject, admission, other_applied, 0)))['kind'] == 'saved'
             checks.append('recovery_source_cas_immutable_proposal_history_review_revert_single_active')
 
-            import re
-            adapter=(web/'src/lib/neon/user-directory-adapter.ts').read_text().split('async deleteUser(admission)')[1]
-            statements=re.findall(r'database`([^`]+)`',adapter)
-            expected_cleanup = [
-                'delete from public.chat_usage_limits where user_subject = ${subject}',
-                'delete from public.chat_conversations where user_subject = ${subject}',
-                'delete from public.weight_operation_receipts where user_subject = ${subject}',
-                'delete from public.body_metric_audit where user_subject = ${subject}',
-                'delete from public.metrics_agent_grants where user_subject = ${subject}',
-                'delete from public.body_metrics where user_subject = ${subject}',
-                'delete from public.native_records where user_subject = ${subject}',
-                'select public.lyb_delete_my_gyms(${subject})',
-                "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ${subject}",
-            ]
-            assert [re.sub(r'\s+', ' ', s).strip() for s in statements] == expected_cleanup
+            statements = account_cleanup_statements(web, sql, lambda path: run(client + ['-f', str(path)]))
             guard_source=(web/'src/lib/neon/native-account-admission.ts').read_text()
             guards=re.findall(r"database.query\('(select public.lyb_native_account_admit\(\$1, \$2::uuid\))'",guard_source)
             assert len(guards)==1, 'Expected the unique actual account guard SQL'
@@ -321,6 +364,9 @@ def main():
             assert weight_counts(subject)==[0,0,0,0] and weight_counts(other)==[1,1,1,1]
             assert sql(f"select count(*) from app_users where identity_subject={quote(subject)};")=='0'
             check('weight account erasure rolls back on failure, retries completely, and preserves the other owner')
+
+            verify_vault_erasure(sql, owner, deletion, quote)
+            check('vault account erasure rolls back on later failure, retries every grant kind and consent log, and preserves the other owner')
 
             for boundary in ['revoke','delete']:
                 for action in ['session_insert','session_update','completion','set_insert','feedback_insert','swap_insert','set_correct','recovery_trial']:
@@ -493,6 +539,11 @@ def main():
                 str(web / 'node_modules/tsx/dist/loader.mjs'),
                 str(web / 'db/tests/verify-training-recovery.ts'), json.dumps(client)], canvas_env), flush=True)
             check('recovery actual adapter/engine apply review revert and prescription replay')
+
+            print(run_command(['node', '--conditions=react-server', '--import',
+                str(web / 'node_modules/tsx/dist/loader.mjs'),
+                str(web / 'db/tests/verify-dated-outcomes.ts'), json.dumps(client)], canvas_env), flush=True)
+            check('dated outcome additive migration, actual adapter, exactly-once recompute and account isolation')
 
             print(json.dumps({'passed':len(checks),'checks':checks,'postgresTools':versions,'scope':'disposable PostgreSQL16; actual migrations, observed owner locks, synthetic rows only'}))
         finally:

@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 import { createTrainingRevisionHandlers } from '../revision-route-handlers';
 import { revisionHarness } from '@/lib/training/revisions.testing';
 import { delegatedProgrammingEnabled } from '@/lib/flags/delegated-programming';
-import { findTool, listTools } from '@/lib/mcp/tools';
+import { findTool, listTools } from '@/lib/mcp/list-tools';
 
 function harness() {
   const h = revisionHarness();

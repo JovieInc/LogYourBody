@@ -38,6 +38,43 @@ This slice adds no endpoint or user-facing activation. Applying suggestions,
 confirmation, feature-gated runtime integration and real-device evidence remain
 with LYB-176. Existing training gates and swap authorization remain in place.
 
+## Approval presentation (LYB-300)
+
+`apps/web/src/components/training/ExerciseSwapApproval.tsx` is the UI-only review
+component for a completed selector result. It renders the two nullable selector
+slots without inspecting feedback, inventory, ROM, or eligibility. The caller
+supplies catalog display names, the existing `evaluateDeload` pain-policy result,
+and any already-established constraint reason codes (`blocked_rom_or_clearance`,
+`missing_station`, `belt_does_not_clear_symptoms`). Both supported selector reasons
+explain that support may reduce trunk demand without implying zero spinal load.
+Constraint reasons explain withheld floor setups, hidden missing stations, and
+that a belt does not clear persistent symptoms. A `pause_session` result renders
+only the policy's exact explanation, even if candidates were also supplied.
+
+Choosing a radio option never changes the prescription. Only **Approve swap**
+calls `onApprove` with the exact selected variant ID. The host connects that
+callback to the existing swap persistence API, rejects failed receipts, and
+updates its active prescription from authoritative readback after success. The
+component prevents repeated submissions while saving and permits an explicit
+retry after a failed save. **Keep current exercise** closes the review locally
+and optionally notifies `onReject`; it never invokes the persistence callback.
+
+The host must supply an account/session/revision-scoped `reviewId` and change it
+when replacing the reviewed context. A new review or a policy pause clears the
+prior choice. `enabled` defaults off and is supplied by the host's existing
+training gates. This presentation slice adds no route, native runtime activation,
+selector rule, persistence endpoint, or change to LYB-114. Wiring into the native
+training surface remains in LYB-176; the React tests prove the component contract,
+not an installed iOS interaction or a real-provider write.
+
+The existing web Jest discovery includes the approval UI tests and reason
+snapshot in CI; the existing root typecheck includes the component. Scoped run:
+
+```bash
+pnpm --filter logyourbody test:watch --watch=false --runInBand --runTestsByPath src/components/training/ExerciseSwapApproval.test.tsx
+pnpm typecheck
+```
+
 Scoped validation from the repository root:
 
 ```bash

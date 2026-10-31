@@ -72,7 +72,15 @@ export function verifyPolicy({ policy, ciWorkflow, enrollmentWorkflow, tokenEnro
     );
   }
 
-  assert(!/labels\.some|\.labels\b/.test(enrollmentWorkflow), 'auto-enrollment must not gate on PR labels');
+  // Only this negative hold predicate may inspect labels. Positive certification
+  // gates remain forbidden, and missing label evidence must block admission.
+  const holdPredicate = "const hasExplicitHold = !Array.isArray(pull.labels) || pull.labels.some(label => typeof label?.name !== 'string' || label.name.toLowerCase() === 'hold');";
+  const normalizedEnrollment = enrollmentWorkflow.replace(/\s+/g, ' ');
+  assert(normalizedEnrollment.includes(holdPredicate), 'auto-enrollment must preserve explicit holds');
+  const withoutHoldPredicate = normalizedEnrollment.replace(holdPredicate, '');
+  assert(!/labels\.some|\.labels\b/.test(withoutHoldPredicate), 'auto-enrollment must not gate on PR labels except the negative hold predicate');
+  assert(/if \(hasExplicitHold\) \{ await recordOutcome\('NOT_ELIGIBLE', '[^']+'\); return; \}/.test(normalizedEnrollment), 'an explicit hold must return before admission');
+
   assert(!/actions\/checkout@/.test(enrollmentWorkflow), 'privileged enrollment must not checkout code');
   assert(!/secrets\./.test(enrollmentWorkflow), 'auto-enrollment must not receive repository secrets');
 

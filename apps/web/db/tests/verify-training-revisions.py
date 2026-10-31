@@ -13,6 +13,8 @@ import tempfile
 import time
 import uuid
 
+from account_cleanup import account_cleanup_statements
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -205,22 +207,8 @@ def main():
                 assert counts(subject)==[0,0,0]
                 check(first+' first: captured legacy enrollment cannot restore revoked consent')
 
-            # Extract the exact existing-path cleanup statements, including owner lock.
-            adapter=(web/'src/lib/neon/user-directory-adapter.ts').read_text().split('async deleteUser(admission)')[1]
             import re
-            statements=re.findall(r'database`([^`]+)`',adapter)
-            expected_cleanup = [
-                'delete from public.chat_usage_limits where user_subject = ${subject}',
-                'delete from public.chat_conversations where user_subject = ${subject}',
-                'delete from public.weight_operation_receipts where user_subject = ${subject}',
-                'delete from public.body_metric_audit where user_subject = ${subject}',
-                'delete from public.metrics_agent_grants where user_subject = ${subject}',
-                'delete from public.body_metrics where user_subject = ${subject}',
-                'delete from public.native_records where user_subject = ${subject}',
-                'select public.lyb_delete_my_gyms(${subject})',
-                "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ${subject}",
-            ]
-            assert [re.sub(r'\s+', ' ', s).strip() for s in statements] == expected_cleanup
+            statements = account_cleanup_statements(web, sql, lambda path: run(client + ['-f', str(path)]))
             guard_source=(web/'src/lib/neon/native-account-admission.ts').read_text()
             guards=re.findall(r"database.query\('(select public.lyb_native_account_admit\(\$1, \$2::uuid\))'",guard_source)
             assert len(guards)==1, 'Expected the unique actual account guard SQL'

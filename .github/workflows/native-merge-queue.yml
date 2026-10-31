@@ -1,6 +1,7 @@
 name: Native Merge Queue Enrollment
 
 # Every same-repo, non-draft PR to main enters the native queue once CI passes on its exact head.
+# Explicit hold labels block admission, including ready-for-review and transient retry events.
 # The queue re-runs CI on the merge group before landing; no extra labels or certification gates.
 # A PR the queue drops re-enters on the `dequeued` event when its head is unchanged and still
 # green and the cause was transient (check timeout) or a first failed merge group. A second
@@ -164,6 +165,15 @@ jobs:
             }
             if (pull.head.sha !== run.head_sha) {
               await recordOutcome('STALE', 'Exact-head CI proof no longer matches the PR', pull.head.sha);
+              return;
+            }
+
+            // Explicit holds are negative admission controls, never certification labels.
+            const hasExplicitHold = !Array.isArray(pull.labels)
+              || pull.labels.some(label => typeof label?.name !== 'string'
+                || label.name.toLowerCase() === 'hold');
+            if (hasExplicitHold) {
+              await recordOutcome('NOT_ELIGIBLE', 'Pull request has an explicit hold or labels are unavailable');
               return;
             }
 

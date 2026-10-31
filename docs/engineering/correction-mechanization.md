@@ -109,6 +109,9 @@ start a second PR owner.
 
 For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
 merges and classifies the correction ledger after other conflicts are resolved.
+Repair a conflicted source projection first with
+`python3 scripts/resolve-repository-docs.py --staged`. If staging fails, it restores
+the original projection bytes (or absence), so the same command remains retryable.
 The shared readiness check also rejects newly added conflict markers in the index,
 including diff3 base markers, markers shorter than seven characters, and files
 marked binary by Git attributes, before
@@ -118,6 +121,14 @@ merge bases and their shared parent before applying the same union. The pre-comm
 `--check-merge` path and staged retries use the same check; cleaning only the working
 file cannot hide an unresolved staged source. Resolve and stage the source, then
 retry the same command. Unrelated unstaged edits remain untouched.
+
+Recursive reconstruction reads each immutable guard blob once per resolution;
+the cache ends with that invocation, so retries never reuse mutable index evidence.
+
+The readiness check forces text inspection even when Git attributes mark a staged
+file as binary, so those attributes cannot conceal unresolved conflict markers.
+It accepts up to 16 MiB of staged diff output, including markers at the end of a
+large merge, and refuses larger output rather than inspecting a truncated diff.
 Both resolver modes require an active merge before writing; conflicted cherry-picks
 are refused without changing the ledger or index.
 

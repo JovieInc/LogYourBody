@@ -30,7 +30,8 @@ struct HomeV2AllPhotosView: View {
         }
         return grouped.keys.sorted(by: >).compactMap { key in
             guard let indices = grouped[key], let first = indices.first else { return nil }
-            let weights = indices.compactMap { formatters.weightValue(bodyMetrics[$0]) }
+            let weights = indices.filter { !bodyMetrics[$0].isExcluded }
+                .compactMap { formatters.weightValue(bodyMetrics[$0]) }
             return (
                 title: HomeV2ContextCopy.monthTitle(for: bodyMetrics[first].date),
                 delta: weights.count > 1

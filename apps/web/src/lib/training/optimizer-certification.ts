@@ -9,9 +9,11 @@ import {
   evaluateMesocycle,
   normalizeOptimizerInput,
   reviewedSwapPrescription,
+  optimizeMesocycle,
   type OptimizationChange,
   type OptimizationProposal,
 } from './optimizer';
+import { trainingRequestHash } from './revisions';
 
 export type CertificationResult = { ok: true } | { ok: false; violations: string[] };
 
@@ -95,10 +97,18 @@ export function certifyOptimization(
   });
   if (/heart rate|heart-rate|\bbpm\b/i.test(text)) violations.push('heart_rate_readiness');
 
+  const expected = evaluateMesocycle(input, rules);
   for (const session of input.sessions) {
+    const remaining = new Set(
+      expected.sequencing
+        .find((row) => row.sessionId === session.id)!
+        .remaining.map((row) => row.exerciseId),
+    );
     if (
       !gripConflict(
-        session.exercises.map((exercise) => exercise.id),
+        session.exercises
+          .filter((exercise) => exercise.phase !== 'warmup' && remaining.has(exercise.id))
+          .map((exercise) => exercise.id),
         rules,
       )
     )
@@ -132,10 +142,10 @@ export function certifyOptimization(
     }
   }
 
-  const expected = evaluateMesocycle(input, rules);
   const expectedChanges = expected.changes.map(changeKey).sort();
   const actualChanges = proposal.changes.map(changeKey).sort();
   if (JSON.stringify(actualChanges) !== JSON.stringify(expectedChanges)) {
+    violations.push('change_mismatch');
     const expectedOffers = new Set(
       expected.changes.filter((change) => change.kind === 'offer_superset').map(changeKey),
     );
@@ -162,6 +172,31 @@ export function certifyOptimization(
       violations.push('missing_superset_offer');
     }
   }
+  // LYB-37: certify the complete ordered diff and narration, including numbers.
+  // Comparing only selected change keys allowed fabricated reorders to pass.
+  for (const field of [
+    'changes',
+    'sequencing',
+    'tradeoff',
+    'rationale',
+    'findings',
+    'resolvedLocation',
+    'rollingSchedule',
+  ] as const) {
+    if (
+      trainingRequestHash(proposal[field] ?? null) !== trainingRequestHash(expected[field] ?? null)
+    ) {
+      violations.push(`${field}_mismatch`);
+    }
+  }
+  const canonical = optimizeMesocycle(source, rules);
+  if (
+    canonical.kind !== 'proposal' ||
+    (['id', 'sourceHash', 'baseFingerprint'] as const).some(
+      (field) => proposal[field] !== canonical.proposal[field],
+    )
+  )
+    violations.push('source_mismatch');
   if (
     JSON.stringify(proposal.findings.map(findingKey).sort()) !==
     JSON.stringify(expected.findings.map(findingKey).sort())

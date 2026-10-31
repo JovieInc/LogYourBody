@@ -222,7 +222,7 @@ enum HomeV2CompositionPolicy {
     ) -> String {
         let start = calendar.date(byAdding: .day, value: -30, to: now) ?? now
         let readings = metrics.filter { metric in
-            guard let value = metric.bodyFatPercentage else { return false }
+            guard !metric.isExcluded, let value = metric.bodyFatPercentage else { return false }
             return value.isFinite && metric.date >= start && metric.date <= now
         }
 
@@ -458,15 +458,20 @@ enum HomeV2WeightQuality {
         for metrics: [BodyMetrics]
     ) -> MetricsInterpolationService.WeightInterpolationContext? {
         MetricsInterpolationService.shared.makeWeightInterpolationContext(
-            for: metrics.filter { isWithinSupportedLoggingRange($0.weight) }
+            for: metrics.filter { !$0.isExcluded && isWithinSupportedLoggingRange($0.weight) }
         )
     }
 
     static func trendWeight(for metric: BodyMetrics, in metrics: [BodyMetrics]) -> Double? {
         // Keep the original flagged measurement visible for correction; do not
         // replace it with a trend from otherwise supported surrounding records.
-        guard metric.weight == nil || isWithinSupportedLoggingRange(metric.weight) else { return nil }
-        return trendContext(for: metrics)?.trendWeight(for: metric.date)?.value
+        guard !metric.isExcluded, metric.weight == nil || isWithinSupportedLoggingRange(metric.weight) else { return nil }
+        // Memoized: this runs from View.body once per rendered card (a
+        // Sentry App Hanging hot path), so reuse the shared trend context.
+        return MetricsInterpolationService.shared.estimateTrendWeight(
+            for: metric.date,
+            metrics: metrics.filter { !$0.isExcluded && isWithinSupportedLoggingRange($0.weight) }
+        )?.value
     }
 }
 

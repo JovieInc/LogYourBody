@@ -200,6 +200,7 @@ class TimelineCalculator {
             hasher.combine(metric.id)
             hasher.combine(metric.date.timeIntervalSinceReferenceDate)
             hasher.combine(metric.updatedAt.timeIntervalSinceReferenceDate)
+            hasher.combine(metric.isExcluded)
 
             hasher.combine(metric.weight != nil)
             if let weight = metric.weight {

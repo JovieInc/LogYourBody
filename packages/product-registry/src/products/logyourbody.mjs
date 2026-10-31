@@ -18,11 +18,7 @@ export const logYourBody = {
       'Weight, body fat, lean mass, HealthKit data, and progress photos in one private timeline that shows the trend.',
     voice: ['clear', 'concise', 'evidence-based', 'non-judgmental', 'private'],
     colors: { background: '#08090A', foreground: '#F7F8F8', accent: '#5E6AD2' },
-    logos: {
-      appIcon: '/brand/logyourbody-app-icon.png',
-      wordmark: null,
-      mark: null,
-    },
+    logos: { appIcon: '/brand/logyourbody-app-icon.png', wordmark: null, mark: null },
   },
   links: {
     home: 'https://www.logyourbody.com',
@@ -91,6 +87,8 @@ export const logYourBody = {
       'progress_photos_old',
       'weight_logs_old',
       'email_subscriptions_old',
+      'health_vault_grants',
+      'health_vault_consent_log',
     ],
     buckets: ['photos'],
     vendor: {
@@ -114,6 +112,9 @@ export const logYourBody = {
       apple: { appStore: 'https://apps.apple.com/us/app/logyourbody/id6755209876' },
     },
     allowlist: [
+      { value: 'https://linear.app/jovie/issue/LYB-37', reason: 'LYB-37 source receipt for priority sequencing and split-session continuity correction guards.' },
+      { value: 'https://onlinelibrary.wiley.com/doi/10.1080/17461391.2020.1733672', reason: 'Nunes exercise-order systematic review cited by the LYB-37 engineering evidence qualification; not a runtime endpoint.' },
+      { value: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC7706677/', reason: 'Campos deltoid-region activation study cited by the LYB-37 engineering evidence qualification; not a runtime endpoint.' },
       { value: 'https://pubmed.ncbi.nlm.nih.gov/28965198/', reason: 'Morán-Navarro et al. (2017) primary recovery evidence cited in the LYB-112 engineering policy; not a runtime endpoint or personal numerical bound.' },
       { value: 'https://www.allianceforeatingdisorders.com/find-treatment/', reason: 'Verified official U.S. eating-disorder support resource in the health disclosure, checked 2026-10-14.' },
       { value: 'https://www.crisistextline.org/', reason: 'Verified official U.S. crisis support resource in the health disclosure, checked 2026-10-14.' },
@@ -138,6 +139,7 @@ export const logYourBody = {
       { value: 'https://help.bevel.health/en/articles/10437057', reason: 'LYB-179 primary reference teardown; documentation only, no integration.' },
       { value: 'https://edpb.europa.eu', reason: 'Legal-doc link (EDPB) referenced by privacy copy.' },
       { value: 'https://chatgpt.com', reason: 'ChatGPT OAuth redirect for the LogYourBody MCP connector (docs/integrations/chatgpt-app).' },
+      { value: 'https://web-sandbox.oaiusercontent.com', reason: 'OpenAI Apps SDK widget sandbox origin for the LYB-330 health vault view. Measurements are fetched from LogYourBody, not from this host.' },
       { value: 'https://apps.apple.com', reason: 'Apple storefront links.' },
       { value: 'https://appstoreconnect.apple.com', reason: 'App Store Connect links in release docs.' },
       { value: 'https://api.appstoreconnect.apple.com', reason: 'App Store Connect API base used by CI scripts.' },
@@ -198,6 +200,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-112', reason: 'LYB-112 source evidence for bounded adaptive recovery learning and the correction ledger.' },
       { value: 'https://linear.app/jovie/issue/LYB-129', reason: 'LYB-129 source evidence for canonical durable workout readiness integration.' },
       { value: 'https://linear.app/jovie/issue/LYB-173', reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.' },
+      { value: 'https://linear.app/jovie/issue/LYB-174', reason: 'Source receipt for timestamped rolling training allocations and unfinished-work recovery; not a runtime endpoint.' },
       { value: 'https://linear.app/jovie/issue/LYB-189', reason: 'LYB-189 source evidence and Tim/legal review handoff for the Apple Health privacy disclosure.' },
       { value: 'https://linear.app/jovie/issue/LYB-194', reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.' },
       { value: 'https://linear.app/jovie/issue/LYB-47', reason: 'LYB-47 source evidence for dated metric observations and neutral trend semantics.' },

@@ -77,8 +77,8 @@ jobs:
     name: Validate Release
     needs: pin-release-tag
     runs-on: ubuntu-latest
-    # Must exceed validate-release-source.sh's RELEASE_CHECK_TIMEOUT_SECONDS (10001s).
-    timeout-minutes: 180
+    # Must exceed validate-release-source.sh's RELEASE_CHECK_TIMEOUT_SECONDS (10901s).
+    timeout-minutes: 200
     permissions:
       contents: read
       checks: read

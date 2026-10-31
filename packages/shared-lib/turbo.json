@@ -73,7 +73,10 @@
         "$TURBO_ROOT$/scripts/neon/test-reported-measurements.py",
         "$TURBO_ROOT$/scripts/neon/test_reported_measurements_harness.py",
         "$TURBO_ROOT$/apps/web/db/tests/verify-training-mutations.py",
-        "$TURBO_ROOT$/apps/web/db/tests/test_verify_training_mutations.py"
+        "$TURBO_ROOT$/apps/web/db/tests/account_cleanup.py",
+        "$TURBO_ROOT$/apps/web/db/tests/test_verify_training_mutations.py",
+        "$TURBO_ROOT$/apps/ios/LogYourBody/Models/LogYourBody.xcdatamodeld/**",
+        "$TURBO_ROOT$/apps/ios/LogYourBody/Models/LogYourBody.xcdatamodeld/.xccurrentversion"
       ]
     },
     "test:mutation": {

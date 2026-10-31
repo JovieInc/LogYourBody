@@ -197,6 +197,79 @@ describe('Fastlane validation source preservation', () => {
       rmSync(directory, { recursive: true, force: true });
     }
   });
+  it('rejects historical model rewrites and incomplete app/widget model graphs', () => {
+    const script = fileURLToPath(
+      new URL('../../../scripts/ios/test_training_rest_project.py', import.meta.url),
+    );
+    const proof = execFileSync(
+      'python3',
+      [
+        '-c',
+        `
+import copy, hashlib, importlib.util, json, pathlib, plistlib, sys, tempfile
+spec = importlib.util.spec_from_file_location('native_project_guard', sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+old = b'<model><entity name="Measurement"/></model>\\n'
+new = b'<model><entity name="Measurement"/><entity name="DatedOutcome"/></model>\\n'
+locked = {name: hashlib.sha256(data).hexdigest() for name, data in [
+    ('LogYourBodyV5.xcdatamodel', old), ('LogYourBodyV6.xcdatamodel', new)]}
+project = {'objects': {
+    'v5a': {'path': 'LogYourBodyV5.xcdatamodel'}, 'v5b': {'path': 'LogYourBodyV5.xcdatamodel'},
+    'v6a': {'path': 'LogYourBodyV6.xcdatamodel'}, 'v6b': {'path': 'LogYourBodyV6.xcdatamodel'},
+    'app': {'isa': 'XCVersionGroup', 'path': 'LogYourBody.xcdatamodeld',
+            'children': ['v5a', 'v6a'], 'currentVersion': 'v6a'},
+    'widget': {'isa': 'XCVersionGroup', 'path': 'LogYourBody.xcdatamodeld',
+               'children': ['v5b', 'v6b'], 'currentVersion': 'v6b'}}}
+failures = ['rewritten-history', 'missing-history', 'unreviewed-version', 'unregistered-version',
+            'duplicate-child', 'duplicate-path', 'wrong-widget-version', 'unregistered-current',
+            'missing-current', 'missing-widget-group', 'symlink-history']
+for name in ['positive', *failures]:
+    with tempfile.TemporaryDirectory(prefix='lyb-model-contract-') as directory:
+        root = pathlib.Path(directory) / 'LogYourBody.xcdatamodeld'
+        root.mkdir()
+        for version, data in [('LogYourBodyV5.xcdatamodel', old), ('LogYourBodyV6.xcdatamodel', new)]:
+            (root / version).mkdir()
+            (root / version / 'contents').write_bytes(data)
+        current = root / '.xccurrentversion'
+        current.write_bytes(plistlib.dumps({'_XCCurrentVersionName': 'LogYourBodyV6.xcdatamodel'}))
+        candidate = copy.deepcopy(project)
+        objects = candidate['objects']
+        previous = root / 'LogYourBodyV5.xcdatamodel' / 'contents'
+        if name == 'rewritten-history': previous.write_bytes(new)
+        elif name == 'missing-history': previous.unlink()
+        elif name == 'unreviewed-version':
+            (root / 'LogYourBodyV7.xcdatamodel').mkdir()
+            (root / 'LogYourBodyV7.xcdatamodel' / 'contents').write_bytes(new)
+        elif name == 'unregistered-version': objects['app']['children'].remove('v5a')
+        elif name == 'duplicate-child': objects['app']['children'].append('v6a')
+        elif name == 'duplicate-path':
+            objects['extra'] = {'path': 'LogYourBodyV6.xcdatamodel'}
+            objects['app']['children'].append('extra')
+        elif name == 'wrong-widget-version': objects['widget']['currentVersion'] = 'v5b'
+        elif name == 'unregistered-current': objects['app']['currentVersion'] = 'v6b'
+        elif name == 'missing-current':
+            current.write_bytes(plistlib.dumps({'_XCCurrentVersionName': 'Missing.xcdatamodel'}))
+        elif name == 'missing-widget-group': del objects['widget']
+        elif name == 'symlink-history':
+            copy_path = pathlib.Path(directory) / 'retained-history'
+            copy_path.write_bytes(old)
+            previous.unlink()
+            previous.symlink_to(copy_path)
+        try:
+            module.check_model_versions(candidate, root, locked)
+        except AssertionError:
+            assert name != 'positive', 'Valid additive model must be accepted'
+        else:
+            assert name == 'positive', 'Unsafe model was accepted: ' + name
+print(json.dumps({'accepted': 1, 'rejected': len(failures)}))
+`,
+        script,
+      ],
+      { encoding: 'utf8' },
+    );
+    expect(JSON.parse(proof)).toEqual({ accepted: 1, rejected: 11 });
+  });
   it('signs the rest Live Activity extension separately in the real release lane', () => {
     const script = fileURLToPath(
       new URL('../../../scripts/ios/test_training_rest_release.rb', import.meta.url),
@@ -204,6 +277,16 @@ describe('Fastlane validation source preservation', () => {
     const result = JSON.parse(execFileSync('ruby', [script], { encoding: 'utf8' }));
     expect(result.cases).toBe(2);
   });
+  // The Ruby/project check took 6.2s on CI; bound the subprocess below the test budget.
+  it('resolves the rest-timer exclusion project path absolutely from the release Fastfile', () => {
+    const script = fileURLToPath(
+      new URL('../../../scripts/ios/test_rest_timer_exclusion_path.rb', import.meta.url),
+    );
+    const result = JSON.parse(
+      execFileSync('ruby', [script], { encoding: 'utf8', timeout: 20_000 }),
+    );
+    expect(result.failures).toEqual([]);
+  }, 30_000);
   it.each(['ci_ios', 'build_check'])(
     '%s compiles without changing tracked metadata or docs',
     (lane) => {

@@ -66,6 +66,8 @@ export const endpoints = {
     'progress_photos_old',
     'weight_logs_old',
     'email_subscriptions_old',
+    'health_vault_grants',
+    'health_vault_consent_log',
   ],
   buckets: ['photos'],
   vendor: {
@@ -102,6 +104,21 @@ export const endpoints = {
     },
   },
   allowlist: [
+    {
+      value: 'https://linear.app/jovie/issue/LYB-37',
+      reason:
+        'LYB-37 source receipt for priority sequencing and split-session continuity correction guards.',
+    },
+    {
+      value: 'https://onlinelibrary.wiley.com/doi/10.1080/17461391.2020.1733672',
+      reason:
+        'Nunes exercise-order systematic review cited by the LYB-37 engineering evidence qualification; not a runtime endpoint.',
+    },
+    {
+      value: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC7706677/',
+      reason:
+        'Campos deltoid-region activation study cited by the LYB-37 engineering evidence qualification; not a runtime endpoint.',
+    },
     {
       value: 'https://pubmed.ncbi.nlm.nih.gov/28965198/',
       reason:
@@ -205,6 +222,11 @@ export const endpoints = {
       value: 'https://chatgpt.com',
       reason:
         'ChatGPT OAuth redirect for the LogYourBody MCP connector (docs/integrations/chatgpt-app).',
+    },
+    {
+      value: 'https://web-sandbox.oaiusercontent.com',
+      reason:
+        'OpenAI Apps SDK widget sandbox origin for the LYB-330 health vault view. Measurements are fetched from LogYourBody, not from this host.',
     },
     {
       value: 'https://apps.apple.com',
@@ -415,6 +437,11 @@ export const endpoints = {
     {
       value: 'https://linear.app/jovie/issue/LYB-173',
       reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-174',
+      reason:
+        'Source receipt for timestamped rolling training allocations and unfinished-work recovery; not a runtime endpoint.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-189',

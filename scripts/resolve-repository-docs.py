@@ -2,6 +2,7 @@
 """Refresh generated documentation from merged or staged sources with the pinned generator."""
 import argparse
 import json
+import re
 import subprocess
 import tempfile
 from contextlib import contextmanager
@@ -50,6 +51,7 @@ def resolve_staged(root):
     ).stdout
     # Rebuild a conflicted projection from staged inputs before resolving unrelated ledgers.
     # Every actual input must have stage zero; staged_bytes fails closed otherwise.
+    # An unrelated ledger conflict must not deadlock the two existing merge resolvers.
     if (dirty and not conflicted) or (output.exists() and not tracked):
         raise ValueError("unstaged projection edits: " + config["output"])
     # Render the index, so partially staged manifests cannot leak into the commit.
@@ -68,12 +70,48 @@ def resolve_staged(root):
             raise ValueError("; ".join(errors))
         projection = repository_docs.local(snapshot, config["output"]).read_bytes()
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_bytes(projection)
-    subprocess.run(["git", "add", "--", config["output"]], cwd=root, check=True)
+    original = output.read_bytes() if output.exists() else None
+    try:
+        output.write_bytes(projection)
+        subprocess.run(["git", "add", "--", config["output"]], cwd=root, check=True)
+    except (OSError, subprocess.CalledProcessError):
+        # Keep failed staging retryable, including the original conflict markers.
+        if original is None:
+            output.unlink(missing_ok=True)
+        else:
+            output.write_bytes(original)
+        raise
     print("repository-docs: regenerated and staged " + config["output"] + " from index")
 
 
-def resolve(root, refresh_lockfile=False, verify_lockfile=False):
+def reviewed_project_pin(root, expected):
+    project = "apps/ios/LogYourBody.xcodeproj/project.pbxproj"
+    workflow = ".github/workflows/ios-ui-diagnostics.yml"
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise ValueError("reviewed project SHA-256 must be 64 lowercase hex characters")
+    snapshots = {}
+    for name in (project, workflow):
+        path = root / name
+        if any(parent.is_symlink() for parent in (path, *path.parents) if parent != root.parent):
+            raise ValueError("reviewed project repair refuses symlinks: " + name)
+        snapshots[name] = repository_docs.local(root, name).read_bytes()
+        if staged_bytes(root, name) != snapshots[name]:
+            raise ValueError("stage reviewed project and workflow edits first: " + name)
+        # Git supports short markers; raw snapshots can also retain CRLF endings.
+        if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", snapshots[name]):
+            raise ValueError("resolve staged conflict markers first: " + name)
+    if repository_docs.digest(snapshots[project]) != expected:
+        raise ValueError("reviewed project SHA-256 does not match merged source")
+    source = snapshots[workflow].decode()
+    pattern = r"(?m)^( +'" + re.escape(project) + r"': ')[0-9a-f]{64}(',)$"
+    updated, count = re.subn(pattern, lambda match: match[1] + expected + match[2], source)
+    if count != 1:
+        raise ValueError("expected exactly one diagnostic project pin")
+    # Only an explicit reviewed digest may update this trust boundary; never derive it here.
+    return workflow, updated
+
+
+def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_project_sha256=None):
     root = Path(root).resolve()
     config = json.loads(repository_docs.local(root, "repository-docs.json").read_text())
     output = repository_docs.local(root, config["output"]).relative_to(root).as_posix()
@@ -84,6 +122,13 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False):
     unresolved = sorted(set(conflicts) - {"", output})
     if unresolved:
         raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
+    pin_update = None
+    if reviewed_project_sha256 is not None:
+        pin_update = reviewed_project_pin(root, reviewed_project_sha256)
+        # Validate immutable imports before changing either derived artifact.
+        errors = repository_docs.run(root)
+        if errors and errors != ["source projection stale: " + output]:
+            raise ValueError("; ".join(errors))
     if refresh_lockfile or verify_lockfile:
         inputs = ["package.json", "**/package.json", "pnpm-workspace.yaml",
                   "pnpm-lock.yaml", ".npmrc", output]
@@ -126,10 +171,14 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False):
                     ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
                     cwd=root, check=True,
                 )
+    if pin_update:
+        repository_docs.local(root, pin_update[0]).write_text(pin_update[1])
     errors = repository_docs.run(root, write=True)
     if errors:
         raise ValueError("; ".join(errors))
     outputs = [output, "pnpm-lock.yaml"] if refresh_lockfile else [output]
+    if pin_update:
+        outputs.append(pin_update[0])
     subprocess.run(["git", "add", "--", *outputs], cwd=root, check=True)
     print("repository-docs: regenerated and staged " + output)
 
@@ -141,12 +190,13 @@ def main():
     mode.add_argument("--staged", action="store_true", help="refresh from the Git index before commit")
     mode.add_argument("--refresh-lockfile", action="store_true", help="repair and verify the pnpm lockfile before refreshing docs")
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
+    mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     args = parser.parse_args()
     try:
         if args.staged:
             resolve_staged(args.root)
         else:
-            resolve(args.root, args.refresh_lockfile, args.verify_lockfile)
+            resolve(args.root, args.refresh_lockfile, args.verify_lockfile, args.reviewed_project_sha256)
     except (ValueError, KeyError, TypeError, OSError, subprocess.CalledProcessError) as exc:
         parser.exit(1, "repository-docs: " + str(exc) + "\n")
 

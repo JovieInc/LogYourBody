@@ -189,6 +189,10 @@ func syncAll(onCompletion: (() -> Void)? = nil) {
             )
             guard authManager.ownsRequestSession(requestOwner) else { return }
             guard failed.isEmpty else { throw PendingSyncError.failedOperations }
+            try await datedOutcomeStore.synchronize(remote: productAPIClient, token: authorization.token) {
+                self.authManager.ownsRequestSession(requestOwner)
+            }
+            guard authManager.ownsRequestSession(requestOwner) else { return }
             try await syncLocalChanges(for: requestOwner.subject, token: authorization.token)
             guard authManager.ownsRequestSession(requestOwner) else { return }
             try await pullLatestData(userId: requestOwner.subject, lastSync: lastSync, token: authorization.token)
@@ -349,6 +353,9 @@ nonisolated func syncBodyMetricsBatch(_ metrics: [PendingBodyMetricSyncItem], to
                     "bone_mass": metric.boneMass > 0 ? metric.boneMass : NSNull(),
                     "photo_url": metric.photoUrl as Any? ?? NSNull(),
                     "notes": metric.notes as Any? ?? NSNull(),
+                    "is_excluded": metric.isExcluded,
+                    "corrected_value": MetricCorrectedValue(jsonString: metric.correctedValueJSON)?.jsonObject
+                        as Any? ?? NSNull(),
                     "data_source": BodyMetricSource.normalizedRawValue(metric.dataSource),
                     "source_metadata": BodyMetricSourceMetadata(jsonString: metric.sourceMetadataJSON)?.jsonObject ?? [:],
                     "created_at": formatter.string(from: metric.createdAt),

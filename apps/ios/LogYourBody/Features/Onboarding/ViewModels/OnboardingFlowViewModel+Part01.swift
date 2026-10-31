@@ -190,12 +190,33 @@ func advanceAfterHealthConfirmation() {
             currentStep = .manualWeight
             return
         }
+        noteImportSatisfiedManualAsk()
 
         if hasBodyFatEntry {
             currentStep = .loading
         } else {
             currentStep = .bodyFatChoice
         }
+    }
+
+/// An import that already filled the manual weight or body-composition ask.
+func noteImportSatisfiedManualAsk() {
+        let weightImported = bodyScoreInput.weightSource == .healthKit || bodyScoreInput.weightSource == .scan
+        let compositionImported = hasBodyFatEntry &&
+            (bodyScoreInput.bodyFat.source == .healthKit || bodyScoreInput.bodyFat.source == .scan)
+        let avoidedCount = (weightImported ? 1 : 0) + (compositionImported ? 1 : 0)
+        guard avoidedCount > 0 else { return }
+        let askKind: String
+        if weightImported && compositionImported {
+            askKind = "mixed_log"
+        } else if compositionImported {
+            askKind = "composition_log"
+        } else {
+            askKind = "scale_log"
+        }
+        BenefitEvents.manualLogAvoided(
+            askId: "onboarding_import", askKind: askKind, avoidedCount: avoidedCount
+        )
     }
 
 /// The reveal needs only weight and body fat; sex, birthday and height are
@@ -406,13 +427,12 @@ func applyImportedScans(_ scans: [DexaPDFScan]) {
             bodyScoreInput.bodyFat = BodyFatValue(percentage: bodyFat, source: .scan)
             bodyFatPercentageText = Self.formatNumber(bodyFat)
             selectedVisualBodyFat = nil
-            currentStep = .loading
         } else {
             bodyScoreInput.bodyFat = BodyFatValue()
             bodyFatPercentageText = ""
             selectedVisualBodyFat = nil
-            currentStep = .bodyFatChoice
         }
+        advanceAfterHealthConfirmation()
         trackStepTransition(from: previousStep, to: currentStep)
     }
 

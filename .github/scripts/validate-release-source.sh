@@ -11,7 +11,7 @@ REQUIRED_CHECKS="${REQUIRED_CHECKS:-CI Summary,JavaScript/TypeScript,iOS}"
 # the StoreKit and iOS Unit job caps plus the 4901s macos-15 queue measured
 # before StoreKit started on CI run 40169457705. Native test allowances stay
 # in the suites; a failed required run still rejects immediately.
-RELEASE_CHECK_TIMEOUT_SECONDS="${RELEASE_CHECK_TIMEOUT_SECONDS:-10001}"
+RELEASE_CHECK_TIMEOUT_SECONDS="${RELEASE_CHECK_TIMEOUT_SECONDS:-10901}"
 RELEASE_CHECK_POLL_SECONDS="${RELEASE_CHECK_POLL_SECONDS:-15}"
 
 fail() {

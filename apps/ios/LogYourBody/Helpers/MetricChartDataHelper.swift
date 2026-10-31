@@ -87,7 +87,8 @@ struct MetricChartDataHelper {
 
         var predicates: [NSPredicate] = [
             NSPredicate(format: "userId == %@", userId),
-            NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false))
+            NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false)),
+            NSPredicate(format: "isExcluded == NO")
         ]
 
         if let startDate {
@@ -467,7 +468,7 @@ struct MetricChartDataHelper {
     }
 
     private static func composeChartData(with context: ChartCompositionContext) -> [SparklineDataPoint] {
-        let metrics = context.metrics
+        let metrics = context.metrics.filter { !$0.isExcluded }
         guard !metrics.isEmpty else { return [] }
 
         let filteredMetrics: [BodyMetrics]

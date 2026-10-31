@@ -31,12 +31,15 @@ import {
 import { poundsToKg } from '@/lib/voice/intent-parser';
 import type { WeightLifecyclePort } from '@/lib/metrics/weight-lifecycle';
 import { LYB_MCP_SCOPES, type LybMcpScope } from './contract';
-import { weightMcpTools } from './weight-tools';
+import type { HealthVaultService } from './health-vault/types';
 
 export type McpToolDependencies = {
   revisions?: TrainingRevisionsPort;
   delegatedEnabled?: () => boolean;
   metricsEnabled?: () => boolean;
+  vaultEnabled?: () => boolean;
+  /** Present only so a gated tool can run. The handler hides vault tools while the gate is closed. */
+  vault?: HealthVaultService;
   weight?: WeightLifecyclePort;
   records: NativeProductRecordsPort;
   now: () => Date;
@@ -46,12 +49,16 @@ export type McpToolDependencies = {
 export type McpToolResult = {
   content: Array<{ type: 'text'; text: string }>;
   structuredContent?: Record<string, unknown>;
+  /** Widget-only metadata. Hidden from the model, still visible to the host. */
+  _meta?: Record<string, unknown>;
   isError?: boolean;
 };
 
 export type ToolDefinition = {
   delegated?: boolean;
-  gate?: 'metrics';
+  gate?: 'metrics' | 'vault';
+  /** Listed and callable only for a widget client. Other clients get an unknown-tool error. */
+  widgetOnly?: boolean;
   name: string;
   title: string;
   description: string;
@@ -61,6 +68,9 @@ export type ToolDefinition = {
   idempotent?: boolean;
   input: z.ZodType<Record<string, unknown>>;
   inputSchema: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  ui?: { resourceUri?: string; visibility?: Array<'model' | 'app'> };
+  openai?: Record<string, unknown>;
   run(subject: string, args: never, deps: McpToolDependencies): Promise<McpToolResult>;
 };
 
@@ -1059,35 +1069,3 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
     },
   },
 ];
-
-function everyTool(): ToolDefinition[] {
-  return [...LYB_MCP_TOOLS, ...weightMcpTools()];
-}
-
-export function listTools(delegatedEnabled = false, metricsEnabled = false) {
-  return everyTool()
-    .filter((tool) => !tool.delegated || delegatedEnabled)
-    .filter((tool) => tool.gate !== 'metrics' || metricsEnabled)
-    .map((tool) => {
-      const securitySchemes = [{ type: 'oauth2', scopes: [tool.scope] }];
-      return {
-        name: tool.name,
-        title: tool.title,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-        annotations: {
-          title: tool.title,
-          readOnlyHint: tool.readOnly,
-          destructiveHint: tool.destructive === true,
-          openWorldHint: false,
-          idempotentHint: tool.idempotent ?? tool.readOnly,
-        },
-        securitySchemes,
-        _meta: { securitySchemes },
-      };
-    });
-}
-
-export function findTool(name: unknown): ToolDefinition | undefined {
-  return everyTool().find((tool) => tool.name === name);
-}

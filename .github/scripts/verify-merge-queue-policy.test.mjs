@@ -60,6 +60,13 @@ script: |
   if (run.conclusion !== 'success') return;
   if (pull.draft) return;
   if (pull.head.sha !== run.head_sha) return;
+  const hasExplicitHold = !Array.isArray(pull.labels)
+    || pull.labels.some(label => typeof label?.name !== 'string'
+      || label.name.toLowerCase() === 'hold');
+  if (hasExplicitHold) {
+    await recordOutcome('NOT_ELIGIBLE', 'Pull request has an explicit hold or labels are unavailable');
+    return;
+  }
   enqueuePullRequest(input: { expectedHeadOid: pull.head.sha })
 `;
 
@@ -193,4 +200,16 @@ test('deliberate red: privileged enrollment may not checkout code', () => {
     }),
     /must not checkout code/,
   );
+});
+
+test('deliberate red: deleting or inverting the negative hold guard is rejected', () => {
+  for (const enrollmentWorkflow of [
+    validEnrollment.replace("label.name.toLowerCase() === 'hold'", "label.name.toLowerCase() === 'machine-certified'"),
+    validEnrollment.replace('if (hasExplicitHold)', 'if (!hasExplicitHold)'),
+    validEnrollment.replace("!Array.isArray(pull.labels)", "Array.isArray(pull.labels)"),
+  ]) {
+    assert.throws(() => verifyPolicy({
+      policy: validPolicy, ciWorkflow: validCI, enrollmentWorkflow,
+    }), /must preserve explicit holds|must return before admission/);
+  }
 });

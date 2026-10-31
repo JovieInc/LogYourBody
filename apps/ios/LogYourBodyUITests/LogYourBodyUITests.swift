@@ -735,13 +735,55 @@ final class LogYourBodyUITests: XCTestCase {
 
         let logoutButton = app.descendants(matching: .any)["settings_logout_button"]
         XCTAssertTrue(logoutButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(logoutButton.isHittable)
+        let logoutConfirmation = app.alerts["Log out of LogYourBody?"]
+        XCTAssertFalse(logoutConfirmation.exists)
         logoutButton.tap()
 
-        let confirmLogout = app.buttons.matching(identifier: "settings_logout_confirm").firstMatch
-        XCTAssertTrue(confirmLogout.waitForExistence(timeout: 5))
+        // Native alerts can expose both a wrapper button and its action button.
+        // Require one hittable leaf inside this alert, never a background button.
+        XCTAssertTrue(logoutConfirmation.waitForExistence(timeout: 5), app.debugDescription)
+        let cancelLogout = try hittableLogoutAction(
+            in: logoutConfirmation, identifier: "settings_logout_cancel", label: "Cancel"
+        )
+        cancelLogout.tap()
+        XCTAssertTrue(logoutConfirmation.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(logoutButton.exists)
+        XCTAssertFalse(app.buttons["continueWithAppleButton"].exists)
+
+        logoutButton.tap()
+        XCTAssertTrue(logoutConfirmation.waitForExistence(timeout: 5), app.debugDescription)
+        let confirmLogout = try hittableLogoutAction(
+            in: logoutConfirmation, identifier: "settings_logout_confirm", label: "Log Out"
+        )
         confirmLogout.tap()
 
         XCTAssertTrue(app.buttons["continueWithAppleButton"].waitForExistence(timeout: 8))
+    }
+
+    private func hittableLogoutAction(in alert: XCUIElement, identifier: String, label: String) throws -> XCUIElement {
+        let candidates = alert.buttons.matching(identifier: identifier)
+        func interactiveActions() -> [XCUIElement] {
+            candidates.allElementsBoundByIndex.filter {
+                $0.label == label && $0.isEnabled && $0.isHittable
+                    && !$0.descendants(matching: .button).matching(identifier: identifier).firstMatch.exists
+            }
+        }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            interactiveActions().count == 1
+        }, object: nil)
+        let result = XCTWaiter.wait(for: [ready], timeout: 5)
+        let controls = alert.buttons.allElementsBoundByIndex.map {
+            "\($0.identifier)=\($0.label) enabled=\($0.isEnabled) hittable=\($0.isHittable) frame=\($0.frame)"
+        }
+        XCTContext.runActivity(named: "Logout action \(identifier): \(controls)") { activity in
+            let attachment = XCTAttachment(string: alert.debugDescription)
+            attachment.lifetime = .keepAlways
+            activity.add(attachment)
+        }
+        XCTAssertEqual(result, .completed, alert.debugDescription)
+        let actions = interactiveActions()
+        return try XCTUnwrap(actions.count == 1 ? actions.first : nil, alert.debugDescription)
     }
 
     func testProfileEditorProvidesAnEscapeRoute() throws {
@@ -2338,13 +2380,21 @@ final class LogYourBodyUITests: XCTestCase {
         let menu = app.buttons["Open Menu"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
         menu.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_menu"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["photo_timeline_menu"].waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            app.buttons.matching(identifier: "photo_timeline_menu").count, 0,
+            "The menu marker must never replace its independent button identifiers."
+        )
     }
 
     private func openSettingsFromPhotoTimelineMenu(in app: XCUIApplication) {
         openPhotoTimelineMenu(in: app)
-        let settings = app.buttons["Settings"]
+        let settingsButtons = app.buttons.matching(identifier: "photo_timeline_menu_settings")
+        let settings = settingsButtons.firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        XCTAssertEqual(settingsButtons.count, 1, "Settings must have one distinct control owner.")
+        XCTAssertEqual(settings.identifier, "photo_timeline_menu_settings")
+        XCTAssertEqual(settings.label, "Settings")
         XCTAssertTrue(settings.isHittable)
         settings.tap()
         XCTAssertTrue(app.buttons["settings_profile_link"].waitForExistence(timeout: 8))
@@ -3490,8 +3540,20 @@ final class LogYourBodyUITests: XCTestCase {
                 }
                 _ = app.keyboards.element.waitForExistence(timeout: 2)
                 let addition = syntheticQuestionInsertion(current: current, question: question)
-                if !addition.isEmpty {
-                    composer.typeText(addition)
+                var prefix = current
+                // Acknowledge each prefix while the simulator keyboard connects.
+                for character in addition {
+                    composer.typeText(String(character))
+                    if String(character) == XCUIKeyboardKey.delete.rawValue {
+                        prefix = String(prefix.dropLast())
+                    } else {
+                        prefix.append(character)
+                    }
+                    if prefix.isEmpty { continue }
+                    let received = XCTNSPredicateExpectation(
+                        predicate: NSPredicate(format: "value == %@", prefix), object: composer
+                    )
+                    guard XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }
                 }
             }
             let entered = XCTNSPredicateExpectation(
@@ -3543,14 +3605,18 @@ final class LogYourBodyUITests: XCTestCase {
         let answer = app.descendants(matching: .any).matching(
             NSPredicate(format: "label == %@", "LogYourBody: " + response)
         ).firstMatch
-        let terminal = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            answer.exists && app.buttons["chat_send_button"].label == "Send message"
-                && !app.buttons["chat_retry_button"].exists
-                && !app.descendants(matching: .any)["chat_recovery_message"].exists
-        }, object: app)
+        // Observe the answer outside a predicate callback: a nested remote query
+        // can consume the callback's entire wait and be interrupted by its waiter.
+        let rendered = answer.waitForExistence(timeout: 8)
+        let terminal = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "Send message"), object: app.buttons["chat_send_button"]
+        )
         let completed = XCTWaiter.wait(for: [terminal], timeout: 8) == .completed
         attachScreenshot(named: capture, from: app)
-        XCTAssertTrue(completed, "Require the full rendered answer and terminal success, not a root, partial text or HTTP status")
+        XCTAssertTrue(
+            rendered && completed && answer.exists,
+            "Require the full rendered answer and terminal success, not a root, partial text or HTTP status"
+        )
         XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["chat_recovery_message"].exists)
         XCTAssertFalse(app.buttons["chat_retry_button"].exists)

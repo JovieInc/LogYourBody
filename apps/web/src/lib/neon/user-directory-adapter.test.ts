@@ -43,6 +43,8 @@ describe('neonUserDirectory.deleteUser', () => {
       'delete from public.metrics_agent_grants where user_subject = ?',
       'delete from public.body_metrics where user_subject = ?',
       'delete from public.native_records where user_subject = ?',
+      'delete from public.health_vault_grants where user_subject = ?',
+      'delete from public.health_vault_consent_log where user_subject = ?',
       'select public.lyb_delete_my_gyms(?)',
       "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ?",
     ];

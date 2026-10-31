@@ -137,6 +137,24 @@ jobs:
                 core.info(`#${pull.number}: CI Summary on ${pull.headRefOid.slice(0, 9)} is ${summary?.conclusion ?? 'missing'}; leaving it`);
                 continue;
               }
+              // The shallow queue snapshot can predate a hold or a moved source.
+              const { data: current } = await github.rest.pulls.get({
+                owner, repo, pull_number: pull.number,
+              });
+              const hasExplicitHold = !Array.isArray(current.labels)
+                || current.labels.some(label => typeof label?.name !== 'string'
+                  || label.name.toLowerCase() === 'hold');
+              if (hasExplicitHold) {
+                core.info(`#${pull.number}: explicit hold or labels are unavailable; leaving it`);
+                continue;
+              }
+              if (current.state !== 'open' || current.draft || current.base?.ref !== 'main'
+                  || current.base?.repo?.full_name !== expectedRepository
+                  || current.head?.repo?.full_name !== expectedRepository
+                  || current.head?.sha !== pull.headRefOid) {
+                core.info(`#${pull.number}: current source is no longer the exact eligible queue head; leaving it`);
+                continue;
+              }
               await github.graphql(`
                 mutation Dequeue($id: ID!) {
                   dequeuePullRequest(input: { id: $id }) { mergeQueueEntry { id } }

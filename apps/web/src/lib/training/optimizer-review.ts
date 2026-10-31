@@ -30,7 +30,12 @@ export type OptimizationDecision =
   | { kind: 'stale_evidence' }
   | { kind: 'user_edit_conflict' }
   | { kind: 'not_certified'; violations: string[] }
-  | { kind: 'accepted'; receipt: OptimizationReceipt; changes: OptimizationChange[] };
+  | {
+      kind: 'accepted';
+      receipt: OptimizationReceipt;
+      changes: OptimizationChange[];
+      rollingSchedule?: OptimizationProposal['rollingSchedule'];
+    };
 
 function receipt(
   proposal: OptimizationProposal,
@@ -65,6 +70,16 @@ export function decideMesocycleOptimization(input: {
 }): OptimizationDecision {
   if (!input.enabled) return { kind: 'disabled' };
   if (input.decision !== 'apply' && input.decision !== 'reject') return { kind: 'invalid' };
+  if (
+    !input.proposal ||
+    input.proposal.version !== 1 ||
+    input.proposal.kind !== 'mesocycle_optimization' ||
+    typeof input.proposal.id !== 'string' ||
+    typeof input.proposal.evidenceVersion !== 'string' ||
+    typeof input.proposal.baseFingerprint !== 'string'
+  ) {
+    return { kind: 'invalid' };
+  }
   if (input.decision === 'reject') {
     return {
       kind: 'rejected',
@@ -81,12 +96,20 @@ export function decideMesocycleOptimization(input: {
   if (input.currentFingerprint !== input.proposal.baseFingerprint) {
     return { kind: 'user_edit_conflict' };
   }
+  // The HTTP caller supplies untrusted JSON. Match the deterministic shape
+  // before the detailed certifier reads nested changes, findings, or tradeoffs.
+  const canonical = optimizeMesocycle(input.source);
+  if (canonical.kind !== 'proposal') return { kind: 'invalid' };
+  if (trainingRequestHash(canonical.proposal) !== trainingRequestHash(input.proposal)) {
+    return { kind: 'not_certified', violations: ['proposal_mismatch'] };
+  }
   const verdict = certifyOptimization(input.source, input.proposal, OPTIMIZER_RULES);
   if (!verdict.ok) return { kind: 'not_certified', violations: verdict.violations };
   return {
     kind: 'accepted',
     receipt: receipt(input.proposal, 'apply', input.currentFingerprint),
     changes: input.proposal.changes,
+    ...(input.proposal.rollingSchedule ? { rollingSchedule: input.proposal.rollingSchedule } : {}),
   };
 }
 

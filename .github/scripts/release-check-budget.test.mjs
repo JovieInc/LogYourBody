@@ -7,10 +7,10 @@ import test from 'node:test';
 // then passed; this wait is not that result.
 const MEASURED_MACOS_QUEUE_SECONDS = 4901;
 
-// Merge-group runs 40627001572 and 40630174025 cancelled the 30-minute
-// StoreKit job after three lifecycles passed and the fourth xcodebuild had
-// started. Main run 40618754083 spent 6m08s in that fourth case alone.
-const STOREKIT_FOUR_LIFECYCLE_MINUTES = 45;
+// Main run 40937070309 exceeded the 45-minute job cap after the fourth
+// method passed, before XCTest finalization and receipt upload completed.
+// Reserve 15 more minutes for cold simulator/launch variance and receipts.
+const STOREKIT_FOUR_LIFECYCLE_MINUTES = 45 + 15;
 
 function source(path) {
   return readFileSync(path, 'utf8');
@@ -47,7 +47,7 @@ test('enclosing release budget preserves native caps', () => {
   const storekitMinutes = timeoutMinutes(jobSection(ci, 'ios_storekit'), 'StoreKit');
   assert.ok(
     storekitMinutes >= STOREKIT_FOUR_LIFECYCLE_MINUTES,
-    `StoreKit cap ${storekitMinutes}m cancels the fourth lifecycle; need ${STOREKIT_FOUR_LIFECYCLE_MINUTES}m`,
+    `StoreKit cap ${storekitMinutes}m cancels the fourth lifecycle; need ${STOREKIT_FOUR_LIFECYCLE_MINUTES}m including finalization and receipts`,
   );
   const unitMinutes = timeoutMinutes(jobSection(unitWorkflow, 'unit'), 'iOS Unit');
   const minimumSeconds = (storekitMinutes + unitMinutes) * 60 + MEASURED_MACOS_QUEUE_SECONDS;

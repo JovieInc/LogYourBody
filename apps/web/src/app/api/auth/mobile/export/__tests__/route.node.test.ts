@@ -7,6 +7,11 @@ import { neonNativeProductRecords } from '@/lib/neon/native-product-records-adap
 import { neonUserDirectory } from '@/lib/neon/user-directory-adapter';
 import { GET, POST } from '../route';
 import { neonTrainingRevisions } from '@/lib/neon/training-revisions-adapter';
+const outcomeRead = jest.fn();
+const outcomeExport = jest.fn();
+jest.mock('@/lib/neon/dated-outcome-adapter', () => ({
+  neonDatedOutcomes: () => ({ read: outcomeRead, exportForSubject: outcomeExport }),
+}));
 jest.mock('@/lib/neon/training-revisions-adapter', () => ({
   neonTrainingRevisions: { exportForSubject: jest.fn() },
 }));
@@ -39,6 +44,11 @@ function request(method: 'GET' | 'POST', token?: string) {
 describe('/api/auth/mobile/export', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    outcomeRead.mockResolvedValue({
+      revision: 'outcome-revision',
+      value: { outcomeDate: '2027-04-01' },
+    });
+    outcomeExport.mockResolvedValue([{ request_id: 'outcome-revision' }]);
     jest
       .mocked(neonTrainingRevisions.exportForSubject)
       .mockResolvedValue({ proposals: [], revisions: [{ id: 'revision-owned' }] });
@@ -98,6 +108,8 @@ describe('/api/auth/mobile/export', () => {
       version: 1,
       subject: 'owner-a',
       profile: { subject: 'owner-a' },
+      dated_outcome: { revision: 'outcome-revision', value: { outcomeDate: '2027-04-01' } },
+      dated_outcome_recompute_requests: [{ request_id: 'outcome-revision' }],
       body_metrics: [{ id: 'metric-1' }],
       training_program_revisions: { proposals: [], revisions: [{ id: 'revision-owned' }] },
       daily_metrics: [{ id: 'daily-1' }],

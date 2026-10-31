@@ -1,5 +1,6 @@
 """Check native unit-test membership and the rest Live Activity Xcode graph."""
 from collections import Counter
+import hashlib
 import json
 import pathlib
 import plistlib
@@ -73,9 +74,48 @@ def check_test_source_membership(project, source_root):
     assert not invalid, 'Native test source membership must compile exactly once: ' + ', '.join(invalid)
 
 
+# Once a model version is used, keep its compiled schema reproducible. Evolve by
+# adding a new version, never by resolving a merge over an existing schema.
+LOCKED_MODEL_VERSIONS = {
+    'LogYourBody.xcdatamodel': '1f60e718d80855eabe2fcd62b0e440459fca274cebd723669ddee89d097ccae5',
+    'LogYourBodyV2.xcdatamodel': '09bcb4ccef113c8f627d99393be2a89035e7012769867123beab1beba4a6c367',
+    'LogYourBodyV3.xcdatamodel': 'fb199105d312a6a6a7e725240c83b052895c9c77aa700ef089dc31d40ac38109',
+    'LogYourBodyV4.xcdatamodel': '66da9882db8b7624867d6149e336f7847647c69ab1b431c7d161ef590e09db96',
+    'LogYourBodyV5.xcdatamodel': 'd344e8c50e13ea843757659942ef2cadf59ad204f672026c360be25b1d6475b4',
+    'LogYourBodyV6.xcdatamodel': '3ad6bfa15f2f50b936249e5bfc6caab6038f07b0b596c743c1f5624b62ed40a5',
+    'LogYourBodyV7.xcdatamodel': '9a16e86aa6811d337b2b4a875f6b5e66f7d9b2a68548279ec71a77db27766ef6',
+}
+
+
+def check_model_versions(project, model_root, locked=None):
+    locked = LOCKED_MODEL_VERSIONS if locked is None else locked
+    current = plistlib.loads((model_root / '.xccurrentversion').read_bytes())['_XCCurrentVersionName']
+    versions = {path.parent.name: path for path in model_root.glob('*.xcdatamodel/contents')}
+    assert set(versions) == set(locked), 'Review additive model versions; never replace a published model'
+    for name, expected in locked.items():
+        path = versions[name]
+        assert not path.is_symlink() and not path.parent.is_symlink(), 'Model versions must be regular source files'
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == expected, (
+            'Published model version changed: ' + name + '; use an additive version')
+    assert current in versions, 'Selected model version must exist'
+    objects = project['objects']
+    groups = [obj for obj in objects.values()
+              if obj.get('isa') == 'XCVersionGroup' and obj.get('path') == model_root.name]
+    assert len(groups) == 2, 'App and widget must both register the model version group'
+    for group in groups:
+        children = group['children']
+        assert len(children) == len(set(children)), 'Duplicate model version registration'
+        registered = [objects[key]['path'] for key in children]
+        assert len(registered) == len(set(registered)), 'Duplicate model version paths'
+        assert set(registered) == set(versions), 'Every model version must compile in app and widget'
+        assert group['currentVersion'] in children, 'Current model version must be registered'
+        assert objects[group['currentVersion']]['path'] == current, 'App and widget must select the current model version'
+
+
 def check_project(path):
     project = read_project(path)
     check_test_source_membership(project, ROOT / 'apps/ios')
+    check_model_versions(project, ROOT / 'apps/ios/LogYourBody/Models/LogYourBody.xcdatamodeld')
     objects = project['objects']
     targets = {objects[key]['name']: objects[key] for key in objects[project['rootObject']]['targets']}
     app = targets['LogYourBody']

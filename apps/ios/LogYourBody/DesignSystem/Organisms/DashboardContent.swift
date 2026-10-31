@@ -25,7 +25,8 @@ struct DashboardContent: View {
     // Computed properties for current metric
     private var currentMetric: BodyMetrics? {
         guard !bodyMetrics.isEmpty && selectedIndex >= 0 && selectedIndex < bodyMetrics.count else { return nil }
-        return bodyMetrics[selectedIndex]
+        return bodyMetrics[selectedIndex].isExcluded
+            ? bodyMetrics.first { !$0.isExcluded } : bodyMetrics[selectedIndex]
     }
 
     var body: some View {

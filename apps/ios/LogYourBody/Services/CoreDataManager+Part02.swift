@@ -94,6 +94,7 @@ func fetchLatestBodyMetric(for userId: String) async -> CachedBodyMetrics? {
             predicates.append(NSPredicate(format: "userId == %@", userId))
             predicates.append(NSPredicate(format: "isMarkedDeleted == %@", NSNumber(value: false)))
 
+            predicates.append(NSPredicate(format: "isExcluded == NO"))
             fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
             fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
             fetchRequest.fetchLimit = 1

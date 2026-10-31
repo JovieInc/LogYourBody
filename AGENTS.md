@@ -406,6 +406,19 @@ The sections below provide platform-specific details for iOS and web development
 
 ## Working with the iOS App
 
+### Swift Data Architecture (enforced)
+
+LogYourBody follows the company Swift ADR (JovieInc/Jovie `docs/architecture/swift-architecture-adr-2026-10-29.md`):
+
+- **The main actor only assigns finished values.** Core Data fetches and saves, JSON, file I/O, image decode and derived data (sort, filter, interpolate, chart prep) run off it.
+  - Never compute from a whole collection in `body`, or in a computed property that `body` reads. Compute once per data change, or memoize on a content fingerprint, as `MetricsInterpolationService` does.
+  - Every production App Hanging event in October 2026 was this pattern.
+- **Core Data:** `viewContext` serves small UI-bound reads only. Dashboard and history fetches and all writes use background contexts.
+- **Observation:** new stores use `@MainActor @Observable`. Do not add new `ObservableObject`, `@Published` or `@EnvironmentObject`.
+- **Mutations:** replace one item by id. Do not reassign whole arrays for one value. Use push over polling.
+
+The `scripts/ios/swift-arch/guard.mjs` ratchet (CI: iOS Static Audits) fails on any new violation, and on a stale-high baseline. After you fix debt, run `node scripts/ios/swift-arch/guard.mjs --write-baseline` in the same PR. Never raise the baseline by hand. The guard is vendored from JovieInc/Jovie `scripts/swift-arch/`; change it there first.
+
 ### Key Directories
 
 - `apps/ios/LogYourBody/` - Main iOS application code
@@ -804,3 +817,5 @@ Read `docs/README.md` inside that installed package first, then read the relevan
 
 This block is written and re-added by `turbo` before repository-scoped commands when an AI agent is detected. In the Turborepo source repository, its template is defined in `crates/turborepo-cli/src/cli/agent_guidance.rs`. Removing the managed block while updates are enabled means a later qualifying invocation will add it again. Set `"agentGuidance": false` in the root `turbo.json` or `turbo.jsonc` to opt out; this does not remove an existing block. Keep the block committed with your work to avoid an uncommitted change on the next agent invocation.
 <!-- END:turborepo-agent-rules -->
+
+Company canon: JovieInc/ci canon/COMPANY.md (applies in full; this file is the repo delta).

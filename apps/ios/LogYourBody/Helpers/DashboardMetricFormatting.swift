@@ -101,7 +101,7 @@ func computeRangeStats(
     valueProvider: (BodyMetrics) -> Double?
 ) -> MetricRangeStats? {
     let points = metrics.compactMap { metric -> MetricChartDataPoint? in
-        guard let value = valueProvider(metric), value.isFinite else { return nil }
+        guard !metric.isExcluded, let value = valueProvider(metric), value.isFinite else { return nil }
         return MetricChartDataPoint(date: metric.date, value: value)
     }
     return computeRangeStats(points: points, requiresComparison: false, includesInferredValues: true)
