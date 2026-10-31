@@ -438,3 +438,19 @@ final class LogYourBodyUITestsLaunchTests: XCTestCase {
         )
     }
 }
+
+// Launch-context forwarding split out of ChaosMonkeyUITests.swift to honor
+// the per-file size budget. Behavior is unchanged.
+extension XCUIApplication {
+    /// Forward native XCTest context without inventing a marker for ordinary launches.
+    func forwardActualXCTestContext() {
+        for key in ["XCTestConfigurationFilePath", "XCTestSessionIdentifier", "XCTestBundlePath"] {
+            if let value = ProcessInfo.processInfo.environment[key],
+               !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                launchEnvironment[key] = value
+            } else {
+                launchEnvironment.removeValue(forKey: key)
+            }
+        }
+    }
+}
