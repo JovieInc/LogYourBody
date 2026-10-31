@@ -5005,5 +5005,23 @@
     },
     "level": "codebase",
     "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "draft-test-fixture-factory-owns-idempotent-teardown",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41156243461",
+    "correction": "PR #1639 (LYB-176), work fingerprint fix-red-5df69c1e5f: Launch Quality executed the undo/relaunch regression but failed at compiler-generated async cleanup with Cocoa error 4 while removing its temporary draft directory. The suite duplicated best-effort removal in 37 test bodies.",
+    "mechanization": "Extend the existing draft fixture factory to register XCTest teardown for every allocated root. Remove all caller-owned async cleanup defers. Centralize removal with narrow acceptance of an already-absent directory and propagate other errors. Add a native regression for repeat removal, preservation of another root and propagation of permission failures. Preserve the undo/relaunch regression and every prior native test identity and assertion. The failing hosted receipt is retained; native regression execution and coverage on the repaired head require macOS CI. Linux validation cannot establish those native results. Machine: built apps/ios/LogYourBodyTests/TrainingSessionDraftTests.swift. The harness retains pushing and PR-body ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture factory can own the complete temporary-directory lifecycle once for all draft tests. XCTest teardown separates cleanup from async throwing test bodies and makes future callers inherit cleanup automatically, while unexpected filesystem failures remain visible."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/TrainingSessionDraftTests.swift",
+      "anchor": "addTeardownBlock { try Self.removeRoot(directory) }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

@@ -49,7 +49,37 @@ final class TrainingSessionDraftTests: XCTestCase {
     }
 
     private func root() -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("LYB-TrainingDraft-Test-" + UUID().uuidString)
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LYB-TrainingDraft-Test-" + UUID().uuidString)
+        addTeardownBlock { try Self.removeRoot(directory) }
+        return directory
+    }
+
+    nonisolated private static func removeRoot(
+        _ directory: URL,
+        removing: (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) }
+    ) throws {
+        do {
+            try removing(directory)
+        } catch let error as CocoaError where error.code == .fileNoSuchFile {
+            return
+        }
+    }
+
+    func testDraftFixtureCleanupIsIdempotentAndPreservesOtherRoots() throws {
+        let directory = root()
+        let other = root()
+        for path in [directory, other] {
+            try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
+            try Data("draft".utf8).write(to: path.appendingPathComponent("journal.json"))
+        }
+        try Self.removeRoot(directory)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+        XCTAssertNoThrow(try Self.removeRoot(directory))
+        XCTAssertEqual(try Data(contentsOf: other.appendingPathComponent("journal.json")), Data("draft".utf8))
+        XCTAssertThrowsError(try Self.removeRoot(other) { _ in throw CocoaError(.fileWriteNoPermission) }) { error in
+            XCTAssertEqual((error as? CocoaError)?.code, .fileWriteNoPermission)
+        }
     }
 
     private func model(_ store: TrainingDraftStore, owner: String = "owner-A") -> TrainingSessionDraft {
@@ -58,7 +88,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testMovementResponseJournalRetainsIndependentObservationsAcrossOfflineReopen() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let draft = model(store)
         var request = TrainingFeedbackRequest(sessionId: "fixture-session")
@@ -105,7 +134,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testRestStartsOnlyAfterAcknowledgementAndRetryUsesOneTimer() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let start = Date(timeIntervalSince1970: 2_000_000_000)
         let draft = TrainingSessionDraft(
             session: session(), ownerId: "owner-A", store: TrainingDraftStore(rootURL: directory),
@@ -136,7 +164,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testAdjustedRestAndSkipSurviveRefreshAndRelaunchWithoutRestarting() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         var time = Date(timeIntervalSince1970: 2_000_000_000)
         let start = time
@@ -178,7 +205,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testCorrectionUndoReceiptAndRestSurviveRelaunchAndPauseCancelsRest() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let time = Date(timeIntervalSince1970: 2_000_000_000)
         let draft = TrainingSessionDraft(
@@ -225,7 +251,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testOlderAcknowledgementDoesNotRestartAdjustedRestAfterSessionRefresh() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         var time = Date(timeIntervalSince1970: 2_000_000_000)
         let draft = TrainingSessionDraft(
             session: session(), ownerId: "owner-A", store: TrainingDraftStore(rootURL: directory),
@@ -256,7 +281,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testRestGateOffKeepsExistingTimerAndNoNewAlertState() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let draft = model(TrainingDraftStore(rootURL: directory))
         await draft.save(exercise, setNumber: 1) { _ in }
         XCTAssertNotNil(draft.restUntil)
@@ -267,7 +291,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testReadinessSafetyReceiptCancelsAnActiveRestTimer() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let draft = TrainingSessionDraft(
             session: session(), ownerId: "owner-A", store: TrainingDraftStore(rootURL: directory),
             isCurrent: { true }, restTimerEnabled: true
@@ -333,7 +356,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testScrubCommitsOnlyToDraftAndOfflineRetryRetainsCanonicalSetIdentity() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let draft = model(store)
         var edit = try XCTUnwrap(TrainingNumericScrubEdit(
@@ -371,7 +393,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testScrubCorrectionUsesExistingDurableIdentityAndCancellingNeverWrites() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let draft = model(store)
         await draft.save(exercise, setNumber: 1) { _ in }
@@ -468,7 +489,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testRestRequestDoesNotInventAReadinessSignal() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let draft = model(TrainingDraftStore(rootURL: directory))
         for intent in [TrainingWorkoutFeedback.Intent.moreRest, .unknown] {
             await draft.recordWorkoutFeedback(feedbackProposal(intent), source: "touch") { request in
@@ -496,7 +516,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testReadinessSurvivesExpiredTimerOfflineRetryAndDoesNotAdvanceTheSet() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         var time = Date()
         let draft = TrainingSessionDraft(
@@ -539,7 +558,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testReadinessRejectsWrongSetReceiptStaleControllerAndWrongAccount() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let draft = model(store)
         var sends = 0
@@ -567,7 +585,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testPerformanceOnlyFeedbackRetainsCanonicalLimitationThroughOfflineRelaunch() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let draft = model(store)
         await draft.save(exercise, setNumber: 1) { _ in }
@@ -597,7 +614,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testPendingLimitationCannotRetainEarlierProceedRecommendation() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let draft = model(TrainingDraftStore(rootURL: directory))
         await draft.recordWorkoutFeedback(feedbackProposal(.ready), source: "touch") { request in
             self.feedbackResponse(request, action: .proceed)
@@ -613,7 +629,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testWeakSetFeedbackRetainsActualValuesAndCorrectionLinksWithoutChangingPrescription() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let draft = model(store)
         draft.update(exercise, setNumber: 1) { $0.repsText = "9"; $0.rir = 1 }
@@ -643,7 +658,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testReadinessDuplicateReceiptRetainsOriginalAgeAndSymptomsOverrideReady() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let draft = model(TrainingDraftStore(rootURL: directory))
         await draft.recordWorkoutFeedback(feedbackProposal(.ready), source: "text") { request in
             var original = request
@@ -669,7 +683,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testFeedbackDiskFailureAndAccountChangeNeverAcknowledgeReadiness() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let brokenStore = TrainingDraftStore(rootURL: directory) { _, _, _ in throw TrainingDraftError.unavailable }
         let broken = model(brokenStore)
         await broken.recordWorkoutFeedback(feedbackProposal(.ready), source: "touch") { _ in
@@ -696,7 +709,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testRawEditsSurviveFileReconstructionWithoutSubmitting() throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         var writeOptions: [Data.WritingOptions] = []
         let store = TrainingDraftStore(rootURL: directory) { data, url, options in
             writeOptions.append(options)
@@ -730,7 +742,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testExplicitBlankAndZeroAreDistinctFromUntouchedEngineLoad() throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let original = model(store)
         XCTAssertEqual(original.row(for: exercise, setNumber: 1).loadText, "60")
@@ -744,7 +755,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testResponseLossRelaunchAndManualRetryKeepExactAttemptAndOneLogicalSet() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let original = model(store)
         original.update(exercise, setNumber: 1) { $0.repsText = "13"; $0.loadText = "22,5"; $0.rir = 4 }
@@ -780,7 +790,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testFailedLocalJournalWritePreventsTransport() async {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory) { _, _, _ in throw CocoaError(.fileWriteOutOfSpace) }
         let draft = model(store)
         var sends = 0
@@ -792,7 +801,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testCorruptJournalIsPreservedAndCannotSubmit() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         model(store).update(exercise, setNumber: 1) { $0.loadText = "22,5" }
         let owner = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).first)
@@ -809,7 +817,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testInvalidInputNeverBecomesPendingOrSends() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let draft = model(store)
         draft.update(exercise, setNumber: 1) { $0.loadText = "501" }
@@ -821,7 +828,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testAcknowledgementCannotRemoveNewerRevisionOrOtherOwner() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let draft = model(store)
         model(store, owner: "owner-B").update(exercise, setNumber: 1) { $0.loadText = "80" }
@@ -839,7 +845,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testDifferentNextSessionRetainsOldPendingWithoutReplayingOrRetargeting() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         var sends = 0
         await model(store).save(exercise, setNumber: 1) { _ in sends += 1; throw URLError(.networkConnectionLost) }
@@ -855,7 +860,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testAuthoritativeSavedSetWinsAndUnknownPrescriptionRowsDoNotRestore() throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         model(store).update(exercise, setNumber: 1) { $0.loadText = "22,5" }
         let unknown = TrainingSetDraft(
@@ -883,7 +887,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testOwnerPurgePreservesOtherAccountAndIsRepeatable() throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         model(store).update(exercise, setNumber: 1) { $0.loadText = "22,5" }
         model(store, owner: "owner-B").update(exercise, setNumber: 1) { $0.loadText = "80" }
@@ -896,7 +899,6 @@ final class TrainingSessionDraftTests: XCTestCase {
     func testStalePrepareCannotOverwriteNewerDraftIncludingInitiallyAbsentRow() async throws {
         for initiallyAbsent in [false, true] {
             let directory = root()
-            defer { try? FileManager.default.removeItem(at: directory) }
             let store = TrainingDraftStore(rootURL: directory)
             if !initiallyAbsent { model(store).update(exercise, setNumber: 1) { $0.loadText = "22,5" } }
             let stale = model(store)
@@ -914,7 +916,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testStaleControllerCannotEditAwayAnotherControllersImmutableAttempt() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         model(store).update(exercise, setNumber: 1) { $0.loadText = "22,5" }
         let saving = model(store)
@@ -932,7 +933,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testCorruptJournalDoesNotHideValidServerAcknowledgement() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         model(store).update(exercise, setNumber: 1) { $0.loadText = "22,5" }
         let owner = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).first)
@@ -957,7 +957,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testCleanupWriteFailureCannotHideLaterServerAcknowledgements() throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let draft = model(store)
         draft.update(exercise, setNumber: 1) { $0.loadText = "22,5" }
@@ -992,7 +991,6 @@ final class TrainingSessionDraftTests: XCTestCase {
     func testRestoredMatchingPendingAcknowledgementClearsAttemptButDifferentValuesRetainIt() async throws {
         for matches in [true, false] {
             let directory = root()
-            defer { try? FileManager.default.removeItem(at: directory) }
             let store = TrainingDraftStore(rootURL: directory)
             let draft = model(store)
             draft.update(exercise, setNumber: 1) { $0.loadText = "22,5" }
@@ -1034,7 +1032,6 @@ final class TrainingSessionDraftTests: XCTestCase {
     func testReturningAcknowledgementAfterABAOrCancellationKeepsPendingAttempt() async throws {
         for interruption in ["owner-B", "ABA", "cancelled"] {
             let directory = root()
-            defer { try? FileManager.default.removeItem(at: directory) }
             let owner = AuthManager.ProfileSessionOwnership(subject: "owner-A", generation: 1)
             var current = owner
             let store = TrainingDraftStore(rootURL: directory)
@@ -1086,7 +1083,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testNowAndUpNextAdvanceOnlyAfterDurableAcknowledgementAndResumeWithoutReplayAnimation() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let draft = model(store)
         XCTAssertEqual(draft.currentPosition?.id, "fixture_press-1")
@@ -1118,7 +1114,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testCorrectionKeepsIdentityAndRetriesExactAuditRequestAfterInterruption() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let original = TrainingSavedSet(
             sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 1,
@@ -1169,7 +1164,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testFreshLogHasNoUndoAndALaterAcknowledgementCannotEraseACorrection() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         let draft = model(store)
         var undoSends = 0
@@ -1221,7 +1215,6 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     func testUndoReceiptSurvivesRelaunchUntilExpiryAndRetriesOneId() async throws {
         let directory = root()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         var clock = Date(timeIntervalSince1970: 1_700_000_000)
         let original = TrainingSavedSet(
