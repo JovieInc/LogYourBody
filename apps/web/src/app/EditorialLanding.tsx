@@ -301,6 +301,7 @@ export function EditorialLanding({
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
             <Link href="/health-disclosure">Health disclosure</Link>
+            <Link href="/consumer-health-data">Consumer health data</Link>
           </nav>
         </div>
       </footer>

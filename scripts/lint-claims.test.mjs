@@ -251,6 +251,7 @@ const webCopyPaths = [
     'privacy',
     'terms',
     'health-disclosure',
+    'consumer-health-data',
     'signup',
     'signin',
   ].map((route) => `apps/web/src/app/${route}/page.tsx`),
@@ -260,6 +261,7 @@ const webCopyPaths = [
   'apps/web/src/lib/load-legal-docs.ts',
   'packages/product-registry/src/products/logyourbody.mjs',
   'shared/legal/health-disclosure.md',
+  'shared/legal/consumer-health-data-policy.md',
   'apps/web/content/blog/published.md',
 ];
 

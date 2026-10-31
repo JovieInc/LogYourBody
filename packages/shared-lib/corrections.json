@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "consumer-health-data-policy-homepage-publication",
+    "correction": "Tim White, 2026-10-31: publish the supplied consumer health data policy as a distinct public route linked from every homepage footer; preserve its wording and skip iOS bundling when Xcode edits are required.",
+    "source": "https://github.com/JovieInc/LogYourBody/tree/compounding/consumer-health-data-policy#tim-white-task-2026-10-31",
+    "mechanization": "Mirror health-disclosure route wiring and retain the shared legal link list. The existing web Jest suite checks the canonical policy file and required sections, the link list, and the visible link in all five rendered homepage/footer surfaces. The new regression fails for the missing link list and all five surfaces before the implementation. Loader tests cover canonical bytes and read failure; existing auth, PWA, footer and metadata route tests cover the new public route.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A shared footer list cannot by itself prevent removal of the canonical policy file or omission from the separately composed editorial homepage footer."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required web Jest suite can assert canonical file sections and render every homepage footer to verify the visible policy link."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/__tests__/consumer-health-policy.test.tsx",
+      "anchor": "consumer health data policy publication guard"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "account-erasure-verifiers-load-canonical-cleanup-migrations",
     "correction": "PR #1636 / LYB-330 (fix-red-1a39536f40 occurrence 7): JavaScript/TypeScript run 41130955586 failed because both training SQL verifiers retained a fixed cleanup inventory and omitted the new health vault tables.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41130955586/job/124321693545",

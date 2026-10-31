@@ -46,6 +46,7 @@ describe('marketing stays on the native acquisition path', () => {
     '/download/ios',
     '/download/android',
     '/health-disclosure',
+    '/consumer-health-data',
     '/landing',
     '/mobile',
     '/privacy',

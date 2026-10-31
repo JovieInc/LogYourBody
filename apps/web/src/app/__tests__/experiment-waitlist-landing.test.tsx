@@ -43,7 +43,7 @@ describe('ExperimentWaitlistLanding', () => {
     jest.clearAllMocks();
   });
 
-  it('renders one conversion path with no navigation or unverified social proof', () => {
+  it('renders one conversion path with legal navigation and no unverified social proof', () => {
     render(
       <ExperimentWaitlistLanding
         variant={resolveLandingVariant({ audience: 'women', goal: 'recomposition' })}
@@ -56,8 +56,12 @@ describe('ExperimentWaitlistLanding', () => {
     );
     expect(screen.getByRole('textbox', { name: 'Email' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Get early access' })).toHaveLength(1);
-    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('navigation')).toHaveLength(1);
+    expect(screen.getByRole('navigation', { name: 'Legal' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Consumer health data' })).toHaveAttribute(
+      'href',
+      '/consumer-health-data',
+    );
     expect(
       screen.queryByText(/testimonial|app store rating|people tracking/i),
     ).not.toBeInTheDocument();

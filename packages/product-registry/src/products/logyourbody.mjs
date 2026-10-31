@@ -114,6 +114,7 @@ export const logYourBody = {
       apple: { appStore: 'https://apps.apple.com/us/app/logyourbody/id6755209876' },
     },
     allowlist: [
+      { value: 'https://www.atg.wa.gov/file-complaint', reason: 'Washington Attorney General complaint link in the supplied consumer health data privacy policy.' },
       { value: 'https://linear.app/jovie/issue/LYB-37', reason: 'LYB-37 source receipt for priority sequencing and split-session continuity correction guards.' },
       { value: 'https://onlinelibrary.wiley.com/doi/10.1080/17461391.2020.1733672', reason: 'Nunes exercise-order systematic review cited by the LYB-37 engineering evidence qualification; not a runtime endpoint.' },
       { value: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC7706677/', reason: 'Campos deltoid-region activation study cited by the LYB-37 engineering evidence qualification; not a runtime endpoint.' },
