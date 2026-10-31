@@ -4889,5 +4889,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fastlane-exclusion-ruby-check-has-bounded-runtime-headroom",
+    "correction": "LYB-346: Main CI run 41143479235 failed only the rest-timer exclusion source-preservation test after 6177ms because it inherited Vitest's 5000ms timeout. The Ruby check can load xcodeproj and rewrite a temporary copy of the real project.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41143479235/job/124363235625",
+    "mechanization": "Give only the existing exclusion regression a 30-second test budget and bound its Ruby subprocess at 20 seconds. Keep the Ruby tiers and failure assertion unchanged. With xcodeproj installed, a temporary 6.2-second Ruby startup delay reproduces the original 5000ms timeout and passes after this repair; five ordinary three-tier executions complete in 0.655-0.804 seconds. The required shared-lib test task continues to execute the assertion. No global timeout, workflow, selector, retry or gate changes. The harness owns pushing, PR creation, auto-merge and verification of two subsequent main JavaScript/TypeScript runs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "This correction concerns a test-runner deadline under variable runner speed. Product logic cannot provide execution headroom for Ruby startup, gem loading and the required real-project check."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required executable regression retains every exclusion assertion within explicit nested deadlines, allowing the observed runtime while still failing on a stuck Ruby process."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/fastlane-validation-source.test.ts",
+      "anchor": "execFileSync('ruby', [script], { encoding: 'utf8', timeout: 20_000 })"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

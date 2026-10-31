@@ -277,13 +277,16 @@ print(json.dumps({'accepted': 1, 'rejected': len(failures)}))
     const result = JSON.parse(execFileSync('ruby', [script], { encoding: 'utf8' }));
     expect(result.cases).toBe(2);
   });
+  // The Ruby/project check took 6.2s on CI; bound the subprocess below the test budget.
   it('resolves the rest-timer exclusion project path absolutely from the release Fastfile', () => {
     const script = fileURLToPath(
       new URL('../../../scripts/ios/test_rest_timer_exclusion_path.rb', import.meta.url),
     );
-    const result = JSON.parse(execFileSync('ruby', [script], { encoding: 'utf8' }));
+    const result = JSON.parse(
+      execFileSync('ruby', [script], { encoding: 'utf8', timeout: 20_000 }),
+    );
     expect(result.failures).toEqual([]);
-  });
+  }, 30_000);
   it.each(['ci_ios', 'build_check'])(
     '%s compiles without changing tracked metadata or docs',
     (lane) => {
