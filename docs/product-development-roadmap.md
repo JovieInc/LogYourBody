@@ -1,6 +1,6 @@
 # LogYourBody Product Roadmap And Build Guardrails
 
-Last reconciled: 2026-10-16 (LYB-179)
+Last reconciled: 2026-10-31 (LYB-161 parity inventory; LYB-179 product direction retained)
 
 ## October 16 supersession: current product behavior
 
@@ -24,6 +24,49 @@ for qualification and missing/mature evidence. A rendered insight is an anonymou
 occurrence, never inferred from calculation or navigation. Pro's current registry
 references are $9.99 monthly / $69.99 annual USD with a three-day trial; earlier
 premium-package proposals are not configured offers. Live terms require receipts.
+
+## Product API and agent parity — October 13 direction (LYB-161)
+
+An authorized agent may be the customer's entire interface. Every iOS capability
+needs an equivalent product API and MCP action, or a truthful device, system, or
+user handoff. Native controls, Siri/App Intents, HTTP, MCP, and a CLI where justified
+must use the same product read/create/correct/delete/handoff actions and execution
+semantics. This requirement complements the current automatic-first product
+direction and does not authorize a web product, food logger, or general workout tracker.
+
+Every new or materially extended feature specification and completion receipt must:
+
+1. Update the [canonical capability inventory](integrations/chatgpt-app/README.md#canonical-capability-inventory)
+   with native source, product API/domain action, MCP mapping, gaps, and owning work.
+2. Specify authenticated subject and record ownership, explicit LYB connection and
+   consent, least-privilege scopes, entitlement, gates, and revoke/reconnect behavior.
+   Shared Jovie identity alone is neither a LYB connection nor consent.
+3. Define validation, units, measured time, local date, zone, provenance, stable
+   operation/measurement IDs, atomic retry receipts, revision conflicts, correction,
+   deletion/tombstones, and native offline reconciliation (or explain inapplicability).
+4. Name the execution boundary and completion readback. Distinguish local save,
+   sync pending, cloud commit, conflict, and actual device effect; opening a screen
+   or returning a dialog does not prove the requested operation completed.
+5. Attach relevant HTTP/MCP, native/device, provider, and independently qualified
+   agent-client receipts plus real CI execution/coverage for implementation. Keep
+   unavailable evidence explicitly pending in [user journeys](USER_JOURNEYS.md#agent-parity-acceptance--october-13-2026).
+
+Compose existing first-party routes, typed actions, ports, and adapters. Adopt the
+official MCP client/Inspector for conformance and dogfood; no new durable agent
+platform, universal runtime, or mandatory custom CLI. Prioritize the manual-weight
+lifecycle (LYB-162), then independent client qualification (LYB-163); extend existing
+LYB-108/123/80/38 ownership rather than creating competing implementations.
+
+KPI: successful supported user journeys through an authorized agent, zero duplicate
+writes or cross-user disclosure, and truthful handoff outcomes.
+
+**Release exception:** the October 13 current TestFlight beta and held release PR
+are grandfathered. LYB-161 and its children do not gate them; fresh latest-main
+TestFlight delivery is a separate higher-priority execution task. This is backlog
+planning only: no dispatch, admission labels, locks, release dependencies,
+implementation, deployment, account connection, or marketplace publication. It
+changes no signing, Apple capabilities, release metadata/checklist/workflow, or
+release PR. Future implementation needs its own authorized work and evidence.
 
 ## September 26 roadmap — preserved v1 history
 

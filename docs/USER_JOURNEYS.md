@@ -58,9 +58,16 @@ Same as GOLDEN_PATH.md: a journey listed here without a compiled, CI-gated test 
 
 ## Agent parity acceptance — October 13, 2026
 
-Manual weight create, read, correct, and delete. The contract is
+The [canonical capability inventory](integrations/chatgpt-app/README.md#canonical-capability-inventory)
+covers every capability family and records remaining action/handoff gaps. Extend
+it and this matrix in the same feature PR. The rows below are acceptance contracts
+and source test pointers, not current execution receipts. This documentation-only
+LYB-161 plan ran no HTTP/MCP/native/provider journey and claims no runtime parity.
+It does not gate the October 13 current TestFlight beta or held release PR, or the
+separate higher-priority latest-main TestFlight delivery.
+
+Manual weight create, read, correct, and delete is the first slice. Its contract is
 [the first implementation slice](integrations/chatgpt-app/README.md#first-implementation-slice-manual-weight-lifecycle).
-This slice does not gate TestFlight.
 
 | Check                   | Expected outcome                                                                                                                                                                                                                                                                                                                                      | Asserting tests                                                                                                   |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -69,3 +76,31 @@ This slice does not gate TestFlight.
 | Retries and conflicts   | Lost acknowledgement and a concurrent identical retry replay one receipt. A changed payload, a stale correction, and a delete replay do not duplicate or resurrect. A delayed native push onto a tombstone conflicts.                                                                                                                                 | `weight-lifecycle.test.ts`; `native-body-metrics-sync-adapter.test.ts`                                            |
 | Isolation and admission | Another subject, a guessed id, the wrong audience, an expired token, a training scope, a revoked or unconnected grant, and a closed gate do not write.                                                                                                                                                                                                | `route.node.test.ts`; `weight-lifecycle.test.ts`                                                                  |
 | Native and Siri         | The authenticated app subject reuses `LogWeightIntent` and `BodyMetricLoggingService`. A retry keeps the operation id. A second log gets a new id. Correction and delete require an owned id and expected revision and are not creates. Denied HealthKit still saves locally. Cloud completion stays unclaimed. A conflicted row is not pushed again. | `BodyMetricAppIntentsTests`; `BodyMetricLoggingServiceTests`; `SyncIntegrationBodyMetricSyncTests`                |
+
+The remaining parity journeys are prospective. All need implementation-specific
+passing/failure cases and exact-head execution/coverage receipts before completion;
+no ✅ status is implied by an existing native journey or shared issuer.
+
+| Journey / owner lane                                  | Required user-visible outcome and evidence                                                                                                                                                                           | Status                                      |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Claude Code, ChatGPT and Jovie (LYB-163 / JOV-7796)   | Each independently completes OAuth, explicit LYB connection/consent, scoped calls and persisted readback. Wrong subject/audience/scope, revoked grant and reconnect cannot disclose or duplicate data.               | Pending per client                          |
+| Entry-point equivalence (LYB-162/163)                 | Native, Siri, HTTP and MCP fixtures preserve subject, owned measurement, units/date/zone/provenance, operation ID and revision; repeat intent vs retry stays distinct. CLI only after a measured gap.                | Pending cross-entry-point execution         |
+| Goals/preferences and deterministic trends            | Owned goals and reset/correction persist; device-local preferences remain explicit. Latest/history/trends report deterministic values, source/freshness, estimates and user-selected targets truthfully.             | Pending focused contracts                   |
+| Photos and imports                                    | User selects/consents, confirms owned attachments/imports, reads partial/failure/completed outcomes, and sees persisted results without duplicate imports or unapproved photo disclosure.                            | Pending focused contracts/device receipts   |
+| Daily and GLP-1 records                               | Daily lifecycle has owned date/unit/retry semantics. Medical/GLP-1 requests hand off to native under current server policy, with no sensitive MCP payload or invented completion.                                    | Pending focused contracts                   |
+| Training (LYB-108/123/80)                             | Engine numbers remain authoritative; logging is additive and correction explicit. Retry/conflict/undo and enrollment/consent handoffs have real readback.                                                            | Pending relevant action/client receipts     |
+| Device/system boundaries (LYB-38 and existing owners) | HealthKit, camera/library, microphone, notifications, biometrics and StoreKit report actual effects or denied/cancelled/unavailable/pending. Screen opening, empty read and accepted request never prove completion. | Pending real device/provider receipts       |
+| Integration status and revoke/reconnect               | LYB grant, issuer token, provider connection and sync freshness/conflict are distinct. Revocation blocks future calls; reconnect obtains fresh consent and reads back status.                                        | Pending focused contracts                   |
+| Export/deletion                                       | Confirmed owned export is delivered; confirmed account deletion invalidates agent access and prevents delayed sync resurrection. Retention/device/provider limits are explicit in the receipt.                       | Pending focused contracts/provider readback |
+
+Account/session security and support/legal actions also require scoped action
+contracts or explicit native/user handoffs. Session revocation needs provider
+readback; report delivery needs explicit user intent and attachment consent.
+Chat transcript access/deletion and photo timelapse/share delivery remain distinct
+from training-tool or weight-tool success.
+
+Parity KPI evidence records supported journey attempts and successful persisted
+outcomes per client/action, duplicate-write and cross-user-disclosure failures
+(target zero), and completed/denied/cancelled/pending handoffs separately. No
+current success rate is asserted. Redact credentials, identifiers and health
+content in retained dogfood receipts.

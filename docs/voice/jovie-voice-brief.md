@@ -12,6 +12,29 @@ The voice should feel cooler, more confident, and unfazed; clear and concise, wi
 
 Spoken replies should be one short, direct imperative line, usually about 12 words or fewer. Avoid filler and explanations. A question from the user permits a longer answer when needed to answer it. Preferred example: “Stop here. Rack it. Two minutes.”
 
+## Action input and agent parity (LYB-161 / LYB-38)
+
+Voice is an entry point to the same product read/create/correct/delete/handoff
+actions as native controls, HTTP and MCP. Follow the
+[October 13 mapping](../integrations/chatgpt-app/README.md#entry-point-to-action-mapping--october-13-clarification):
+reuse `LogWeightIntent`, `LogBodyFatIntent`, `ShowLatestMetricsIntent` and
+`BodyMetricLoggingService`; preserve authenticated ownership, validation,
+units/date/zone/provenance, retry identity, revisions and permission boundaries.
+Weight/latest adapters come first; body-fat/correction/delete extensions follow
+their passing contracts. Action selection is distinct from extracting arguments;
+neither may create numeric training prescriptions outside the deterministic engine.
+
+Speak the actual outcome: local saved, sync pending, cloud committed, conflict or
+device handoff. A local dialog does not prove cloud or HealthKit completion.
+Microphone permission, protected data, biometrics and other device effects require
+explicit handoffs and readback. Full-duplex Siri through AirPods is a founder
+hypothesis, not a verified Apple announcement. Mira Thud remains research without
+an available public API or verified weights dependency.
+
+This backlog clarification retains LYB-38 ownership, the selected TTS voice and
+all existing gates. It installs no dependency, selects no runtime, and does not
+gate the grandfathered beta/held release PR or latest-main TestFlight delivery.
+
 ## Selection rounds
 
 - Round 1: all nine initial candidates were rejected. Their preview files are excluded from the repository.
