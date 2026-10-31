@@ -186,10 +186,13 @@ describe('App Store promotion workflow', () => {
     }
     expect(deploy).toContain('GITHUB_STEP_SUMMARY');
     // Explicit false inputs must remain false; GitHub expression || defaults lose them.
-    for (const input of ['submit_for_review', 'automatic_release', 'phased_release']) {
+    for (const input of ['submit_for_review', 'phased_release']) {
       expect(deploy).toContain(`\${{ inputs.${input} }}`);
       expect(deploy).not.toContain(`inputs.${input} ||`);
     }
+    expect(deploy).toContain('automatic_release:false');
+    expect(workflow).not.toContain('inputs.automatic_release');
+    expect(workflow).not.toMatch(/automatic_release:\s*\n/);
     const directory = mkdtempSync(`${tmpdir()}/lyb-promotion-summary-`);
     try {
       const summary = deploy.match(/ {10}\{\n[\s\S]*?\} >> "\$GITHUB_STEP_SUMMARY"/)?.[0];
@@ -232,7 +235,7 @@ describe('App Store promotion Fastlane behavior', () => {
       build_number: build,
       paywall_verified_build_number: build,
       submit_for_review: true,
-      automatic_release: true,
+      automatic_release: false,
       phased_release: true,
     };
     const cases = [
@@ -260,6 +263,10 @@ describe('App Store promotion Fastlane behavior', () => {
       { options: { phased_release: 'invalid' } },
       { failure: 'A review submission is already in progress' },
       { failure: 'ASC unavailable' },
+      ...[true, 'true', '1', 'yes', 'y', 'on'].map((value) => ({
+        options: { automatic_release: value },
+      })),
+      { options: { automatic_release: 'invalid' } },
     ];
     try {
       const result = JSON.parse(
@@ -325,6 +332,7 @@ puts JSON.generate(results: results, covered: coverage.count { |n| n > 0 }, tota
           build_number: build,
           platform: 'ios',
           skip_binary_upload: true,
+          automatic_release: false,
         });
         expect(r.writes[0]).not.toHaveProperty('ipa');
       }
@@ -341,7 +349,12 @@ puts JSON.generate(results: results, covered: coverage.count { |n| n > 0 }, tota
           expect(result.results[index].reads).toEqual([]);
         }
       }
+      expect(result.results[18].error).toContain('health gate');
       expect(result.results[20].error).toBe('A review submission is already in progress');
+      expect(result.results[21].error).toBe('ASC unavailable');
+      for (const resultCase of result.results.slice(22, 28)) {
+        expect(resultCase.error).toContain('health gate');
+      }
       console.log(
         `App Store promotion Ruby coverage: ${result.covered}/${result.total} executable lines; ${cases.length} behavior cases`,
       );

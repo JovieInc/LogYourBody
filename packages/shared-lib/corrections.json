@@ -5233,5 +5233,95 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "home-header-swipe-excludes-button-hit-targets",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41202801363/job/124541975223",
+    "correction": "PR #1664 / LYB-139, fix-red-5df69c1e5f occurrence 21: Launch Quality fails when a single menu tap leaves Today visible. The parent header's simultaneous navigation drag still competes with its child buttons; preserve release health gating and repair the actual failed interaction.",
+    "mechanization": "Move the existing navigation drag to the full-height title region so it cannot receive touches in either header button. Extend the existing launch UI regression audit with a structural isolation rule and mutation cases rejecting all three gesture priorities on the header call site, header container or menu button, as well as lost title navigation and hit regions. The rule fails on the original Swift source before the fix. The existing required shared-lib suite executes the audit behavior tests, and Launch Quality executes the same audit and unchanged single-tap/sidebar-swipe regression. Extend that native regression to open and close the selected-day detail with one tap after sidebar navigation. Native execution remains unverified on this Linux host. The harness owns push and PR edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Attaching navigation only to the title sibling excludes both button hit regions by construction, preserving direct button touch delivery without changing feature gates, swipe destinations or release controls. The existing static and native guards retain regression coverage."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "# Header navigation drags must not own either button's touch region."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "app-store-release-health-before-and-during-phased-rollout",
+    "correction": "LYB-139: Approved versions released without a Sentry health decision, automatic Apple release bypassed the monitor, and active phased rollouts had no crash pause.",
+    "source": "https://linear.app/jovie/issue/LYB-139",
+    "mechanization": "The existing approved-release monitor resolves exact ASC-attached version/build identities, queries production Sentry session/user health against absolute and previous-version limits, and blocks release unless verified. It monitors all active or paused live versions, pauses breached or unverified active rollouts before filing or reopening one GitHub remediation issue, and never resumes automatically. Future workflow submissions use manual Apple release so the monitor owns the health decision. HTTP fixture regressions run in shared-lib and directly in the required js job to avoid stale Turbo receipts for external script changes. The pre-fix script exits zero and POSTs a release for the breached fixture; the repaired script blocks it. Submission sequencing was verified from main monitor run 41177144249 (2026-10-31): 1.2.0 WAITING_FOR_REVIEW. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The release automation owns both the release request and phased rollout state, so it can enforce measured health and pause by construction without a product feature flag or a weaker CI gate."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/app-store-release-health.rb",
+      "anchor": "return true if decision[:status] == \"HEALTHY\""
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-repair-rejects-concurrent-index-changes",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1664",
+    "correction": "PR #1664, fix-red-e3b0c44298 occurrence 66: merge origin/main without rebasing or losing the App Store health gate and either parent correction receipts; extend the existing repair machine and reject stale merge evidence when another writer changes the index during validation.",
+    "mechanization": "Extend the existing correction classifier resolver and staged verifier to compare the index against the initial stage/mode snapshot before writing or accepting a merge. Three real-Git negative controls cover unstaged resolution, staged resolution and staged verification, preserve another writer changes and ledger bytes on refusal, and retry successfully with the current index. They fail against the previous implementation and run through the existing required shared-lib wrapper with unchanged 100 percent line, branch and function coverage. Retain the fixed process budget with one additional index comparison and no per-guard Git calls. Use the extended resolver on the actual ledger conflict, retain both immutable parents, and regenerate the source map from merged inputs. The harness retains push and PR-body ownership and must add exactly one machine line: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing merge resolver owns validation and writes, so it can refuse a changed index by construction before overwriting the ledger or returning a stale successful verdict."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "merge index changed during validation; retry from the current index"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "storekit-cleanup-synchronizes-deleted-history-before-readiness",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41209937833",
+    "correction": "PR #1664, fix-red-e3b0c44298 occurrence 67: merge-group StoreKit failed setup and teardown for testMonthlyTrialPurchaseRestoreExpiration because post-warm-up cleanup did not reach empty history within five seconds. The lifecycle body never ran. origin/main was already an ancestor, so the required merge was a no-op.",
+    "mechanization": "Extend the existing shared cleanup helper used by setup, teardown and bounded warm-up with one throwing AppStore.sync after scoped transaction deletion and before polling both complete history views. This explicitly refreshes app-side transaction information instead of only rereading it. Preserve captured-ID deletion, the existing wait bound, all four lifecycle assertions and exact-case evidence gates. Extend the existing required shared-lib source regression to reject missing or misplaced synchronization and swallowed refresh errors; it fails against the recorded head before the fix and passes afterward. These are static prevention checks; native execution and coverage on the repaired head remain required in macOS merge-group CI. The harness retains pushing and PR-body ownership and must add exactly one machine line: Machine: built apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing cleanup helper owns every StoreKit fixture reset, so one throwing synchronization request orders server-side deletion before app-side readiness checks for every caller. A failed refresh cannot advance into a lifecycle purchase; polling and all entitlement assertions remain unchanged."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift",
+      "anchor": "try await AppStore.sync()\n        for _ in 0..<50"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "app-store-promotion-preserves-mandatory-release-health",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1664",
+    "correction": "PR #1664, fix-red-e3b0c44298 occurrence 68: merge origin/main without rebasing, preserve LYB-334 exact tested-build promotion and LYB-139 mandatory health gating, and prevent future promotion callers from bypassing the monitor with automatic Apple release.",
+    "mechanization": "Extend the existing submit_app_store Fastlane machine to reject every truthy automatic_release input and always submit with automatic_release false. Extend its existing required shared-lib workflow and real-Ruby behavior regressions to retain exact TestFlight identity, immutable provenance, binary-upload refusal, explicit false dispatch values and the mandatory health gate together. The new regression fails against the incoming main lane because automatic_release true writes a release-enabled submission, then passes with the lane guard; 59 promotion and release-health tests pass, including six truthy boolean spellings and malformed input. Reuse the existing source-map and correction-ledger resolvers for this merge, preserving both immutable parents. The harness retains push and PR-body ownership and must include exactly one machine line: Machine: built apps/ios/fastlane/Fastfile.release.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared promotion lane owns every submission write. Rejecting automatic release and fixing the upload option to false prevents every caller from bypassing the health monitor by construction, while existing required tests guard combined promotion and health behavior during future merges."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/fastlane/Fastfile.release",
+      "anchor": "automatic_release bypasses the App Store health gate; use the approved-release monitor"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

@@ -308,8 +308,8 @@ end
     automatic_release = bool_option.call(options[:automatic_release], false)
     phased_release = bool_option.call(options[:phased_release], false)
 
-    if automatic_release && !submit_for_review
-      UI.user_error!("automatic_release requires submit_for_review")
+    if automatic_release
+      UI.user_error!("automatic_release bypasses the App Store health gate; use the approved-release monitor")
     end
 
     env_or_default = lambda do |key, default|
@@ -336,7 +336,7 @@ end
       skip_metadata: false,
       skip_screenshots: false,
       submit_for_review: submit_for_review,
-      automatic_release: automatic_release,
+      automatic_release: false,
       phased_release: phased_release,
       app_review_information: app_review_information,
       run_precheck_before_submit: false,

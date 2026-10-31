@@ -13,6 +13,7 @@ it('runs correction classifier fixtures and CLI behavior through the normal scri
       '--test-coverage-branches=100',
       '--test-coverage-functions=100',
       'scripts/correction-classifier.test.mjs',
+      'scripts/correction-classifier-concurrency.test.mjs',
     ],
     {
       cwd: fileURLToPath(new URL('../../..', import.meta.url)),

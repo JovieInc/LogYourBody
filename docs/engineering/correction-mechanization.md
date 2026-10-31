@@ -149,3 +149,6 @@ files); a symlink blob cannot supply guard evidence, even when its text matches
 the anchor and the working file is regular. The batched blob reader enforces file
 modes for final verification and staged retries. Unstaged guard text or symlinks
 cannot change the reviewed staged snapshot. Refusal preserves the ledger and index.
+Both resolution modes and staged verification refuse an index that changes during
+validation, before writing the ledger or returning success. Retry the same command
+against the current index; the refusal preserves the other writer's staged changes.

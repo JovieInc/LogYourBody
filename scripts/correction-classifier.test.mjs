@@ -861,15 +861,15 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         );
         assert.equal(
           commands.filter((args) => args.includes('ls-files')).length,
-          1,
-          'read index stages and regular-file modes once per verification',
+          2,
+          'snapshot index stages and modes, then confirm they stayed unchanged',
         );
         assert.equal(
           commands.filter((args) => args.includes('cat-file')).length,
           2,
           'batch the ledgers, then all staged and immutable parent guards',
         );
-        assert.equal(commands.length, 4, 'verification must retain a fixed Git process budget');
+        assert.equal(commands.length, 5, 'verification must retain a fixed Git process budget');
         assert.equal(
           commands.filter((args) => args.includes('show')).length,
           0,

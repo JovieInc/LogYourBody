@@ -3,8 +3,8 @@ name: iOS App Store Approved Release
 # Kept clock (external fact): Apple App Review state changes in App Store
 # Connect, which emits no GitHub event here. Replacement: an App Store Connect
 # webhook (appStoreVersion state) bridged to repository_dispatch. The run only
-# reads ASC state and releases a PENDING_DEVELOPER_RELEASE version; it never
-# holds a PR or the merge queue.
+# checks release health before releasing and throughout phased rollout.
+# Unhealthy or unverified active rollouts are paused and tracked in an issue.
 on:
   schedule:
     - cron: '*/30 * * * *'
@@ -28,6 +28,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      issues: write
 
     steps:
       - uses: actions/checkout@v6
@@ -82,7 +83,7 @@ jobs:
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Release Approved Version
+      - name: Check Release Health and Release Approved Version
         run: |
           cd apps/ios
           bundle exec ruby ../../.github/scripts/release-approved-app-store-version.rb
@@ -90,6 +91,14 @@ jobs:
           APP_STORE_APP_ID: "6755209876"
           APP_IDENTIFIER: com.logyourbody.app
           APP_VERSION: ${{ steps.app_version.outputs.version }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG || 'jovie' }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT || 'log-your-body-ios' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_HEALTH_MIN_CRASH_FREE_PERCENT: ${{ vars.RELEASE_HEALTH_MIN_CRASH_FREE_PERCENT || '99.5' }}
+          RELEASE_HEALTH_MAX_REGRESSION_PP: ${{ vars.RELEASE_HEALTH_MAX_REGRESSION_PP || '0.5' }}
+          RELEASE_HEALTH_MIN_SESSIONS: ${{ vars.RELEASE_HEALTH_MIN_SESSIONS || '100' }}
+          RELEASE_HEALTH_MIN_USERS: ${{ vars.RELEASE_HEALTH_MIN_USERS || '20' }}
 
       - name: Cleanup
         if: always()
