@@ -1,6 +1,7 @@
 import { cycleConfigurationSchema } from './cycle-contract';
 export { cycleConfigurationSchema } from './cycle-contract';
 import { z } from 'zod';
+import { structuredTrainingRecord } from './outbound-policy';
 import { CATALOG_EQUIPMENT } from './catalog';
 import { MUSCLE_GROUPS, TRAINING_CONSENT_VERSION, TRAINING_SESSIONS_PER_WEEK } from './types';
 import {
@@ -117,7 +118,7 @@ export const baselinePlanSchema = z.object({
     .max(6),
   plannedFractionalVolume: z.record(z.string(), z.number().finite().nonnegative()),
 });
-export const initialProposalSchema = z
+const initialProposalRecordSchema = z
   .object({
     version: z.literal(1),
     id: uuid,
@@ -153,6 +154,7 @@ export const initialProposalSchema = z
     createdAt: timestamp,
   })
   .strict();
+export const initialProposalSchema = structuredTrainingRecord(initialProposalRecordSchema);
 export type InitialTrainingProposal = z.infer<typeof initialProposalSchema>;
 export const appliedSetupSchema = programSetupSchema.extend({
   programRevisionId: uuid,
@@ -178,9 +180,11 @@ const initialReceiptSchema = z
         r.setup?.programRevisionId === r.revisionId
       : r.status === 'rejected' && r.revisionId === null && r.setup === null,
   );
-export const revisionReceiptSchema = z.union([initialReceiptSchema, delegatedReceiptSchema]);
+export const revisionReceiptSchema = structuredTrainingRecord(
+  z.union([initialReceiptSchema, delegatedReceiptSchema]),
+);
 export type TrainingRevisionReceipt = z.infer<typeof revisionReceiptSchema>;
-export const storedProposalSchema = z
+const storedProposalRecordSchema = z
   .object({
     proposal: z.union([initialProposalSchema, delegatedProposalSchema]),
     status: z.enum(['proposed', 'applied', 'rejected']),
@@ -208,4 +212,5 @@ export const storedProposalSchema = z
         (r.proposal.version === 2 || r.receipt.actor.subject === r.proposal.actor.subject) &&
         (r.receipt.setup === null || r.receipt.setup.id === r.proposal.programId),
   );
+export const storedProposalSchema = structuredTrainingRecord(storedProposalRecordSchema);
 export type StoredTrainingProposal = z.infer<typeof storedProposalSchema>;
