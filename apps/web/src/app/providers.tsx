@@ -18,6 +18,7 @@ const authFreeMarketingPrefixes = [
   '/delete-account',
   '/download',
   '/health-disclosure',
+  '/consumer-health-data',
   '/mobile',
   '/privacy',
   '/security',

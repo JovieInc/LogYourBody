@@ -1,21 +1,47 @@
 [
   {
-    "fingerprint": "app-store-release-health-before-and-during-phased-rollout",
-    "correction": "LYB-139: Approved versions released without a Sentry health decision, automatic Apple release bypassed the monitor, and active phased rollouts had no crash pause.",
-    "source": "https://linear.app/jovie/issue/LYB-139",
-    "mechanization": "The existing approved-release monitor resolves exact ASC-attached version/build identities, queries production Sentry session/user health against absolute and previous-version limits, and blocks release unless verified. It monitors all active or paused live versions, pauses breached or unverified active rollouts before filing or reopening one GitHub remediation issue, and never resumes automatically. Future workflow submissions use manual Apple release so the monitor owns the health decision. HTTP fixture regressions run in shared-lib and directly in the required js job to avoid stale Turbo receipts for external script changes. The pre-fix script exits zero and POSTs a release for the breached fixture; the repaired script blocks it. Submission sequencing was verified from main monitor run 41177144249 (2026-10-31): 1.2.0 WAITING_FOR_REVIEW. The harness retains push and PR ownership.",
+    "fingerprint": "fix-red-d5dac7802d",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41188544023/job/124500510040",
+    "correction": "PR #1658, occurrence 3: Detect Changes rejects the new consumer health policy route as unlisted, which also fails CI Summary. Merging main conflicts in the canonical endpoint allowlist and its generated projection.",
+    "mechanization": "Extend the existing surface-reconciliation guard with reviewed local static-web declarations, preserving the pinned upstream contract, its digest and all baseline allowances. Register the consumer health data route through that mechanism. Negative controls reject undeclared future routes, malformed declarations, native additions, pinned disposition overrides and reachable hidden/deleted routes. Two new general regressions fail on the prior guard before the extension. The existing required Detect Changes step runs the extended suite and exact-base ratchet without workflow changes. Resolve the endpoint source by retaining both parents and use the existing registry merge generator for its projection. The harness retains push and PR-body ownership and must add exactly one machine line: Machine: built scripts/surface-reconciliation.mjs.",
     "classification": {
       "codebase": {
+        "feasible": false,
+        "rationale": "New public surface classifications require an explicit reviewed policy decision. Automatically permitting every routable page would weaken launch scope, and application code cannot update the independent pinned upstream contract."
+      },
+      "static": {
         "feasible": true,
-        "rationale": "The release automation owns both the release request and phased rollout state, so it can enforce measured health and pause by construction without a product feature flag or a weaker CI gate."
+        "rationale": "The existing required surface guard can consume explicit local web declarations, reject changes to pinned dispositions and enforce the immutable-base ratchet while retaining every existing finding and negative control."
       }
     },
     "guard": {
-      "path": ".github/scripts/app-store-release-health.rb",
-      "anchor": "return true if decision[:status] == \"HEALTHY\""
+      "path": "scripts/surface-reconciliation.mjs",
+      "anchor": "// Local web declarations cannot override any pinned disposition or add native surfaces."
     },
-    "level": "codebase",
-    "ruleId": "code-prevention"
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "consumer-health-data-policy-homepage-publication",
+    "correction": "Tim White, 2026-10-31: publish the supplied consumer health data policy as a distinct public route linked from every homepage footer; preserve its wording and skip iOS bundling when Xcode edits are required.",
+    "source": "https://github.com/JovieInc/LogYourBody/tree/compounding/consumer-health-data-policy#tim-white-task-2026-10-31",
+    "mechanization": "Mirror health-disclosure route wiring and retain the shared legal link list. The existing web Jest suite checks the canonical policy file and required sections, the link list, and the visible link in all five rendered homepage/footer surfaces. The new regression fails for the missing link list and all five surfaces before the implementation. Loader tests cover canonical bytes and read failure; existing auth, PWA, footer and metadata route tests cover the new public route.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A shared footer list cannot by itself prevent removal of the canonical policy file or omission from the separately composed editorial homepage footer."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required web Jest suite can assert canonical file sections and render every homepage footer to verify the visible policy link."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/__tests__/consumer-health-policy.test.tsx",
+      "anchor": "consumer health data policy publication guard"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "account-erasure-verifiers-load-canonical-cleanup-migrations",
@@ -5186,6 +5212,42 @@
     "guard": {
       "path": "apps/web/src/app/__tests__/prelaunch-pricing.test.tsx",
       "anchor": "it('frames every prelaunch price as launch pricing and a free beta'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "app-store-release-health-before-and-during-phased-rollout",
+    "correction": "LYB-139: Approved versions released without a Sentry health decision, automatic Apple release bypassed the monitor, and active phased rollouts had no crash pause.",
+    "source": "https://linear.app/jovie/issue/LYB-139",
+    "mechanization": "The existing approved-release monitor resolves exact ASC-attached version/build identities, queries production Sentry session/user health against absolute and previous-version limits, and blocks release unless verified. It monitors all active or paused live versions, pauses breached or unverified active rollouts before filing or reopening one GitHub remediation issue, and never resumes automatically. Future workflow submissions use manual Apple release so the monitor owns the health decision. HTTP fixture regressions run in shared-lib and directly in the required js job to avoid stale Turbo receipts for external script changes. The pre-fix script exits zero and POSTs a release for the breached fixture; the repaired script blocks it. Submission sequencing was verified from main monitor run 41177144249 (2026-10-31): 1.2.0 WAITING_FOR_REVIEW. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The release automation owns both the release request and phased rollout state, so it can enforce measured health and pause by construction without a product feature flag or a weaker CI gate."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/app-store-release-health.rb",
+      "anchor": "return true if decision[:status] == \"HEALTHY\""
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-repair-rejects-concurrent-index-changes",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1664",
+    "correction": "PR #1664, fix-red-e3b0c44298 occurrence 66: merge origin/main without rebasing or losing the App Store health gate and either parent correction receipts; extend the existing repair machine and reject stale merge evidence when another writer changes the index during validation.",
+    "mechanization": "Extend the existing correction classifier resolver and staged verifier to compare the index against the initial stage/mode snapshot before writing or accepting a merge. Three real-Git negative controls cover unstaged resolution, staged resolution and staged verification, preserve another writer changes and ledger bytes on refusal, and retry successfully with the current index. They fail against the previous implementation and run through the existing required shared-lib wrapper with unchanged 100 percent line, branch and function coverage. Retain the fixed process budget with one additional index comparison and no per-guard Git calls. Use the extended resolver on the actual ledger conflict, retain both immutable parents, and regenerate the source map from merged inputs. The harness retains push and PR-body ownership and must add exactly one machine line: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing merge resolver owns validation and writes, so it can refuse a changed index by construction before overwriting the ledger or returning a stale successful verdict."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "merge index changed during validation; retry from the current index"
     },
     "level": "codebase",
     "ruleId": "code-prevention"

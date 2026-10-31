@@ -115,6 +115,7 @@ export const logYourBody = {
       apple: { appStore: 'https://apps.apple.com/us/app/logyourbody/id6755209876' },
     },
     allowlist: [
+      { value: 'https://www.atg.wa.gov/file-complaint', reason: 'Washington Attorney General complaint link in the supplied consumer health data privacy policy.' },
       { value: 'https://oidc.vercel.com/jovie', reason: 'Vercel OIDC issuer and JWKS for authenticated production Summer customer voice replies.' },
       { value: 'https://github.com/postalsys/postal-mime', reason: 'MIT-0 MIME parser adopted for the customer voice Email Worker; primary-source adoption receipt.' },
       { value: 'https://github.com/panva/jose', reason: 'MIT JOSE/JWT verifier adopted for production Summer OIDC; primary-source adoption receipt.' },

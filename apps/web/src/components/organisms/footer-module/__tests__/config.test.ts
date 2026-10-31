@@ -10,6 +10,7 @@ describe('resolveFooterVariant', () => {
     expect(resolveFooterVariant('auto', '/privacy')).toBe('compact');
     expect(resolveFooterVariant('auto', '/terms/')).toBe('compact');
     expect(resolveFooterVariant('auto', '/health-disclosure')).toBe('compact');
+    expect(resolveFooterVariant('auto', '/consumer-health-data')).toBe('compact');
     expect(resolveFooterVariant('auto', '/security')).toBe('compact');
   });
 

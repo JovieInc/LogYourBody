@@ -160,7 +160,7 @@ function isWebCopyFile(file) {
     /^apps\/web\/src\/(?:app|components|constants)\/.*\.(?:[cm]?[jt]sx?|mdx?)$/.test(file) ||
     file === 'apps/web/src/lib/load-legal-docs.ts' ||
     /^apps\/web\/content\/blog\/.*\.md$/.test(file) ||
-    /^shared\/legal\/(?:privacy-policy|terms-of-service|health-disclosure)\.md$/.test(file) ||
+    /^shared\/legal\/(?:privacy-policy|terms-of-service|health-disclosure|consumer-health-data-policy)\.md$/.test(file) ||
     file === 'packages/product-registry/src/products/logyourbody.mjs'
   );
 }

@@ -106,6 +106,11 @@ export const endpoints = {
   },
   allowlist: [
     {
+      value: 'https://www.atg.wa.gov/file-complaint',
+      reason:
+        'Washington Attorney General complaint link in the supplied consumer health data privacy policy.',
+    },
+    {
       value: 'https://oidc.vercel.com/jovie',
       reason:
         'Vercel OIDC issuer and JWKS for authenticated production Summer customer voice replies.',
