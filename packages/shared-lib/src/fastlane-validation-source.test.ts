@@ -281,9 +281,17 @@ print(json.dumps({'accepted': 1, 'rejected': len(failures)}))
     const script = fileURLToPath(
       new URL('../../../scripts/ios/test_rest_timer_exclusion_path.rb', import.meta.url),
     );
-    const result = JSON.parse(execFileSync('ruby', [script], { encoding: 'utf8' }));
+    const result = JSON.parse(
+      execFileSync('ruby', [script], {
+        encoding: 'utf8',
+        // Measured at ~0.5s locally with all three tiers (LYB-346); the xcodeproj
+        // gem load can stretch on slow CI runners. Kill a hung ruby rather than
+        // wedging the vitest worker; the test timeout below is the outer bound.
+        timeout: 15_000,
+      }),
+    );
     expect(result.failures).toEqual([]);
-  });
+  }, 30_000);
   it.each(['ci_ios', 'build_check'])(
     '%s compiles without changing tracked metadata or docs',
     (lane) => {
