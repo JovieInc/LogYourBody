@@ -384,8 +384,8 @@ export const logYourBody = {
       primaryCta: 'Download on the App Store',
     },
     waitlist: {
-      success: 'Your early-access request was received.',
-      duplicate: 'Your early-access request was received.',
+      success: "You're on the early-access list. We'll email you when your invite is ready.",
+      duplicate: "You're on the early-access list. We'll email you when your invite is ready.",
       error: 'Something went wrong. Please try again.',
       invalidEmail: 'Enter a valid email address.',
     },

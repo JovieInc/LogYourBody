@@ -238,24 +238,36 @@ export function EditorialLanding({
           <div className={styles.story}>
             <Chapter>05 / LogYourBody {launchLandingCopy.pricingHeading}</Chapter>
             <h2 id="pricing-heading">
-              Make room
-              <br />
-              for the long game.
+              {appStoreLive ? (
+                <>
+                  Make room
+                  <br />
+                  for the long game.
+                </>
+              ) : (
+                launchLandingCopy.prelaunchPricingHeading
+              )}
             </h2>
             <p className={styles.lead}>
               A private place to keep your progress, and a reason to keep showing up for yourself.
             </p>
           </div>
           <div className={styles.story}>
-            <p
-              className={styles.price}
-              aria-label={`Reference price: ${launchLandingCopy.monthlyReferencePrice} USD per month`}
-            >
-              {launchLandingCopy.monthlyReferencePrice} <span>USD / month</span>
-            </p>
-            <p className={styles.annualPrice}>
-              Or {launchLandingCopy.annualReferencePrice} USD per year.
-            </p>
+            {appStoreLive ? (
+              <>
+                <p
+                  className={styles.price}
+                  aria-label={`Reference price: ${launchLandingCopy.monthlyReferencePrice} USD per month`}
+                >
+                  {launchLandingCopy.monthlyReferencePrice} <span>USD / month</span>
+                </p>
+                <p className={styles.annualPrice}>
+                  Or {launchLandingCopy.annualReferencePrice} USD per year.
+                </p>
+              </>
+            ) : (
+              <p className={styles.lead}>{launchLandingCopy.prelaunchPricingLine}</p>
+            )}
             <p className={styles.terms}>{launchLandingCopy.pricingNote}</p>
             <PrimaryAction appStoreLive={appStoreLive} />
           </div>
