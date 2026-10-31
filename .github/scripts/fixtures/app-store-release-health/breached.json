@@ -1,0 +1,13 @@
+{
+  "groups": [
+    {
+      "by": { "release": "ios-1.3.0 (130)" },
+      "totals": {
+        "sum(session)": 1000,
+        "count_unique(user)": 200,
+        "crash_free_rate(session)": 0.97,
+        "crash_free_rate(user)": 0.98
+      }
+    }
+  ]
+}

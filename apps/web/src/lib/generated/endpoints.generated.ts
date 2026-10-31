@@ -404,6 +404,23 @@ export const endpoints = {
       reason: 'Product social profile.',
     },
     {
+      value: 'https://sentry.io/api/0/organizations',
+      reason:
+        'LYB-139 release-health sessions API; organization is selected by the existing SENTRY_ORG variable.',
+    },
+    {
+      value: 'https://docs.sentry.io/api/releases/retrieve-release-health-session-statistics/',
+      reason: 'Official release-health API contract cited by the LYB-139 runbook.',
+    },
+    {
+      value: 'https://github.com/fixture/repo/issues/42',
+      reason: 'LYB-139 HTTP-only fixture remediation URL; never contacted.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-139',
+      reason: 'LYB-139 source evidence for App Store release health and phased rollout pausing.',
+    },
+    {
       value: 'https://api.github.com',
       reason: 'GitHub REST API used by CI scripts.',
     },

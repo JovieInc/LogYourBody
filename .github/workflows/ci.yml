@@ -347,6 +347,11 @@ jobs:
           .github/scripts/ios-release-tag.test.mjs
           .github/scripts/fastlane-log-failures.test.mjs
 
+      # These tests read release operations outside the package directory;
+      # execute them directly so Turbo cannot reuse a stale package receipt.
+      - name: Test App Store release health
+        run: pnpm --filter @logyourbody/shared-lib exec vitest run src/app-store-release-health.test.ts
+
       - name: Test
         run: pnpm test:ci
 

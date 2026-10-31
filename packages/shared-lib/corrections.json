@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "app-store-release-health-before-and-during-phased-rollout",
+    "correction": "LYB-139: Approved versions released without a Sentry health decision, automatic Apple release bypassed the monitor, and active phased rollouts had no crash pause.",
+    "source": "https://linear.app/jovie/issue/LYB-139",
+    "mechanization": "The existing approved-release monitor resolves exact ASC-attached version/build identities, queries production Sentry session/user health against absolute and previous-version limits, and blocks release unless verified. It monitors all active or paused live versions, pauses breached or unverified active rollouts before filing or reopening one GitHub remediation issue, and never resumes automatically. Future workflow submissions use manual Apple release so the monitor owns the health decision. HTTP fixture regressions run in shared-lib and directly in the required js job to avoid stale Turbo receipts for external script changes. The pre-fix script exits zero and POSTs a release for the breached fixture; the repaired script blocks it. Submission sequencing was verified from main monitor run 41177144249 (2026-10-31): 1.2.0 WAITING_FOR_REVIEW. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The release automation owns both the release request and phased rollout state, so it can enforce measured health and pause by construction without a product feature flag or a weaker CI gate."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/app-store-release-health.rb",
+      "anchor": "return true if decision[:status] == \"HEALTHY\""
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "account-erasure-verifiers-load-canonical-cleanup-migrations",
     "correction": "PR #1636 / LYB-330 (fix-red-1a39536f40 occurrence 7): JavaScript/TypeScript run 41130955586 failed because both training SQL verifiers retained a fixed cleanup inventory and omitted the new health vault tables.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41130955586/job/124321693545",
