@@ -222,6 +222,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-239', reason: 'LYB-239 source evidence for HealthKit import identity and the correction ledger.' },
       { value: 'https://linear.app/jovie/issue/LYB-240', reason: 'LYB-240 source evidence for per-reading provenance and effective-date labels.' },
       { value: 'https://linear.app/jovie/issue/LYB-252', reason: 'LYB-252 source evidence for recurring correction escalation and guard-failure detection.' },
+      { value: 'https://linear.app/jovie/issue/LYB-334', reason: 'LYB-334 source evidence for promoting the attested TestFlight binary without rebuilding.' },
       { value: 'https://linear.app/jovie/issue/LYB-307', reason: 'LYB-307 source evidence for emitted lint correction checks and recurrence-based severity.' },
       { value: 'https://linear.app/jovie/issue/LYB-97', reason: 'LYB-97, Pro intro-offer audit in docs/audits/lyb-97.' },
       { value: 'https://linear.app/jovie/issue/LYB-33', reason: 'LYB-33, related issue cited by the LYB-97 trial audit.' },
