@@ -50,7 +50,7 @@ UI smoke (launch, fixtures for signed-out/paywall/MVP surfaces): `LogYourBodyUIT
 
 ## The one human step to revenue
 
-Everything above is machine-gated. The single human action standing between the current state and App Store revenue: a real TestFlight paywall purchase/restore, then dispatching `ios-release-loop.yml` with `release_type=app_store` + `paywall_testflight_verified=true`. Full sequence: [RELEASE_APP_STORE.md](RELEASE_APP_STORE.md). App Store version 1.2.0 currently sits in `PREPARE_FOR_SUBMISSION`; the approved-release poller automates everything after Apple approval.
+Everything above is machine-gated. The single human action standing between the current state and App Store revenue: a real TestFlight paywall purchase/restore, then dispatching `ios-release-loop.yml` with `release_type=app_store`, the tested `build_number`, and an equal `paywall_verified_build_number`. Full sequence: [RELEASE_APP_STORE.md](RELEASE_APP_STORE.md). App Store version 1.2.0 currently sits in `PREPARE_FOR_SUBMISSION`; the approved-release poller automates everything after Apple approval.
 
 ## Rule
 
