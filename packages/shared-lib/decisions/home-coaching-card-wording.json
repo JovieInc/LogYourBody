@@ -1,0 +1,28 @@
+{
+  "id": "LYB-302",
+  "parent": "LYB-173",
+  "status": "accepted",
+  "question": "Which exact sentences may the single home card use for on-track, import receipt, photo ask, today's workout, calm empty, and deload deferral?",
+  "decision": "Use the six sentences below only when their stored observation or plan condition is met. These lines report status or offer an optional next step; they make no outcome claims.",
+  "moments": {
+    "on_track": "Your recorded weight trend is within your chosen range.",
+    "new_weight_import_receipt": "New weight saved from Apple Health.",
+    "add_a_photo_ask": "Add a progress photo if you'd like.",
+    "todays_workout": "Today's workout is in your plan.",
+    "calm_nothing_to_do": "Nothing needs your attention right now.",
+    "deload_deferral_explanation": "Your saved check-ins don't yet support a deload; your plan stays the same."
+  },
+  "show_when": {
+    "on_track": "A stored weight-trend observation with current source and confidence is within the user's explicitly chosen range for that same metric and period. Missing or stale data never establishes this state.",
+    "new_weight_import_receipt": "A new weight observation from Apple Health has been saved successfully. A sync attempt, duplicate or failed save does not qualify. Show as a quiet receipt without requiring dismissal or repeating an already acknowledged import.",
+    "add_a_photo_ask": "Photo capture is available and the user has not declined or dismissed the ask. Keep it optional, without urgency, streaks or repeated prompts after dismissal.",
+    "todays_workout": "The stored, engine-issued plan has a workout scheduled for the user's local today and it remains actionable. This sentence does not generate or adjust a prescription.",
+    "calm_nothing_to_do": "Current stored state has no actionable plan item or unresolved issue. Missing data or an unavailable source does not establish that there is nothing to do. Allow the user to leave without another task.",
+    "deload_deferral_explanation": "A stored deterministic-engine decision explicitly defers a deload based on the user's saved check-ins and retains the current plan. Never infer this from absent check-ins, override a planned deload or pain pause, or imply medical clearance. The engine decision retains its observation references and opaque evidence IDs for explanation."
+  },
+  "boundaries": "Wording decision only. Runtime eligibility, selection, rollout and rendering belong to their implementation slices. If a condition cannot be verified, do not use its sentence. These six lines allow no body-change or performance-benefit claims; any future observation-backed outcome wording needs a separate decision. No view code, HealthKit client, Jovie change or LYB-168 share-card work is authorized here.",
+  "standards": [
+    "docs/product/brand-ethos.md",
+    "docs/product/evidence-and-recommendation-standard.md"
+  ]
+}
