@@ -1,6 +1,6 @@
 # LogYourBody Product Roadmap And Build Guardrails
 
-Last reconciled: 2026-10-16 (LYB-179)
+Last reconciled: 2026-10-31 (LYB-161; preserves LYB-179 product supersession)
 
 ## October 16 supersession: current product behavior
 
@@ -24,6 +24,55 @@ for qualification and missing/mature evidence. A rendered insight is an anonymou
 occurrence, never inferred from calculation or navigation. Pro's current registry
 references are $9.99 monthly / $69.99 annual USD with a three-day trial; earlier
 premium-package proposals are not configured offers. Live terms require receipts.
+
+## Product API and MCP parity — LYB-161
+
+Founder direction, October 13, 2026: an authorized agent may be the customer's
+entire interface. Every iOS capability needs an equivalent product API and MCP
+action, or a truthful device, system, or user handoff. This applies to every new
+or materially extended feature from specification through completion evidence.
+The [canonical capability inventory and entry-point mapping](integrations/chatgpt-app/README.md#canonical-ios-capability-inventory)
+records existing source, gaps, and execution boundaries. Update its affected rows
+in the same feature PR; source availability alone does not establish parity.
+
+### Feature specification and completion contract
+
+Each feature specification must record:
+
+- The supported user journey, its trigger and KPI; native control, Siri/App
+  Intent, product HTTP, and MCP mappings at the same read/create/correct/delete
+  or device-handoff level. Mark unsupported actions explicitly. A CLI is optional
+  only for a demonstrated scripting gap.
+- Authenticated subject, resource audience, least-privilege scopes, explicit LYB
+  connection/consent, ownership, entitlement and default-off gates. Shared Jovie
+  identity alone grants no LYB connection or delegated permission.
+- Validation, units, measured time, local date/zone, source/provenance and stable
+  measurement identity; distinguish measured values, estimates and selected goals.
+- Stable retry/operation IDs, intentional repeat entries, atomic mutation/receipt
+  persistence, correction revisions, conflicts, tombstones and offline/native
+  reconciliation. Generic table sync is not an agent product action.
+- Execution boundary and user confirmation, including denied/unavailable/cancelled
+  outcomes. Report local saved, sync pending, cloud committed, conflict, and
+  device-effect states separately, with persisted readback for claimed completion.
+- Named HTTP/MCP/native/provider regression and failure-path tests, actual CI
+  execution/coverage, and [independent agent dogfood receipts](USER_JOURNEYS.md#agent-parity-completion-evidence).
+  Missing or simulated evidence stays pending; a tool response or local dialog
+  alone is not end-to-end completion.
+
+Compose existing first-party routes, typed domain actions, ports and adapters.
+Adopt the official MCP client/Inspector for conformance and dogfood. Preserve Core
+Data/offline authority, per-user isolation, health-data boundaries and engine-only
+numeric training prescriptions. No new durable agent platform, universal runtime,
+food logger, general workout tracker, or mandatory custom CLI is implied.
+
+**Release exception and planning boundary:** the October 13 TestFlight beta and
+held release PR are grandfathered. LYB-161 and its children do not gate that
+release or the separate, higher-priority latest-main TestFlight delivery. This
+plan authorizes no implementation, deployment, account connection, dependency
+installation, marketplace publication, Apple capability/signing change, release
+metadata/checklist/workflow change, or release-PR mutation. Keep linked planning
+items in Backlog without dispatch, admission labels, locks or release-blocking
+relations; retain existing owners and branches.
 
 ## September 26 roadmap — preserved v1 history
 
