@@ -238,6 +238,8 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
           execute,
           regularGuards,
         ));
+      // Reuse guard snapshots between resolution and verification, only within this command.
+      let sources = new Map();
       const verifyMerge = (receipts) => {
         indexCorrectionReceipts(receipts);
         assert.deepEqual(
@@ -257,7 +259,14 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
             ),
           ),
         ];
-        const sources = readGitSources(root, objects, execute, regularGuards);
+        for (const [object, source] of readGitSources(
+          root,
+          objects.filter((object) => !sources.has(object)),
+          execute,
+          regularGuards,
+        )) {
+          sources.set(object, source);
+        }
         const current = guardCoverageReport(receipts, (guard) => sources.get(`:0:${guard}`), {
           requireClassification: true,
         });
@@ -293,7 +302,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
       // Normalize identical parent replays with the existing union policy.
       const stages = readGitMergeLedgers(root).map((rows) => mergeLedgers(rows, []));
       // Batch the staged union's guards too; repeated receipts must not spawn Git.
-      const sources = stagingMerge
+      sources = stagingMerge
         ? readGitSources(
             root,
             [
@@ -307,7 +316,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
             execute,
             regularGuards,
           )
-        : null;
+        : sources;
       result = classifyLedger(
         // Keep incoming order, then append branch-only receipts so future main
         // prepends do not collide with the same branch receipt on every repair.

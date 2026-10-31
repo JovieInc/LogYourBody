@@ -7,6 +7,29 @@ import CoreImage.CIFilterBuiltins
 import UIKit
 import Vision
 
+/// Presentation-only similarity transform. A single positive scale preserves
+/// body proportions and excludes reflection, shear and independent axis scaling.
+/// The source image remains separate from the rendered stage crop.
+struct BodyPhotoRegistration {
+    let translation: CGPoint
+    let rotation: CGFloat
+    let scale: CGFloat
+
+    init?(translation: CGPoint, rotation: CGFloat = 0, scale: CGFloat) {
+        guard translation.x.isFinite, translation.y.isFinite,
+              rotation.isFinite, scale.isFinite, scale > 0 else { return nil }
+        self.translation = translation
+        self.rotation = rotation
+        self.scale = scale
+    }
+
+    var transform: CGAffineTransform {
+        let cosine = cos(rotation) * scale
+        let sine = sin(rotation) * scale
+        return CGAffineTransform(a: cosine, b: sine, c: -sine, d: cosine, tx: translation.x, ty: translation.y)
+    }
+}
+
 /// The progress-photo treatment: the person stays sharp while the background is
 /// blurred, desaturated and dimmed, so every photo reads the same no matter the
 /// room it was taken in. Nothing is ever drawn over the person.
