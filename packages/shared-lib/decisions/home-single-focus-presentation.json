@@ -1,0 +1,126 @@
+{
+  "id": "LYB-266",
+  "parent": "LYB-173",
+  "status": "accepted",
+  "recorded_on": "2026-10-31",
+  "approval_basis": "Recommended default adopted under LYB-266's ships-if-unanswered instruction. This records the authorized default, not a separate human visual review.",
+  "question": "What does the single-focus Home card, the pill row and an earned-win message look and sound like?",
+  "specification": "packages/shared-lib/decisions/home-single-focus.md",
+  "visual_reference": "packages/shared-lib/decisions/home-single-focus.svg",
+  "home_card": {
+    "maximum_foreground_cards": 1,
+    "width": "Full available content width within the native screen inset.",
+    "maximum_primary_buttons": 1,
+    "dismiss_label": "Not now",
+    "layout": "One leading-aligned observation or action sentence, a quiet source/date/confidence line, one full-width primary capsule and a quiet text dismissal below it. Height grows with content and Dynamic Type.",
+    "passive_states": "A calm empty state needs no button or dismissal. A win may offer View details. A successfully saved import is a quiet receipt, not a competing card or an earned win by itself.",
+    "dismissal": "Not now defers only the optional presentation through the existing dismissal policy. It never accepts a plan revision, marks an action completed, clears a safety condition or changes the user's target.",
+    "wording_from": "packages/shared-lib/decisions/home-coaching-card-wording.json",
+    "additional_copy": {
+      "weight_ask": "Add a recent weight reading.",
+      "body_fat_ask": "Add a recent body fat reading.",
+      "plan_revision": "Your plan has an update.",
+      "unavailable": "Waiting for recent data."
+    },
+    "actions": {
+      "on_track": "View progress",
+      "new_weight_import_receipt": null,
+      "add_a_photo_ask": "Add photo",
+      "todays_workout": "View workout",
+      "calm_nothing_to_do": null,
+      "deload_deferral_explanation": "View plan",
+      "weight_ask": "Log weight",
+      "body_fat_ask": "Log body fat",
+      "plan_revision": "Review plan",
+      "unavailable": null,
+      "earned_win": "View details"
+    }
+  },
+  "composer_pills": {
+    "layout": "One horizontally scrolling row of compact neutral capsules immediately above the existing composer. Preserve ranker order and native scrolling; no grid or second row.",
+    "labels": {
+      "addPhoto": "Add photo",
+      "weight": "Log weight",
+      "bodyFat": "Log body fat",
+      "plainInput": "Ask a question"
+    },
+    "placeholder": "Ask about your progress",
+    "interaction": "Each capsule opens its existing action. Plain input focuses the existing composer without sending a message. Keep keyboard and VoiceOver access to plain input even when it scrolls out of view. Render ranker output without inventing, reinserting or reordering actions."
+  },
+  "earned_win": {
+    "eligibility_from": "packages/shared-lib/decisions/earned-win-eligibility.json",
+    "allowed_win_kinds": ["goal_relative_gain", "first_ever_milestone", "measured_time_saved"],
+    "confetti": false,
+    "presentation": "Use the same card and type hierarchy. No celebratory overlay, trophy, streak badge, count-up animation, automatic sound or celebration haptic. State the verified fact plainly; a numeric decrease is not inherently a win.",
+    "templates": {
+      "goal_relative_gain": "{direction} {change} {unit} since {comparison_date}",
+      "first_ever_milestone": "{milestone} on {event_date}.",
+      "measured_time_saved": "{task} took {minutes} minutes less than on {comparison_date}."
+    },
+    "directions": ["Down", "Up"],
+    "milestones": {
+      "firstImport": "First Apple Health import saved",
+      "firstPhoto": "First progress photo saved",
+      "firstWorkout": "First planned workout completed"
+    },
+    "tasks": {
+      "logging": "Logging",
+      "workout": "Your planned workout"
+    },
+    "forecast_suffix": ", on track for {target_date}",
+    "forecast_condition": "Append only when a current, separately supported forecast for the user's explicit safe target and date is supplied. EarnedWinDetector alone supplies no forecast. Without one, omit the entire suffix; never infer a deadline from a favorable change.",
+    "formatting": "Use the user's units, locale and local dates, with a year when needed to disambiguate. Body fat changes use percentage points, not percent. Identify measured versus estimated or interpolated values and retain source, period and confidence in the quiet proof line. Do not manufacture precision or a confidence score.",
+    "evidence_condition": "Use only eligible, unacknowledged detector output with recoverable stored observations and the user's selected goal where required by LYB-305. Missing, stale, unsafe or unverifiable evidence cannot establish a win, an on-track state or a first-ever milestone. A shorter workout alone does not prove benefit."
+  },
+  "empty_states": {
+    "verified_quiet": "Use calm_nothing_to_do from LYB-302 only when current stored state establishes that nothing needs attention. No fabricated win, counter or forced action.",
+    "unknown": "Use unavailable when reliable recent data is missing. Retain existing loading, offline and error/recovery surfaces; do not relabel an unresolved error as calm or hide saved values."
+  },
+  "rollout": {
+    "gate": "ios_home_single_focus_v1",
+    "default_enabled": false,
+    "boundary": "Reserved implementation gate through the existing platform port. This decision does not create or enable a live Statsig gate or alter current navigation. All three UI slices integrate with the existing Home and composer; no parallel Home implementation."
+  },
+  "ui_slices": [
+    {
+      "key": "home_card",
+      "specification": "packages/shared-lib/decisions/home-single-focus.md#slice-home-card",
+      "depends_on": ["HomeFocusSelector", "LYB-302"],
+      "snapshot_cases": ["actionable", "long_copy", "loading_disabled", "gate_off"]
+    },
+    {
+      "key": "composer_pills",
+      "specification": "packages/shared-lib/decisions/home-single-focus.md#slice-composer-pills",
+      "depends_on": ["QuickPillRanker"],
+      "snapshot_cases": [
+        "all_missing",
+        "all_fresh",
+        "horizontal_overflow",
+        "keyboard_visible",
+        "gate_off"
+      ]
+    },
+    {
+      "key": "win_and_empty",
+      "specification": "packages/shared-lib/decisions/home-single-focus.md#slice-win-and-empty",
+      "depends_on": ["EarnedWinDetector", "home_card", "LYB-305"],
+      "snapshot_cases": [
+        "gain",
+        "gain_with_forecast",
+        "first_ever",
+        "time_saved",
+        "verified_quiet",
+        "unknown",
+        "gate_off"
+      ]
+    }
+  ],
+  "boundaries": "Decision and three repository-local UI implementation slices only. Runtime UI, selector, pill ranker, detector, engine prescriptions and their policies are not changed. Snapshot execution belongs to the UI slices after implementation; real-device TestFlight evidence remains with LYB-173. Repository slice keys are not new Linear issue IDs.",
+  "standards": [
+    "docs/product/brand-ethos.md",
+    "docs/product/evidence-and-recommendation-standard.md",
+    "docs/product-development-roadmap.md",
+    "docs/design/native-button-parity.md",
+    "apps/ios/LogYourBody/DesignSystem/Theme.swift"
+  ]
+}

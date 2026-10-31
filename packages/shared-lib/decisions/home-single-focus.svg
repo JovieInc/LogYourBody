@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1264" height="660" viewBox="0 0 1264 660" role="img" aria-labelledby="title description">
+  <title id="title">LYB-266 accepted default: Home card, composer pills, earned win and empty states</title>
+  <desc id="description">Static layout reference using synthetic data, not a native screenshot. The Home slot shows one alternative at a time. An actionable card has one primary button and a quiet Not now action. Neutral capsules scroll above the composer. The win states a number and comparison date without confetti. Known quiet and unavailable data have separate wording.</desc>
+  <!-- Palette and geometry reference Theme.swift; this artifact defines no runtime tokens. -->
+  <defs>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Arial, sans-serif; fill: #F5F7FB; }
+      .label { font-size: 12px; font-weight: 500; fill: #A0A5AF; letter-spacing: 1px; }
+      .sentence { font-size: 22px; font-weight: 600; }
+      .proof { font-size: 14px; fill: #A0A5AF; }
+      .action { font-size: 16px; font-weight: 600; fill: #030407; text-anchor: middle; }
+      .quiet { font-size: 14px; fill: #A0A5AF; text-anchor: middle; }
+      .pill { font-size: 14px; font-weight: 500; text-anchor: middle; }
+    </style>
+    <clipPath id="pill-viewport"><rect x="20" y="412" width="350" height="44"/></clipPath>
+  </defs>
+  <rect width="1264" height="660" fill="#030406"/>
+  <text x="28" y="35" class="label">LYB-266 · ACCEPTED DEFAULT · SYNTHETIC LAYOUT REFERENCE</text>
+
+  <g transform="translate(28 68)">
+    <text x="0" y="16" class="label">01 / HOME CARD + COMPOSER</text>
+    <rect x="0" y="40" width="390" height="504" rx="24" fill="#07080A"/>
+    <rect x="20" y="68" width="350" height="274" rx="20" fill="#131417"/>
+    <text x="40" y="111" class="sentence" data-copy="weight_ask"><tspan x="40">Add a recent weight</tspan><tspan x="40" dy="29"> reading.</tspan></text>
+    <text x="40" y="177" class="proof">Saved reading · Sep 14</text>
+    <rect x="40" y="210" width="310" height="52" rx="26" fill="#F8FAFD"/>
+    <text x="195" y="242" class="action" data-copy="weight_action">Log weight</text>
+    <text x="195" y="302" class="quiet" data-copy="dismiss">Not now</text>
+    <g clip-path="url(#pill-viewport)">
+      <rect x="20" y="418" width="104" height="32" rx="16" fill="#1A1B1E"/>
+      <text x="72" y="439" class="pill" data-copy="pill_addPhoto">Add photo</text>
+      <rect x="132" y="418" width="110" height="32" rx="16" fill="#1A1B1E"/>
+      <text x="187" y="439" class="pill" data-copy="pill_weight">Log weight</text>
+      <rect x="250" y="418" width="120" height="32" rx="16" fill="#1A1B1E"/>
+      <text x="310" y="439" class="pill" data-copy="pill_bodyFat">Log body fat</text>
+      <rect x="378" y="418" width="140" height="32" rx="16" fill="#1A1B1E"/>
+      <text x="448" y="439" class="pill" data-copy="pill_plainInput">Ask a question</text>
+    </g>
+    <rect x="20" y="468" width="350" height="52" rx="26" fill="#1A1B1E"/>
+    <text x="40" y="500" class="proof" data-copy="placeholder">Ask about your progress</text>
+    <text x="0" y="572" class="proof">Pills scroll horizontally; composer stays reachable.</text>
+  </g>
+
+  <g transform="translate(437 68)">
+    <text x="0" y="16" class="label">02 / EARNED WIN</text>
+    <rect x="0" y="40" width="390" height="504" rx="24" fill="#07080A"/>
+    <rect x="20" y="68" width="350" height="274" rx="20" fill="#131417"/>
+    <text x="40" y="111" class="sentence" data-copy="gain_example"><tspan x="40">Down 1.2 kg</tspan><tspan x="40" dy="29"> since Sep 14</tspan></text>
+    <text x="40" y="177" class="proof">Measured · Apple Health · Oct 31</text>
+    <rect x="40" y="210" width="310" height="52" rx="26" fill="#F8FAFD"/>
+    <text x="195" y="242" class="action" data-copy="win_action">View details</text>
+    <text x="195" y="302" class="quiet">Not now</text>
+    <text x="0" y="572" class="proof">Observed change alone does not establish a forecast.</text>
+  </g>
+
+  <g transform="translate(846 68)">
+    <text x="0" y="16" class="label">03 / EMPTY ALTERNATIVES</text>
+    <text x="20" y="69" class="proof">Current data establishes nothing to do</text>
+    <rect x="20" y="88" width="350" height="144" rx="20" fill="#131417"/>
+    <text x="40" y="134" class="sentence" data-copy="calm"><tspan x="40">Nothing needs your</tspan><tspan x="40" dy="29"> attention right now.</tspan></text>
+    <text x="20" y="300" class="proof">Recent reliable data is unavailable</text>
+    <rect x="20" y="320" width="350" height="144" rx="20" fill="#131417"/>
+    <text x="40" y="367" class="sentence" data-copy="unavailable"><tspan x="40">Waiting for recent</tspan><tspan x="40" dy="29"> data.</tspan></text>
+    <text x="0" y="572" class="proof">Alternatives, never two foreground cards.</text>
+  </g>
+</svg>
