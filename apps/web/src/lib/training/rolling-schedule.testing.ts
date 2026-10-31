@@ -1,5 +1,4 @@
-import { optimizeMesocycle, type OptimizerInput } from './optimizer';
-import { certifyOptimization } from './optimizer-certification';
+import type { OptimizerInput } from './optimizer';
 import type { RollingScheduleContext } from './rolling-schedule';
 import { RECOVERY_POLICY } from './recovery';
 import type { RecoveryTrial } from './recovery-contract';
@@ -69,14 +68,6 @@ export function slot(id: string, scheduledAt: string): RollingScheduleContext['s
     availableEquipment: ['dumbbells' as const, 'bench' as const],
     priorityTargets: [],
   };
-}
-
-export function review(input = source()) {
-  const result = optimizeMesocycle(input);
-  if (result.kind !== 'proposal') throw new Error('Expected proposal');
-  expect(certifyOptimization(input, result.proposal)).toEqual({ ok: true });
-  expect(result.proposal.rollingSchedule).toBeDefined();
-  return result.proposal.rollingSchedule!;
 }
 
 export function history(

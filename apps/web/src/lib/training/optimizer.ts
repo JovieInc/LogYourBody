@@ -1,18 +1,4 @@
 import {
-  optimizerInputSchema,
-  type OptimizerInput,
-  type PlanExercise,
-  type PlanSession,
-  type SupersetPreference,
-} from './optimizer-contract';
-export {
-  optimizerInputSchema,
-  type OptimizerInput,
-  type PlanExercise,
-  type PlanSession,
-  type SupersetPreference,
-} from './optimizer-contract';
-import {
   catalogVariantById,
   isEligibleVariant,
   resolveAvailableEquipment,
@@ -40,6 +26,22 @@ import {
   type MuscleGroup,
   type SetLog,
 } from './types';
+
+import { optimizerInputSchema } from './optimizer-schema';
+import type {
+  OptimizerInput,
+  PlanExercise,
+  PlanSession,
+  SupersetPreference,
+} from './optimizer-schema';
+
+export { optimizerInputSchema } from './optimizer-schema';
+export type {
+  OptimizerInput,
+  PlanExercise,
+  PlanSession,
+  SupersetPreference,
+} from './optimizer-schema';
 
 export type ResolvedLocation = {
   id: string | null;

@@ -1,13 +1,15 @@
 import { catalogVariantById } from './catalog';
 import { exerciseDemands, OPTIMIZER_RULES } from './optimizer-rules';
-import type { PlanExercise } from './optimizer-contract';
-import type { SetLog } from './types';
+import { MUSCLE_GROUPS, type MuscleGroup, type SetLog } from './types';
+import type { PlanExercise } from './optimizer';
 import type {
   Observation,
   RollingScheduleContext,
   RollingScheduleReview,
-} from './rolling-schedule-contract';
+} from './rolling-schedule-schema';
 
+export const emptyVolume = () =>
+  Object.fromEntries(MUSCLE_GROUPS.map((muscle) => [muscle, 0])) as Record<MuscleGroup, number>;
 export const HOUR = 3600000;
 export const WEEK = 7 * 24 * HOUR;
 

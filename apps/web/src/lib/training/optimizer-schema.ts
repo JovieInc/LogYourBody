@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { catalogVariantById } from './catalog';
-import { MUSCLE_GROUPS } from './types';
 import { sequencingContextSchema } from './sequencing';
-import { rollingScheduleSchema } from './rolling-schedule-contract';
+import { rollingScheduleSchema } from './rolling-schedule';
+import { MUSCLE_GROUPS } from './types';
 
 const WEEKDAYS = [
   'monday',

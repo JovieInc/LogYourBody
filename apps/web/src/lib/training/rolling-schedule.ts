@@ -1,27 +1,34 @@
+import { catalogVariantById, isEligibleVariant } from './catalog';
+import { CONTROLLER_POLICY } from './controller';
+import { applyRecoveryTrials } from './recovery-application';
 import { exerciseDemands, OPTIMIZER_RULES } from './optimizer-rules';
-import { HOUR, WEEK, contributions, affects, attendanceChoice } from './rolling-schedule-signals';
-import type {
+import { rollingSessionOrder } from './rolling-session';
+import { planSessionDuration } from './session-duration';
+import { MUSCLE_GROUPS, type Session, type SetLog } from './types';
+import type { PlanSession } from './optimizer';
+import {
+  affects,
+  attendanceChoice,
+  contributions,
+  emptyVolume,
+  HOUR,
+  WEEK,
+} from './rolling-schedule-signals';
+import {
+  type Observation,
+  type RollingScheduleContext,
+  type RollingScheduleReview,
+  type ScheduledWork,
+} from './rolling-schedule-schema';
+
+export { rollingScheduleSchema } from './rolling-schedule-schema';
+export type {
   Observation,
   RollingScheduleContext,
   RollingScheduleReview,
   ScheduledWork,
-} from './rolling-schedule-contract';
-export {
-  rollingScheduleSchema,
-  type RollingScheduleContext,
-  type RollingScheduleReview,
-  type ScheduledWork,
-} from './rolling-schedule-contract';
-import { catalogVariantById, isEligibleVariant } from './catalog';
-import { CONTROLLER_POLICY } from './controller';
-import { applyRecoveryTrials } from './recovery-application';
-import { rollingSessionOrder } from './rolling-session';
-import { planSessionDuration } from './session-duration';
-import { MUSCLE_GROUPS, type MuscleGroup, type Session, type SetLog } from './types';
-import type { PlanSession } from './optimizer';
+} from './rolling-schedule-schema';
 
-const emptyVolume = () =>
-  Object.fromEntries(MUSCLE_GROUPS.map((muscle) => [muscle, 0])) as Record<MuscleGroup, number>;
 /** Allocate each remaining approved identity at most once, into user-offered
  * timestamped opportunities. A partial workout retains its original set numbers.
  * This is an optimizer proposal, not another progression or readiness engine. */

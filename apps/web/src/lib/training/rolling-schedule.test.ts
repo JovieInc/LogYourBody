@@ -1,9 +1,14 @@
-import { source, slot, review, history, reduction } from './rolling-schedule.testing';
-import { optimizeMesocycle, type OptimizerInput } from './optimizer';
+import { optimizeMesocycle } from './optimizer';
 import { certifyOptimization } from './optimizer-certification';
-import type { RollingScheduleContext } from './rolling-schedule';
-import { RECOVERY_POLICY } from './recovery';
-import type { RecoveryTrial } from './recovery-contract';
+import { history, reduction, review, slot, source } from './rolling-schedule.testing';
+
+function review(input = source()) {
+  const result = optimizeMesocycle(input);
+  if (result.kind !== 'proposal') throw new Error('Expected proposal');
+  expect(certifyOptimization(input, result.proposal)).toEqual({ ok: true });
+  expect(result.proposal.rollingSchedule).toBeDefined();
+  return result.proposal.rollingSchedule!;
+}
 
 describe('rolling schedule certification (LYB-174)', () => {
   it('allocates the approved rotation into actual opportunities across weekends without adding visits or sets', () => {
