@@ -1,0 +1,16 @@
+{
+  "id": "LYB-306",
+  "parent": "LYB-173",
+  "status": "accepted",
+  "question": "May LYB send a push or other outbound message to request a photo, weigh-in, or check-in?",
+  "decision": "No outbound asks this release for a photo, weigh-in, or check-in, through push notifications or any other outbound channel.",
+  "outbound_asks_enabled": false,
+  "max_outbound_cadence_days": 0,
+  "cadence_semantics": "0 denotes no permitted outbound cadence while outbound asks are disabled. Future enablement requires a separate decision defining a permitted cadence.",
+  "in_app_policy": "Show at most one in-app single-card ask when the value policy marks it useful. Eligibility and selection remain with the ranker.",
+  "boundaries": "Decision record only. This slice adds no notification sender, scheduling, delivery integration, or runtime ranker changes. It does not change unrelated notifications or reminders.",
+  "standards": [
+    "docs/product/brand-ethos.md",
+    "docs/product/evidence-and-recommendation-standard.md"
+  ]
+}

@@ -113,7 +113,11 @@ describe('ExperimentWaitlistLanding', () => {
         }),
       }),
     );
-    expect(await screen.findByText('Your early-access request was received.')).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "You're on the early-access list. We'll email you when your invite is ready.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it('shows validation feedback without attempting a request', () => {
@@ -183,7 +187,7 @@ describe('ExperimentWaitlistLanding', () => {
       );
       if (outcome === 'accepted') {
         expect(screen.getByRole('status')).toHaveTextContent(
-          'Your early-access request was received.',
+          "You're on the early-access list. We'll email you when your invite is ready.",
         );
         expect(screen.getByRole('button', { name: 'Get early access' })).toBeDisabled();
       }

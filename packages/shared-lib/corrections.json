@@ -5175,5 +5175,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "prelaunch-pricing-separates-paid-launch-from-free-beta",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/893462398575562b7fcd4d3d2a67d09f18c11b41/apps/web/src/app/launch-landing-copy.ts",
+    "correction": "Tim White company buyer evaluation, 2026-10-31 (all four ICP personas, 3/3 blocker votes): Prelaunch landing pages showed reference subscription prices alongside only Request early access, implying payment while waitlisted. Confirmation did not explain the next step.",
+    "mechanization": "Reuse APP_STORE_LIVE for both pricing variants and derive prelaunch prices and trial from the product registry. Update shared registry waitlist confirmation with the invite-ready fallback because persistence does not prove TestFlight delivery. The required web Jest suite renders standard, editorial, minimal, legacy and all six audience/goal variants; altered registry values detect hard-coded prices/trials and live-store tests preserve old copy. Against unchanged old pricing, four prelaunch cases failed and two live-store controls passed.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Existing launch availability and registry copy can drive the rendered offer without a second release flag or duplicated price/trial values; rendered regression tests cover every routed variant."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/__tests__/prelaunch-pricing.test.tsx",
+      "anchor": "it('frames every prelaunch price as launch pricing and a free beta'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

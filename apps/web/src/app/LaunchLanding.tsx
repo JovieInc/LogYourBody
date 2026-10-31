@@ -170,10 +170,14 @@ export function LaunchLanding({
               id="pricing-heading"
               className={`${styles.heading} text-[clamp(1.75rem,3.5vw,2.5rem)]`}
             >
-              {launchLandingCopy.pricingHeading}
+              {LANDING_FLAGS.APP_STORE_LIVE
+                ? launchLandingCopy.pricingHeading
+                : launchLandingCopy.prelaunchPricingHeading}
             </h2>
             <p className="mt-4 text-lg leading-8 sm:text-xl sm:leading-9">
-              {launchLandingCopy.pricingLine}
+              {LANDING_FLAGS.APP_STORE_LIVE
+                ? launchLandingCopy.pricingLine
+                : launchLandingCopy.prelaunchPricingLine}
             </p>
             <p className={`${styles.quiet} mt-2 text-[15px]`}>{launchLandingCopy.pricingNote}</p>
             <div className="mt-8">

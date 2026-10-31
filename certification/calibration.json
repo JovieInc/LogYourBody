@@ -1,0 +1,11 @@
+{
+  "schema": "company.buyer-calibration/v1",
+  "note": "Known-bad walks must come out no_pay and the off-ICP control must be no_pay. Walk run directories live in ~/.local/state/logyourbody-buyer-eval/walks/<id> (frames from canary walks only). A positive canary is required before the buyer gate can open; none exists yet (the paid path is iOS-only and needs a StoreKit sandbox walk).",
+  "holdouts": [
+    { "id": "download-loops-to-waitlist", "expect": "no_pay", "why": "Download for iOS shows the same waitlist form as the homepage: there is nothing to install.", "expectedObjections": ["no_path_to_product"], "walk": "holdout-download-loop" },
+    { "id": "signup-dead-end", "expect": "no_pay", "why": "Web Create your account offers only Continue with Apple, then onboarding redirects to sign-in; no product is reachable on the web.", "expectedObjections": ["no_path_to_product", "no_value_shown"], "walk": "holdout-signup-dead-end" },
+    { "id": "offline-hero", "expect": "no_pay", "why": "The hero product shot shows an Offline banner, the product looks broken before it is tried.", "expectedObjections": ["trust"], "walk": "holdout-offline-hero" }
+  ],
+  "controls": [{ "persona": "control-android", "expect": "no_pay" }],
+  "positiveCanaries": []
+}

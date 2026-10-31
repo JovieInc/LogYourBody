@@ -1,0 +1,73 @@
+{
+  "schema": "company.public-app-cert/v1",
+  "app": "logyourbody",
+  "stage": "prelaunch",
+  "dataClass": "health",
+  "policy": "JovieInc/ci canon/PUBLIC-APP-CERTIFICATION.md (applies in full; this file is the app config)",
+  "goldenPath": {
+    "stages": [
+      { "id": "visit", "kind": "entry", "surface": "web", "oracle": "A first-time visitor understands within the first screen that LogYourBody is an iPhone app that puts weight, body fat, lean mass and progress photos on one private timeline, sees the price, and has one working next step (install or request access). No error, offline or placeholder state is shown as the product." },
+      { "id": "install", "kind": "entry", "surface": "web", "oracle": "Download / iOS links lead to the App Store listing or TestFlight invite path for LogYourBody, never back to the same waitlist form." },
+      { "id": "sign-in", "kind": "signup", "surface": "ios", "oracle": "The canary signs in with Apple and lands as itself (its own name), never on the paid surface while unauthenticated." },
+      { "id": "onboarding", "kind": "onboarding", "surface": "ios", "oracle": "Onboarding takes the canary's weight and body-fat inputs and reflects them back (composition reveal shows the canary's own numbers, labelled measured or estimated); profile asks only what is missing." },
+      { "id": "first-value", "kind": "first-value", "surface": "ios", "oracle": "Today's logged weight appears on the body timeline at today's date as Measured, with the trend visible." },
+      { "id": "paywall", "kind": "paid-conversion", "surface": "ios", "oracle": "The paywall shows the live StoreKit price ($9.99/month or $69.99/year, 3-day trial) and what Premium adds over the free alternative; a sandbox purchase with the canary unlocks Premium." },
+      { "id": "survives", "kind": "retention", "surface": "ios", "oracle": "After relaunch the logged entry and the Premium entitlement are still there." }
+    ],
+    "flows": {
+      "web": "certification/flows/web.mjs",
+      "ios": "apps/ios/LogYourBodyUITests/OnboardingGoldenPathUITests.swift"
+    },
+    "accounts": {
+      "policy": "canary-only",
+      "source": "web: synthetic prodcert addresses browse-ready+synthetic-prodcert-*@jov.ie; ios: Sign in with Apple sandbox tester and StoreKit sandbox (credentials in Doppler, never in git)",
+      "emailPattern": "^browse-ready\\+synthetic-prodcert-[a-z\\d]{6,24}@jov\\.ie$"
+    }
+  },
+  "paidOutcome": {
+    "plan": "LogYourBody Pro (RevenueCat entitlement Premium)",
+    "price": 9.99,
+    "currency": "USD",
+    "interval": "month",
+    "trialDays": 3,
+    "alternatives": [{ "price": 69.99, "interval": "year" }],
+    "priceSource": "packages/product-registry/src/products/logyourbody.mjs",
+    "pricePattern": "monthly:\\s*\\{\\s*amount:\\s*([0-9.]+)",
+    "freeAlternative": "Apple Health plus a notes app or spreadsheet, or a free scale app; progress photos in the camera roll"
+  },
+  "buyer": {
+    "personas": "certification/personas.json",
+    "calibration": "certification/calibration.json",
+    "privatePersonaDir": "~/.local/state/logyourbody-buyer-eval/personas",
+    "contaminationMarkers": ["Jovie Coach", "LYB-", "JOV-"]
+  },
+  "privacy": {
+    "profile": "health",
+    "registry": "certification/tracker-registry.json",
+    "policyUrl": "https://www.logyourbody.com/privacy",
+    "healthPolicyUrl": "https://www.logyourbody.com/consumer-health-data",
+    "counselSignoff": null,
+    "crawl": [
+      { "url": "https://www.logyourbody.com/", "input": true, "health": true },
+      { "url": "https://www.logyourbody.com/download/ios", "input": true },
+      { "url": "https://www.logyourbody.com/signup", "input": true },
+      { "url": "https://www.logyourbody.com/signin", "input": true },
+      { "url": "https://www.logyourbody.com/privacy", "input": false },
+      { "url": "https://www.logyourbody.com/health-disclosure", "input": false },
+      { "url": "https://www.logyourbody.com/support", "input": false }
+    ],
+    "appSurfaces": "iOS app: HealthKit, body metrics and photos never go to analytics (AnalyticsEventPolicy allowlist: ids, kinds, counts only)"
+  },
+  "customerVoice": {
+    "approval": "tim",
+    "sink": "SUMMER_BASE_URL",
+    "channels": [
+      { "id": "support-email", "kind": "email", "address": "support@logyourbody.com", "route": "Cloudflare Email Routing -> workers/customer-voice-email -> apps/web /api/customer-voice/inbound -> Summer", "status": "pending" },
+      { "id": "privacy-email", "kind": "email", "address": "privacy@logyourbody.com", "route": "Cloudflare Email Routing -> workers/customer-voice-email -> apps/web /api/customer-voice/inbound -> Summer", "status": "pending" },
+      { "id": "coach-chat", "kind": "chat", "route": "agent/ core chat feedback-shaped turns -> capture -> Summer", "status": "pending" },
+      { "id": "app-store-reviews", "kind": "app-store-review", "route": "App Store Connect customer reviews API poll -> capture -> Summer", "status": "pending" }
+    ]
+  },
+  "waste": { "appId": "logyourbody" },
+  "capacity": { "appId": "logyourbody" }
+}

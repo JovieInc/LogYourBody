@@ -1,0 +1,11 @@
+{
+  "schema": "company.buyer-personas/v1",
+  "note": "Archetypes only: public, no PII. Real-signup personas live in ~/.local/state/logyourbody-buyer-eval/personas (0600), never in git. Briefs describe the buyer's situation, budget and current alternative, never product features.",
+  "archetypes": [
+    { "id": "recomp-lifter", "brief": "28-34, lifts 4x a week, trying to lose fat while keeping muscle. Weighs in most mornings with a smart scale synced to Apple Health. Tracks progress photos in the camera roll and a spreadsheet for monthly measurements. Pays for two fitness apps already (about $15/month total) and is wary of another subscription unless it replaces the spreadsheet." },
+    { "id": "glp1-user", "brief": "41, on a prescribed GLP-1 medication for six months, down 30 lb. Worried about losing muscle along with fat. Their doctor checks weight monthly. Wants to see whether the loss is fat or lean mass between visits. Comfortable paying for health tools if they are clearly trustworthy and private." },
+    { "id": "busy-parent", "brief": "37, two kids, wants to get back in shape before summer. Weighs in a few times a week. Has started and abandoned several apps that asked for too much setup. Will pay a small amount if it is effortless and shows progress without daily logging." },
+    { "id": "skeptic-data-nerd", "brief": "33, software engineer, has used MacroFactor and Happy Scale, owns a DEXA history from two scans. Distrusts body-fat estimates from photos or BMI-style formulas. Would pay only if the app is honest about what is measured versus estimated and exports cleanly." },
+    { "id": "control-android", "control": true, "brief": "52, uses an Android phone and a Windows laptop, no Apple devices, wants a free step counter. Not looking for body composition tracking." }
+  ]
+}

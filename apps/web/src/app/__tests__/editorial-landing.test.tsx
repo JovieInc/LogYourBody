@@ -56,14 +56,8 @@ describe('EditorialLanding', () => {
     expect(screen.getByText('Illustrative timeline / 30 days')).toBeInTheDocument();
     expect(screen.getByText('Apple Health · measured')).toBeInTheDocument();
     expect(screen.getByText('Manual entry · estimated')).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(
-        `Reference price: ${launchLandingCopy.monthlyReferencePrice} USD per month`,
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(`Or ${launchLandingCopy.annualReferencePrice} USD per year.`),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Pricing at launch' })).toBeInTheDocument();
+    expect(screen.getByText(launchLandingCopy.prelaunchPricingLine)).toBeInTheDocument();
     expect(screen.getByText(launchLandingCopy.pricingNote)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Your body.*Your business/ })).toBeInTheDocument();
     expect(
@@ -91,7 +85,11 @@ describe('EditorialLanding', () => {
       '/api/waitlist',
       expect.objectContaining({ method: 'POST' }),
     );
-    expect(await screen.findByText('Your early-access request was received.')).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "You're on the early-access list. We'll email you when your invite is ready.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it('sends every primary action to the App Store when the listing is live, without an email field', () => {
