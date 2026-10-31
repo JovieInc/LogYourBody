@@ -70,6 +70,39 @@ function choose(name: string) {
 }
 
 describe('exercise swap approval', () => {
+  it('explains first-use exercise and setup trials before requiring explicit approval', async () => {
+    const trials = suggestAlternatives(
+      {
+        exerciseId: CURRENT.id,
+        feedback: feedback(CURRENT.id, 6).slice(0, 1),
+        previousSwaps: [],
+        allowTrials: true,
+      },
+      EXERCISE_CATALOG,
+      EQUIPMENT,
+    );
+    expect(trials.differentExercise?.reason).toBe('supported_exercise_trial');
+    expect(trials.sameExerciseSetup?.reason).toBe('supported_setup_trial');
+    const { persist } = review(undefined, { suggestions: trials });
+    for (const [candidate, kind] of [
+      [trials.differentExercise, 'exercise'],
+      [trials.sameExerciseSetup, 'setup'],
+    ] as const) {
+      const option = screen.getByRole('radio', { name: NAMES[candidate!.variantId] });
+      expect(option).toHaveAccessibleDescription(
+        `Supported ${kind} to try. Support may reduce trunk demand; it does not mean zero spinal load.`,
+      );
+      expectSafeReason(
+        document.getElementById(option.getAttribute('aria-describedby')!)!.textContent!,
+      );
+    }
+    choose(NAMES[trials.sameExerciseSetup!.variantId]);
+    expect(persist).not.toHaveBeenCalled();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Approve swap' })));
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledWith(trials.sameExerciseSetup!.variantId);
+  });
+
   it.each([
     { label: 'two candidates', equipment: EQUIPMENT, count: 2 },
     {

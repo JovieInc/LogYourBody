@@ -1,3 +1,5 @@
+import { logYourBodyFeatures } from './logyourbody-features.mjs';
+
 /** @type {import('../types.js').ProductDefinition} */
 export const logYourBody = {
   schemaVersion: 1,
@@ -201,6 +203,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-129', reason: 'LYB-129 source evidence for canonical durable workout readiness integration.' },
       { value: 'https://linear.app/jovie/issue/LYB-173', reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.' },
       { value: 'https://linear.app/jovie/issue/LYB-174', reason: 'Source receipt for timestamped rolling training allocations and unfinished-work recovery; not a runtime endpoint.' },
+      { value: 'https://linear.app/jovie/issue/LYB-176', reason: 'Source receipt for distinct exercise/setup selection, observed tolerability, approval and correction regression guards.' },
       { value: 'https://linear.app/jovie/issue/LYB-189', reason: 'LYB-189 source evidence and Tim/legal review handoff for the Apple Health privacy disclosure.' },
       { value: 'https://linear.app/jovie/issue/LYB-194', reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.' },
       { value: 'https://linear.app/jovie/issue/LYB-47', reason: 'LYB-47 source evidence for dated metric observations and neutral trend semantics.' },
@@ -392,68 +395,7 @@ export const logYourBody = {
       valueProposition: 'Track weight, body fat, FFMI, and honest visual change with one private history.',
     },
   },
-  features: [
-    {
-      id: 'body-metrics',
-      name: 'Body metrics',
-      description: 'Log weight, body fat, lean mass, and derived composition metrics.',
-      category: 'measure',
-      availability: 'available',
-      platforms: ['ios'],
-      entitlement: 'premium',
-      marketing: true,
-    },
-    {
-      id: 'healthkit-sync',
-      name: 'HealthKit sync',
-      description: 'Bring supported weight and activity data into the timeline.',
-      category: 'import',
-      availability: 'available',
-      platforms: ['ios'],
-      entitlement: 'premium',
-      marketing: true,
-    },
-    {
-      id: 'progress-photos',
-      name: 'Progress photos',
-      description: 'Keep private photos aligned with measurements over time.',
-      category: 'measure',
-      availability: 'available',
-      platforms: ['ios'],
-      entitlement: 'premium',
-      marketing: true,
-    },
-    {
-      id: 'private-timeline',
-      name: 'Private timeline',
-      description: 'See measurements and photos together without social comparison.',
-      category: 'understand',
-      availability: 'available',
-      platforms: ['ios'],
-      entitlement: 'premium',
-      marketing: true,
-    },
-    {
-      id: 'phase-insight',
-      name: 'Phase insight',
-      description: 'Classify supported trends as cutting, maintaining, or gaining.',
-      category: 'understand',
-      availability: 'beta',
-      platforms: ['ios'],
-      entitlement: 'premium',
-      marketing: false,
-    },
-    {
-      id: 'data-export',
-      name: 'Data export',
-      description: 'Take a portable copy of account and measurement data.',
-      category: 'privacy',
-      availability: 'available',
-      platforms: ['ios', 'web'],
-      entitlement: 'account',
-      marketing: false,
-    },
-  ],
+  features: logYourBodyFeatures,
   plans: [
     {
       id: 'pro',

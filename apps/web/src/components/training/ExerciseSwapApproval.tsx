@@ -8,11 +8,13 @@ const SUPPORT_REASON = 'Support may reduce trunk demand; it does not mean zero s
 const REASON_TEXT = {
   supported_exercise_previously_tolerated: SUPPORT_REASON,
   supported_setup_previously_tolerated: SUPPORT_REASON,
+  supported_exercise_trial: `Supported exercise to try. ${SUPPORT_REASON}`,
+  supported_setup_trial: `Supported setup to try. ${SUPPORT_REASON}`,
   blocked_rom_or_clearance:
     'This floor setup is withheld because range of motion or clearance is blocked.',
   missing_station: 'This station is hidden because it is not available at your active gym.',
   belt_does_not_clear_symptoms: 'A belt does not clear persistent symptoms.',
-} as const;
+} as const satisfies Record<AlternativeOption['reason'], string> & Record<string, string>;
 
 type ConstraintReason = Exclude<keyof typeof REASON_TEXT, AlternativeOption['reason']>;
 

@@ -496,6 +496,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     };
     // Exercise the real CLI once per scenario; reuse its command runner for retries.
     const commands = [];
+    const requestedObjects = [];
     const run = (...args) => {
       let stdout = '';
       let stderr = '';
@@ -511,6 +512,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         },
         (command, args, options) => {
           commands.push(args);
+          if (args.includes('cat-file')) requestedObjects.push(...options.input.trim().split('\n'));
           return execFileSync(command, args, options);
         },
       );
@@ -1129,8 +1131,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
     assert.equal(await git('rev-parse', 'HEAD', operationHead), parents);
     assert.match(await git('diff', '--name-only'), /unrelated.txt/);
-    if (scenario === 'additions') {
-      // Future main receipts may arrive at either end of the ledger.
+    if (scenario === 'additions') { // Future main receipts may arrive at either end.
       for (const placement of ['prepend', 'append']) {
         await git('commit', '-m', 'test: resolved ledger');
         await git('switch', 'right');
@@ -1154,16 +1155,15 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         assert.equal(nextMerge.status, placement === 'prepend' ? 0 : 1, nextMerge.stderr);
         if (placement === 'append') {
           assert.match(readFileSync(ledger, 'utf8'), /<<<<<<< HEAD/);
-          commands.length = 0;
+          commands.length = requestedObjects.length = 0;
           const repaired = run('--resolve-merge', repository, '--stage');
           assert.equal(repaired.status, 0, repaired.stderr);
+          assert.deepEqual(
+            requestedObjects, [...new Set(requestedObjects)],
+            'resolution and parent verification must reuse each guard snapshot within one command',
+          );
           assert.equal(
-            commands.filter(
-              (args) =>
-                args.includes('show') &&
-                rows.some(({ guard }) => args.at(-1).endsWith(`:${guard.path}`)),
-            ).length,
-            0,
+            commands.some((args) => args.includes('show')), false,
             'staged conflict resolution must batch guard reads, including repeated receipts',
           );
         }

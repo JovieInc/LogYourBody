@@ -444,6 +444,11 @@ export const endpoints = {
         'Source receipt for timestamped rolling training allocations and unfinished-work recovery; not a runtime endpoint.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-176',
+      reason:
+        'Source receipt for distinct exercise/setup selection, observed tolerability, approval and correction regression guards.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-189',
       reason:
         'LYB-189 source evidence and Tim/legal review handoff for the Apple Health privacy disclosure.',

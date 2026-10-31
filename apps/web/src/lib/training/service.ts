@@ -1,4 +1,7 @@
 import type { TrainingMutationAdmission } from '@/lib/ports/training-mutations';
+import { learnedExerciseSwaps, type ExerciseSwapRecord } from './selection-learning';
+export { learnedExerciseSwaps, type ExerciseSwapRecord } from './selection-learning';
+import { exerciseSelectionEnabled } from './selection';
 import {
   captureTrainingAdmission,
   requireAdmittedSetup,
@@ -74,17 +77,6 @@ export type TrainingRecordsSnapshot = {
 export function plannedSessionCount(setup: TrainingProgramSetup, week: number): number {
   return setup.delegated?.completedWeeks[String(week)] ?? setup.sessionsPerWeek;
 }
-
-/** Persists one exercise substitution for the rest of a mesocycle block. The
- * original exercise keeps its history; the variant starts from its own. */
-export type ExerciseSwapRecord = NativeProductRecord & {
-  record_type: 'exercise_swap';
-  programSetupId: string;
-  blockId: string;
-  sessionId: string;
-  fromExerciseId: string;
-  toVariantId: string;
-};
 
 function toExerciseSwap(record: NativeProductRecord): ExerciseSwapRecord | null {
   const value = record as Partial<ExerciseSwapRecord>;
@@ -262,7 +254,7 @@ export async function loadTrainingRecords(
   const setupRecord = activeFeedback
     .filter((record) => recordType(record) === 'program_setup' && isProgramSetup(record))
     .sort((a, b) => Date.parse(String(b.startedAt)) - Date.parse(String(a.startedAt)))[0];
-  return {
+  const snapshot: TrainingRecordsSnapshot = {
     sourceRecords: [
       ...sessions.map((row) => ({ ...row, collection: 'training_sessions' })),
       ...sets.map((row) => ({ ...row, collection: 'logged_sets' })),
@@ -282,6 +274,8 @@ export async function loadTrainingRecords(
       .map(toTrainingFeedback)
       .filter((record): record is TrainingFeedback => record !== null),
   };
+  if (exerciseSelectionEnabled()) snapshot.swaps.push(...learnedExerciseSwaps(snapshot));
+  return snapshot;
 }
 
 export type NextWorkoutResult =

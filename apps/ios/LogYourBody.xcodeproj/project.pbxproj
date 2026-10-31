@@ -373,6 +373,7 @@
 		ADDC47E62E2D89F3003C97E7 /* ExportDataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B002E15FA5C002376C6 /* ExportDataView.swift */; };
 		ADDC47E92E2D89F3003C97E7 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B032E15FA5C002376C6 /* LoginView.swift */; };
 		ADDC47EB2E2D89F3003C97E7 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B052E15FA5C002376C6 /* MainTabView.swift */; };
+		E17620261031000200000002 /* ChatSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E17620261031000200000001 /* ChatSessionState.swift */; };
 		ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B062E15FA5C002376C6 /* PreferencesView.swift */; };
 		ADDC47F22E2D89F3003C97E7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B0E2E15FA5C002376C6 /* ContentView.swift */; };
 		ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723B122E15FA5C002376C6 /* LogYourBodyApp.swift */; };
@@ -448,6 +449,7 @@
 		E251E204A77F2161E880A19E /* RevenueCatSubscriptionAnalyticsTransitionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F1996527170EC15B242FF4B /* RevenueCatSubscriptionAnalyticsTransitionTests.swift */; };
 		E389C2EFF4E7B92EE0A9A997 /* RealtimeSyncManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = D557A5B9E670DD0A6A8BA893 /* RealtimeSyncManager+Part01.swift */; };
 		E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4172D019C9F4A30A881C001 /* TrainingService.swift */; };
+		E17620261031000100000002 /* TrainingSelectionContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = E17620261031000100000001 /* TrainingSelectionContract.swift */; };
 		E11020261025000100000002 /* TrainingProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11020261025000100000001 /* TrainingProgress.swift */; };
 		A24720261025000100000002 /* WorkoutAttendancePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24720261025000100000001 /* WorkoutAttendancePolicy.swift */; };
 		A24720261025000100000004 /* WorkoutAttendancePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24720261025000100000003 /* WorkoutAttendancePolicyTests.swift */; };
@@ -457,11 +459,14 @@
 		F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000003 /* TrainingSessionDraft.swift */; };
 		153A00000000000000000004 /* TrainingNumericScrubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153A00000000000000000003 /* TrainingNumericScrubTests.swift */; };
 		F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000005 /* TrainingSessionDraftTests.swift */; };
+		E17620261031000400000002 /* TrainingNativeCardsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E17620261031000400000001 /* TrainingNativeCardsTests.swift */; };
 		153A00000000000000000002 /* TrainingNumericScrub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153A00000000000000000001 /* TrainingNumericScrub.swift */; };
 		E11020261025000100000006 /* TrainingProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11020261025000100000005 /* TrainingProgressTests.swift */; };
 		E41302026025000000000004 /* DelegatedTrainingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41302026025000000000003 /* DelegatedTrainingTests.swift */; };
 		E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4172D019C9F4A30A881C003 /* TrainingViews.swift */; };
+		E17620261031000300000002 /* TrainingLoadPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E17620261031000300000001 /* TrainingLoadPolicy.swift */; };
 		E11020261025000100000004 /* TrainingProgressViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11020261025000100000003 /* TrainingProgressViews.swift */; };
+		E17620261030000100000002 /* TrainingSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E17620261030000100000001 /* TrainingSelectionView.swift */; };
 		E4C0A5110000000000000002 /* MesocycleCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000001 /* MesocycleCanvas.swift */; };
 		E41302026025000000000002 /* DelegatedTrainingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41302026025000000000001 /* DelegatedTrainingView.swift */; };
 		E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */; };
@@ -839,6 +844,7 @@
 		AD723B002E15FA5C002376C6 /* ExportDataView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ExportDataView.swift; sourceTree = "<group>"; };
 		AD723B032E15FA5C002376C6 /* LoginView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		AD723B052E15FA5C002376C6 /* MainTabView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		E17620261031000200000001 /* ChatSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatSessionState.swift; sourceTree = "<group>"; };
 		AD723B062E15FA5C002376C6 /* PreferencesView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
 		AD723B0B2E15FA5C002376C6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AD723B0C2E15FA5C002376C6 /* Config.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
@@ -1101,6 +1107,7 @@
 		E2715F4BF0E82E86A99821E3 /* PhotoLibraryScannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoLibraryScannerTests.swift; sourceTree = "<group>"; };
 		E2AC3C23E6923176F103B414 /* StepsIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StepsIndicator.swift; path = DesignSystem/Molecules/StepsIndicator.swift; sourceTree = "<group>"; };
 		E4172D019C9F4A30A881C001 /* TrainingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingService.swift; sourceTree = "<group>"; };
+		E17620261031000100000001 /* TrainingSelectionContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSelectionContract.swift; sourceTree = "<group>"; };
 		E11020261025000100000001 /* TrainingProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingProgress.swift; sourceTree = "<group>"; };
 		A24720261025000100000001 /* WorkoutAttendancePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutAttendancePolicy.swift; sourceTree = "<group>"; };
 		A24720261025000100000003 /* WorkoutAttendancePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutAttendancePolicyTests.swift; sourceTree = "<group>"; };
@@ -1110,11 +1117,14 @@
 		F00720261007000100000003 /* TrainingSessionDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraft.swift; sourceTree = "<group>"; };
 		153A00000000000000000003 /* TrainingNumericScrubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingNumericScrubTests.swift; sourceTree = "<group>"; };
 		F00720261007000100000005 /* TrainingSessionDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraftTests.swift; sourceTree = "<group>"; };
+		E17620261031000400000001 /* TrainingNativeCardsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingNativeCardsTests.swift; sourceTree = "<group>"; };
 		153A00000000000000000001 /* TrainingNumericScrub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingNumericScrub.swift; sourceTree = "<group>"; };
 		E11020261025000100000005 /* TrainingProgressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingProgressTests.swift; sourceTree = "<group>"; };
 		E41302026025000000000003 /* DelegatedTrainingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DelegatedTrainingTests.swift; sourceTree = "<group>"; };
 		E4172D019C9F4A30A881C003 /* TrainingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingViews.swift; sourceTree = "<group>"; };
+		E17620261031000300000001 /* TrainingLoadPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingLoadPolicy.swift; sourceTree = "<group>"; };
 		E11020261025000100000003 /* TrainingProgressViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingProgressViews.swift; sourceTree = "<group>"; };
+		E17620261030000100000001 /* TrainingSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSelectionView.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000001 /* MesocycleCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvas.swift; sourceTree = "<group>"; };
 		E41302026025000000000001 /* DelegatedTrainingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DelegatedTrainingView.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvasTests.swift; sourceTree = "<group>"; };
@@ -1667,6 +1677,7 @@
 				A26100000000000000000002 /* QuickPillRanker.swift */,
 				D0C0DE000000000000000002 /* VoiceCaptureService.swift */,
 				E4172D019C9F4A30A881C001 /* TrainingService.swift */,
+				E17620261031000100000001 /* TrainingSelectionContract.swift */,
 				E11020261025000100000001 /* TrainingProgress.swift */,
 				26820261025000000000003 /* DatedOutcomeStore.swift */,
 				A24720261025000100000001 /* WorkoutAttendancePolicy.swift */,
@@ -1821,9 +1832,12 @@
 				AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */,
 				AD723B032E15FA5C002376C6 /* LoginView.swift */,
 				AD723B052E15FA5C002376C6 /* MainTabView.swift */,
+				E17620261031000200000001 /* ChatSessionState.swift */,
 				153A00000000000000000001 /* TrainingNumericScrub.swift */,
 				E4172D019C9F4A30A881C003 /* TrainingViews.swift */,
+				E17620261031000300000001 /* TrainingLoadPolicy.swift */,
 				E11020261025000100000003 /* TrainingProgressViews.swift */,
+				E17620261030000100000001 /* TrainingSelectionView.swift */,
 				E4C0A5110000000000000001 /* MesocycleCanvas.swift */,
 				E41302026025000000000001 /* DelegatedTrainingView.swift */,
 				8E3A26E632164AACAA5D77FD /* MainTabViewPolicies.swift */,
@@ -1939,6 +1953,7 @@
 				E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */,
 				153A00000000000000000003 /* TrainingNumericScrubTests.swift */,
 				F00720261007000100000005 /* TrainingSessionDraftTests.swift */,
+				E17620261031000400000001 /* TrainingNativeCardsTests.swift */,
 				E11020261025000100000005 /* TrainingProgressTests.swift */,
 				26820261025000000000007 /* DatedOutcomeStoreTests.swift */,
 				A24720261025000100000003 /* WorkoutAttendancePolicyTests.swift */,
@@ -2422,6 +2437,7 @@
 				E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */,
 				153A00000000000000000004 /* TrainingNumericScrubTests.swift in Sources */,
 				F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */,
+				E17620261031000400000002 /* TrainingNativeCardsTests.swift in Sources */,
 				E24920261025000400000002 /* WorkoutReconciliationPromptTests.swift in Sources */,
 				E11020261025000100000006 /* TrainingProgressTests.swift in Sources */,
 				26820261025000000000008 /* DatedOutcomeStoreTests.swift in Sources */,
@@ -2649,6 +2665,7 @@
 				A26100000000000000000001 /* QuickPillRanker.swift in Sources */,
 				D0C0DE000000000000000001 /* VoiceCaptureService.swift in Sources */,
 				E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */,
+				E17620261031000100000002 /* TrainingSelectionContract.swift in Sources */,
 				E11020261025000100000002 /* TrainingProgress.swift in Sources */,
 				26820261025000000000004 /* DatedOutcomeStore.swift in Sources */,
 				A24720261025000100000002 /* WorkoutAttendancePolicy.swift in Sources */,
@@ -2660,7 +2677,9 @@
 				F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */,
 				153A00000000000000000002 /* TrainingNumericScrub.swift in Sources */,
 				E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */,
+				E17620261031000300000002 /* TrainingLoadPolicy.swift in Sources */,
 				E11020261025000100000004 /* TrainingProgressViews.swift in Sources */,
+				E17620261030000100000002 /* TrainingSelectionView.swift in Sources */,
 				E4C0A5110000000000000002 /* MesocycleCanvas.swift in Sources */,
 				E41302026025000000000002 /* DelegatedTrainingView.swift in Sources */,
 				AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */,
@@ -2750,6 +2769,7 @@
 				C0D300012F30000100ABCDEF /* GeneratedProductRegistry.swift in Sources */,
 				ADE146442EBF05E000B64DA0 /* TimelineMode.swift in Sources */,
 				ADDC47EB2E2D89F3003C97E7 /* MainTabView.swift in Sources */,
+				E17620261031000200000002 /* ChatSessionState.swift in Sources */,
 				272AFFF5324345C4B93608F8 /* MainTabViewPolicies.swift in Sources */,
 				ADDC47EC2E2D89F3003C97E7 /* PreferencesView.swift in Sources */,
 				AD3147B12F0B000100ABCDEF /* PreferenceGoalEditing.swift in Sources */,

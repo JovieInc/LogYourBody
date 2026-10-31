@@ -31,6 +31,22 @@ function report(): AlternativeReport {
 }
 
 describe('back/trunk fatigue alternatives', () => {
+  it('offers distinct exercise and setup trials after the first explicit fatigue report', () => {
+    const input = Object.assign(report(), {
+      allowTrials: true,
+      previousSwaps: [],
+      feedback: observations('cable_curl', 6).slice(0, 1),
+      exerciseId: 'cable_curl',
+    });
+    const result = suggestAlternatives(input, EXERCISE_CATALOG, new Set([...equipment, 'cable']));
+    expect(result.status).toBe('suggested');
+    expect(result.differentExercise).toMatchObject({ reason: 'supported_exercise_trial' });
+    expect(result.sameExerciseSetup).toEqual({
+      variantId: 'supported_cable_curl',
+      reason: 'supported_setup_trial',
+    });
+  });
+
   it.each([
     { name: 'standing curls fatigue the trunk; supported curls tolerated', patch: {} },
     {

@@ -286,54 +286,6 @@ struct TrainingEnrollmentView: View {
     }
 }
 
-/// The engine carries last session's final-set load forward on hold and
-/// add-reps weeks; the load field starts there, like reps start at the target.
-enum TrainingLoadPrefillPolicy {
-    static func text(for targetLoadKg: Double?) -> String {
-        guard let targetLoadKg, targetLoadKg > 0 else { return "" }
-        let rounded = (targetLoadKg * 100).rounded() / 100
-        let style = FloatingPointFormatStyle<Double>.number
-            .precision(.fractionLength(0...2))
-            .grouping(.never)
-            .locale(Locale(identifier: "en_US_POSIX"))
-        return rounded.formatted(style)
-    }
-}
-
-enum TrainingLoadInputPolicy {
-    static let invalidMessage = "Enter a load from 0 to 500 kg, or leave it blank for bodyweight."
-
-    static func loadKg(from text: String) throws -> Double? {
-        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value.isEmpty { return nil }
-        guard value.range(of: #"^([0-9]+([.,][0-9]*)?|[.,][0-9]+)$"#, options: .regularExpression) != nil,
-              let load = Double(value.replacingOccurrences(of: ",", with: ".")),
-              load.isFinite, (0...500).contains(load)
-        else { throw InputError.invalidLoad }
-        return load
-    }
-
-    static func isValid(_ text: String) -> Bool {
-        do {
-            _ = try loadKg(from: text)
-            return true
-        } catch {
-            return false
-        }
-    }
-
-    static func savedText(for load: Double?) -> String {
-        guard let load else { return "" }
-        let text = String(load)
-        return text.hasSuffix(".0") ? String(text.dropLast(2)) : text
-    }
-
-    enum InputError: LocalizedError {
-        case invalidLoad
-        var errorDescription: String? { TrainingLoadInputPolicy.invalidMessage }
-    }
-}
-
 private enum TrainingVoiceReview {
     case log(VoiceSetProposal)
     case correct(VoiceSetProposal)
@@ -346,6 +298,7 @@ enum TrainingCompletionMotionPolicy {
 }
 
 struct TrainingLiveSessionView: View {
+    let onReviewSelection: ((TrainingSelectionRequest) async throws -> TrainingSelectionResponse)?
     let cardsEnabled: Bool
     let ownsSession: () -> Bool
     let voiceEnabled: Bool
@@ -390,6 +343,7 @@ struct TrainingLiveSessionView: View {
     @State private var completionReceipt: TrainingSetSaveReceipt?
     @State private var showEndConfirmation = false
     @State private var showsSwap = false
+    @State private var showsSelection = false
     @State private var selectedPositionId: String?
 
     init(
@@ -413,7 +367,8 @@ struct TrainingLiveSessionView: View {
             TrainingSession, String, VoiceSetContext?, VoiceSetContext?
         ) async throws -> VoiceIntentResponse,
         onFeedback: @escaping (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse,
-        onLoadProgress: (() async throws -> TrainingProgressResponse)? = nil
+        onLoadProgress: (() async throws -> TrainingProgressResponse)? = nil,
+        onReviewSelection: ((TrainingSelectionRequest) async throws -> TrainingSelectionResponse)? = nil
     ) {
         self.cardsEnabled = cardsEnabled
         self.ownsSession = isCurrent
@@ -423,6 +378,7 @@ struct TrainingLiveSessionView: View {
         self.progressEnabled = progressEnabled
         self.progressDecision = progressDecision
         self.onLoadProgress = onLoadProgress
+        self.onReviewSelection = onReviewSelection
         self.onLogSet = onLogSet
         self.onCorrectSet = onCorrectSet
         self.onUndoSet = onUndoSet
@@ -583,6 +539,30 @@ struct TrainingLiveSessionView: View {
                 }
                 .navigationTitle("Swap movement")
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { showsSwap = false } } }
+            }
+        }
+        .sheet(isPresented: $showsSelection) {
+            if let current = draft.currentPosition, let onReviewSelection {
+                TrainingSelectionView(
+                    session: draft.session, exercise: current.exercise, setNumber: current.setNumber,
+                    feedbackDraft: draft.feedback,
+                    ownsSession: ownsSession,
+                    onFeedback: { request in
+                        let saved: Bool
+                        if draft.feedback != nil, draft.feedback?.response == nil {
+                            saved = await draft.retryFeedback(send: onFeedback)
+                        } else { saved = await draft.recordFeedback(request, send: onFeedback) }
+                        guard saved, let receipt = draft.feedback?.response, receipt.matches(request)
+                        else { throw TrainingServiceError.invalidResponse }
+                        return receipt
+                    },
+                    onReview: onReviewSelection,
+                    onAction: { request in
+                        let updated = try await onWorkoutAction(request)
+                        draft.replaceSession(updated)
+                        return updated
+                    }
+                )
             }
         }
     }
@@ -830,7 +810,8 @@ struct TrainingLiveSessionView: View {
     }
 
     private var hasSafetyStop: Bool {
-        draft.session.safetyStop || (readinessEnabled && draft.nextSetRecommendation?.action == .symptomSafety)
+        draft.session.safetyStop || ((readinessEnabled || onReviewSelection != nil) &&
+            draft.nextSetRecommendation?.action == .symptomSafety)
     }
 
     private var readinessControl: some View {
@@ -887,6 +868,11 @@ struct TrainingLiveSessionView: View {
 
     private var sessionControls: some View {
         VStack(spacing: JovieTokens.itemGap) {
+            if onReviewSelection != nil {
+                Button("Movement response and alternatives") { showsSelection = true }
+                    .accessibilityIdentifier("training_selection_open")
+                    .disabled(!draft.rows.isEmpty)
+            }
             trainingControlsLayout {
                 if cardsEnabled {
                     Button("Review swaps", systemImage: "arrow.triangle.swap") { showsSwap = true }

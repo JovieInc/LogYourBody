@@ -109,6 +109,15 @@ start a second PR owner.
 
 For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
 merges and classifies the correction ledger after other conflicts are resolved.
+Union generation and parent verification share guard snapshots within that command;
+each retry reads the index and guard sources afresh.
+For a documentation rewrite conflicting with incoming new sections, run
+`python3 scripts/resolve-repository-docs.py --merge-sections docs/path.md`.
+It prints a proposal from the three unmerged index stages, preserving the branch
+and appending distinct incoming level-two sections. Review the proposal, replace
+the conflicted file and stage it explicitly. This mode never writes or stages;
+it refuses incoming edits/deletions, duplicate headings, unheaded additions and
+non-documentation paths. It does not adjudicate contradictory prose.
 Repair a conflicted source projection first with
 `python3 scripts/resolve-repository-docs.py --staged`. If staging fails, it restores
 the original projection bytes (or absence), so the same command remains retryable.

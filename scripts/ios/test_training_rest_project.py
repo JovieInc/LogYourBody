@@ -74,6 +74,21 @@ def check_test_source_membership(project, source_root):
     assert not invalid, 'Native test source membership must compile exactly once: ' + ', '.join(invalid)
 
 
+def check_test_suite_isolation(source_root):
+    """Split test files into independent suites so private fixtures stay local."""
+    # Ignore comments and fixture strings before inspecting suite declarations.
+    literals = r'//[^\n]*|/\*.*?\*/|#+""".*?"""#+|""".*?"""|#+".*?"#+|"(?:\\.|[^"\\])*"'
+    sources = {path: re.sub(literals, ' ', path.read_text(), flags=re.S)
+               for path in sorted(source_root.rglob('*.swift'))}
+    suites = {name: path for path, source in sources.items()
+              for name in re.findall(r'\bclass\s+(\w+)\s*:\s*(?:XCTest\.)?XCTestCase\b', source)}
+    invalid = [f'{path.name}: extension {name} belongs in {suites[name].name}; use an independent XCTestCase'
+               for path, source in sources.items()
+               for name in re.findall(r'\bextension\s+(\w+)\b', source)
+               if name in suites and suites[name] != path]
+    assert not invalid, 'Cross-file XCTestCase extension can strand private fixtures: ' + '; '.join(invalid)
+
+
 # Once a model version is used, keep its compiled schema reproducible. Evolve by
 # adding a new version, never by resolving a merge over an existing schema.
 LOCKED_MODEL_VERSIONS = {
@@ -115,6 +130,7 @@ def check_model_versions(project, model_root, locked=None):
 def check_project(path):
     project = read_project(path)
     check_test_source_membership(project, ROOT / 'apps/ios')
+    check_test_suite_isolation(ROOT / 'apps/ios/LogYourBodyTests')
     check_model_versions(project, ROOT / 'apps/ios/LogYourBody/Models/LogYourBody.xcdatamodeld')
     objects = project['objects']
     targets = {objects[key]['name']: objects[key] for key in objects[project['rootObject']]['targets']}

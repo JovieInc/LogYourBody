@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Refresh generated documentation from merged or staged sources with the pinned generator."""
 import argparse
+import difflib
 import json
 import re
 import subprocess
@@ -30,6 +31,58 @@ def staged_bytes(root, name):
     return subprocess.run(
         ["git", "show", ":" + name], cwd=root, check=True, capture_output=True,
     ).stdout
+
+
+def merge_sections(root, name):
+    """Propose an additive documentation merge from immutable index stages; never write."""
+    root = Path(root).resolve()
+    repository_docs.local(root, name)
+    if not name.startswith("docs/") or not name.endswith(".md"):
+        raise ValueError("section merging requires a docs/*.md path")
+
+    def git(*args):
+        return subprocess.run(
+            ["git", *args], cwd=root, check=True, capture_output=True, text=True,
+        ).stdout
+
+    git("rev-parse", "--verify", "MERGE_HEAD")
+    entries = git("ls-files", "--unmerged", "-z", "--", name).strip("\0").split("\0")
+    stages = [entry.split("\t", 1)[0].split() for entry in entries]
+    if len(stages) != 3 or {row[2] for row in stages if len(row) == 3} != {"1", "2", "3"}:
+        raise ValueError("section merging requires all three unmerged stages")
+    if any(row[0] not in {"100644", "100755"} for row in stages):
+        raise ValueError("section merging requires regular indexed files")
+    base, ours, theirs = [git("show", f":{stage}:{name}") for stage in (1, 2, 3)]
+    for source in (base, ours, theirs):
+        if re.search(r"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", source):
+            raise ValueError("section merging refuses conflict markers in a parent")
+    headings = lambda source: [
+        " ".join(title.split()).casefold()
+        for title in re.findall(r"(?m)^#{1,6} +(.+?) *#*\s*$", source)
+    ]
+    known = set(headings(base) + headings(ours))
+    original, incoming = base.splitlines(keepends=True), theirs.splitlines(keepends=True)
+    additions = []
+    for tag, start, _, first, last in difflib.SequenceMatcher(
+        None, original, incoming, autojunk=False,
+    ).get_opcodes():
+        if tag == "equal":
+            continue
+        if tag != "insert":
+            raise ValueError("incoming documentation must only add standalone sections")
+        block = "".join(incoming[first:last]).strip("\n")
+        prefix = "".join(original[:start])
+        if (not block.startswith("## ") or re.search(r"(?m)^# ", block)
+                or len(re.findall(r"(?m)^(?:`{3,}|~{3,})", prefix)) % 2):
+            raise ValueError("incoming additions must start with a standalone level-two section")
+        for title in headings(block):
+            if title in known:
+                raise ValueError("incoming section heading already exists: " + title)
+            known.add(title)
+        additions.append(block)
+    if not additions:
+        raise ValueError("no incoming sections to merge")
+    return ours.rstrip("\n") + "\n\n" + "\n\n".join(additions) + "\n"
 
 
 def resolve_staged(root):
@@ -191,9 +244,12 @@ def main():
     mode.add_argument("--refresh-lockfile", action="store_true", help="repair and verify the pnpm lockfile before refreshing docs")
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
     mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
+    mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
     args = parser.parse_args()
     try:
-        if args.staged:
+        if args.merge_sections:
+            print(merge_sections(args.root, args.merge_sections), end="")
+        elif args.staged:
             resolve_staged(args.root)
         else:
             resolve(args.root, args.refresh_lockfile, args.verify_lockfile, args.reviewed_project_sha256)
