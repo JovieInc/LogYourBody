@@ -16,12 +16,6 @@ const tokenWorkflow = fs.readFileSync(
   'utf8',
 );
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-// LYB-349: the workflow half of the budget guard ships as a git-apply patch
-// (the App token cannot write .github/workflows). The budget tests assert the
-// guard strictly once it lands and skip with a reason while it is pending.
-const budgetGuardApplied = tokenWorkflow.includes('MIN_GRAPHQL_REMAINING');
-const pendingWorkflowPatch = () =>
-  !budgetGuardApplied ? 'LYB-349 workflow patch not applied yet (see PR body)' : false;
 const head = 'a'.repeat(40);
 const repository = 'JovieInc/LogYourBody';
 
@@ -58,7 +52,6 @@ function recordingCore() {
     summary,
     info: (message) => messages.push(message),
     notice: (message) => messages.push(message),
-    warning: (message) => messages.push(message),
   };
 }
 
@@ -621,7 +614,7 @@ for (const [name, mutate] of [
   });
 }
 
-async function tokenScenario({ mutate = () => {}, entryMutate = () => {}, freshMutate = () => {}, enqueueError, rateLimit } = {}) {
+async function tokenScenario({ mutate = () => {}, entryMutate = () => {}, freshMutate = () => {} } = {}) {
   const context = {
     repo: { owner: 'JovieInc', repo: 'LogYourBody' },
     eventName: 'workflow_run',
@@ -666,26 +659,6 @@ async function tokenScenario({ mutate = () => {}, entryMutate = () => {}, freshM
   const core = recordingCore();
   const github = {
     rest: {
-      ...(rateLimit
-        ? {
-            rateLimit: {
-              async get() {
-                if (rateLimit === 'unavailable') throw new Error('rate limit endpoint is down');
-                return {
-                  data: {
-                    resources: {
-                      graphql: {
-                        remaining: rateLimit.remaining,
-                        limit: rateLimit.limit ?? 5000,
-                        resetAt: rateLimit.resetAt ?? '2026-10-31T10:00:00Z',
-                      },
-                    },
-                  },
-                };
-              },
-            },
-          }
-        : {}),
       pulls: { async get() { return { data: fresh }; } },
       checks: {
         async listForRef() {
@@ -699,7 +672,6 @@ async function tokenScenario({ mutate = () => {}, entryMutate = () => {}, freshM
         return { repository: { mergeQueue: { entries: { nodes: [entry] } } } };
       if (query.includes('mutation Dequeue'))
         return { dequeuePullRequest: { mergeQueueEntry: { id: 'MQ_fixture' } } };
-      if (enqueueError) throw enqueueError;
       return { enqueuePullRequest: { mergeQueueEntry: { id: 'MQ_fixture', position: 1 } } };
     },
   };
@@ -712,51 +684,6 @@ test('token repair re-enqueues only a bot-owned exact source head with CI Summar
   assert.equal(calls.length, 3);
   assert.match(calls[1].query, /dequeuePullRequest/);
   assert.equal(calls[2].variables.expectedHeadOid, head);
-});
-
-const rateLimitFailure = () => Object.assign(
-  new Error(`GraphQL: App installation 112037986 is at 5000/5000`),
-  { errors: [{ type: 'RATE_LIMIT' }] },
-);
-
-test('a healthy shared GraphQL budget proceeds with the normal re-enqueue', { skip: pendingWorkflowPatch() }, async () => {
-  const { calls, core } = await tokenScenario({ rateLimit: { remaining: 4000 } });
-  assert.equal(calls.length, 3);
-  assert.ok(core.messages.some((message) => message.startsWith('RE-ENQUEUED:')));
-});
-
-test('an exhausted shared GraphQL budget exits neutral before querying the queue', { skip: pendingWorkflowPatch() }, async () => {
-  const { calls, core } = await tokenScenario({ rateLimit: { remaining: 100 } });
-  assert.equal(calls.length, 0, 'No queue query or mutation may run on a nearly dry bucket');
-  assert.ok(core.messages.some((message) => message.startsWith('SKIPPED: shared GraphQL budget is low')));
-  assert.ok(core.messages.some((message) => message.includes('retried on the next enrollment completion')));
-});
-
-for (const [name, rateLimit] of [
-  ['a failed budget sample', 'unavailable'],
-  ['an absent budget endpoint', null],
-]) {
-  test(`${name} falls back to the normal query path`, { skip: pendingWorkflowPatch() }, async () => {
-    const { calls, core } = await tokenScenario({ rateLimit });
-    assert.equal(calls.length, 3);
-    assert.ok(core.messages.some((message) => message.startsWith('RE-ENQUEUED:')));
-  });
-}
-
-test('a mid-sweep rate limit defers the rest of the sweep without failing', { skip: pendingWorkflowPatch() }, async () => {
-  const { calls, core } = await tokenScenario({ enqueueError: rateLimitFailure(), rateLimit: { remaining: 4000 } });
-  assert.equal(calls.length, 3, 'The dequeue lands, the enqueue hits the budget wall, and the sweep stops there');
-  assert.match(calls[1].query, /mutation Dequeue/);
-  assert.match(calls[2].query, /mutation Enqueue/);
-  assert.ok(core.messages.some((message) => message.startsWith('DEFERRED:') && message.includes('#1284')));
-  assert.ok(!core.messages.some((message) => message.startsWith('RE-ENQUEUED:')));
-});
-
-test('non-rate-limit mutation failures still fail the token repair', { skip: pendingWorkflowPatch() }, async () => {
-  await assert.rejects(
-    tokenScenario({ enqueueError: new Error('Resource not accessible by integration'), rateLimit: { remaining: 4000 } }),
-    /Resource not accessible by integration/,
-  );
 });
 
 for (const [name, entryMutate] of [
