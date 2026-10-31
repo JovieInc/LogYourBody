@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { MarketingFooter } from '@/components/MarketingFooter';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { analytics, type AnalyticsProperties } from '@/lib/analytics';
@@ -274,6 +275,7 @@ export function ExperimentWaitlistLanding({
           </p>
         </main>
       </div>
+      <MarketingFooter variant="compact" />
     </div>
   );
 }

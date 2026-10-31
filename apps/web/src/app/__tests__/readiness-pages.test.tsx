@@ -144,4 +144,19 @@ describe('production-adjacent readiness pages', () => {
     expect(loadLegalDocument).toHaveBeenCalledWith('terms');
     expect(screen.getByTestId('legal-document')).toHaveTextContent('Loaded terms legal copy');
   });
+
+  it('loads the distinct consumer health data policy with its own metadata', async () => {
+    const { loadLegalDocument } = await import('@/lib/load-legal-docs');
+    const { default: ConsumerHealthDataPage, metadata } =
+      await import('../consumer-health-data/page');
+
+    render(await ConsumerHealthDataPage());
+
+    expect(loadLegalDocument).toHaveBeenCalledWith('consumerHealth');
+    expect(screen.getByTestId('legal-document')).toHaveTextContent(
+      'Loaded consumerHealth legal copy',
+    );
+    expect(metadata.alternates?.canonical).toBe('/consumer-health-data');
+    expect(metadata.title).toBe('Consumer Health Data Privacy Policy');
+  });
 });

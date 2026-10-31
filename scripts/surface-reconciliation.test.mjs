@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {
   BASELINE_PATH,
   INVENTORY_PATH,
+  WEB_ADDITIONS_PATH,
   REPO_ROOT,
   assess,
   enumerateSurfaces,
@@ -44,7 +45,8 @@ function redTree() {
     'apps/web/src/app/gone/page.tsx': `import { redirect } from 'next/navigation';
 export default function Gone() { redirect('/'); }
 `,
-    'apps/web/src/app/extra/page.tsx': 'export default function Extra() { return <main>Extra</main>; }\n',
+    'apps/web/src/app/extra/page.tsx':
+      'export default function Extra() { return <main>Extra</main>; }\n',
   };
 }
 
@@ -59,6 +61,118 @@ test('the vendored launch contract matches the Jovie fixture digest', () => {
   const bytes = readFileSync(INVENTORY_PATH);
   assert.equal(createHash('sha256').update(bytes).digest('hex'), launchDigest);
   assert.equal(loadInventory(INVENTORY_PATH).digest, launchDigest);
+});
+
+test('local web declarations classify future routes without changing the pinned contract', () => {
+  const root = mkdtempSync(join(tmpdir(), 'surface-web-additions-'));
+  const inventoryPath = join(root, 'inventory.json');
+  const additionsPath = join(root, 'scripts/fixtures/web-surface-additions.json');
+  try {
+    writeTree(root, {
+      'inventory.json': fixtureInventory({ 'web:/': 'launch' }),
+      'scripts/fixtures/web-surface-additions.json': JSON.stringify({
+        schema: 'lyb.web-surface-additions/v1',
+        surfaces: { 'web:/future-policy': 'launch' },
+      }),
+      'apps/web/src/app/page.tsx': 'export default () => <main>Home</main>;',
+      'apps/web/src/app/future-policy/page.tsx': 'export default () => <main>Policy</main>;',
+    });
+    const pinned = loadInventory(inventoryPath);
+    const extended = loadInventory(inventoryPath, additionsPath);
+    const surfaces = enumerateSurfaces(root);
+    assert.equal(findingsFor(surfaces, pinned.inventory)[0].id, 'web:/future-policy');
+    assert.deepEqual(findingsFor(surfaces, extended.inventory), []);
+    assert.equal(extended.digest, pinned.digest);
+    assert.equal(pinned.inventory.surfaces['web:/future-policy'], undefined);
+    const output = execFileSync(
+      process.execPath,
+      [script, '--root', root, '--inventory', inventoryPath, '--no-baseline'],
+      { encoding: 'utf8' },
+    );
+    assert.match(output, /surface reconciliation: pass/);
+    writeTree(root, {
+      'apps/web/src/app/unreviewed/page.tsx': 'export default () => <main>Extra</main>;',
+    });
+    assert.throws(
+      () =>
+        execFileSync(process.execPath, [
+          script,
+          '--root',
+          root,
+          '--inventory',
+          inventoryPath,
+          '--no-baseline',
+        ]),
+      (error) => error.status === 1 && /web:\/unreviewed/.test(error.stdout.toString()),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('local web declarations reject malformed input, native additions and pinned overrides', () => {
+  const root = mkdtempSync(join(tmpdir(), 'surface-web-invalid-'));
+  const inventoryPath = join(root, 'inventory.json');
+  const additionsPath = join(root, 'additions.json');
+  try {
+    writeTree(root, {
+      'inventory.json': fixtureInventory({
+        'web:/privacy': 'launch',
+        'web:/hidden': 'hide',
+        'web:/deleted': 'delete',
+      }),
+    });
+    for (const surfaces of [
+      null,
+      [],
+      'invalid',
+      { 'ios.screen.new': 'launch' },
+      { 'web:/../escape': 'launch' },
+      { 'web:/privacy': 'launch' },
+      { 'web:/hidden': 'launch' },
+      { 'web:/deleted': 'launch' },
+      { 'web:/future-policy': 'unknown' },
+    ]) {
+      writeFileSync(
+        additionsPath,
+        JSON.stringify({ schema: 'lyb.web-surface-additions/v1', surfaces }),
+      );
+      assert.throws(() => loadInventory(inventoryPath, additionsPath), /Invalid local web surface/);
+    }
+    writeFileSync(additionsPath, JSON.stringify({ schema: 'unknown', surfaces: {} }));
+    assert.throws(() => loadInventory(inventoryPath, additionsPath), /Invalid local web surface/);
+    writeFileSync(additionsPath, '{');
+    assert.throws(() => loadInventory(inventoryPath, additionsPath), SyntaxError);
+    assert.throws(() => loadInventory(inventoryPath, join(root, 'missing.json')), /ENOENT/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('local hide and delete declarations still reject reachable routes', () => {
+  const root = mkdtempSync(join(tmpdir(), 'surface-web-dispositions-'));
+  try {
+    writeTree(root, {
+      'inventory.json': fixtureInventory({}),
+      'additions.json': JSON.stringify({
+        schema: 'lyb.web-surface-additions/v1',
+        surfaces: { 'web:/hidden': 'hide', 'web:/deleted': 'delete', 'web:/repair': 'repair' },
+      }),
+      'apps/web/src/app/hidden/page.tsx': 'export default () => <main>Hidden</main>;',
+      'apps/web/src/app/deleted/page.tsx': 'export default () => <main>Deleted</main>;',
+      'apps/web/src/app/repair/page.tsx': 'export default () => <main>Repair</main>;',
+    });
+    const { inventory } = loadInventory(join(root, 'inventory.json'), join(root, 'additions.json'));
+    assert.deepEqual(
+      findingsFor(enumerateSurfaces(root), inventory).map(({ id, kind }) => [id, kind]),
+      [
+        ['web:/deleted', 'deleted-reachable'],
+        ['web:/hidden', 'hidden-reachable'],
+      ],
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('a fixture tree fails on one unlisted surface and one reachable hidden surface', () => {
@@ -260,7 +374,7 @@ test('shrinking a resolved finding passes and a stale baseline row does not', ()
 });
 
 test('the repository matches its baseline and keeps deleted modes off launch routes', () => {
-  const { inventory, digest } = loadInventory(INVENTORY_PATH);
+  const { inventory, digest } = loadInventory(INVENTORY_PATH, WEB_ADDITIONS_PATH);
   const started = Date.now();
   const findings = findingsFor(enumerateSurfaces(REPO_ROOT), inventory);
   assert.ok(Date.now() - started < 60000);

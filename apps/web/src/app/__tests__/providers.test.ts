@@ -11,6 +11,7 @@ describe('needsProductAuthRuntime', () => {
     '/delete-account',
     '/download/ios',
     '/health-disclosure',
+    '/consumer-health-data',
     '/privacy',
     '/support',
     '/terms',

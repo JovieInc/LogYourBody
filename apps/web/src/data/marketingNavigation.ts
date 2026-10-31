@@ -45,12 +45,14 @@ export const MARKETING_LEGAL_LINKS: readonly MarketingFooterLink[] = [
   { href: '/privacy', label: 'Privacy' },
   { href: '/terms', label: 'Terms' },
   { href: '/health-disclosure', label: 'Health disclosure' },
+  { href: '/consumer-health-data', label: 'Consumer health data' },
 ] as const;
 
 export const COMPACT_FOOTER_PATHS = new Set<string>([
   '/privacy',
   '/terms',
   '/health-disclosure',
+  '/consumer-health-data',
   '/security',
 ]);
 
@@ -68,6 +70,7 @@ export function isMarketingPath(pathname: string | null | undefined) {
     '/delete-account',
     '/download',
     '/health-disclosure',
+    '/consumer-health-data',
     '/landing',
     '/mobile',
     '/privacy',

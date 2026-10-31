@@ -8,7 +8,9 @@
 // Pre-existing violations are an exact baseline. CI also passes the merge base:
 // a new surface id cannot be silenced by editing that baseline. Removing a
 // violation requires shrinking the baseline in the same change. The baseline
-// does not classify new surfaces; classification belongs in the contract fixture.
+// does not classify new surfaces; classification requires an explicit declaration.
+// New static web routes use reviewed web-surface-additions.json declarations.
+// These extend the local inventory without rewriting the pinned upstream contract.
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -20,6 +22,7 @@ import process from 'node:process';
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = join(SCRIPT_DIR, '..');
 export const INVENTORY_PATH = join(SCRIPT_DIR, 'fixtures', 'lyb-launch-contract.json');
+export const WEB_ADDITIONS_PATH = join(SCRIPT_DIR, 'fixtures', 'web-surface-additions.json');
 export const BASELINE_PATH = join(SCRIPT_DIR, 'fixtures', 'surface-reconciliation-baseline.json');
 export const BASELINE_SCHEMA = 'lyb.surface-reconciliation-baseline/v1';
 export const DISPOSITIONS = new Set(['launch', 'repair', 'hide', 'delete']);
@@ -241,7 +244,7 @@ export function enumerateSurfaces(root) {
   return [...surfaces.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
-export function loadInventory(path) {
+export function loadInventory(path, additionsPath = null) {
   const bytes = readFileSync(path);
   const inventory = JSON.parse(bytes.toString('utf8'));
   if (inventory?.schema !== 'lyb-launch-contract/v1' || !inventory.surfaces) {
@@ -250,6 +253,26 @@ export function loadInventory(path) {
   for (const [id, disposition] of Object.entries(inventory.surfaces)) {
     if (typeof id !== 'string' || !id || !DISPOSITIONS.has(disposition)) {
       throw new Error(`Invalid surface disposition: ${id}`);
+    }
+  }
+  if (additionsPath) {
+    const additions = JSON.parse(readText(additionsPath));
+    if (
+      additions?.schema !== 'lyb.web-surface-additions/v1' ||
+      !additions.surfaces ||
+      typeof additions.surfaces !== 'object' ||
+      Array.isArray(additions.surfaces)
+    )
+      throw new Error('Invalid local web surface declarations');
+    for (const [id, disposition] of Object.entries(additions.surfaces)) {
+      // Local web declarations cannot override any pinned disposition or add native surfaces.
+      if (
+        !/^web:\/(?:[a-z0-9-]+\/)*[a-z0-9-]+$/u.test(id) ||
+        !DISPOSITIONS.has(disposition) ||
+        Object.hasOwn(inventory.surfaces, id)
+      )
+        throw new Error(`Invalid local web surface declaration: ${id}`);
+      inventory.surfaces[id] = disposition;
     }
   }
   return {
@@ -415,7 +438,11 @@ export function runCli(argv, stdout = process.stdout) {
     else if (arg === '--base-ref') options.baseRef = optionValue(argv, ++index);
     else throw new Error(printUsage());
   }
-  const { inventory, digest } = loadInventory(options.inventory);
+  const additionsPath = join(options.root, 'scripts', 'fixtures', 'web-surface-additions.json');
+  const { inventory, digest } = loadInventory(
+    options.inventory,
+    existsSync(additionsPath) ? additionsPath : null,
+  );
   const findings = findingsFor(enumerateSurfaces(options.root), inventory);
   let baseline = null;
   if (options.baseline) {

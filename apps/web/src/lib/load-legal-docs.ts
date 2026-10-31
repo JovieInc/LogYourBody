@@ -2,12 +2,13 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { logYourBody } from '@jovieinc/product-registry';
 
-export type LegalDocumentType = 'privacy' | 'terms' | 'health';
+export type LegalDocumentType = 'privacy' | 'terms' | 'health' | 'consumerHealth';
 
 const documentMap: Record<LegalDocumentType, string> = {
   privacy: 'privacy-policy.md',
   terms: 'terms-of-service.md',
   health: 'health-disclosure.md',
+  consumerHealth: 'consumer-health-data-policy.md',
 };
 
 /**
@@ -43,6 +44,14 @@ For questions, contact: ${logYourBody.contacts.privacy}`,
 By using LogYourBody, you agree to our terms. Please check back soon for our full terms of service.
 
 For questions, contact: ${logYourBody.contacts.legal}`,
+
+      consumerHealth: `# Consumer Health Data Privacy Policy
+
+**Last Updated: ${new Date().toLocaleDateString()}**
+
+Please check back soon for our full consumer health data privacy policy.
+
+For questions, contact: ${logYourBody.contacts.privacy}`,
 
       health: `# Health Disclosure
 

@@ -11,6 +11,7 @@ export const PUBLIC_MARKETING_ROUTES = [
   '/privacy',
   '/terms',
   '/health-disclosure',
+  '/consumer-health-data',
   '/blog',
   '/changelog',
   '/delete-account',
