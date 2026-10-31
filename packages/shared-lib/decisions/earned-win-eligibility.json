@@ -1,0 +1,21 @@
+{
+  "id": "LYB-305",
+  "parent": "LYB-173",
+  "status": "accepted",
+  "question": "Which goal-relative events may render as a celebration instead of a calm nothing-to-do state?",
+  "decision": "Celebrate only a verified first-ever milestone, a goal-relative gain computed from stored observations, or measured time saved. Eligibility permits a celebration; it never requires one.",
+  "allowed_win_kinds": ["goal_relative_gain", "first_ever_milestone", "measured_time_saved"],
+  "vanity_counters_allowed": false,
+  "fabricated_impact_allowed": false,
+  "eligibility": {
+    "goal_relative_gain": "Stored observations establish progress toward the user's explicitly selected goal over a stated comparison period. Retain the goal, observation references, provenance and confidence; distinguish measured values from estimates. A change in weight or another metric is not inherently a gain, and no goal may be inferred from an immutable trait.",
+    "first_ever_milestone": "Stored history verifies the first achievement of a meaningful milestone tied to the user's selected goal. A new session, reinstall, daily reset or incomplete history cannot establish first-ever status. App opens, log counts and streaks alone do not qualify.",
+    "measured_time_saved": "Comparable recorded durations for the same task establish an actual reduction in time spent. Retain the baseline and observed durations, task context and comparison period. An assumed manual duration, sync count or hypothetical future saving cannot establish time saved."
+  },
+  "fallback": "All other quiet moments remain a calm nothing-to-do state without a celebration or vanity counters. Missing, stale or unverifiable evidence never establishes a win and must not be presented as proof that the user is on track or that an unresolved issue is resolved.",
+  "boundaries": "Celebration eligibility decision only. This record does not implement runtime selection, feature rollout, copy, pixel layout or a home view. Existing safety and evidence standards still apply; eligibility does not authorize unsafe targets, prescriptive coaching or unsupported health or body-change claims.",
+  "standards": [
+    "docs/product/brand-ethos.md",
+    "docs/product/evidence-and-recommendation-standard.md"
+  ]
+}
