@@ -2,10 +2,10 @@
 # frozen_string_literal: true
 
 require "json"
-require "jwt"
 require "net/http"
 require "openssl"
 require "uri"
+require_relative "lib/app-store-release-health"
 
 API_BASE = "https://api.appstoreconnect.apple.com"
 PLATFORM = ENV.fetch("APP_STORE_PLATFORM", "IOS")
@@ -21,6 +21,7 @@ REVIEW_STATES = %w[
 
 SUCCESS_STATES = %w[
   READY_FOR_SALE
+  READY_FOR_DISTRIBUTION
   PREORDER_READY_FOR_SALE
 ].freeze
 
@@ -104,6 +105,7 @@ rescue JSON::ParserError => e
 end
 
 def bearer_token
+  require "jwt"
   key = api_key
   private_key = OpenSSL::PKey::EC.new(key.fetch("key"))
   payload = {
@@ -127,7 +129,8 @@ def request(method, path, token, body: nil)
   uri = URI("#{API_BASE}#{path}")
   request_class = {
     get: Net::HTTP::Get,
-    post: Net::HTTP::Post
+    post: Net::HTTP::Post,
+    patch: Net::HTTP::Patch
   }.fetch(method)
 
   req = request_class.new(uri)
@@ -135,11 +138,11 @@ def request(method, path, token, body: nil)
   req["Content-Type"] = "application/json"
   req.body = JSON.generate(body) if body
 
-  response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
+  response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true, open_timeout: 15, read_timeout: 30) do |http|
     http.request(req)
   end
 
-  [response.code.to_i, response.body.empty? ? {} : JSON.parse(response.body)]
+  [response.code.to_i, response.body.to_s.empty? ? {} : JSON.parse(response.body)]
 rescue JSON::ParserError => e
   fail_with("App Store Connect returned invalid JSON for #{path}: #{e.message}")
 end
@@ -183,11 +186,35 @@ end
 def app_store_versions(token, app_id)
   query = URI.encode_www_form(
     "filter[platform]" => PLATFORM,
-    "fields[appStoreVersions]" => "versionString,appVersionState,platform",
-    "limit" => "20"
+    "fields[appStoreVersions]" => "versionString,appVersionState,releaseType,platform,build,appStoreVersionPhasedRelease",
+    "fields[builds]" => "version",
+    "include" => "build,appStoreVersionPhasedRelease",
+    "limit" => "200"
   )
-  response = expect(:get, "/v1/apps/#{app_id}/appStoreVersions?#{query}", token)
-  response.fetch("data", [])
+  versions = []
+  path = "/v1/apps/#{app_id}/appStoreVersions?#{query}"
+  seen = []
+  while path
+    fail_with("App Store version pagination repeated") if seen.include?(path)
+    seen << path
+    response = expect(:get, path, token)
+    included = response.fetch("included", [])
+    response.fetch("data").each do |version|
+      { "build" => "healthBuild", "appStoreVersionPhasedRelease" => "healthPhase" }.each do |relationship, field|
+        resource = version.dig("relationships", relationship, "data")
+        version[field] = included.find { |item| item["type"] == resource&.fetch("type") && item["id"] == resource&.fetch("id") }
+      end
+      versions << version
+    end
+    next_url = response.dig("links", "next")
+    path = nil
+    if next_url
+      uri = URI(next_url)
+      fail_with("Untrusted App Store version pagination") unless uri.scheme == "https" && uri.host == "api.appstoreconnect.apple.com" && !uri.userinfo
+      path = uri.request_uri
+    end
+  end
+  versions
 end
 
 def selected_version(versions)
@@ -331,46 +358,76 @@ def emit_review_submission_remediation(submission_id, review_state, item_summary
   exit 1
 end
 
-token = bearer_token
-id = app_id(token)
-version = selected_version(app_store_versions(token, id))
+def release_approved_app_store_version
+  token = bearer_token
+  id = app_id(token)
+  versions = app_store_versions(token, id)
+  version = selected_version(versions)
 
-if version.nil?
-  app_version = ENV["APP_VERSION"].to_s.strip
-  fail_with(app_version.empty? ? "No App Store versions found for #{id}" : "App Store version #{app_version} was not found for #{id}")
-end
+  # Inspect every ongoing rollout even when MARKETING_VERSION points at a newer review.
+  health = {}
+  versions.each do |candidate|
+    next unless %w[ACTIVE PAUSED].include?(candidate.dig("healthPhase", "attributes", "phasedReleaseState")) ||
+      (candidate == version && candidate.dig("attributes", "appVersionState") == "PENDING_DEVELOPER_RELEASE")
 
-version_id = version.fetch("id")
-version_string = version.dig("attributes", "versionString")
-state = version.dig("attributes", "appVersionState").to_s
-active_review_submission = active_review_submission_for_version(token, id, version_id)
-
-case state
-when "PENDING_DEVELOPER_RELEASE"
-  request_release(token, version_id)
-  puts "Released approved App Store version #{version_string} (#{version_id})."
-when *SUCCESS_STATES
-  puts "App Store version #{version_string} is already #{state}; no release action needed."
-when *REVIEW_STATES
-  puts "App Store version #{version_string} is #{state}; waiting for Apple approval."
-when *FAILURE_STATES
-  fail_with("App Store version #{version_string} is #{state}; release needs remediation.")
-when "PREPARE_FOR_SUBMISSION"
-  if active_review_submission
-    review_state = active_review_submission.dig("attributes", "state")
-    submission_items = review_submission_items(token, active_review_submission.fetch("id"))
-    item_summary = review_submission_item_summary(submission_items)
-    puts "App Store version #{version_string} has active App Review submission #{active_review_submission.fetch("id")} (#{review_state}); waiting for Apple review."
-    puts "App Review submission items: #{item_summary}"
-    emit_review_submission_remediation(
-      active_review_submission.fetch("id"),
-      review_state,
-      item_summary,
-      rejected_review_submission_items(submission_items)
-    )
-  else
-    puts "App Store version #{version_string} is #{state}; waiting for App Store Connect review state to update."
+    health[candidate.fetch("id")] = guard_release_health(token, candidate, versions)
   end
-else
-  warn_with("App Store version #{version_string} is #{state}; no release action taken.")
+
+  if version.nil?
+    app_version = ENV["APP_VERSION"].to_s.strip
+    fail_with(app_version.empty? ? "No App Store versions found for #{id}" : "App Store version #{app_version} was not found for #{id}")
+  end
+
+  version_id = version.fetch("id")
+  version_string = version.dig("attributes", "versionString")
+  state = version.dig("attributes", "appVersionState").to_s
+  # Take over an existing automatic submission as well as future submissions.
+  if (REVIEW_STATES + ["PENDING_DEVELOPER_RELEASE"]).include?(state) && version.dig("attributes", "releaseType") != "MANUAL"
+    body = { data: { type: "appStoreVersions", id: version_id, attributes: { releaseType: "MANUAL" } } }
+    begin
+      updated = expect(:patch, "/v1/appStoreVersions/#{version_id}", token, body: body)
+      raise "Manual release mode not confirmed" unless updated.dig("data", "attributes", "releaseType") == "MANUAL"
+      append_step_summary(["App Store #{version_string}: releaseType changed to MANUAL; health monitor owns the release request."])
+    rescue StandardError, SystemExit
+      append_step_summary(["App Store #{version_string}: **UNVERIFIED** — unable to set MANUAL release mode. Apple may auto-release; set manual release in App Store Connect."])
+      fail_with("Unable to confirm health-controlled manual release mode for #{version_string}.")
+    end
+  end
+  active_review_submission = active_review_submission_for_version(token, id, version_id)
+
+  case state
+  when "PENDING_DEVELOPER_RELEASE"
+    if health[version_id] == true && version.dig("healthPhase", "attributes", "phasedReleaseState") != "PAUSED"
+      request_release(token, version_id)
+      append_step_summary(["Release requested for App Store #{version_string} (#{version_id}) after HEALTHY decision."])
+      puts "Released approved App Store version #{version_string} (#{version_id})."
+    end
+  when *SUCCESS_STATES
+    puts "App Store version #{version_string} is already #{state}; no release action needed."
+  when *REVIEW_STATES
+    puts "App Store version #{version_string} is #{state}; waiting for Apple approval."
+  when *FAILURE_STATES
+    fail_with("App Store version #{version_string} is #{state}; release needs remediation.")
+  when "PREPARE_FOR_SUBMISSION"
+    if active_review_submission
+      review_state = active_review_submission.dig("attributes", "state")
+      submission_items = review_submission_items(token, active_review_submission.fetch("id"))
+      item_summary = review_submission_item_summary(submission_items)
+      puts "App Store version #{version_string} has active App Review submission #{active_review_submission.fetch("id")} (#{review_state}); waiting for Apple review."
+      puts "App Review submission items: #{item_summary}"
+      emit_review_submission_remediation(
+        active_review_submission.fetch("id"),
+        review_state,
+        item_summary,
+        rejected_review_submission_items(submission_items)
+      )
+    else
+      puts "App Store version #{version_string} is #{state}; waiting for App Store Connect review state to update."
+    end
+  else
+    warn_with("App Store version #{version_string} is #{state}; no release action taken.")
+  end
+  fail_with("App Store release health requires remediation; see step summary.") if health.value?(false)
 end
+
+release_approved_app_store_version if $PROGRAM_NAME == __FILE__

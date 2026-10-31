@@ -3,8 +3,9 @@ name: iOS App Store Approved Release
 # Kept clock (external fact): Apple App Review state changes in App Store
 # Connect, which emits no GitHub event here. Replacement: an App Store Connect
 # webhook (appStoreVersion state) bridged to repository_dispatch. The run only
-# reads ASC state and releases a PENDING_DEVELOPER_RELEASE version; it never
-# holds a PR or the merge queue.
+# gates PENDING_DEVELOPER_RELEASE on Sentry health and monitors every ongoing
+# phased rollout. Unhealthy or UNVERIFIED rollouts are paused; it never resumes
+# a paused rollout or holds a PR or the merge queue.
 on:
   schedule:
     - cron: '*/30 * * * *'
@@ -31,6 +32,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
 
       - name: Setup Ruby and Bundler
         uses: ./.github/actions/setup-ruby-bundler
@@ -87,9 +92,11 @@ jobs:
           cd apps/ios
           bundle exec ruby ../../.github/scripts/release-approved-app-store-version.rb
         env:
-          APP_STORE_APP_ID: "6755209876"
+          APP_STORE_APP_ID: '6755209876'
           APP_IDENTIFIER: com.logyourbody.app
           APP_VERSION: ${{ steps.app_version.outputs.version }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
 
       - name: Cleanup
         if: always()

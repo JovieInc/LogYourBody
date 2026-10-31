@@ -115,6 +115,9 @@ export const logYourBody = {
       apple: { appStore: 'https://apps.apple.com/us/app/logyourbody/id6755209876' },
     },
     allowlist: [
+      { value: 'https://sentry.io/api/0/organizations/jovie/sessions/', reason: 'LYB-139 exact-build Sentry release-health API used by the approved App Store release monitor.' },
+      { value: 'https://docs.sentry.io/api/releases/retrieve-release-health-session-statistics/', reason: 'LYB-139 release-health API contract in the App Store release runbook.' },
+      { value: 'https://linear.app/jovie/issue/LYB-139', reason: 'LYB-139 source receipt for App Store release health and phased rollout remediation.' },
       { value: 'https://oidc.vercel.com/jovie', reason: 'Vercel OIDC issuer and JWKS for authenticated production Summer customer voice replies.' },
       { value: 'https://github.com/postalsys/postal-mime', reason: 'MIT-0 MIME parser adopted for the customer voice Email Worker; primary-source adoption receipt.' },
       { value: 'https://github.com/panva/jose', reason: 'MIT JOSE/JWT verifier adopted for production Summer OIDC; primary-source adoption receipt.' },

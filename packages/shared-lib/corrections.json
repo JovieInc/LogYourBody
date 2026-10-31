@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "app-store-release-health-gates-phased-rollout",
+    "correction": "LYB-139: Approved App Store versions auto-release without Sentry crash-free health checks, and phased rollout advances without an automated pause on crashes.",
+    "source": "https://linear.app/jovie/issue/LYB-139",
+    "mechanization": "Gate release requests on exact ASC version/build Sentry production session health, compare both crash-free rates to absolute floors and the previous released build, and pause ongoing phased rollouts on breached or UNVERIFIED evidence. Reuse the existing Linear intake to create or reopen a per-version remediation issue. Future Fastlane submissions reject automatic release; the monitor switches existing review submissions to MANUAL. Fixture tests cover healthy, breached, missing data, API failures, manual mode, exact identity, previous-version comparison, all active rollouts, pause ordering, and Linear creation/reopening through the existing required shared-lib suite. Negative controls remove the release gate and falsely mark missing data healthy; the fixtures reject both. The latest approved-release run observed 1.2.0 WAITING_FOR_REVIEW on 2026-10-31, satisfying the submission sequencing prerequisite. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing release monitor can prevent unsafe release requests by construction and pause Apple phased releases using its existing ASC credentials. Runtime health decisions and real entrypoint fixtures prevent silent no-data passes without a separate scheduler or a weaker CI gate."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/app-store-release-health.mjs",
+      "anchor": "// Known bad evidence wins even if another check is unavailable."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "account-erasure-verifiers-load-canonical-cleanup-migrations",
     "correction": "PR #1636 / LYB-330 (fix-red-1a39536f40 occurrence 7): JavaScript/TypeScript run 41130955586 failed because both training SQL verifiers retained a fixed cleanup inventory and omitted the new health vault tables.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41130955586/job/124321693545",

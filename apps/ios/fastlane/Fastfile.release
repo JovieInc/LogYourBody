@@ -281,8 +281,8 @@ end
     automatic_release = bool_option.call(options[:automatic_release], false)
     phased_release = bool_option.call(options[:phased_release], false)
 
-    if automatic_release && !submit_for_review
-      UI.user_error!("automatic_release requires submit_for_review")
+    if automatic_release
+      UI.user_error!("automatic_release bypasses release health; use the approved-release monitor")
     end
 
     env_or_default = lambda do |key, default|

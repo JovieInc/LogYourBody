@@ -106,6 +106,19 @@ export const endpoints = {
   },
   allowlist: [
     {
+      value: 'https://sentry.io/api/0/organizations/jovie/sessions/',
+      reason:
+        'LYB-139 exact-build Sentry release-health API used by the approved App Store release monitor.',
+    },
+    {
+      value: 'https://docs.sentry.io/api/releases/retrieve-release-health-session-statistics/',
+      reason: 'LYB-139 release-health API contract in the App Store release runbook.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-139',
+      reason: 'LYB-139 source receipt for App Store release health and phased rollout remediation.',
+    },
+    {
       value: 'https://oidc.vercel.com/jovie',
       reason:
         'Vercel OIDC issuer and JWKS for authenticated production Summer customer voice replies.',

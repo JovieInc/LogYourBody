@@ -4,7 +4,8 @@ The engineering pipeline automates builds and submission. Human release evidence
 
 ## Current state
 
-- App Store version **1.2.0** is stuck in `PREPARE_FOR_SUBMISSION` — nothing has been submitted. The poller `ios-app-store-approved-release.yml` (every 30 min) will auto-release it once Apple approves, but Apple can't approve what was never submitted.
+- App Store version **1.2.0** was observed `WAITING_FOR_REVIEW` in the [2026-10-31 approved-release run](https://github.com/JovieInc/LogYourBody/actions/runs/41177144249). This satisfies LYB-139's submission sequencing prerequisite; it does not replace native, commerce or privacy release evidence.
+- `ios-app-store-approved-release.yml` runs every 30 minutes. It sets review submissions to manual release mode, gates release requests on Sentry health, and monitors every active or paused phased rollout, including older versions after the marketing version changes.
 - `ios-release-loop.yml` auto-builds and deploys to **TestFlight** on every push to `main` touching `apps/ios/**`. This is the build you verify against.
 - TestFlight upload waits for Apple to finish processing the build before assigning tester groups. The deploy job allows up to 60 minutes for that provider-controlled step.
 - App Store submission is gated behind `paywall_testflight_verified: true` — a deliberate manual gate so no build ships without a proven purchase/restore.
@@ -61,12 +62,32 @@ are complete; `paywall_testflight_verified` attests only to the purchase/restore
 gh workflow run ios-release-loop.yml \
   -f release_type=app_store \
   -f submit_for_review=true \
-  -f automatic_release=true \
+  -f automatic_release=false \
   -f phased_release=true \
   -f paywall_testflight_verified=true
 ```
 
-4. The loop builds, runs precheck, and submits 1.2.0 for review. After Apple approves, `ios-app-store-approved-release.yml` auto-releases it (phased). No further action.
+4. The loop builds, runs precheck, and submits for review with manual release and phased rollout. After Apple approves, `ios-app-store-approved-release.yml` requests release only after a HEALTHY decision. Fastlane rejects `automatic_release=true` because Apple would bypass that check.
+
+## Release health (LYB-139)
+
+The existing poller reads [Sentry session health](https://docs.sentry.io/api/releases/retrieve-release-health-session-statistics/) for `jovie/log-your-body-ios`, environment `production`, for the latest 24 complete hours. It queries both the candidate and the preceding released App Store version using their selected ASC builds. The native adapter sets `releaseName` to `ios-<marketing version> (<build>)`; production configuration requires Sentry environment `production`. dSYM upload alone does not prove session delivery. Live session delivery remains unverified until the poller receives sufficient exact-build data.
+
+The policy in `.github/scripts/app-store-release-health.mjs` requires, for both crash-free users and sessions:
+
+- At least 99.50% crash-free for the candidate.
+- No drop larger than 0.20 percentage points from the previous released build.
+- At least 20 users and 100 sessions for each build in the observation window.
+
+A breached floor or regression is BREACHED. Missing credentials, API failures, empty/invalid data, an incorrect build/window, insufficient samples, or no previous release produce UNVERIFIED. Neither result permits a release request. An ACTIVE phased rollout is [patched to PAUSED](https://developer.apple.com/documentation/appstoreconnectapi/patch-v1-appstoreversionphasedreleases-_id_) for either result, and a `remediation:app-store-health-<version>` Linear issue is filed or reopened through the existing intake. The step summary records rates, sample sizes, thresholds, window, decision, pause result and issue outcome. The job fails on unsafe or unverified health; pause/intake errors remain visible. Paused releases never resume automatically.
+
+The monitor uses the existing `SENTRY_AUTH_TOKEN` and `LINEAR_API_KEY` secrets. The Sentry session endpoint requires `org:read` (or a broader documented organization scope); symbol-upload access alone may be insufficient. A missing scope yields visible UNVERIFIED, not permission to release. No new secret value is stored in source.
+
+The first App Store release has no previous-version baseline and therefore remains UNVERIFIED. Do not invent a baseline or silently waive it: investigate telemetry and record an explicit owner release decision with the existing release evidence. The monitor has no health bypass. A healthy paused release still needs investigation and a deliberate manual resume in App Store Connect. Apple limits cumulative phase pauses to 30 days; monitoring cannot hold a rollout indefinitely.
+
+For a submission already configured for automatic release (including the original 1.2.0 submission), the first updated poller attempts to set `releaseType=MANUAL` and checks Apple's returned state. If Apple refuses, the summary reports UNVERIFIED and requires setting manual release in App Store Connect. Until that readback succeeds, Apple's existing automatic approval behavior is still possible. After deployment, verify that summary before relying on the pre-release gate.
+
+Local fixture verification: `node --test .github/scripts/app-store-release-health.test.mjs`. It also runs the real Ruby monitor and Fastlane lane with external APIs stubbed; no build is released as a test. The same suite runs in the required shared-lib test task.
 
 ## Watch
 

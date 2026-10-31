@@ -21,10 +21,10 @@ on:
         type: boolean
         default: true
       automatic_release:
-        description: 'Automatically release after Apple approval'
+        description: 'Must remain false; approved-release monitor requests release after Sentry health passes'
         required: false
         type: boolean
-        default: true
+        default: false
       phased_release:
         description: 'Use phased release for approved App Store builds'
         required: false
@@ -447,7 +447,7 @@ jobs:
           cd apps/ios
 
           SUBMIT_FOR_REVIEW="${{ github.event.inputs.submit_for_review || 'true' }}"
-          AUTOMATIC_RELEASE="${{ github.event.inputs.automatic_release || 'true' }}"
+          AUTOMATIC_RELEASE="${{ github.event.inputs.automatic_release || 'false' }}"
           PHASED_RELEASE="${{ github.event.inputs.phased_release || 'true' }}"
           PAYWALL_TESTFLIGHT_VERIFIED="${{ github.event.inputs.paywall_testflight_verified || 'false' }}"
 
