@@ -79,6 +79,8 @@
 		417364FB8DBF56DE4302BA11 /* SessionListOrderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031C0B385F7C300284AA6A5F /* SessionListOrderingTests.swift */; };
 		4212B84EECB988D56259A5FD /* ErrorTrackingServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E493B38B586CB7B2C6FB452 /* ErrorTrackingServiceTests.swift */; };
 		4266EBC42CCDE9B0AB079FB7 /* HomeV2PhotoJourneyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80FA8107D65954647EF3709 /* HomeV2PhotoJourneyPolicy.swift */; };
+		63D97D06FB2246F4BA50870A /* AspectFillCropper.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC77A5C6538F4D789AE8F452 /* AspectFillCropper.swift */; };
+		EF8D3CE91BCC43438F4520B6 /* ChaosMonkeyUITests+ElementFingerprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = F632DB5C669C43439F03E630 /* ChaosMonkeyUITests+ElementFingerprint.swift */; };
 		42B0784EAF04F40C031D0186 /* DailyReminderPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 095D9694F1EA5B5091B0AE8B /* DailyReminderPolicyTests.swift */; };
 		437B26CA4B494BC0EF95A673 /* TimelineBucketCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86EEBD8D36DAF492B449176A /* TimelineBucketCalculatorTests.swift */; };
 		43ED1CCFAE5CC7DA20E6DB3E /* BaseTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEFB074F9FFF63EE8FD17BA /* BaseTextField.swift */; };
@@ -1062,6 +1064,8 @@
 		B3C4D0104A77000100ABCDEF /* DexaPDFImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DexaPDFImportSheet.swift; sourceTree = "<group>"; };
 		B4BF04D15583E3AE1CA4A836 /* View+Styles.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "View+Styles.swift"; path = "View+Styles.swift"; sourceTree = "<group>"; };
 		B80FA8107D65954647EF3709 /* HomeV2PhotoJourneyPolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2PhotoJourneyPolicy.swift; sourceTree = "<group>"; };
+		BC77A5C6538F4D789AE8F452 /* AspectFillCropper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AspectFillCropper.swift; sourceTree = "<group>"; };
+		F632DB5C669C43439F03E630 /* ChaosMonkeyUITests+ElementFingerprint.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "ChaosMonkeyUITests+ElementFingerprint.swift"; path = "ChaosMonkeyUITests+ElementFingerprint.swift"; sourceTree = "<group>"; };
 		BA9844F348C4675E22E4592F /* HomeV2TrendChart.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2TrendChart.swift; sourceTree = "<group>"; };
 		BBB847A2050F3135D62950A1 /* AuthFormField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthFormField.swift; path = DesignSystem/Molecules/AuthFormField.swift; sourceTree = "<group>"; };
 		BC71479CEEDEAD772518C5E9 /* BodyMetricAppIntentsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyMetricAppIntentsTests.swift; sourceTree = "<group>"; };
@@ -1389,6 +1393,7 @@
 				D6C9C472B04458CEC52B54DD /* HomeV2ProgressView.swift */,
 				A170ED170000000000000001 /* HomeV2MetricEditorial.swift */,
 				B80FA8107D65954647EF3709 /* HomeV2PhotoJourneyPolicy.swift */,
+				BC77A5C6538F4D789AE8F452 /* AspectFillCropper.swift */,
 				6B2C7FB705AB09C1ED795CC9 /* HomeV2PhotoTimelineRuler.swift */,
 				53C0B4CD7942CEEF6E37A0AC /* HomeV2PhotoToolsSheet.swift */,
 				C3AACE4608B68E543112CF52 /* HomeV2CompareView.swift */,
@@ -1451,6 +1456,7 @@
 				AD722F122E15FA5A002376C6 /* LogYourBodyUITestsLaunchTests.swift */,
 				7911018E5B654D7581BD9522 /* OnboardingGoldenPathUITests.swift */,
 				93D52CE5E90CEAADACDADD54 /* ChaosMonkeyUITests.swift */,
+				F632DB5C669C43439F03E630 /* ChaosMonkeyUITests+ElementFingerprint.swift */,
 				0345065164F33A05EE2404E5 /* ChaosEdgeCaseUITests.swift */,
 			);
 			path = LogYourBodyUITests;
@@ -2622,6 +2628,7 @@
 				B39A732AA4894B1DB77C9901 /* HomeV2PhotoViewerLayoutUITests.swift in Sources */,
 				401055DB589E0EF494FCBB1E /* OnboardingGoldenPathUITests.swift in Sources */,
 				542F8AAE22D916390F4ACA2D /* ChaosMonkeyUITests.swift in Sources */,
+				EF8D3CE91BCC43438F4520B6 /* ChaosMonkeyUITests+ElementFingerprint.swift in Sources */,
 				EC21D3139E83CAF325AFC45D /* ChaosEdgeCaseUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2949,6 +2956,7 @@
 				A170ED170000000000000002 /* HomeV2MetricEditorial.swift in Sources */,
 				987BBA9243F88C752E3E19E8 /* DashboardViewLiquid+HomeV2Progress.swift in Sources */,
 				4266EBC42CCDE9B0AB079FB7 /* HomeV2PhotoJourneyPolicy.swift in Sources */,
+				63D97D06FB2246F4BA50870A /* AspectFillCropper.swift in Sources */,
 				232F6B14662F9FC0F3C3A5A3 /* HomeV2PhotoTimelineRuler.swift in Sources */,
 				BDBF72C61DE5AE80FF6BE044 /* HomeV2PhotoToolsSheet.swift in Sources */,
 				251017544917A27E427E1991 /* HomeV2CompareView.swift in Sources */,
