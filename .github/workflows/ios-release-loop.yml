@@ -25,11 +25,14 @@ on:
         required: false
         type: boolean
         default: true
-      paywall_testflight_verified:
-        description: 'Required for App Store submission after a real TestFlight paywall purchase/restore passes'
+      build_number:
+        description: 'Required for app_store: already-processed TestFlight build to promote (no rebuild)'
         required: false
-        type: boolean
-        default: false
+        type: string
+      paywall_verified_build_number:
+        description: 'Required for app_store: build number with a verified TestFlight purchase AND restore; must equal build_number'
+        required: false
+        type: string
   workflow_call:
 
 concurrency:
@@ -48,6 +51,7 @@ jobs:
   # branch tip needs only contents:write. A scope refusal warns and continues.
   pin-release-tag:
     name: Pin Release Tag
+    if: github.event.inputs.release_type != 'app_store'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -70,6 +74,7 @@ jobs:
   # StoreKit job CI Summary is waiting on.
   validate-release:
     name: Validate Release
+    if: github.event.inputs.release_type != 'app_store'
     needs: pin-release-tag
     runs-on: ubuntu-latest
     # Must exceed validate-release-source.sh's RELEASE_CHECK_TIMEOUT_SECONDS (10901s).
@@ -95,6 +100,7 @@ jobs:
 
   bind-release-version:
     name: Bind Release Version
+    if: github.event.inputs.release_type != 'app_store'
     needs: [pin-release-tag, validate-release]
     runs-on: macos-26
     timeout-minutes: 20
@@ -165,36 +171,14 @@ jobs:
           echo "📦 Version: $VERSION"
           echo "🔢 Build: $PINNED_BUILD"
 
-  # Reuse a previously validated artifact if possible.
-  check-existing-build:
-    name: Check Existing Build
-    needs: validate-release
-    runs-on: ubuntu-latest
-    outputs:
-      has_artifact: ${{ steps.check.outputs.exists }}
-      artifact_url: ${{ steps.check.outputs.url }}
-
-    steps:
-      - name: Check for existing release artifact
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Look for a recent validated build artifact.
-          echo "🔍 Checking for reusable release build..."
-
-          # This is a placeholder - in production, you'd check artifact storage
-          echo "exists=false" >> "$GITHUB_OUTPUT"
-          echo "ℹ️ No reusable build found, will build fresh"
-
   build-release:
     name: Build Release
-    needs: [bind-release-version, check-existing-build]
-    if: needs.check-existing-build.outputs.has_artifact != 'true'
+    needs: bind-release-version
+    if: github.event.inputs.release_type != 'app_store'
     runs-on: macos-26
     timeout-minutes: 30
     environment:
-      name: ${{ github.event.inputs.release_type == 'app_store' && 'Production' || 'production-testflight' }}
+      name: production-testflight
 
     steps:
       - uses: actions/checkout@v6
@@ -346,9 +330,35 @@ jobs:
         Please test thoroughly before App Store submission.
     secrets: inherit
 
+  select-app-store-build:
+    name: Select Tested App Store Build
+    if: github.event.inputs.release_type == 'app_store'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      version: ${{ steps.select.outputs.version }}
+      build_number: ${{ steps.select.outputs.build_number }}
+      tag: ${{ steps.select.outputs.tag }}
+      commit: ${{ steps.select.outputs.commit }}
+      testflight_run: ${{ steps.select.outputs.testflight_run }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Resolve attested TestFlight build and producing run
+        id: select
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          PAYWALL_VERIFIED_BUILD_NUMBER: ${{ inputs.paywall_verified_build_number }}
+        run: node .github/scripts/resolve-app-store-build.mjs
+
   deploy-app-store:
     name: Deploy to App Store
-    needs: [bind-release-version, build-release]
+    needs: select-app-store-build
     if: github.event.inputs.release_type == 'app_store'
     runs-on: macos-26
     timeout-minutes: 30
@@ -363,23 +373,11 @@ jobs:
         with:
           node-version: 22
 
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - name: Setup Ruby and Bundler
+        uses: ./.github/actions/setup-ruby-bundler
         with:
-          name: ios-release-build
-          path: apps/ios/build
-
-      - name: Setup iOS Build Environment
-        uses: ./.github/actions/setup-ios-build
-        with:
-          xcode-version: 'latest-stable'
           working-directory: apps/ios
-
-      - name: Set Environment Variables for Build
-        run: |
-          cd apps/ios
-          echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> "$GITHUB_ENV"
-          echo "APP_STORE_APP_ID=${{ env.LOGYOURBODY_APP_STORE_APP_ID }}" >> "$GITHUB_ENV"
+          cache-key-prefix: ios-gems
 
       - name: Setup App Store Connect Authentication
         env:
@@ -406,6 +404,19 @@ jobs:
           RUBY
 
           echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> "$GITHUB_ENV"
+
+      - name: Verify selected TestFlight build is processed
+        working-directory: apps/ios
+        env:
+          VERSION_NAME: ${{ needs.select-app-store-build.outputs.version }}
+          BUILD_NUMBER: ${{ needs.select-app-store-build.outputs.build_number }}
+          PAYWALL_VERIFIED_BUILD_NUMBER: ${{ inputs.paywall_verified_build_number }}
+          APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
+        run: |
+          bundle exec fastlane validate_app_store_build \
+            version_name:"$VERSION_NAME" \
+            build_number:"$BUILD_NUMBER" \
+            paywall_verified_build_number:"$PAYWALL_VERIFIED_BUILD_NUMBER"
 
       - name: Ensure App Store Free Pricing
         run: |
@@ -441,31 +452,15 @@ jobs:
         run: |
           cd apps/ios
 
-          SUBMIT_FOR_REVIEW="${{ github.event.inputs.submit_for_review || 'true' }}"
-          PHASED_RELEASE="${{ github.event.inputs.phased_release || 'true' }}"
-          PAYWALL_TESTFLIGHT_VERIFIED="${{ github.event.inputs.paywall_testflight_verified || 'false' }}"
-
-          if [ "$SUBMIT_FOR_REVIEW" = "true" ] && [ "$PAYWALL_TESTFLIGHT_VERIFIED" != "true" ]; then
-            echo "::error::App Store submission is blocked until a real TestFlight paywall purchase and restore have been verified. Re-run with paywall_testflight_verified=true only after that proof exists."
-            exit 1
-          fi
-
-          IPA_PATH="$(find "$GITHUB_WORKSPACE/apps/ios/build" -name "*.ipa" -type f -print -quit)"
-          if [ -z "$IPA_PATH" ]; then
-            echo "::error::No IPA file found in downloaded build artifact"
-            find "$GITHUB_WORKSPACE/apps/ios/build" -maxdepth 4 -type f -print || true
-            exit 1
-          fi
-
-          echo "Submitting IPA: $IPA_PATH"
-
-          # Submit for review
+          # Promote the selected ASC build. This job never downloads or uploads an IPA.
           set -o pipefail
           bundle exec fastlane submit_app_store \
-            ipa_path:"$IPA_PATH" \
-            submit_for_review:$SUBMIT_FOR_REVIEW \
+            version_name:"$VERSION_NAME" \
+            build_number:"$BUILD_NUMBER" \
+            paywall_verified_build_number:"$PAYWALL_VERIFIED_BUILD_NUMBER" \
+            submit_for_review:"$SUBMIT_FOR_REVIEW" \
             automatic_release:false \
-            phased_release:$PHASED_RELEASE 2>&1 | tee submit.log
+            phased_release:"$PHASED_RELEASE" 2>&1 | tee submit.log
 
           # Second check: name real fastlane failure lines, not changelog text.
           if ! node ../../.github/scripts/fastlane-log-failures.mjs submit.log; then
@@ -473,6 +468,11 @@ jobs:
             exit 1
           fi
         env:
+          VERSION_NAME: ${{ needs.select-app-store-build.outputs.version }}
+          BUILD_NUMBER: ${{ needs.select-app-store-build.outputs.build_number }}
+          PAYWALL_VERIFIED_BUILD_NUMBER: ${{ inputs.paywall_verified_build_number }}
+          SUBMIT_FOR_REVIEW: ${{ inputs.submit_for_review }}
+          PHASED_RELEASE: ${{ inputs.phased_release }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
           FASTLANE_SKIP_UPDATE_CHECK: '1'
@@ -483,6 +483,26 @@ jobs:
           APP_REVIEW_PHONE_NUMBER: ${{ secrets.APP_REVIEW_PHONE_NUMBER || vars.APP_REVIEW_PHONE_NUMBER }}
           APP_REVIEW_NOTES: ${{ vars.APP_REVIEW_NOTES }}
 
+      - name: Record promoted build
+        env:
+          VERSION_NAME: ${{ needs.select-app-store-build.outputs.version }}
+          BUILD_NUMBER: ${{ needs.select-app-store-build.outputs.build_number }}
+          RELEASE_TAG: ${{ needs.select-app-store-build.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.select-app-store-build.outputs.commit }}
+          TESTFLIGHT_RUN: ${{ needs.select-app-store-build.outputs.testflight_run }}
+          SUBMIT_FOR_REVIEW: ${{ inputs.submit_for_review }}
+        run: |
+          {
+            echo "### App Store build promotion"
+            echo "- Version: $VERSION_NAME"
+            echo "- Build: $BUILD_NUMBER"
+            echo "- Release tag: $RELEASE_TAG"
+            echo "- Commit: $RELEASE_COMMIT"
+            echo "- TestFlight run: $TESTFLIGHT_RUN"
+            echo "- Purchase and restore verified for build: $BUILD_NUMBER (attested by @$GITHUB_ACTOR)"
+            echo "- Submitted for review: $SUBMIT_FOR_REVIEW"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Cleanup
         if: always()
         run: |
@@ -491,8 +511,8 @@ jobs:
 
   create-release:
     name: Create Release
-    needs: [bind-release-version, deploy-testflight, deploy-app-store]
-    if: always() && (needs.deploy-testflight.result == 'success' || needs.deploy-app-store.result == 'success')
+    needs: [bind-release-version, deploy-testflight]
+    if: always() && needs.deploy-testflight.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

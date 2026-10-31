@@ -1,23 +1,5 @@
 [
   {
-    "fingerprint": "home-header-swipe-excludes-button-hit-targets",
-    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41202801363/job/124541975223",
-    "correction": "PR #1664 / LYB-139, fix-red-5df69c1e5f occurrence 21: Launch Quality fails when a single menu tap leaves Today visible. The parent header's simultaneous navigation drag still competes with its child buttons; preserve release health gating and repair the actual failed interaction.",
-    "mechanization": "Move the existing navigation drag to the full-height title region so it cannot receive touches in either header button. Extend the existing launch UI regression audit with a structural isolation rule and mutation cases rejecting all three gesture priorities on the header call site, header container or menu button, as well as lost title navigation and hit regions. The rule fails on the original Swift source before the fix. The existing required shared-lib suite executes the audit behavior tests, and Launch Quality executes the same audit and unchanged single-tap/sidebar-swipe regression. Extend that native regression to open and close the selected-day detail with one tap after sidebar navigation. Native execution remains unverified on this Linux host. The harness owns push and PR edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
-    "classification": {
-      "codebase": {
-        "feasible": true,
-        "rationale": "Attaching navigation only to the title sibling excludes both button hit regions by construction, preserving direct button touch delivery without changing feature gates, swipe destinations or release controls. The existing static and native guards retain regression coverage."
-      }
-    },
-    "guard": {
-      "path": "scripts/ios/launch-ui-regression-audit.py",
-      "anchor": "# Header navigation drags must not own either button's touch region."
-    },
-    "level": "codebase",
-    "ruleId": "code-prevention"
-  },
-  {
     "fingerprint": "fix-red-d5dac7802d",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41188544023/job/124500510040",
     "correction": "PR #1658, occurrence 3: Detect Changes rejects the new consumer health policy route as unlisted, which also fails CI Summary. Merging main conflicts in the canonical endpoint allowlist and its generated projection.",
@@ -5235,6 +5217,42 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "c2ea61458293",
+    "source": "https://linear.app/jovie/issue/LYB-334",
+    "correction": "LYB-334: App Store dispatch built a fresh main IPA while paywall verification referred to an unrelated TestFlight binary. Promote only the exact tested build, bind attestation to it, and retain its commit and producing run.",
+    "mechanization": "Separate App Store promotion from every build/tag job. Resolve the attested build through its TestFlight release tag, release evidence and successful upload/processing run; require the exact processed, valid, unexpired ASC build before pricing or submission writes. The existing required shared-lib suite executes provenance failures, workflow wiring and the actual Ruby lanes with stubbed external reads/writes. No IPA is accepted and binary upload is disabled. The harness owns push and PR operations. Machine: built .github/scripts/resolve-app-store-build.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Removing build dependencies and requiring an exact attested build at both provenance resolution and the submission lane prevents untested fresh-binary submission by construction. Existing required shared-lib tests cover refusal and promotion behavior."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/resolve-app-store-build.mjs",
+      "anchor": "// App Store promotion must resolve an attested TestFlight build, never dispatch HEAD."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "home-header-swipe-excludes-button-hit-targets",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41202801363/job/124541975223",
+    "correction": "PR #1664 / LYB-139, fix-red-5df69c1e5f occurrence 21: Launch Quality fails when a single menu tap leaves Today visible. The parent header's simultaneous navigation drag still competes with its child buttons; preserve release health gating and repair the actual failed interaction.",
+    "mechanization": "Move the existing navigation drag to the full-height title region so it cannot receive touches in either header button. Extend the existing launch UI regression audit with a structural isolation rule and mutation cases rejecting all three gesture priorities on the header call site, header container or menu button, as well as lost title navigation and hit regions. The rule fails on the original Swift source before the fix. The existing required shared-lib suite executes the audit behavior tests, and Launch Quality executes the same audit and unchanged single-tap/sidebar-swipe regression. Extend that native regression to open and close the selected-day detail with one tap after sidebar navigation. Native execution remains unverified on this Linux host. The harness owns push and PR edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Attaching navigation only to the title sibling excludes both button hit regions by construction, preserving direct button touch delivery without changing feature gates, swipe destinations or release controls. The existing static and native guards retain regression coverage."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "# Header navigation drags must not own either button's touch region."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "app-store-release-health-before-and-during-phased-rollout",
     "correction": "LYB-139: Approved versions released without a Sentry health decision, automatic Apple release bypassed the monitor, and active phased rollouts had no crash pause.",
     "source": "https://linear.app/jovie/issue/LYB-139",
@@ -5284,6 +5302,24 @@
     "guard": {
       "path": "apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift",
       "anchor": "try await AppStore.sync()\n        for _ in 0..<50"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "app-store-promotion-preserves-mandatory-release-health",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1664",
+    "correction": "PR #1664, fix-red-e3b0c44298 occurrence 68: merge origin/main without rebasing, preserve LYB-334 exact tested-build promotion and LYB-139 mandatory health gating, and prevent future promotion callers from bypassing the monitor with automatic Apple release.",
+    "mechanization": "Extend the existing submit_app_store Fastlane machine to reject every truthy automatic_release input and always submit with automatic_release false. Extend its existing required shared-lib workflow and real-Ruby behavior regressions to retain exact TestFlight identity, immutable provenance, binary-upload refusal, explicit false dispatch values and the mandatory health gate together. The new regression fails against the incoming main lane because automatic_release true writes a release-enabled submission, then passes with the lane guard; 59 promotion and release-health tests pass, including six truthy boolean spellings and malformed input. Reuse the existing source-map and correction-ledger resolvers for this merge, preserving both immutable parents. The harness retains push and PR-body ownership and must include exactly one machine line: Machine: built apps/ios/fastlane/Fastfile.release.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared promotion lane owns every submission write. Rejecting automatic release and fixing the upload option to false prevents every caller from bypassing the health monitor by construction, while existing required tests guard combined promotion and health behavior during future merges."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/fastlane/Fastfile.release",
+      "anchor": "automatic_release bypasses the App Store health gate; use the approved-release monitor"
     },
     "level": "codebase",
     "ruleId": "code-prevention"

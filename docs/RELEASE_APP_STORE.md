@@ -7,7 +7,7 @@ The engineering pipeline automates builds and submission. Human release evidence
 - App Store version **1.2.0** was `WAITING_FOR_REVIEW` in [approved-release run 41177144249](https://github.com/JovieInc/LogYourBody/actions/runs/41177144249) on 2026-10-31 at 06:35 UTC. Submission (LYB-138) has happened; this satisfies LYB-139's sequencing prerequisite. This is a dated readback, not a current approval receipt.
 - `ios-release-loop.yml` auto-builds and deploys to **TestFlight** on every push to `main` touching `apps/ios/**`. This is the build you verify against.
 - TestFlight upload waits for Apple to finish processing the build before assigning tester groups. The deploy job allows up to 60 minutes for that provider-controlled step.
-- App Store submission is gated behind `paywall_testflight_verified: true` — a deliberate manual gate so no build ships without a proven purchase/restore.
+- App Store promotion requires `build_number` and an equal `paywall_verified_build_number`, attesting that purchase and restore passed on that exact TestFlight binary. Neither input may be omitted for `release_type=app_store`; they remain optional on the shared dispatch form so TestFlight builds need no promotion inputs.
 
 ## Read-only readiness check
 
@@ -23,7 +23,7 @@ gh run list --workflow app-store-connect-readiness.yml --branch main --limit 5
 
 ## Preconditions (machine-verified, no action needed)
 
-These run inside `ios-release-loop.yml`'s `build-release` job and fail the lane if unmet:
+The TestFlight build checks subscriptions and RevenueCat. App Store promotion resolves the selected release tag and successful TestFlight producing run, then reads ASC to require the exact version/build to be processed, valid and unexpired before any ASC write:
 
 - `verify-app-store-subscriptions.rb` — subscription products exist and are in a submittable state
 - `verify_revenuecat_offerings.sh` — RevenueCat "main" offering resolves with monthly + annual packages
@@ -46,11 +46,11 @@ evidence. The committed comparison is currently **pending**. Before later
 submissions, reconcile changed answers and the archive's SDK privacy report
 against that receipt. Required Reason API declarations in PrivacyInfo remain a
 separate review. Do not submit until both privacy evidence and paywall evidence
-are complete; `paywall_testflight_verified` attests only to the purchase/restore.
+are complete; `paywall_verified_build_number` attests only to purchase/restore for the selected build.
 
 ## TestFlight purchase and restore
 
-1. **Wait for a fresh TestFlight build** from the latest `main`. Confirm it finished processing and appears in the intended tester group in App Store Connect → TestFlight.
+1. **Select a TestFlight build** from a successful `main` release-loop run. Record its CFBundleVersion, `ios-v<version>-testflight.<build_number>` release tag, source commit and producing run. Confirm it finished processing and appears in the intended tester group in App Store Connect → TestFlight. Later commits on `main` do not change the binary selected for promotion.
 2. On a real device, install that TestFlight build and run the paid path end to end:
    - Continue with Apple → complete onboarding → reach the paywall.
    - **Purchase** the monthly (or annual) subscription with a sandbox account. Confirm the app unlocks (entitlement active, weight logging reachable).
@@ -58,14 +58,16 @@ are complete; `paywall_testflight_verified` attests only to the purchase/restore
 3. Only if both purchase and restore succeed, dispatch the App Store release:
 
 ```bash
-gh workflow run ios-release-loop.yml \
+BUILD_NUMBER="<the TestFlight build number you verified>"
+gh workflow run ios-release-loop.yml --ref main \
   -f release_type=app_store \
+  -f build_number="$BUILD_NUMBER" \
+  -f paywall_verified_build_number="$BUILD_NUMBER" \
   -f submit_for_review=true \
-  -f phased_release=true \
-  -f paywall_testflight_verified=true
+  -f phased_release=true
 ```
 
-4. The loop builds, runs precheck, and submits for review with `automatic_release:false`. After Apple approves, the scheduled approved-release monitor requests release only after verified health. The already-submitted 1.2.0 Apple release setting is not changed by this workflow update; continue manual observation for that submission.
+4. The loop validates provenance and ASC processing, runs precheck, and submits the selected TestFlight build for review with binary upload disabled. No archive, signing or IPA download/upload runs on the App Store path. Its summary records the build, release-tag commit, original TestFlight run and dispatcher attestation. Missing or ambiguous tags, unpublished release evidence, failed producing runs, missing TestFlight upload/processing receipts and unprocessed or expired ASC builds fail closed. Restore missing provenance through the normal TestFlight release path; never substitute dispatch HEAD or the latest ASC build. Submission uses `automatic_release:false`; the Fastlane lane rejects automatic release so every promotion waits for the health monitor. After Apple approves, `ios-app-store-approved-release.yml` requests release only after verified health and monitors the phased rollout. The already-submitted 1.2.0 Apple release setting is not changed by this workflow update; continue manual observation for that submission.
 
 ## Watch
 

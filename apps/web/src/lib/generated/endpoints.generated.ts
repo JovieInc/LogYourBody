@@ -545,6 +545,11 @@ export const endpoints = {
         'LYB-252 source evidence for recurring correction escalation and guard-failure detection.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-334',
+      reason:
+        'LYB-334 source evidence for promoting the attested TestFlight binary without rebuilding.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-307',
       reason:
         'LYB-307 source evidence for emitted lint correction checks and recurrence-based severity.',

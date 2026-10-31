@@ -22,7 +22,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `86c9b97d1058a55f4e972f97dbeb88fe579a904b1f763df28b2a8af948e67022`)
 - `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `5a96cbfc2cbfad98715428422323ddf1dc82665fff746fda3331d93422b823d1`)
 - `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `6d4e837517b18d8d08933f7e3896a810fb932197f84e9e7dd281faba2ee76e4e`)
-- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `315faf060cb9a03623720a6db7fb780f98fceb9d3bb1abe579fa3744fa51486c`)
+- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3f1104f4c3a8d6c030f6e89f2795dcfd887998efea8a8fd9e5bcd7598cf93df0`)
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf3cd24d39d6ff980d4bbc77b5ac72c1aa00aaeb7e92065e7bd467397ac1ac51`)
 - `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `ddc9efbe68915f529f7b828c7df5a88a00b14d20883e4e7ac9268b9278780110`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)

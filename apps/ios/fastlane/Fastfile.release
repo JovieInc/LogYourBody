@@ -262,9 +262,36 @@ end
     )
   end
 
-  desc "Submit existing IPA to App Store"
-  lane :submit_app_store do |options|
+  desc "Validate an attested, processed TestFlight build before any App Store write"
+  lane :validate_app_store_build do |options|
+    version_name = options[:version_name].to_s.strip
+    build_number = options[:build_number].to_s.strip
+    verified_build = options[:paywall_verified_build_number].to_s.strip
+    UI.user_error!("version_name is required for App Store promotion") unless version_name.match?(/\A\d+\.\d+(?:\.\d+)?\z/)
+    UI.user_error!("build_number is required for App Store promotion") unless build_number.match?(/\A\d+(?:\.\d+){0,2}\z/)
+    # Bind purchase/restore evidence to the exact binary before any ASC write.
+    UI.user_error!("paywall_verified_build_number must equal build_number") unless verified_build == build_number
+    UI.user_error!("App Store promotion cannot accept an IPA") if options[:ipa_path]
+
     setup_app_store_connect_api
+    builds = Spaceship::ConnectAPI::Build.all(
+      app_id: app_store_app_id.call,
+      version: version_name,
+      build_number: build_number,
+      platform: "IOS"
+    )
+    UI.user_error!("Expected exactly one selected TestFlight build in ASC") unless builds.length == 1
+    selected = builds.first
+    unless selected.version == build_number && selected.app_version == version_name &&
+           selected.platform == "IOS" && selected.processing_state == "VALID" && selected.expired == false
+      UI.user_error!("Selected TestFlight build must match the version and be processed, valid and unexpired")
+    end
+    selected
+  end
+
+  desc "Promote an attested TestFlight build to App Store without uploading a binary"
+  lane :submit_app_store do |options|
+    validate_app_store_build(options)
 
     bool_option = lambda do |value, default|
       return default if value.nil?
@@ -281,8 +308,8 @@ end
     automatic_release = bool_option.call(options[:automatic_release], false)
     phased_release = bool_option.call(options[:phased_release], false)
 
-    if automatic_release && !submit_for_review
-      UI.user_error!("automatic_release requires submit_for_review")
+    if automatic_release
+      UI.user_error!("automatic_release bypasses the App Store health gate; use the approved-release monitor")
     end
 
     env_or_default = lambda do |key, default|
@@ -298,29 +325,24 @@ end
       notes: env_or_default.call("APP_REVIEW_NOTES", "Review access: choose Create Account, enter an email address that can receive a one-time code, accept Terms, Privacy Policy, and Health Disclaimer, then enter the email code. On LogYourBody Pro, tap Start trial; subscriptions use Apple's sandbox review environment and include a 3-day trial. After purchase or trial activation, the paid surface opens to the photo-first body-composition HUD. Add one progress photo, review the timeline and Stats view, optionally connect or skip HealthKit, then open Settings to test Restore Purchases, Manage Subscription, Export Data, and Delete Account. Apple Sign-In is hidden unless enabled for an internal cohort. If email codes, photos, HealthKit prompts, or subscription products do not load, contact support@logyourbody.com.")
     }.compact
 
-    begin
-      upload_to_app_store(
-        ipa: options[:ipa_path],
-        force: true,
-        metadata_path: "fastlane/metadata",
-        screenshots_path: "fastlane/screenshots",
-        skip_metadata: false,
-        skip_screenshots: false,
-        submit_for_review: submit_for_review,
-        automatic_release: automatic_release,
-        phased_release: phased_release,
-        app_review_information: app_review_information,
-        run_precheck_before_submit: false,
-        app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
-        team_id: ENV["APPLE_TEAM_ID"]
-      )
-    rescue => e
-      if submit_for_review && e.message.include?("A review submission is already in progress")
-        UI.success("App Store review submission is already in progress; treating as submitted.")
-      else
-        raise
-      end
-    end
+    upload_to_app_store(
+      app_version: options[:version_name].to_s.strip,
+      build_number: options[:build_number].to_s.strip,
+      platform: "ios",
+      skip_binary_upload: true,
+      force: true,
+      metadata_path: "fastlane/metadata",
+      screenshots_path: "fastlane/screenshots",
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: submit_for_review,
+      automatic_release: false,
+      phased_release: phased_release,
+      app_review_information: app_review_information,
+      run_precheck_before_submit: false,
+      app_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
+      team_id: ENV["APPLE_TEAM_ID"]
+    )
   end
 
   desc "Deploy to App Store (build + upload)"
