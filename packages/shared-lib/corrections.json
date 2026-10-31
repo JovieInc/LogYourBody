@@ -5215,5 +5215,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "c2ea61458293",
+    "source": "https://linear.app/jovie/issue/LYB-334",
+    "correction": "LYB-334: App Store dispatch built a fresh main IPA while paywall verification referred to an unrelated TestFlight binary. Promote only the exact tested build, bind attestation to it, and retain its commit and producing run.",
+    "mechanization": "Separate App Store promotion from every build/tag job. Resolve the attested build through its TestFlight release tag, release evidence and successful upload/processing run; require the exact processed, valid, unexpired ASC build before pricing or submission writes. The existing required shared-lib suite executes provenance failures, workflow wiring and the actual Ruby lanes with stubbed external reads/writes. No IPA is accepted and binary upload is disabled. The harness owns push and PR operations. Machine: built .github/scripts/resolve-app-store-build.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Removing build dependencies and requiring an exact attested build at both provenance resolution and the submission lane prevents untested fresh-binary submission by construction. Existing required shared-lib tests cover refusal and promotion behavior."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/resolve-app-store-build.mjs",
+      "anchor": "// App Store promotion must resolve an attested TestFlight build, never dispatch HEAD."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

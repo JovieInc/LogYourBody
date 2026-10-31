@@ -22,13 +22,13 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `86c9b97d1058a55f4e972f97dbeb88fe579a904b1f763df28b2a8af948e67022`)
 - `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `5a96cbfc2cbfad98715428422323ddf1dc82665fff746fda3331d93422b823d1`)
 - `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `a43b7fb870bb423c0f2a2758e36cf4cdc09e9cf3186cd18c81c3592def9abf60`)
-- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `8859af8a1c558477783f6e65404979f08d46900af22e0a1932d4bfbbaa4cdc93`)
+- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4df821426254f9f1396d71b9c6f7e4eaf81943aa5182c21d6b75b29947809414`)
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf3cd24d39d6ff980d4bbc77b5ac72c1aa00aaeb7e92065e7bd467397ac1ac51`)
 - `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `ddc9efbe68915f529f7b828c7df5a88a00b14d20883e4e7ac9268b9278780110`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `9bc7b407391f7f787fae4bbb1bb04b98bdb28a0be484a88733419a5299b08cdd`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0f5b2f05e66e04105ed6b858cf3dcc041a75a9d2ade482589dbaebf11a149afe`)
 
 ### `apps/web/package.json`: engines
 
@@ -124,7 +124,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "embla-carousel-react": "^8.6.0",
   "exifr": "^7.1.3",
   "framer-motion": "^14.0.0",
-  "glob": "^11.1.0",
+  "glob": "^14.0.2",
   "idb": "^8.0.3",
   "input-otp": "^1.5.0",
   "jose": "^6.2.14",
