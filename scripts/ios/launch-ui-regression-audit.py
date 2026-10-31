@@ -402,6 +402,24 @@ def main() -> int:
         violations=violations,
     )
 
+    # Header navigation drags must not own either button's touch region.
+    hud_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
+    hud = hud_path.read_text()
+    header_call = hud.split("photoTimelineRootNavigation\n", 1)[-1].split("photoTimelineHomeContent\n", 1)[0]
+    header = hud.split("private var photoTimelineRootNavigation: some View {", 1)[-1].split(
+        "private var photoTimelineSwipe:", 1
+    )[0]
+    title = header.split("VStack(spacing: 2) {", 1)[-1].split("if isHomeV2CheckIn {", 1)[0]
+    gesture = re.compile(r"\.(?:gesture|simultaneousGesture|highPriorityGesture)\s*\(")
+    if (gesture.search(header_call) or gesture.search(header.replace(title, ""))
+            or ".gesture(photoTimelineSwipe)" not in title
+            or ".contentShape(Rectangle())" not in title
+            or "minHeight: JovieTokens.minimumHitTarget" not in title):
+        violations.append(AuditViolation(
+            check="timeline.header_swipe_excludes_buttons", file=str(hud_path.relative_to(root)), line=1,
+            detail="Attach the header swipe only to the full-height title hit region, outside the menu and detail buttons.",
+        ))
+
     checkin_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
     checkin_card = checkin_path.read_text().split("var hudGlp1WeeklyCheckIn:", 1)[-1].split(
         "var isPhaseInsightEnabled:", 1

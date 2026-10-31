@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "home-header-swipe-excludes-button-hit-targets",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41202801363/job/124541975223",
+    "correction": "PR #1664 / LYB-139, fix-red-5df69c1e5f occurrence 21: Launch Quality fails when a single menu tap leaves Today visible. The parent header's simultaneous navigation drag still competes with its child buttons; preserve release health gating and repair the actual failed interaction.",
+    "mechanization": "Move the existing navigation drag to the full-height title region so it cannot receive touches in either header button. Extend the existing launch UI regression audit with a structural isolation rule and mutation cases rejecting all three gesture priorities on the header call site, header container or menu button, as well as lost title navigation and hit regions. The rule fails on the original Swift source before the fix. The existing required shared-lib suite executes the audit behavior tests, and Launch Quality executes the same audit and unchanged single-tap/sidebar-swipe regression. Extend that native regression to open and close the selected-day detail with one tap after sidebar navigation. Native execution remains unverified on this Linux host. The harness owns push and PR edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Attaching navigation only to the title sibling excludes both button hit regions by construction, preserving direct button touch delivery without changing feature gates, swipe destinations or release controls. The existing static and native guards retain regression coverage."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "# Header navigation drags must not own either button's touch region."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-d5dac7802d",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41188544023/job/124500510040",
     "correction": "PR #1658, occurrence 3: Detect Changes rejects the new consumer health policy route as unlisted, which also fails CI Summary. Merging main conflicts in the canonical endpoint allowlist and its generated projection.",
