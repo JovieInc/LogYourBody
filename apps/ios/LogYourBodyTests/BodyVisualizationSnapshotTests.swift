@@ -2,8 +2,7 @@ import XCTest
 @testable import LogYourBody
 
 @MainActor
-final class BodyVisualizationSnapshotTests: XCTestCase {
-    let account = "fixture-account"
+final class BodyVisualizationSnapshotTests: BodyVisualizationSnapshotFixtureCase {
     private let ownerId = "11111111-1111-4111-8111-111111111111"
 
     func testSyntheticFixturesCoverSparseDatesConflictsAndLineage() async throws {
@@ -31,10 +30,11 @@ final class BodyVisualizationSnapshotTests: XCTestCase {
         let repeated = try await schedule(harness, request: dexRequest(at: day(0)))
         XCTAssertEqual(repeated.snapshot.id, early.snapshot.id)
         XCTAssertEqual(repeated.job.id, early.job.id)
-        XCTAssertEqual(try await harness.ledger.snapshotCount(accountId: account), 2)
+        let storedCount = try await harness.ledger.snapshotCount(accountId: account)
+        XCTAssertEqual(storedCount, 2)
 
         let conflict = try await schedule(harness, request: request(evidence: [
-            evidence("height", role: .height, magnitude: 164.5, unit: "cm", confidence: 0.4),
+            evidence("height", role: .height, confidence: 0.4, magnitude: 164.5, unit: "cm"),
             evidence("weight-a", role: .weight, confidence: 0.5, conflictIds: ["weight-b"]),
             evidence("weight-b", role: .weight, confidence: 0.5, conflictIds: ["weight-a"]),
             evidence("fat", role: .bodyFat, confidence: 0.5)
@@ -133,7 +133,7 @@ final class BodyVisualizationSnapshotTests: XCTestCase {
         let first = try await schedule(harness, request: request(evidence: baseEvidence(), at: day(0), model: model("v1")))
         let second = try await schedule(harness, request: request(evidence: baseEvidence(), at: day(4), model: model("v1")))
         XCTAssertTrue(BodyVisualizationConsumer.progressComparisonAllowed(first.snapshot, second.snapshot))
-        var bridged = request(evidence: [], at: day(2), representation: .transitionalInterpolation)
+        var bridged = request(evidence: [], representation: .transitionalInterpolation, at: day(2))
         bridged.interpolationEndpointIds = [first.snapshot.id, second.snapshot.id]
         let bridge = try await schedule(harness, request: bridged)
         XCTAssertEqual(bridge.snapshot.representation, .transitionalInterpolation)
@@ -264,7 +264,8 @@ final class BodyVisualizationSnapshotTests: XCTestCase {
         try await harness.ledger.bind(switched)
         let crossed = try await harness.ledger.finish(jobId: scheduled.job.id, permit: permit)
         XCTAssertEqual(crossed, .rejected(.accountMismatch))
-        XCTAssertEqual(try await harness.ledger.snapshotCount(accountId: "other-account"), 0)
+        let otherSnapshots = try await harness.ledger.snapshotCount(accountId: "other-account")
+        XCTAssertEqual(otherSnapshots, 0)
 
         try await harness.ledger.bind(permit)
         var nextGeneration = permit
@@ -393,7 +394,8 @@ final class BodyVisualizationSnapshotTests: XCTestCase {
         } catch {
             XCTFail("unexpected \(error)")
         }
-        XCTAssertEqual(try await harness.ledger.snapshotCount(accountId: account), 0)
+        let gatedCount = try await harness.ledger.snapshotCount(accountId: account)
+        XCTAssertEqual(gatedCount, 0)
 
         let open = BodyVisualizationEntry(
             isEnabled: { true },

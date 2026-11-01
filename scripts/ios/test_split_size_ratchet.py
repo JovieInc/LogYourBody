@@ -84,6 +84,65 @@ class SplitSizeRatchetTests(unittest.TestCase):
         self.assertIn("enum BodyVisualizationComposer", composer)
         self.assertNotIn("enum BodyVisualizationComposer", snapshot)
 
+    def test_rehome_turns_a_split_extension_into_a_superclass(self):
+        suite = (
+            "import XCTest\n\n"
+            "final class SampleTests: XCTestCase {\n"
+            '    private let account = "a"\n'
+            '    private let ownerId = "owner"\n'
+            "    func testKeepsOwner() {\n"
+            "        _ = account\n"
+            "        _ = ownerId\n"
+            "    }\n"
+            "}\n"
+        )
+        companion = (
+            "import XCTest\n\n"
+            "extension SampleTests {\n"
+            "    func helper() -> String { account }\n"
+            "}\n"
+        )
+        suite_out, companion_out = ratchet.rehome_suite_extension(suite, companion)
+        self.assertIn("final class SampleTests: SampleFixtureCase {", suite_out)
+        self.assertNotIn("let account", suite_out)
+        self.assertIn('private let ownerId = "owner"', suite_out)
+        self.assertIn("class SampleFixtureCase: XCTestCase {", companion_out)
+        self.assertIn('let account = "a"', companion_out)
+        self.assertNotIn("private let account", companion_out)
+        self.assertNotIn("extension SampleTests", companion_out)
+        self.assertNotIn("ownerId", companion_out)
+
+    def test_pack_rehomes_a_suite_extension_instead_of_stranding_it(self):
+        source = (
+            "import XCTest\n\n"
+            "final class SampleTests: XCTestCase {\n"
+            '    let account = "a"\n'
+            "    func testOne() { _ = account }\n"
+            "}\n\n"
+            "extension SampleTests {\n"
+            "    func helper() -> String { account }\n"
+            "}\n"
+        )
+        limit = ratchet.line_count(source) - 1
+        bodies = ratchet.pack(source, limit)
+        self.assertGreater(len(bodies), 1)
+        self.assertEqual(ratchet.stranded_suite_extensions(bodies), [])
+        self.assertNotIn("extension SampleTests", "\n".join(bodies))
+        self.assertTrue(any("class SampleFixtureCase: XCTestCase" in body for body in bodies))
+        self.assertTrue(any("class SampleTests: SampleFixtureCase" in body for body in bodies))
+
+    def test_visualization_fixtures_are_an_independent_suite(self):
+        suite = (ROOT / OWNED[2]).read_text()
+        fixture = (ROOT / OWNED[3]).read_text()
+        self.assertNotIn("extension BodyVisualizationSnapshotTests", fixture)
+        self.assertIn("class BodyVisualizationSnapshotFixtureCase: XCTestCase", fixture)
+        self.assertIn(
+            "final class BodyVisualizationSnapshotTests: BodyVisualizationSnapshotFixtureCase",
+            suite,
+        )
+        self.assertIn('let account = "fixture-account"', fixture)
+        self.assertNotIn('let account = "fixture-account"', suite)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(SplitSizeRatchetTests)

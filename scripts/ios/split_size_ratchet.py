@@ -3,7 +3,9 @@
 
 Company guards reject a new file over 500 lines. This packs whole top-level
 types into sibling files. It refuses to cut inside a type: extract that piece
-by hand, then run again. It does not edit the Xcode project.
+by hand, then run again. A split that would leave an XCTestCase extension in
+another file rehomes that extension onto an independent superclass instead.
+It does not edit the Xcode project.
 """
 import argparse
 import re
@@ -149,10 +151,154 @@ def _too_big(chunk, limit):
     )
 
 
-def pack(text, limit=LIMIT):
-    """Return sibling file bodies. The first body keeps the original header."""
-    if line_count(text) <= limit:
-        return [text]
+_PROPERTY = re.compile(
+    r"^[ \t]*(?:(?:public|open|internal|fileprivate|private|static|class|final|lazy)[ \t]+)*"
+    r"(?:let|var)[ \t]+([A-Za-z_]\w*)\b"
+)
+_SUITE_CLASS = re.compile(
+    r"(?m)^[ \t]*(?:final[ \t]+)?class[ \t]+(\w+)[ \t]*:[ \t]*(?:XCTest\.)?XCTestCase\b"
+)
+_EXTENSION_LINE = re.compile(r"(?m)^[ \t]*extension[ \t]+(\w+)\b")
+
+
+def fixture_case_name(suite_name):
+    """Independent superclass name for helpers that must leave a suite file."""
+    if suite_name.endswith("Tests") and len(suite_name) > len("Tests"):
+        return suite_name[: -len("Tests")] + "FixtureCase"
+    return suite_name + "FixtureCase"
+
+
+def _declaration_at(text, open_at):
+    line_start = text.rfind("\n", 0, open_at) + 1
+    return text[line_start:open_at]
+
+
+def _suite_brace(text, name):
+    pattern = re.compile(
+        r"\bclass\s+" + re.escape(name) + r"\s*:\s*(?:XCTest\.)?XCTestCase\b"
+    )
+    for open_at, close_at in top_level_braces(text):
+        if pattern.search(_declaration_at(text, open_at)):
+            return open_at, close_at
+    return None
+
+
+def _extension_brace(text):
+    for open_at, close_at in top_level_braces(text):
+        match = re.search(r"\bextension\s+(\w+)\s*$", _declaration_at(text, open_at))
+        if match:
+            return match.group(1), open_at, close_at
+    return None
+
+
+def _leading_properties(text, open_at):
+    found = []
+    for line in text[open_at + 1 :].splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped == "" or stripped.startswith(("//", "///")):
+            continue
+        match = _PROPERTY.match(line)
+        if not match:
+            break
+        found.append((match.group(1), line))
+    return found
+
+
+def _widen_property(line):
+    """A superclass in another file cannot keep file-private stored state."""
+    return re.sub(r"\b(?:private|fileprivate)[ \t]+", "", line, count=1)
+
+
+def _rehome(suite_text, extension_text, name, ext_open, ext_close):
+    suite_brace = _suite_brace(suite_text, name)
+    if suite_brace is None:
+        raise ValueError(name + " is not an XCTestCase in the suite file")
+    same_file = suite_text == extension_text
+    ext_body = extension_text[ext_open + 1 : ext_close]
+    movable = [
+        (prop, line)
+        for prop, line in _leading_properties(suite_text, suite_brace[0])
+        if re.search(r"\b" + re.escape(prop) + r"\b", ext_body)
+    ]
+    case_name = fixture_case_name(name)
+    new_suite = suite_text
+    for _prop, line in movable:
+        new_suite = new_suite.replace(line, "", 1)
+    new_suite = re.sub(
+        r"(\bclass\s+" + re.escape(name) + r"\s*:\s*)(?:XCTest\.)?XCTestCase\b",
+        r"\1" + case_name,
+        new_suite,
+        count=1,
+    )
+    prop_block = "".join(_widen_property(line) for _prop, line in movable)
+    if same_file:
+        new_suite = new_suite.replace(
+            "extension " + name + " {",
+            "class " + case_name + ": XCTestCase {",
+            1,
+        )
+        needle = "class " + case_name + ": XCTestCase {"
+        brace = new_suite.find(needle)
+        if brace < 0:
+            raise ValueError("rehome lost the fixture case declaration")
+        insert_at = new_suite.find("{", brace) + 1
+        if new_suite[insert_at : insert_at + 1] == "\n":
+            insert_at += 1
+        return new_suite[:insert_at] + prop_block + new_suite[insert_at:], new_suite
+    new_ext = extension_text.replace(
+        "extension " + name + " {",
+        "class " + case_name + ": XCTestCase {",
+        1,
+    )
+    needle = "class " + case_name + ": XCTestCase {"
+    brace = new_ext.find(needle)
+    if brace < 0:
+        raise ValueError("rehome lost the fixture case declaration")
+    insert_at = new_ext.find("{", brace) + 1
+    if new_ext[insert_at : insert_at + 1] == "\n":
+        insert_at += 1
+    new_ext = new_ext[:insert_at] + prop_block + new_ext[insert_at:]
+    return new_suite, new_ext
+
+
+def rehome_suite_extension(suite_text, extension_text):
+    """Move a cross-file XCTestCase extension onto an independent superclass."""
+    found = _extension_brace(extension_text)
+    if found is None:
+        raise ValueError("companion file has no XCTestCase extension to rehome")
+    name, ext_open, ext_close = found
+    return _rehome(suite_text, extension_text, name, ext_open, ext_close)
+
+
+def rehome_extensions_in_source(text):
+    """Rehome a same-file XCTestCase extension before a split can strand it."""
+    found = _extension_brace(text)
+    if found is None:
+        return text
+    name, ext_open, ext_close = found
+    if _suite_brace(text, name) is None:
+        return text
+    rewritten, _same = _rehome(text, text, name, ext_open, ext_close)
+    return rewritten
+
+
+def stranded_suite_extensions(bodies):
+    """Names of XCTestCase extensions that landed outside their suite file."""
+    suites = {}
+    extensions = []
+    for index, body in enumerate(bodies):
+        for match in _SUITE_CLASS.finditer(body):
+            suites[match.group(1)] = index
+        for match in _EXTENSION_LINE.finditer(body):
+            extensions.append((index, match.group(1)))
+    return [
+        name
+        for index, name in extensions
+        if name in suites and suites[name] != index
+    ]
+
+
+def _pack_types(text, limit):
     header, chunks = declaration_chunks(text)
     extra_header = _second_header(header)
     files = []
@@ -175,6 +321,28 @@ def pack(text, limit=LIMIT):
         current += "\n"
     files.append(current)
     return files
+
+
+def pack(text, limit=LIMIT):
+    """Return sibling file bodies. The first body keeps the original header."""
+    if line_count(text) <= limit:
+        return [text]
+    bodies = _pack_types(text, limit)
+    if not stranded_suite_extensions(bodies):
+        return bodies
+    rewritten = rehome_extensions_in_source(text)
+    if rewritten == text:
+        raise ValueError(
+            "split would leave a cross-file XCTestCase extension; "
+            "use an independent XCTestCase"
+        )
+    bodies = _pack_types(rewritten, limit)
+    if stranded_suite_extensions(bodies):
+        raise ValueError(
+            "split would leave a cross-file XCTestCase extension; "
+            "use an independent XCTestCase"
+        )
+    return bodies
 
 
 def output_paths(source, bodies):
@@ -207,13 +375,37 @@ def apply_split(source, limit=LIMIT, dry_run=False):
     return paths
 
 
+def apply_rehome(suite, companion):
+    suite = Path(suite)
+    companion = Path(companion)
+    suite_text, companion_text = rehome_suite_extension(suite.read_text(), companion.read_text())
+    suite.write_text(suite_text)
+    companion.write_text(companion_text)
+    return suite, companion
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path, help="Swift file to split")
     parser.add_argument("--limit", type=int, default=LIMIT)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--rehome-extension",
+        type=Path,
+        help="Rehome this cross-file XCTestCase extension onto an independent superclass",
+    )
     args = parser.parse_args()
     try:
+        if args.rehome_extension:
+            suite_text, companion_text = rehome_suite_extension(
+                args.source.read_text(), args.rehome_extension.read_text()
+            )
+            if not args.dry_run:
+                args.source.write_text(suite_text)
+                args.rehome_extension.write_text(companion_text)
+            print(args.source.name + ": " + str(line_count(suite_text)) + " lines")
+            print(args.rehome_extension.name + ": " + str(line_count(companion_text)) + " lines")
+            return
         paths = apply_split(args.source, args.limit, args.dry_run)
         bodies = pack(args.source.read_text(), args.limit) if args.dry_run else None
     except (OSError, ValueError) as exc:

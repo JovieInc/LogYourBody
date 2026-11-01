@@ -2,7 +2,8 @@ import XCTest
 @testable import LogYourBody
 
 @MainActor
-extension BodyVisualizationSnapshotTests {
+class BodyVisualizationSnapshotFixtureCase: XCTestCase {
+    let account = "fixture-account"
     struct Harness {
         var root: URL
         var ledger: BodyVisualizationLedger
@@ -102,7 +103,12 @@ extension BodyVisualizationSnapshotTests {
     }
 
     func dexRequest(at date: Date) -> BodyVisualizationRequest {
-        request(evidence: baseEvidence(), at: date, representation: .personalizedInferredGeometry, geometryKnown: true)
+        request(
+            evidence: baseEvidence(),
+            representation: .personalizedInferredGeometry,
+            geometryKnown: true,
+            at: date
+        )
     }
 
     func request(
