@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "marketing-assets-reject-future-capture-provenance",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1685",
+    "correction": "PR #1685 / LYB-277, fix-red-95726c4f82 occurrence 10: merge origin/main without rebasing and preserve verbatim program-revision rationale. Merge-group run 41290991865 fails marketing screenshot freshness because synthetic Git history emits a future capture date; Tently separately reports an AI-provider outage.",
+    "mechanization": "Merge main's hash-bound provenance repair and resolve the correction ledger with the existing classifier, retaining all 282 parent receipts. Extend the same marketing asset generator to reject future timestamps in retained manifests and complete Git history, recovering from complete history when possible. Four real-generator regressions fail against the merged main generator and pass after the extension; the existing required web suite runs them without changing its nonfuture or 60-day freshness gates. Run the extended generator on this checkout and retain the unchanged canonical capture manifest. The harness retains push and PR-body ownership and must add exactly one line: Machine: built scripts/marketing/sync-ios-marketing-assets.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator owns capture timestamp admission and can prevent future provenance from reaching its generated manifest, including when a saved timestamp matches the source hash. Incomplete or future Git evidence must fail rather than refresh the asset's age."
+      }
+    },
+    "guard": {
+      "path": "scripts/marketing/sync-ios-marketing-assets.mjs",
+      "anchor": "Date.parse(previous.capturedAt) <= latestCaptureTime"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "marketing-assets-git-capture-instant",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41290965357",
     "correction": "PR #1683 / LYB-293, fix-red-e3b0c44298 occurrence 75: the complete-history marketing provenance fixture compares ISO timestamp spelling, so Git 2.56's UTC Z output fails against the equivalent +00:00 fixture on the repaired head.",
