@@ -159,3 +159,103 @@ elif lock.read_text() != 'resolved lock\\n':
     });
   }
 }
+
+function jsonConflict(t, base, ours, theirs, path = 'config/inputs.json') {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-json-union-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+  mkdirSync(dirname(join(root, path)), { recursive: true });
+  const commit = (content) => {
+    writeFileSync(join(root, path), content);
+    git('add', path);
+    git('commit', '-qm', 'fixture');
+  };
+  git('init', '-q', '-b', 'feature');
+  git('config', 'core.hooksPath', '/dev/null');
+  commit(base);
+  git('switch', '-qc', 'incoming');
+  commit(theirs);
+  git('switch', '-q', 'feature');
+  commit(ours);
+  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: root, env });
+  assert.equal(merge.status, 1, 'fixture must contain a real merge conflict');
+  const resolve = () => spawnSync('python3', [
+    resolver, '--root', root, '--union-json', path,
+  ], { env, encoding: 'utf8' });
+  return { root, git, path, resolve };
+}
+
+const jsonBase = '{\n  "items": ["a", "b"],\n  "n": 1\n}\n';
+const jsonOurs = '{\n  "items": ["a", "x", "b"],\n  "n": 1,\n  "ours": true\n}\n';
+const jsonTheirs = '{\n  "items": ["a", "b", "y"],\n  "nested": {"z": 1},\n  "n": 1\n}\n';
+
+test('json union keeps branch order and incoming additions without staging', (t) => {
+  const f = jsonConflict(t, jsonBase, jsonOurs, jsonTheirs);
+  writeFileSync(join(f.root, f.path), 'Unrelated working edits must survive.\n');
+  const index = f.git('ls-files', '--stage');
+  const result = f.resolve();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, [
+    '{',
+    '  "items": [',
+    '    "a",',
+    '    "x",',
+    '    "b",',
+    '    "y"',
+    '  ],',
+    '  "nested": {',
+    '    "z": 1',
+    '  },',
+    '  "n": 1,',
+    '  "ours": true',
+    '}',
+    '',
+  ].join('\n'));
+  assert.equal(f.git('ls-files', '--stage'), index);
+  assert.equal(readFileSync(join(f.root, f.path), 'utf8'), 'Unrelated working edits must survive.\n');
+  assert.equal(f.resolve().stdout, result.stdout, 'repeated generation uses immutable index stages');
+});
+
+test('json union preserves a duplicate inherited from the merge base', (t) => {
+  const base = '{\n  "items": ["a", "a", "b"]\n}\n';
+  const ours = '{\n  "items": ["a", "a", "x", "b"]\n}\n';
+  const theirs = '{\n  "items": ["a", "a", "b", "y"]\n}\n';
+  const result = jsonConflict(t, base, ours, theirs).resolve();
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout).items, ['a', 'a', 'x', 'b', 'y']);
+});
+
+for (const [name, ours, theirs, pattern] of [
+  ['list deletion', jsonBase.replace('"b"', '"z"'), jsonTheirs, /list deletions or reorders/],
+  ['list reorder', jsonBase.replace('["a", "b"]', '["b", "a"]'), jsonTheirs, /list deletions or reorders/],
+  ['scalar replacement', jsonOurs.replace('"n": 1', '"n": 2'), jsonTheirs, /conflicting replacement/],
+  ['duplicate values', jsonOurs.replace('["a", "x", "b"]', '["a", "x", "x", "b"]'), jsonTheirs, /duplicate/],
+  ['conflict markers', jsonOurs, jsonTheirs.replace('\n  "n": 1\n', '\n<<<<<<< incoming\n  "n": 1\n'), /conflict markers/],
+]) {
+  test(`json union refuses ${name} without changing files or index`, (t) => {
+    const f = jsonConflict(t, jsonBase, ours, theirs);
+    const before = readFileSync(join(f.root, f.path), 'utf8');
+    const index = f.git('ls-files', '--stage');
+    const result = f.resolve();
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, pattern);
+    assert.equal(result.stdout, '');
+    assert.equal(readFileSync(join(f.root, f.path), 'utf8'), before);
+    assert.equal(f.git('ls-files', '--stage'), index);
+  });
+}
+
+test('json union requires an active conflict and a regular json path', (t) => {
+  const f = jsonConflict(t, jsonBase, jsonOurs, jsonTheirs);
+  for (const path of ['../escape.json', 'AGENTS.md', 'docs/engineering/selection.md']) {
+    const result = spawnSync('python3', [resolver, '--root', f.root, '--union-json', path], { env, encoding: 'utf8' });
+    assert.notEqual(result.status, 0, path);
+  }
+  const blob = f.git('rev-parse', `:3:${f.path}`).trim();
+  execFileSync('git', ['update-index', '--index-info'], {
+    cwd: f.root, env, input: `120000 ${blob} 3\t${f.path}\n`,
+  });
+  assert.match(f.resolve().stderr, /regular indexed files/);
+  f.git('merge', '--abort');
+  assert.notEqual(f.resolve().status, 0, 'ordinary commits cannot generate a merge');
+});

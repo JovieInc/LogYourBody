@@ -323,6 +323,17 @@ print(json.dumps({'accepted': 1, 'rejected': len(failures)}))
     );
     const result = JSON.parse(execFileSync('ruby', [script], { encoding: 'utf8' }));
     expect(result.cases).toBe(2);
+    expect(result.rejected).toBe(1);
+  });
+  it('fails the archived IPA check when an embedded extension version differs', () => {
+    const script = fileURLToPath(
+      new URL('../../../scripts/ios/test_embedded_bundle_versions.py', import.meta.url),
+    );
+    const result = JSON.parse(execFileSync('python3', [script], { encoding: 'utf8' }));
+    expect(result.rejected).toEqual(
+      expect.arrayContaining(['mismatched-build', 'mismatched-marketing-version']),
+    );
+    expect(result.accepted).toEqual(expect.arrayContaining(['matching-appex', 'no-appex']));
   });
   it('creates the Apple Distribution certificate the release lanes sign with', () => {
     const script = fileURLToPath(

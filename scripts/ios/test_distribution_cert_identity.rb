@@ -224,10 +224,17 @@ begin
   cases += 1
 
   reset_records
+  ENV['RELEASE_BUILD_NUMBER'] = '20261101140020'
+  ENV['RELEASE_MARKETING_VERSION'] = '1.2.0'
   build_release
   check(MATCH_CALLS.size == 1, 'release archive did not sync provisioning once')
   check(MATCH_CALLS.fetch(0)[:readonly] == true, 'release archive provisioning can create certificates')
   check(MATCH_CALLS.fetch(0)[:type] == 'appstore', 'release archive changed match type')
+  release_xcargs = BUILDS.fetch(0)[:xcargs].to_s
+  check(release_xcargs.include?('CURRENT_PROJECT_VERSION=20261101140020'),
+        'build_release did not stamp the pinned build number')
+  check(release_xcargs.include?('MARKETING_VERSION=1.2.0'),
+        'build_release did not stamp the pinned marketing version')
   release_identities = SIGNING.map { |signing| signing[:code_sign_identity] }
   check(release_identities == [RELEASE_IDENTITY], "build_release signs with #{release_identities.inspect}")
   check(release_identities.all? { |identity| identity == renewal_identity },
