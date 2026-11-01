@@ -1,5 +1,41 @@
 [
   {
+    "fingerprint": "weekly-photo-prompt-keeps-provenance-chip-tappable",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 4: Launch Quality run 41336887265 fails testProgressShareKeepsSelectedMetricAndVisibleValue because the weekly photo prompt sits between the photo pager and the provenance chip, pushing the chip under the dock on a 393 by 852 phone. The tap reaches the dock, so the provenance sheet never appears. Tently reports an AI-provider outage and stays unchanged.",
+    "mechanization": "Render the weekly photo prompt inside the photo number block immediately after the provenance chip, so the chip keeps its pre-prompt position above the dock and the prompt still shows without replacing the check-in dock. Extend the existing launch UI regression audit, through its home-interaction sibling, to reject a prompt that renders before the chip. That mutation fails on the old order and passes after the move. Origin/main is already merged as d28b97ba6. Native XCTest stays unverified on this Linux host. The harness owns push and PR-body edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The home column renders the prompt after the provenance chip, so the chip stays above the dock instead of being pushed into the check-in control."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "Place the weekly photo prompt after the provenance chip so the chip stays above the dock."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "synthetic-chat-typing-refocuses-dropped-keyboard",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 4: Launch Quality run 41336887265 fails testHomeV2AskSyntheticCancelledTurnRecovers because submitSyntheticChatQuestion calls typeText after the keyboard drops. The composer holds only S and event synthesis aborts the test before the retry loop. Tently reports an AI-provider outage and stays unchanged.",
+    "mechanization": "Inside the synthetic character loop, refocus the composer and wait for the keyboard when it is absent, then enter the next character. Stop the loop without sending a partial question if the keyboard never returns. Extend the existing launch UI regression audit so a character loop that enters text before checking keyboard.exists is rejected. The mutation fails when that check is removed and passes with it. The harness owns push and PR-body edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The character loop refocuses and confirms the keyboard before each character, so a dropped keyboard no longer aborts event synthesis on the first unfocused character."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "Refocus the composer when the keyboard drops before each synthetic character."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "marketing-assets-reject-future-capture-provenance",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1685",
     "correction": "PR #1685 / LYB-277, fix-red-95726c4f82 occurrence 10: merge origin/main without rebasing and preserve verbatim program-revision rationale. Merge-group run 41290991865 fails marketing screenshot freshness because synthetic Git history emits a future capture date; Tently separately reports an AI-provider outage.",

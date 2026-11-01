@@ -118,6 +118,13 @@ def check_timeline_calendar_day(root: Path, violations: list[AuditViolation]) ->
     module.check(root, violations, line_number, function_body, AuditViolation)
 
 
+def check_home_interaction(root: Path, app_dir: Path, violations: list[AuditViolation]) -> None:
+    path = Path(__file__).with_name("launch_ui_home_interaction_audit.py")
+    spec = importlib.util.spec_from_file_location("launch_ui_home_interaction_audit", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.check(root, app_dir, violations, function_body, AuditViolation)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -444,6 +451,7 @@ def main() -> int:
 
     # Timeline positions follow the injected calendar day, not elapsed 86400-second offsets.
     check_timeline_calendar_day(root, violations)
+    check_home_interaction(root, app_dir, violations)
 
     write_outputs(args.artifact_dir, violations)
     if violations:

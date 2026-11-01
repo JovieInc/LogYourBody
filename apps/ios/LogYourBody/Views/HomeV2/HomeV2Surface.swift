@@ -55,9 +55,6 @@ struct HomeV2Surface: View {
                         unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto,
                         isNavigating: isPhotoScrubNavigating || showsProvenance
                     )
-                    if let weeklyPhotoPrompt {
-                        WeeklyPhotoCheckInPrompt(prompt: weeklyPhotoPrompt, onAdd: onAddWeeklyPhoto)
-                    }
                     photoNumberBlock
                     if hasAnyPhotoInHistory {
                         HomeV2DisclosureLink(
@@ -155,6 +152,9 @@ struct HomeV2Surface: View {
 
             if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
                 HomeV2ProvenanceChip(detail: provenance) { showsProvenance = true }
+            }
+            if let weeklyPhotoPrompt {
+                WeeklyPhotoCheckInPrompt(prompt: weeklyPhotoPrompt, onAdd: onAddWeeklyPhoto)
             }
 
             if HomeV2EditorialPolicy.bodyFat(in: metric) == nil {
