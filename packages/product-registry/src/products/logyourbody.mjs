@@ -115,6 +115,7 @@ export const logYourBody = {
       apple: { appStore: 'https://apps.apple.com/us/app/logyourbody/id6755209876' },
     },
     allowlist: [
+      { value: 'https://app.bodyspec.com', reason: 'LYB-246 public OpenAPI and Scalar docs for the BodySpec capability finding. Host only; not a new runtime endpoint.' },
       { value: 'https://www.atg.wa.gov/file-complaint', reason: 'Washington Attorney General complaint link in the supplied consumer health data privacy policy.' },
       { value: 'https://linear.app/jovie/issue/LYB-328', reason: 'LYB-328 source review and counsel handoff for health-data consent and wellness claims; not a runtime endpoint.' },
       { value: 'https://app.leg.wa.gov/RCW/default.aspx?cite=19.373&full=true', reason: 'Washington My Health My Data Act primary source for the LYB-328 review; not a runtime endpoint.' },

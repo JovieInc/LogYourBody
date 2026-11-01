@@ -21,7 +21,7 @@ web_pattern='^(agent/|evals/|apps/web/|packages/|\.github/actions/|\.github/scri
 ios_pattern='^(apps/ios/|scripts/ios/|\.github/actions/(setup-ios-build|setup-ruby-bundler)/|\.github/scripts/(mac-lane\.sh|detect-changes\.sh)$|\.github/workflows/(ci|mac-lane|mac-lane-route)\.yml$|\.github/workflows/ios-(unit|quality)\.yml$)'
 # Release signing provisioning. An unknown diff selects it: matches() is true
 # when the base and head cannot be compared, so a missing diff never skips it.
-signing_pattern='^(apps/ios/fastlane/|(.*/)?project\.pbxproj$|.*\.entitlements$|\.github/scripts/release-signing-provisioned\.mjs$|\.github/scripts/release-signing-provisioned\.test\.mjs$|\.github/scripts/release-match-identifiers\.rb$|\.github/workflows/ci\.yml$)'
+signing_pattern='^(apps/ios/fastlane/|(.*/)?project\.pbxproj$|.*\.entitlements$|\.github/scripts/release-signing-provisioned\.mjs$|\.github/scripts/release-signing-provisioned\.test\.mjs$|\.github/scripts/release-signing-project\.mjs$|\.github/scripts/release-match-identifiers\.rb$|\.github/workflows/ci\.yml$)'
 
 have_commit() { git cat-file -e "$1^{commit}" 2>/dev/null; }
 

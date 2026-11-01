@@ -198,6 +198,14 @@ test('profile bytes decode to entitlements and a secret body never leaves the cl
   const catalog = await readCatalog(client, Date.parse('2026-11-01T00:00:00Z'));
   assert.deepEqual(catalog.bundleIdentifiers, ['com.example.app']);
   assert.equal(catalog.profiles.length, 1);
+  assert.ok(
+    calls.some(
+      (call) =>
+        call.url.includes('/v1/profiles') &&
+        call.url.includes('profileContent') &&
+        call.url.includes('bundleId'),
+    ),
+  );
   assert.equal(catalog.profiles[0].entitlements['com.apple.developer.healthkit'], true);
   assert.equal(JSON.stringify(catalog).includes(SECRET), false);
   assert.ok(calls.every((call) => call.method === 'GET'));
@@ -325,6 +333,78 @@ test("replaying PR 1540 against today's missing App Store profile fails without 
   });
   assert.deepEqual(current, []);
   assert.match(successMessage(), new RegExp(RUNBOOK.replaceAll('.', '\\.')));
+});
+
+test('a stripped profile include still maps through the bundle id list', async () => {
+  const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const required = { 'com.apple.developer.healthkit': true };
+  const client = createReleaseClient(
+    {
+      ASC_KEY_ID: 'ABCD123456',
+      ASC_ISSUER_ID: '57246542-96fe-1a63-e053-0824d011072a',
+      ASC_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    },
+    async (url) => {
+      const page = String(url);
+      if (page.includes('/v1/bundleIds')) {
+        return new Response(
+          JSON.stringify({ data: [{ id: 'BID', attributes: { identifier: 'com.example.app' } }] }),
+          { status: 200 },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          data: [
+            {
+              attributes: {
+                profileType: 'IOS_APP_STORE',
+                profileState: 'ACTIVE',
+                expirationDate: '2099-01-01T00:00:00Z',
+                profileContent: plist(required, { entitlementsKey: true }).toString('base64'),
+              },
+              relationships: { bundleId: { data: { type: 'bundleIds', id: 'BID' } } },
+            },
+          ],
+          included: [],
+        }),
+        { status: 200 },
+      );
+    },
+  );
+  const catalog = await readCatalog(client, Date.parse('2026-11-01T00:00:00Z'));
+  assert.equal(catalog.profiles[0].bundleId, 'com.example.app');
+  assert.equal(catalog.profiles[0].entitlements['com.apple.developer.healthkit'], true);
+
+  const unmapped = createReleaseClient(
+    {
+      ASC_KEY_ID: 'ABCD123456',
+      ASC_ISSUER_ID: '57246542-96fe-1a63-e053-0824d011072a',
+      ASC_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    },
+    async (url) => {
+      if (String(url).includes('/v1/bundleIds')) {
+        return new Response(JSON.stringify({ data: [{ attributes: { identifier: 'com.example.app' } }] }), {
+          status: 200,
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          data: [
+            {
+              attributes: {
+                profileType: 'IOS_APP_STORE',
+                profileState: 'ACTIVE',
+                expirationDate: '2099-01-01T00:00:00Z',
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    },
+  );
+  await assert.rejects(readCatalog(unmapped, Date.parse('2026-11-01T00:00:00Z')));
+  assert.doesNotMatch(failureMessage([{ reason: 'unreadable' }]), /no active App Store profile/);
 });
 
 test('fork pulls finish neutral and same-repo pulls without credentials fail closed', () => {

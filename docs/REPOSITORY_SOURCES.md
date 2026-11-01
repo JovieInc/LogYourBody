@@ -16,7 +16,7 @@ Repository: `JovieInc/LogYourBody`
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
 - `.github/workflows/advisory-ai-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e92850748e44b4e1b7b8f966dad0ee036ecf455c453a2c4837329bbf104e0f97`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `2503a8bd971e85ad935f83664c050b639737f53da21b0ee15782b094f4f98784`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e3d3a3618fb558a7412bed92feaed38cd8eb6b991eb3d223a31c3845a0138e04`)
 - `.github/workflows/codeql-analysis.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e37420a26b4176ca77a7f67e4b67223b1bfa104727a9fb1af5c0ffc0dde76b73`)
 - `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3e943ed690246c6dd743d840f05a79e219103e6c4fac9e9495db2985b412c48d`)
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `86c9b97d1058a55f4e972f97dbeb88fe579a904b1f763df28b2a8af948e67022`)
@@ -391,8 +391,8 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
 - `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `213b1e75527cb362a72aa287da5c2500de934ed9ef5f953414b2db24af48ae38`)
-- `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `57f07d0c21e8b2241ef59427042a746b2f422e657e2db2a8fab9d4967bbc8ea5`)
+- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `5d660f72bd38cad51a87bd0913917d2ec9dabcdbabcb20e22794d393e61e9ab1`)
+- `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `87941ea0acf0ad3f0bf3e729c0c3ca6b33f66b191c838d84bfe18954291587c4`)
 
 ## Pinned shared sources
 

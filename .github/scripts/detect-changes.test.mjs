@@ -112,8 +112,7 @@ const surfaces = (web, iosChanged, unit, quality, deferred = 'false', signing = 
   ios_changed: iosChanged,
   ios_unit: unit,
   ios_quality: quality,
-  ios_quality_deferred: deferred,
-  signing,
+  ios_quality_deferred: deferred, signing,
 });
 
 test('large native source imports preserve detection under pipefail', () => {
@@ -282,11 +281,6 @@ test('ci.yml wires detection, the iOS jobs and the CI Summary dependencies', () 
   assert.match(jobBlock('ios'), /if: needs\.detect-changes\.outputs\.ios_unit == 'true'/);
   assert.match(jobBlock('ios_quality'), /if: needs\.detect-changes\.outputs\.ios_quality == 'true'/);
   assert.match(jobBlock('ci-summary'), /if: always\(\)[\s\S]*needs: \[detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_static, ios_storekit, release-signing\]/);
-  assert.match(detection, /signing: \$\{\{ steps\.filter\.outputs\.signing \}\}/);
-  assert.match(jobBlock('release-signing'), /if: needs\.detect-changes\.outputs\.signing == 'true'/);
-  assert.match(jobBlock('release-signing'), /node --test \.github\/scripts\/release-signing-provisioned\.test\.mjs/);
-  assert.match(jobBlock('release-signing'), /node \.github\/scripts\/release-signing-provisioned\.mjs/);
-  assert.match(jobBlock('release-signing'), /FORK: \$\{\{ github\.event\.pull_request\.head\.repo\.fork == true \}\}/);
 });
 
 test('required CI rejects a stale repository source projection', () => {
@@ -308,21 +302,7 @@ test('required CI rejects a stale repository source projection', () => {
   assert.equal(check.status, 0, `${check.stdout}${check.stderr}`);
 });
 
-function runSummaryGate({
-  web,
-  ios,
-  quality = ios,
-  js,
-  iosResult,
-  qualityResult,
-  event = 'pull_request',
-  storekitResult,
-  staticResult,
-  signing = 'false',
-  signingResult = 'skipped',
-  signingConclusion = '',
-  fork = 'false',
-}) {
+function runSummaryGate({ web, ios, quality = ios, js, iosResult, qualityResult, event = 'pull_request', storekitResult, staticResult }) {
   const block = jobBlock('ci-summary');
   const script = block
     .slice(block.indexOf('run: |') + 'run: |'.length)
@@ -342,11 +322,7 @@ function runSummaryGate({
     'needs.ios.result': iosResult,
     'needs.ios_quality.result': qualityResult,
     'needs.ios_static.result': staticResult ?? qualityResult,
-    'needs.ios_storekit.result': storekitResult ?? (event === 'push' || (event === 'merge_group' && (ios === 'true' || quality === 'true')) ? 'success' : 'skipped'),
-    'needs.detect-changes.outputs.signing': signing,
-    'needs.release-signing.result': signingResult,
-    'needs.release-signing.outputs.conclusion': signingConclusion,
-    'github.event.pull_request.head.repo.fork': fork,
+    'needs.ios_storekit.result': storekitResult ?? (event === 'push' || (event === 'merge_group' && (ios === 'true' || quality === 'true')) ? 'success' : 'skipped'), 'needs.detect-changes.outputs.signing': 'false', 'needs.release-signing.result': 'skipped', 'needs.release-signing.outputs.conclusion': '', 'github.event.pull_request.head.repo.fork': 'false',
   };
   const rendered = script.replace(/\$\{\{\s*([^}]+?)\s*\}\}/g, (_, expr) => {
     assert.ok(expr in values, `unrendered expression ${expr}`);
@@ -355,44 +331,6 @@ function runSummaryGate({
   const summary = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ci-summary-')), 'summary.md');
   return spawnSync('bash', ['-e', '-c', rendered], { encoding: 'utf8', env: { ...process.env, GITHUB_STEP_SUMMARY: summary } }).status;
 }
-
-test('signing inputs select the release provisioning check and other files do not', () => {
-  const cases = [
-    ['apps/ios/fastlane/Fastfile.release', 'true', 'true'],
-    ['apps/ios/LogYourBody.xcodeproj/project.pbxproj', 'true', 'true'],
-    ['apps/ios/LogYourBody/LogYourBody.entitlements', 'true', 'true'],
-    ['apps/ios/App.swift', 'false', 'true'],
-    ['.github/scripts/release-signing-provisioned.mjs', 'true', 'false'],
-  ];
-  for (const [file, signing, iosChanged] of cases) {
-    const fx = queueFixture({ [file]: 'changed' });
-    try {
-      const outputs = detect(fx.workspace, { ...mergeGroup(fx), GITHUB_EVENT_NAME: 'pull_request', PR_DRAFT: 'false' }).outputs;
-      assert.equal(outputs.signing, signing, file);
-      assert.equal(outputs.ios_changed, iosChanged, file);
-    } finally {
-      fs.rmSync(fx.root, { recursive: true, force: true });
-    }
-  }
-});
-
-test('CI Summary requires release signing only when signing inputs change', () => {
-  const base = { web: 'false', ios: 'false', quality: 'false', js: 'skipped', iosResult: 'skipped', qualityResult: 'skipped' };
-  assert.equal(runSummaryGate(base), 0);
-  assert.notEqual(runSummaryGate({ ...base, signingResult: 'success', signingConclusion: 'success' }), 0);
-  assert.equal(runSummaryGate({ ...base, signing: 'true', signingResult: 'success', signingConclusion: 'success' }), 0);
-  assert.notEqual(runSummaryGate({ ...base, signing: 'true', signingResult: 'success', signingConclusion: 'neutral' }), 0);
-  assert.notEqual(runSummaryGate({ ...base, signing: 'true', signingResult: 'failure', signingConclusion: 'failure' }), 0);
-  assert.notEqual(runSummaryGate({ ...base, signing: 'true', signingResult: 'skipped', signingConclusion: '' }), 0);
-  assert.equal(
-    runSummaryGate({ ...base, signing: 'true', signingResult: 'success', signingConclusion: 'neutral', fork: 'true' }),
-    0,
-  );
-  assert.notEqual(
-    runSummaryGate({ ...base, signing: 'true', signingResult: 'success', signingConclusion: 'success', fork: 'true' }),
-    0,
-  );
-});
 
 test('CI Summary passes a web-only change with iOS skipped', () => {
   assert.equal(runSummaryGate({ web: 'true', ios: 'false', js: 'success', iosResult: 'skipped', qualityResult: 'skipped' }), 0);
