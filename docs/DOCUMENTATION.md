@@ -29,9 +29,11 @@ python3 scripts/repository_docs.py --root /path/to/this-repo --write \
 
 After merging a branch, resolve source conflicts first, then run
 `python3 scripts/resolve-repository-docs.py` to regenerate and stage the source
-map from the merged sources. This wraps the pinned generator and refuses to
-write while any other file is unmerged or a shared import fails parity. It
-stages only the generated output; review the source diff before committing.
+map from the merged sources. A conflicted map is rebuilt from the merged index,
+so unstaged source edits and either parent projection cannot change its
+fingerprints. This wraps the pinned generator and refuses to write while any
+other file is unmerged or a shared import fails parity. It stages only the
+generated output; review the source diff before committing.
 
 When a merged Xcode project changes the diagnostic workflow's exact project pin,
 review and stage the project and workflow first, retaining one project-pin line.

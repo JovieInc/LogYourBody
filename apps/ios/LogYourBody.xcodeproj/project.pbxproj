@@ -23,6 +23,8 @@
 		B31520261101000000000002 /* BodyVisualizationSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31520261101000000000001 /* BodyVisualizationSnapshot.swift */; };
 		B31520261101000000000004 /* BodyVisualizationLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31520261101000000000003 /* BodyVisualizationLedger.swift */; };
 		B31520261101000000000006 /* BodyVisualizationSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31520261101000000000005 /* BodyVisualizationSnapshotTests.swift */; };
+		B31520261101000000000008 /* BodyVisualizationComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31520261101000000000007 /* BodyVisualizationComposer.swift */; };
+		B3152026110100000000000A /* BodyVisualizationSnapshotFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31520261101000000000009 /* BodyVisualizationSnapshotFixtures.swift */; };
 		B18320261101000000000002 /* LaunchJourney.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18320261101000000000001 /* LaunchJourney.swift */; };
 		B18320261101000000000004 /* LaunchJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18320261101000000000003 /* LaunchJourneyTests.swift */; };
 		B18320261101000000000006 /* LaunchJourneyUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18320261101000000000005 /* LaunchJourneyUI.swift */; };
@@ -196,6 +198,10 @@
 		AD3145C22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145B22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift */; };
 		AD3145C32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */; };
 		AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */; };
+		B314A11A0000000000000002 /* WireframeAvatarFamily.swift in Sources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000001 /* WireframeAvatarFamily.swift */; };
+		B314A11A0000000000000004 /* WireframeAvatarStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000003 /* WireframeAvatarStage.swift */; };
+		B314A11A0000000000000006 /* WireframeAvatarFamily.json in Resources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000005 /* WireframeAvatarFamily.json */; };
+		B314A11A0000000000000008 /* WireframeAvatarFamilyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000007 /* WireframeAvatarFamilyTests.swift */; };
 		AD3145E22F0A030100ABCDEF /* DashboardMetricsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */; };
 		AD3145E42F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145E32F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift */; };
 		AD3145F22F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145F12F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift */; };
@@ -617,6 +623,8 @@
 		B31520261101000000000001 /* BodyVisualizationSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyVisualizationSnapshot.swift; sourceTree = "<group>"; };
 		B31520261101000000000003 /* BodyVisualizationLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyVisualizationLedger.swift; sourceTree = "<group>"; };
 		B31520261101000000000005 /* BodyVisualizationSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyVisualizationSnapshotTests.swift; sourceTree = "<group>"; };
+		B31520261101000000000007 /* BodyVisualizationComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyVisualizationComposer.swift; sourceTree = "<group>"; };
+		B31520261101000000000009 /* BodyVisualizationSnapshotFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyVisualizationSnapshotFixtures.swift; sourceTree = "<group>"; };
 		B18320261101000000000001 /* LaunchJourney.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchJourney.swift; sourceTree = "<group>"; };
 		B18320261101000000000003 /* LaunchJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchJourneyTests.swift; sourceTree = "<group>"; };
 		B18320261101000000000005 /* LaunchJourneyUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchJourneyUI.swift; sourceTree = "<group>"; };
@@ -810,6 +818,9 @@
 		AD3145B22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineAnalytics.swift"; sourceTree = "<group>"; };
 		AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineInsights.swift"; sourceTree = "<group>"; };
 		AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AvatarBodyRenderer.swift; path = Components/AvatarBodyRenderer.swift; sourceTree = "<group>"; };
+		B314A11A0000000000000001 /* WireframeAvatarFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WireframeAvatarFamily.swift; path = Components/WireframeAvatarFamily.swift; sourceTree = "<group>"; };
+		B314A11A0000000000000003 /* WireframeAvatarStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WireframeAvatarStage.swift; path = Components/WireframeAvatarStage.swift; sourceTree = "<group>"; };
+		B314A11A0000000000000007 /* WireframeAvatarFamilyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WireframeAvatarFamilyTests.swift; sourceTree = "<group>"; };
 		AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricsSection.swift; sourceTree = "<group>"; };
 		AD3145E32F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+Glp1MetricCard.swift"; sourceTree = "<group>"; };
 		AD3145F12F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+FullScreenMetricData.swift"; sourceTree = "<group>"; };
@@ -1143,6 +1154,7 @@
 		153A00000000000000000005 /* TrainingNumericScrubUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingNumericScrubUITests.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvasUITests.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MesocycleCanvasSequence.json; sourceTree = "<group>"; };
+		B314A11A0000000000000005 /* WireframeAvatarFamily.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = WireframeAvatarFamily.json; sourceTree = "<group>"; };
 		E442F03731E41EA713BCAE3E /* HomeV2Policy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2Policy.swift; sourceTree = "<group>"; };
 		E47A7741CF9BBCD0F5DC0D5C /* LaunchSurfacePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchSurfacePolicyTests.swift; sourceTree = "<group>"; };
 		E47CB009DE7EAE53EC20AE72 /* DSAvatar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAvatar.swift; path = DesignSystem/Atoms/DSAvatar.swift; sourceTree = "<group>"; };
@@ -1325,6 +1337,8 @@
 				ADA600252ED259A700088042 /* BodyScoreShareCard.swift */,
 				A16800000000000000000002 /* ContextualMetricShare.swift */,
 				AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */,
+				B314A11A0000000000000001 /* WireframeAvatarFamily.swift */,
+				B314A11A0000000000000003 /* WireframeAvatarStage.swift */,
 				ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */,
 				ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */,
 				ADA4B74E2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift */,
@@ -1475,6 +1489,7 @@
 				E24920261025000400000001 /* WorkoutReconciliationPromptTests.swift */,
 				B26920261025000000000003 /* BackwardPlannerTests.swift */,
 				B31520261101000000000005 /* BodyVisualizationSnapshotTests.swift */,
+				B31520261101000000000009 /* BodyVisualizationSnapshotFixtures.swift */,
 				B18320261101000000000003 /* LaunchJourneyTests.swift */,
 				B27020261029000000000003 /* OutcomeFeasibilityTests.swift */,
 				B26920261025000000000005 /* lyb-launch-contract.json */,
@@ -1674,6 +1689,7 @@
 				92214BD7648D98322296C4CA /* Fonts */,
 				E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */,
 				E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */,
+				B314A11A0000000000000005 /* WireframeAvatarFamily.json */,
 				AD723AE12E15FA5C002376C6 /* app-icon-180.png */,
 				AD0054EA2E2197600029E0FF /* Legal */,
 			);
@@ -1719,6 +1735,7 @@
 				AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */,
 				4885B7AB7A8A7A8978CFFF5D /* MetricCorrectionService.swift */,
 				B31520261101000000000001 /* BodyVisualizationSnapshot.swift */,
+				B31520261101000000000007 /* BodyVisualizationComposer.swift */,
 				B31520261101000000000003 /* BodyVisualizationLedger.swift */,
 				2E6CF428B39B066C378F12CD /* BodyRecordReviewConsumer.swift */,
 				AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */,
@@ -1983,6 +2000,7 @@
 				FE01A1A100000000000000F1 /* TimelineDataProviderScrubTests.swift */,
 				3CBF4E377107434EA53A2F1B /* PaidWeightLoggerMVPPolicyTests.swift */,
 				FE07A7A700000000000000F7 /* PhotoTimelineHUDPolicyTests.swift */,
+				B314A11A0000000000000007 /* WireframeAvatarFamilyTests.swift */,
 				FE08A8A800000000000000F8 /* BodyScoreShareCardTests.swift */,
 				B04020261025000000000004 /* BodyScoreShareExportTests.swift */,
 				FE09A9A900000000000000F9 /* ProgressPhotoImagePipelineTests.swift */,
@@ -2404,6 +2422,7 @@
 				AB92EB88BB101CE4C08FF99D /* InterTight-OFL.txt in Resources */,
 				E9A811932F40800000C0A701 /* PrivacyInfo.xcprivacy in Resources */,
 				E4C0A5110000000000000008 /* MesocycleCanvasSequence.json in Resources */,
+				B314A11A0000000000000006 /* WireframeAvatarFamily.json in Resources */,
 				AD72432A2F01234500ABCDEF /* Assets.xcassets in Resources */,
 				AD72435C2E15FA5E002376C6 /* LaunchScreen.storyboard in Resources */,
 				AD7243322E15FA5D002376C6 /* Preview Assets.xcassets in Resources */,
@@ -2451,6 +2470,7 @@
 			files = (
 				B26920261025000000000004 /* BackwardPlannerTests.swift in Sources */,
 				B31520261101000000000006 /* BodyVisualizationSnapshotTests.swift in Sources */,
+				B3152026110100000000000A /* BodyVisualizationSnapshotFixtures.swift in Sources */,
 				B18320261101000000000004 /* LaunchJourneyTests.swift in Sources */,
 				B27020261029000000000004 /* OutcomeFeasibilityTests.swift in Sources */,
 				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
@@ -2470,6 +2490,7 @@
 				FE01A1A100000000000000B1 /* TimelineDataProviderScrubTests.swift in Sources */,
 				5DB1A0B114B3417EAE9E143B /* PaidWeightLoggerMVPPolicyTests.swift in Sources */,
 				FE07A7A700000000000000B7 /* PhotoTimelineHUDPolicyTests.swift in Sources */,
+				B314A11A0000000000000008 /* WireframeAvatarFamilyTests.swift in Sources */,
 				FE08A8A800000000000000B8 /* BodyScoreShareCardTests.swift in Sources */,
 				B04020261025000000000003 /* BodyScoreShareExportTests.swift in Sources */,
 				FE09A9A900000000000000B9 /* ProgressPhotoImagePipelineTests.swift in Sources */,
@@ -2675,10 +2696,13 @@
 				AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */,
 				C3A33981B636CF792D2C0688 /* MetricCorrectionService.swift in Sources */,
 				B31520261101000000000002 /* BodyVisualizationSnapshot.swift in Sources */,
+				B31520261101000000000008 /* BodyVisualizationComposer.swift in Sources */,
 				B31520261101000000000004 /* BodyVisualizationLedger.swift in Sources */,
 				80341C4DDED4231D4589ED47 /* BodyRecordReviewConsumer.swift in Sources */,
 				AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */,
 				AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */,
+				B314A11A0000000000000002 /* WireframeAvatarFamily.swift in Sources */,
+				B314A11A0000000000000004 /* WireframeAvatarStage.swift in Sources */,
 				AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */,
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
