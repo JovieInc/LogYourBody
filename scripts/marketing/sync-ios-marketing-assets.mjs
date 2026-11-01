@@ -5,6 +5,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const manifestPath = path.join(root, 'apps/web/src/generated/marketing-product-assets.json');
+let previousManifest = {};
+try {
+  previousManifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+}
 
 const assets = {
   weightLog: {
@@ -40,7 +47,16 @@ function pngDimensions(buffer) {
   };
 }
 
-async function capturedAtFor(source) {
+async function capturedAtFor(source, sourceSha256, previousAsset) {
+  // Unchanged bytes retain their capture receipt. Shallow Git history and archive
+  // mtimes describe the checkout, not when the product image was captured.
+  if (
+    previousAsset?.source === source &&
+    previousAsset.sourceSha256 === sourceSha256 &&
+    Number.isFinite(Date.parse(previousAsset.capturedAt))
+  ) {
+    return previousAsset.capturedAt;
+  }
   try {
     const value = execFileSync('git', ['log', '-1', '--format=%cI', '--', source], {
       cwd: root,
@@ -64,18 +80,18 @@ for (const [id, asset] of Object.entries(assets)) {
   await copyFile(sourcePath, outputPath);
   const outputBuffer = await readFile(outputPath);
   const { width, height } = pngDimensions(outputBuffer);
+  const sourceSha256 = sha256(sourceBuffer);
 
   manifest[id] = {
     ...asset,
     width,
     height,
-    sourceSha256: sha256(sourceBuffer),
+    sourceSha256,
     outputSha256: sha256(outputBuffer),
-    capturedAt: await capturedAtFor(asset.source),
+    capturedAt: await capturedAtFor(asset.source, sourceSha256, previousManifest[id]),
   };
 }
 
-const manifestPath = path.join(root, 'apps/web/src/generated/marketing-product-assets.json');
 await mkdir(path.dirname(manifestPath), { recursive: true });
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 

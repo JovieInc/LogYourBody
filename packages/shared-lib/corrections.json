@@ -1,5 +1,45 @@
 [
   {
+    "fingerprint": "company-guards-required-ci-summary",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1681",
+    "correction": "LYB-347 / PR #1681, fix-red-95726c4f82 occurrence 9: Company Guards size-500 was advisory because its standalone check did not gate the required CI Summary. Preserve the required dependency across pull requests, merge groups and main pushes during merge repairs.",
+    "mechanization": "Extend the existing required merge-queue policy verifier to enforce the canonical reusable Company Guards caller, its pinned shared workflow, unconditional execution, the Detect Changes dependency and failure propagation to CI Summary. Negative controls reject removing the dependency, skipping or softening either workflow, replacing the caller and disconnecting or inverting the summary. The original PR wiring is retained. The harness owns pushing and PR updates and must add exactly one machine line: Machine: built .github/scripts/verify-merge-queue-policy.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application code cannot require an independent GitHub Actions workflow before merge; the repository's required aggregate check must enforce that dependency."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing merge-queue policy suite runs in required Detect Changes on every diff and can reject conditional, advisory or disconnected Company Guards wiring."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/verify-merge-queue-policy.mjs",
+      "anchor": "Company Guards failures must reach the required CI Summary"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "marketing-capture-provenance-survives-shallow-builds",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41290548370",
+    "correction": "PR #1681 merge-group JavaScript/TypeScript failed marketing-product-assets.test.ts: the prebuild asset sync replaced actual capture provenance with a shallow synthetic merge commit timestamp ahead of the runner clock.",
+    "mechanization": "Extend the existing marketing asset generator to retain a valid recorded capture date only when both the canonical source path and its SHA-256 still match. Keep the existing recent/non-future capture checks and byte/dimension assertions. A real shallow-Git fixture with a future synthetic commit fails before the fix and passes afterward; it also checks idempotence, source archives and refreshed provenance for changed bytes. The existing required web Jest suite executes this regression.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Content-bound receipt reuse prevents normal builds from relabelling unchanged captures with checkout, merge or extraction times without relaxing freshness or hash checks."
+      }
+    },
+    "guard": {
+      "path": "scripts/marketing/sync-ios-marketing-assets.mjs",
+      "anchor": "Unchanged bytes retain their capture receipt."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "lyb-web-landing-only-v1",
     "source": "https://github.com/JovieInc/LogYourBody/tree/codex/lyb-100-20261101t042159#lyb-100-task",
     "correction": "Tim's lyb-web-landing-only-v1 lock: after 1.2.0 submission, remove authenticated web app UI and navigation while retaining the landing, marketing/legal pages and first-party iOS APIs.",
