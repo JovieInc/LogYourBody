@@ -286,7 +286,8 @@ final class WeeklyPhotoCheckInPolicyTests: XCTestCase {
         )
         XCTAssertEqual(changed, 1)
         store.viewContext.reset()
-        let saved = try XCTUnwrap(await store.fetchBodyMetrics(for: owner, localDate: row.localDate).first)
+        let fetched = await store.fetchBodyMetrics(for: owner, localDate: row.localDate)
+        let saved = try XCTUnwrap(fetched.first)
         let provenance = try XCTUnwrap(saved.toBodyMetrics()?.sourceMetadata?.weeklyPhotoProvenance)
         XCTAssertNil(provenance.capturedAt)
         XCTAssertEqual(provenance.importedAt, imported)
@@ -341,9 +342,11 @@ final class WeeklyPhotoCheckInPolicyTests: XCTestCase {
         )
         XCTAssertTrue(linked)
         store.viewContext.reset()
-        let row = try XCTUnwrap(
-            await store.fetchBodyMetrics(for: owner, localDate: BodyMetricLocalDate.key(for: effective)).first
+        let committed = await store.fetchBodyMetrics(
+            for: owner,
+            localDate: BodyMetricLocalDate.key(for: effective)
         )
+        let row = try XCTUnwrap(committed.first)
         XCTAssertEqual(row.photoUrl, localURL)
         XCTAssertEqual(row.syncStatus, "local_weekly_photo")
         XCTAssertTrue(row.isSynced)
