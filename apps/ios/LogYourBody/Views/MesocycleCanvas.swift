@@ -486,7 +486,7 @@ final class MesocycleCanvasModel: ObservableObject {
     }
 }
 
-struct MesocycleCanvasScreen: View {
+struct MesocycleCanvasHost: View {
     @StateObject private var model: MesocycleCanvasModel
 
     init(

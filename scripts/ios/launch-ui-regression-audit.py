@@ -213,6 +213,36 @@ def main() -> int:
             violations=violations,
         )
 
+    # A launch directive must not consume the home or become its sheet presenter.
+    launch_ui = app_dir / "Services/LaunchJourneyUI.swift"
+    for token in [
+        "ViewThatFits(in: .vertical)", "ScrollView {\n                content",
+        ".frame(maxHeight: 160)",
+    ]:
+        require_token(root=root, path=launch_ui, token=token,
+                      check="launch.bounded_scrollable_directive",
+                      detail="The directive must fit or scroll within a bounded header.",
+                      violations=violations)
+    require_token(root=root, path=app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift",
+                  token="if isLaunchJourneyEnabled {\n                launchJourneyDirective",
+                  check="launch.gated_directive",
+                  detail="The deadline journey must be opt-in through its feature gate.",
+                  violations=violations)
+    directive = launch_ui.read_text().split("var launchJourneyDirective: some View {", 1)[-1].split(
+        "var launchJourneyOutcomeEditor:", 1
+    )[0]
+    if ".sheet(isPresented: $showsLaunchOutcomeEditor)" not in directive:
+        violations.append(AuditViolation(
+            check="launch.local_editor_presenter", file=str(launch_ui.relative_to(root)), line=1,
+            detail="Attach the outcome editor to its directive, away from home provenance presenters."
+        ))
+    add_pattern_violations(
+        root=root, paths=[app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"],
+        pattern=re.compile(r"\.sheet\(isPresented: \$showsLaunchOutcomeEditor\)"),
+        check="launch.local_editor_presenter", detail="The root must not own the outcome-editor sheet.",
+        violations=violations,
+    )
+
     # Done must clear the presenting state even inside another sheet modifier.
     for relative_path, token in [
         ("Views/HomeV2/HomeV2MetricEditorial.swift", "@Binding var isPresented: Bool"),

@@ -52,7 +52,7 @@ describe('ExperimentWaitlistLanding', () => {
     );
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Know if the work is working.',
+      'Your body-composition goal, planned around your next date.',
     );
     expect(screen.getByRole('textbox', { name: 'Email' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Get early access' })).toHaveLength(1);

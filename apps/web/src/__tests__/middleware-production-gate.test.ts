@@ -135,7 +135,7 @@ describe('middleware production debug/test gate', () => {
       shouldBlockDebugRoute,
       shouldUseProductAuthMiddleware,
     } = await import('../middleware');
-    const request = new NextRequest('https://logyourbody.com/dashboard', {
+    const request = new NextRequest('https://logyourbody.com/settings', {
       headers: { cookie: 'lyb_access_token=test-token' },
     });
 
@@ -147,15 +147,35 @@ describe('middleware production debug/test gate', () => {
     expect(response?.status).toBe(200);
   });
 
-  it('does not redirect a retired app page to sign-in', async () => {
+  it('sends a deleted product route home before sign-in', async () => {
     const { default: middleware } = await import('../middleware');
     const response = await middleware(
       new NextRequest('https://logyourbody.com/dashboard?tab=trend'),
     );
 
+    expect(response?.status).toBe(307);
+    expect(response?.headers.get('location')).toBe('https://logyourbody.com/');
+  });
+
+  it('leaves the retired settings root to Next without requiring sign-in', async () => {
+    const { default: middleware } = await import('../middleware');
+    const response = await middleware(
+      new NextRequest('https://logyourbody.com/settings?tab=account'),
+    );
+
     expect(response?.status).toBe(200);
     expect(response?.headers.get('location')).toBeNull();
   });
+
+  it.each(['/settings/notifications', '/settings/preferences', '/settings/profile'])(
+    'recovers the hidden %s route to the landing page',
+    async (pathname) => {
+      const { default: middleware } = await import('../middleware');
+      const response = await middleware(new NextRequest(`https://logyourbody.com${pathname}`));
+      expect(response.status).toBe(307);
+      expect(response.headers.get('location')).toBe('https://logyourbody.com/');
+    },
+  );
 
   it.each(['/api/weights', '/api/auth/delete-account', '/api/parse-pdf', '/api/parse-pdf-v2'])(
     'preserves API authentication without redirecting %s to retired UI',
@@ -213,7 +233,7 @@ describe('middleware production debug/test gate', () => {
     expect(response?.status).toBe(200);
   });
 
-  it('keeps normal public routes reachable in production', async () => {
+  it('sends hidden marketing routes back to the launch entry', async () => {
     process.env.VERCEL_ENV = 'production';
     const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
     const request = new NextRequest('https://logyourbody.com/about');
@@ -222,7 +242,8 @@ describe('middleware production debug/test gate', () => {
 
     const response = await middleware(request);
 
-    expect(response?.status).toBe(200);
+    expect(response?.status).toBe(307);
+    expect(response?.headers.get('location')).toBe('https://logyourbody.com/');
   });
 
   it.each(['/', '/download/ios', '/privacy', '/support'])(

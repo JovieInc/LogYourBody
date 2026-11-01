@@ -157,7 +157,7 @@ function modeRouted(source, caseName) {
 }
 
 function screenMounted(source, caseName) {
-  const code = stripComments(source);
+  const code = stripDebug(stripComments(source));
   return (
     new RegExp(String.raw`worldClassScreen\(\s*\.${caseName}\b`).test(code) ||
     new RegExp(String.raw`\bscreen\s*:\s*\.${caseName}\b`).test(code) ||
@@ -166,7 +166,10 @@ function screenMounted(source, caseName) {
 }
 
 function symbolRouted(source, symbol) {
-  const code = stripComments(source).replace(new RegExp(String.raw`\b(?:struct|enum|class)\s+${symbol}\b`), '');
+  const code = stripDebug(stripComments(source)).replace(
+    new RegExp(String.raw`\b(?:struct|enum|class)\s+${symbol}\b`),
+    '',
+  );
   return new RegExp(String.raw`\b${symbol}\b`).test(code);
 }
 
@@ -174,7 +177,7 @@ function screenStructs(source) {
   const names = [];
   // Generic shells such as SettingsDetailScreen<Content> are components.
   // Loading variants are part of the screen that presents them.
-  for (const match of stripComments(source).matchAll(
+  for (const match of stripDebug(stripComments(source)).matchAll(
     /\bstruct\s+([A-Z][A-Za-z0-9]*Screen)\b([^{]*)\{/g,
   )) {
     if (match[1].endsWith('LoadingScreen') || match[2].includes('<')) continue;

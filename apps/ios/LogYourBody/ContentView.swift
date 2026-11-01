@@ -255,7 +255,7 @@ struct ContentView: View {
                 reviewedTokens: releaseReviewStateStore.state.reviewedTokens,
                 isEligible: isEligible
             )
-            showWhatsNew = !releaseReviewItems.isEmpty
+            showWhatsNew = false
         }
         .onChange(of: loadingManager.isLoading) { _, _ in
             completeLaunchOverlayIfReady()
@@ -529,7 +529,6 @@ struct LogYourBodyWhatsNewView: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("What’s New")
         .onAppear(perform: onSeen)
-        .worldClassScreen(.whatsNew)
     }
 
     @ViewBuilder

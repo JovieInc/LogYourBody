@@ -170,7 +170,7 @@ export function Prefooter({ variant = 'default', className = '' }: PrefooterProp
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Link href="/about">
+              <Link href="/support">
                 <Button
                   variant="ghost"
                   className="text-linear-text-secondary hover:text-linear-text rounded-lg px-6 py-3 text-base transition-all"

@@ -45,7 +45,10 @@ test('canonical landing and primary sections match reviewed visual baselines', a
   await page.goto('/');
   await page.evaluate(() => document.fonts.ready);
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Know if the work is working.' }),
+    page.getByRole('heading', {
+      level: 1,
+      name: 'Your body-composition goal, planned around your next date.',
+    }),
   ).toBeVisible();
   await expect(page).toHaveScreenshot('lyb-system-b-full-page.png', {
     fullPage: true,
@@ -104,16 +107,21 @@ test('retired articles recover without auth and old aliases reach the single fun
   for (const route of ['/landing', '/mobile', '/download']) {
     await page.goto(route);
     await expect(
-      page.getByRole('heading', { level: 1, name: 'Know if the work is working.' }),
+      page.getByRole('heading', {
+        level: 1,
+        name: 'Your body-composition goal, planned around your next date.',
+      }),
     ).toBeVisible();
   }
   const response = await page.goto('/blog/what-is-ffmi-and-why-it-matters');
-  expect(response?.status()).toBe(404);
-  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Contact support' })).toHaveAttribute(
-    'href',
-    '/support',
-  );
+  expect(response?.status()).toBeLessThan(400);
+  expect(response?.url()).toMatch(/\/$/);
+  await expect(
+    page.getByRole('heading', {
+      level: 1,
+      name: 'Your body-composition goal, planned around your next date.',
+    }),
+  ).toBeVisible();
 });
 
 test('hero works at boundary widths, text growth, RTL and reduced motion', async ({ page }) => {

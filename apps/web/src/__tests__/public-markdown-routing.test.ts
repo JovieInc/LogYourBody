@@ -160,10 +160,17 @@ it('bounds a hung gate request and keeps HTML fallback available', async () => {
 });
 
 it.each(['/no-such-public-page/nested', '/dashboard', '/settings/profile', '/training/canvas'])(
-  'routes negotiated missing or retired page %s through the real Next fallback, retaining status404',
+  'keeps negotiated recovery for %s consistent with the launch scope',
   async (path) => {
     const req = request(`${path}?private=never-echo`);
     const middlewareResponse = await middleware(req);
+    if (path !== '/no-such-public-page/nested') {
+      expect(middlewareResponse.status).toBe(307);
+      expect(middlewareResponse.headers.get('location')).toBe('https://www.logyourbody.com/');
+      expect(middlewareResponse.headers.has(PUBLIC_MARKDOWN_HEADER)).toBe(false);
+      expect(fetchMock).not.toHaveBeenCalled();
+      return;
+    }
     const forwarded = forwardedHeaders(middlewareResponse, req);
     expect(forwarded.get(PUBLIC_MARKDOWN_HEADER)).toBe('1');
     const configResponse = await unstable_getResponseFromNextConfig({

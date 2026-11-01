@@ -13,10 +13,11 @@ vendored here.
 The entry point for the parent journey is
 `RealtimeSyncManager.shared.datedOutcomeStore`. The parent supplies one complete
 value to `save`, including all fields changed in the same Save action. There is
-no new screen in this storage slice. Native writes/sync require the default-off
-Platform/Statsig gate `dated_outcome_v1`; API traffic requires
-`LYB_DATED_OUTCOME_ENABLED=true`. Enable both only after migration and native
-validation.
+no new screen in this storage slice. Local saves persist while the
+default-off Platform/Statsig gate `dated_outcome_v1` is off, so a relaunch
+keeps the date. Cloud sync stays behind that gate. API traffic requires
+`LYB_DATED_OUTCOME_ENABLED=true`. Enable the gate only after migration and
+native validation.
 
 The additive V6 Core Data model adds `CachedDatedOutcome` while preserving V1–V5 byte-for-byte. Main’s V5 contains `CachedWorkoutReconciliationDay`; the earlier dated-outcome V5 proposal must not replace that published schema. Both app and widget select V6.
 An owner-scoped journal commits each value and recompute request together.
