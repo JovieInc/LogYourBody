@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// Read-only signing expiry check (LYB-141).
-// GETs distribution certificates, App Store profiles, and API-key auth.
-// Never creates, revokes, rotates, or nukes signing material.
-// Reports and Linear text contain only asset kind and days remaining.
+// Read-only signing expiry check (LYB-141, LYB-332).
+// GETs distribution certificates, the App Store profiles Matchfile requires,
+// and API-key auth. Never creates, revokes, rotates, or nukes signing material.
+// Reports and Linear text name bundle IDs and certificate types only.
 
-import { appendFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { appendFileSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createToken } from './app-store-readiness.mjs';
 import {
   findTeamIdByKey,
@@ -22,7 +23,12 @@ export const FINGERPRINT = 'remediation:signing-expiry';
 export const SOURCE_WORKFLOW = '.github/workflows/signing-expiry.yml';
 export const RUNBOOK = 'docs/engineering/signing-expiry.md';
 export const APP_BUNDLE_ID = 'com.logyourbody.app';
+export const MATCHFILE_PATH = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../apps/ios/fastlane/Matchfile',
+);
 const DISTRIBUTION_TYPES = new Set(['IOS_DISTRIBUTION', 'DISTRIBUTION']);
+const BUNDLE_ID = /^[A-Za-z0-9.-]{1,200}$/;
 const DAY_MS = 86_400_000;
 const MATERIAL =
   /certificateContent|profileContent|-----BEGIN [A-Z0-9 ]*(?:PRIVATE KEY|CERTIFICATE)-----|[A-Za-z0-9+/]{80,}={0,2}/;
@@ -63,6 +69,29 @@ export function assertPublicReport(text, forbidden = []) {
   if (MATERIAL.test(value) || forbidden.some((secret) => secret && value.includes(secret))) {
     throw new Error('signing expiry report withheld');
   }
+}
+
+// Matchfile app_identifier is the source of truth for the bundle IDs release
+// signing must have a profile for. Fastfile.release's readonly match call can
+// temporarily omit one (LYB-310); that omission must not hide a missing profile.
+export function parseRequiredBundleIds(source) {
+  const code = String(source ?? '')
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('#'))
+    .join('\n');
+  const match = code.match(/app_identifier\s*\(\s*(\[[\s\S]*?\]|"[^"]*"|'[^']*')\s*\)/);
+  if (!match) return [];
+  const ids = [];
+  const quoted = /"([^"]*)"|'([^']*)'/g;
+  for (let found = quoted.exec(match[1]); found; found = quoted.exec(match[1])) {
+    const id = (found[1] ?? found[2] ?? '').trim();
+    if (BUNDLE_ID.test(id)) ids.push(id);
+  }
+  return [...new Set(ids)];
+}
+
+export function readRequiredBundleIds(matchfilePath = MATCHFILE_PATH, readFile = readFileSync) {
+  return parseRequiredBundleIds(readFile(matchfilePath, 'utf8'));
 }
 
 export function daysUntil(expirationDate, nowMs) {
@@ -166,8 +195,59 @@ function bundleIdentifier(record, included) {
   return typeof match?.attributes?.identifier === 'string' ? match.attributes.identifier : '';
 }
 
-export function projectProfiles(body, bundleId = APP_BUNDLE_ID) {
+function indexCertificates(body, index = new Map()) {
+  const records = [
+    ...(Array.isArray(body?.data) ? body.data : []),
+    ...(Array.isArray(body?.included) ? body.included : []),
+  ];
+  for (const record of records) {
+    if (record?.type && record.type !== 'certificates') continue;
+    if (!record?.id || index.has(record.id)) continue;
+    index.set(record.id, {
+      certificateType:
+        typeof record?.attributes?.certificateType === 'string'
+          ? record.attributes.certificateType
+          : '',
+      expirationDate:
+        typeof record?.attributes?.expirationDate === 'string'
+          ? record.attributes.expirationDate
+          : '',
+    });
+  }
+  return index;
+}
+
+function embeddedDistributionCerts(record, index) {
+  const links = record?.relationships?.certificates?.data;
+  if (!Array.isArray(links)) return { certificateLink: 'unreadable', certificates: [] };
+  const certificates = [];
+  let unresolved = false;
+  for (const link of links) {
+    const id = typeof link?.id === 'string' ? link.id : '';
+    const certificate = id ? index.get(id) : undefined;
+    if (!certificate) {
+      unresolved = true;
+      continue;
+    }
+    if (!DISTRIBUTION_TYPES.has(certificate.certificateType)) continue;
+    certificates.push({
+      certificateType: certificate.certificateType,
+      expirationDate: certificate.expirationDate,
+    });
+  }
+  if (unresolved || certificates.length === 0) {
+    return { certificateLink: 'unreadable', certificates: [] };
+  }
+  return { certificateLink: 'ok', certificates };
+}
+
+export function projectProfiles(body, requiredBundleIds = [], certificateIndex = new Map()) {
   const included = Array.isArray(body?.included) ? body.included : [];
+  const index = indexCertificates(
+    body,
+    certificateIndex instanceof Map ? certificateIndex : new Map(),
+  );
+  const required = new Set(requiredBundleIds || []);
   const profiles = [];
   for (const record of Array.isArray(body?.data) ? body.data : []) {
     const profileType = record?.attributes?.profileType;
@@ -175,17 +255,28 @@ export function projectProfiles(body, bundleId = APP_BUNDLE_ID) {
     if (profileType !== 'IOS_APP_STORE') continue;
     if (profileState && profileState !== 'ACTIVE') continue;
     const identifier = bundleIdentifier(record, included);
-    if (identifier && identifier !== bundleId && !identifier.startsWith(`${bundleId}.`)) continue;
+    if (!identifier || !required.has(identifier)) continue;
+    const embedded = embeddedDistributionCerts(record, index);
     profiles.push({
+      bundleId: identifier,
       profileType: 'IOS_APP_STORE',
       profileState: profileState || 'ACTIVE',
       expirationDate:
         typeof record?.attributes?.expirationDate === 'string'
           ? record.attributes.expirationDate
           : '',
+      certificateLink: embedded.certificateLink,
+      certificates: embedded.certificates,
     });
   }
   return profiles;
+}
+
+function bodyHasBundleIdentifier(body) {
+  const included = Array.isArray(body?.included) ? body.included : [];
+  return (Array.isArray(body?.data) ? body.data : []).some((record) =>
+    bundleIdentifier(record, included),
+  );
 }
 
 const CERTIFICATE_QUERY = {
@@ -200,12 +291,13 @@ const PROFILE_QUERY = {
   limit: '200',
 };
 
-export async function loadSigningAssets(client) {
+export async function loadSigningAssets(client, requiredBundleIds = []) {
   const assets = {
     certificates: [],
     profiles: [],
     certificatesReadable: false,
     profilesReadable: false,
+    requiredBundleIds: Array.isArray(requiredBundleIds) ? requiredBundleIds : [],
     apiKey: { authenticated: false, expirationDate: null },
   };
   let certificates;
@@ -217,18 +309,30 @@ export async function loadSigningAssets(client) {
   // One successful read proves the team API key still authenticates.
   // Apple does not put an expiration date on that key.
   assets.apiKey = { authenticated: true, expirationDate: null };
+  const certificateIndex = indexCertificates(certificates);
   assets.certificates = projectCertificates(certificates).filter((certificate) =>
     DISTRIBUTION_TYPES.has(certificate.certificateType),
   );
   assets.certificatesReadable = true;
 
   const profileQueries = [
+    {
+      ...PROFILE_QUERY,
+      include: 'bundleId,certificates',
+      'fields[bundleIds]': 'identifier',
+      'fields[certificates]': 'certificateType,expirationDate',
+    },
     { ...PROFILE_QUERY, include: 'bundleId', 'fields[bundleIds]': 'identifier' },
     PROFILE_QUERY,
   ];
   for (const query of profileQueries) {
     try {
-      assets.profiles = projectProfiles(await client.getAll('/v1/profiles', query));
+      const body = await client.getAll('/v1/profiles', query);
+      indexCertificates(body, certificateIndex);
+      const projected = projectProfiles(body, assets.requiredBundleIds, certificateIndex);
+      const rawCount = Array.isArray(body?.data) ? body.data.length : 0;
+      if (rawCount > 0 && projected.length === 0 && !bodyHasBundleIdentifier(body)) continue;
+      assets.profiles = projected;
       assets.profilesReadable = true;
       break;
     } catch {
@@ -238,50 +342,152 @@ export async function loadSigningAssets(client) {
   return assets;
 }
 
-function distributionRow(certificates, nowMs) {
-  const dated = (certificates || [])
-    .filter((certificate) => DISTRIBUTION_TYPES.has(certificate.certificateType))
-    .map((certificate) => daysUntil(certificate.expirationDate, nowMs))
-    .filter((days) => days !== null);
-  const valid = dated.filter((days) => days >= 0);
-  // An already-expired leftover must not hide a newer valid distribution cert.
-  if (valid.length > 0) {
-    return {
-      kind: 'distribution-certificate',
-      daysRemaining: Math.min(...valid),
-      status: 'ok',
-      count: valid.length,
-    };
-  }
-  if (dated.length > 0) {
-    return {
-      kind: 'distribution-certificate',
-      daysRemaining: Math.max(...dated),
-      status: 'expired',
-      count: dated.length,
-    };
-  }
-  return { kind: 'distribution-certificate', daysRemaining: 0, status: 'missing', count: 0 };
+function certKey(certificate) {
+  return `${certificate.certificateType}|${certificate.expirationDate}`;
 }
 
-function profileRows(profiles, nowMs) {
-  const rows = (profiles || []).map((profile) => {
-    const days = daysUntil(profile.expirationDate, nowMs);
-    if (days === null) {
-      return { kind: 'app-store-profile', daysRemaining: 0, status: 'unreadable', count: 1 };
+function profileRows(assets, nowMs) {
+  if (
+    !assets?.profilesReadable ||
+    !Array.isArray(assets.requiredBundleIds) ||
+    assets.requiredBundleIds.length === 0
+  ) {
+    return [
+      {
+        kind: 'app-store-profile',
+        bundleId: '',
+        daysRemaining: 0,
+        status: 'unreadable',
+        embedded: [],
+      },
+    ];
+  }
+  return assets.requiredBundleIds.map((bundleId) => {
+    const matches = (assets.profiles || []).filter((profile) => profile.bundleId === bundleId);
+    if (matches.length === 0) {
+      return {
+        kind: 'app-store-profile',
+        bundleId,
+        daysRemaining: 0,
+        status: 'missing',
+        embedded: [],
+      };
     }
+    let best = null;
+    let bestDays = null;
+    for (const profile of matches) {
+      const days = daysUntil(profile.expirationDate, nowMs);
+      if (!best || (days !== null && (bestDays === null || days > bestDays))) {
+        best = profile;
+        bestDays = days;
+      }
+    }
+    if (!best || bestDays === null) {
+      return {
+        kind: 'app-store-profile',
+        bundleId,
+        daysRemaining: 0,
+        status: 'unreadable',
+        embedded: [],
+      };
+    }
+    const embedded = (best.certificateLink === 'ok' ? best.certificates || [] : [])
+      .filter((certificate) => DISTRIBUTION_TYPES.has(certificate.certificateType))
+      .map((certificate) => ({
+        certificateType: certificate.certificateType,
+        expirationDate: certificate.expirationDate,
+        daysRemaining: daysUntil(certificate.expirationDate, nowMs),
+      }));
+    const linkOk =
+      best.certificateLink === 'ok' &&
+      embedded.length > 0 &&
+      embedded.every((certificate) => certificate.daysRemaining !== null);
     return {
       kind: 'app-store-profile',
-      daysRemaining: days,
-      status: days < 0 ? 'expired' : 'ok',
-      count: 1,
+      bundleId,
+      daysRemaining: bestDays,
+      status: bestDays < 0 ? 'expired' : 'ok',
+      embedded: linkOk ? embedded : [],
+      certificateUnreadable: !linkOk,
     };
   });
-  rows.sort((left, right) => left.daysRemaining - right.daysRemaining);
-  if (rows.length === 0) {
-    return [{ kind: 'app-store-profile', daysRemaining: 0, status: 'missing', count: 0 }];
+}
+
+function certificateRows(assets, profiles, nowMs) {
+  if (!assets?.certificatesReadable) {
+    return [
+      {
+        kind: 'distribution-certificate',
+        certificateType: '',
+        daysRemaining: 0,
+        status: 'unreadable',
+        unused: false,
+      },
+    ];
   }
-  return rows;
+  const inUse = [];
+  const seenInUse = new Set();
+  let linkUnreadable = false;
+  for (const profile of profiles || []) {
+    if (profile.status === 'missing' || profile.status === 'unreadable') continue;
+    if (profile.certificateUnreadable || !profile.embedded?.length) {
+      linkUnreadable = true;
+      continue;
+    }
+    for (const certificate of profile.embedded) {
+      const key = certKey(certificate);
+      if (seenInUse.has(key)) continue;
+      seenInUse.add(key);
+      inUse.push({
+        kind: 'distribution-certificate',
+        certificateType: certificate.certificateType,
+        daysRemaining: certificate.daysRemaining,
+        status: certificate.daysRemaining < 0 ? 'expired' : 'ok',
+        unused: false,
+      });
+    }
+  }
+  if (linkUnreadable) {
+    inUse.unshift({
+      kind: 'distribution-certificate',
+      certificateType: '',
+      daysRemaining: 0,
+      status: 'unreadable',
+      unused: false,
+    });
+  }
+  const unused = [];
+  const seenUnused = new Set();
+  for (const certificate of assets.certificates || []) {
+    if (!DISTRIBUTION_TYPES.has(certificate.certificateType)) continue;
+    const daysRemaining = daysUntil(certificate.expirationDate, nowMs);
+    // Expired leftovers that no required profile embeds do not drive the report.
+    if (daysRemaining === null || daysRemaining < 0) continue;
+    const key = certKey(certificate);
+    if (seenInUse.has(key) || seenUnused.has(key)) continue;
+    seenUnused.add(key);
+    unused.push({
+      kind: 'distribution-certificate',
+      certificateType: certificate.certificateType,
+      daysRemaining,
+      status: 'ok',
+      unused: true,
+    });
+  }
+  inUse.sort((left, right) => left.daysRemaining - right.daysRemaining);
+  unused.sort((left, right) => left.daysRemaining - right.daysRemaining);
+  if (inUse.length === 0 && unused.length === 0) {
+    return [
+      {
+        kind: 'distribution-certificate',
+        certificateType: '',
+        daysRemaining: 0,
+        status: 'missing',
+        unused: false,
+      },
+    ];
+  }
+  return [...inUse, ...unused];
 }
 
 function apiKeyRow(apiKey, nowMs) {
@@ -303,19 +509,17 @@ function apiKeyRow(apiKey, nowMs) {
 }
 
 export function buildSigningRows(assets, nowMs) {
+  const profiles = profileRows(assets, nowMs);
   return [
-    assets?.certificatesReadable
-      ? distributionRow(assets.certificates, nowMs)
-      : { kind: 'distribution-certificate', daysRemaining: 0, status: 'unreadable', count: 0 },
-    ...(assets?.profilesReadable
-      ? profileRows(assets.profiles, nowMs)
-      : [{ kind: 'app-store-profile', daysRemaining: 0, status: 'unreadable', count: 0 }]),
+    ...profiles,
+    ...certificateRows(assets, profiles, nowMs),
     apiKeyRow(assets?.apiKey, nowMs),
   ];
 }
 
 export function severity(rows) {
   const days = (rows || [])
+    .filter((row) => !row.unused)
     .map((row) => row.daysRemaining)
     .filter((value) => typeof value === 'number');
   if (days.length === 0) return 'ok';
@@ -325,28 +529,36 @@ export function severity(rows) {
   return 'ok';
 }
 
+function describe(row) {
+  if (row.kind === 'asc-api-key') {
+    const label = KIND_LABEL['asc-api-key'];
+    if (row.status === 'no-expiration') return `${label}: no expiration date`;
+    if (row.status === 'unreadable' || row.status === 'rejected') return `${label}: unreadable`;
+    return `${label}: ${row.daysRemaining} days`;
+  }
+  if (row.kind === 'app-store-profile') {
+    const label = row.bundleId ? `${row.bundleId} IOS_APP_STORE` : 'app store profile';
+    if (row.status === 'missing') return `${label}: missing`;
+    if (row.status === 'unreadable') return `${label}: unreadable`;
+    const certs = (row.embedded || [])
+      .map((certificate) => `${certificate.certificateType}, ${certificate.daysRemaining} days`)
+      .join('; ');
+    const suffix = certs
+      ? ` (${certs})`
+      : row.certificateUnreadable
+        ? ' (distribution certificate unreadable)'
+        : '';
+    return `${label}: ${row.daysRemaining} days${suffix}`;
+  }
+  const name = row.unused ? 'unused distribution certificate' : 'distribution certificate';
+  const label = row.certificateType ? `${name} ${row.certificateType}` : name;
+  if (row.status === 'missing') return `${label}: missing`;
+  if (row.status === 'unreadable') return `${label}: unreadable`;
+  return `${label}: ${row.daysRemaining} days`;
+}
+
 export function formatReport(rows) {
-  const countableProfiles = (rows || []).filter(
-    (row) =>
-      row.kind === 'app-store-profile' && row.status !== 'missing' && row.status !== 'unreadable',
-  ).length;
-  let profileOrdinal = 0;
-  return (rows || [])
-    .map((row) => {
-      const label = KIND_LABEL[row.kind] || 'signing asset';
-      if (row.status === 'no-expiration') return `${label}: no expiration date`;
-      if (row.status === 'missing') return `${label}: missing`;
-      if (row.status === 'unreadable' || row.status === 'rejected') return `${label}: unreadable`;
-      if (row.kind === 'app-store-profile' && countableProfiles > 1) {
-        profileOrdinal += 1;
-        return `${label} ${profileOrdinal}: ${row.daysRemaining} days`;
-      }
-      if (row.kind === 'distribution-certificate' && row.count > 1 && row.daysRemaining >= 0) {
-        return `${label}: ${row.daysRemaining} days (${row.count} valid)`;
-      }
-      return `${label}: ${row.daysRemaining} days`;
-    })
-    .join('\n');
+  return (rows || []).map((row) => describe(row)).join('\n');
 }
 
 function cell(value) {
@@ -358,11 +570,10 @@ function cell(value) {
 export function renderSummary(rows, runUrl = '') {
   const level = severity(rows);
   const lines = (rows || []).map((row) => {
-    const label = KIND_LABEL[row.kind] || 'signing asset';
-    let days = `${row.daysRemaining} days`;
-    if (row.status === 'no-expiration') days = 'no expiration date';
-    else if (row.status === 'missing') days = 'missing';
-    else if (row.status === 'unreadable' || row.status === 'rejected') days = 'unreadable';
+    const line = describe(row);
+    const splitAt = line.indexOf(': ');
+    const label = splitAt === -1 ? line : line.slice(0, splitAt);
+    const days = splitAt === -1 ? '' : line.slice(splitAt + 2);
     return `| ${cell(label)} | ${cell(days)} |`;
   });
   return [
@@ -524,14 +735,25 @@ async function main() {
     (process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
       ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
       : '');
+  let requiredBundleIds = [];
+  let requiredBundleIdsReadable = true;
+  try {
+    requiredBundleIds = readRequiredBundleIds();
+    if (requiredBundleIds.length === 0) requiredBundleIdsReadable = false;
+  } catch {
+    requiredBundleIdsReadable = false;
+  }
   let rows;
   try {
-    rows = buildSigningRows(await loadSigningAssets(createSigningClient(process.env)), Date.now());
+    const loaded = await loadSigningAssets(createSigningClient(process.env), requiredBundleIds);
+    if (!requiredBundleIdsReadable) loaded.profilesReadable = false;
+    rows = buildSigningRows(loaded, Date.now());
   } catch {
     rows = buildSigningRows(
       {
         certificatesReadable: false,
         profilesReadable: false,
+        requiredBundleIds: [],
         apiKey: { authenticated: false, expirationDate: null },
       },
       Date.now(),
