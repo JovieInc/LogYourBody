@@ -23,6 +23,9 @@ struct HomeV2Surface: View {
     let dateText: (BodyMetrics) -> String
     let loggedSentence: String?
     var systemState: HomeV2SystemState?
+    var healthSyncStatus: HealthSyncStateReducer?
+    var healthWeightReceipt: HealthWeightReceipt?
+    var onRecentReadings: () -> Void = {}
     let onOpenPhoto: () -> Void
     let onViewProgress: () -> Void
     let onViewMetric: (HomeV2ProgressMetric) -> Void
@@ -170,6 +173,16 @@ struct HomeV2Surface: View {
                 }
             }
             .padding(.vertical, HomeV2Tokens.Space.tight)
+
+            if let healthSyncStatus {
+                HealthSyncStatusView(
+                    state: healthSyncStatus.state,
+                    lastSync: healthSyncStatus.lastSuccessfulSync,
+                    receipt: healthWeightReceipt,
+                    unit: weightUnit,
+                    onRecentReadings: onRecentReadings
+                )
+            }
 
             HomeV2Hairline()
             HomeV2StepsSummary(value: stepsValue, detail: stepsDetail, dateText: dateText(metric)) {

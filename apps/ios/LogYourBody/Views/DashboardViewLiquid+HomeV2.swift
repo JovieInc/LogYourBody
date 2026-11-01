@@ -67,6 +67,14 @@ extension DashboardViewLiquid {
             dateText: { formatHUDDate($0.date) },
             loggedSentence: homeV2Logged.map { $0.confirmationText },
             systemState: homeV2SystemState,
+            healthSyncStatus: HealthSyncPresentationPolicy.isEnabled() ? healthSyncPresentation.syncStatus : nil,
+            healthWeightReceipt: healthSyncPresentation.receipt,
+            onRecentReadings: {
+                if let receipt = healthSyncPresentation.receipt {
+                    healthSyncPresentation.dismissReceipt(id: receipt.id)
+                }
+                showsRecentHealthReadings = true
+            },
             onOpenPhoto: { isHomeV2ViewerPresented = true },
             onViewProgress: { openHomeV2Progress() },
             onViewMetric: { openHomeV2Progress(metric: $0) },
