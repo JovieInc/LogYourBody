@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -258,4 +259,54 @@ test('json union requires an active conflict and a regular json path', (t) => {
   assert.match(f.resolve().stderr, /regular indexed files/);
   f.git('merge', '--abort');
   assert.notEqual(f.resolve().status, 0, 'ordinary commits cannot generate a merge');
+});
+
+test('projection merge fingerprints the merged source instead of either parent', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-projection-merge-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+  const source = 'packages/shared-lib/turbo.json';
+  const output = 'docs/REPOSITORY_SOURCES.md';
+  const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+  const turbo = (ours, theirs) => `${JSON.stringify({ oursSlot: ['a', ...ours], theirsSlot: ['b', ...theirs] }, null, 2)}\n`;
+  const commit = (content) => {
+    mkdirSync(dirname(join(root, source)), { recursive: true });
+    writeFileSync(join(root, 'README.md'), 'Local instructions\n');
+    writeFileSync(join(root, 'repository-docs.json'), `${JSON.stringify({
+      schemaVersion: 1,
+      repository: 'example/app',
+      entrypoints: ['README.md'],
+      sources: [{ path: source, purpose: 'Test cache inputs' }],
+      imports: [],
+      output,
+    })}\n`);
+    writeFileSync(join(root, source), content);
+    execFileSync('python3', [
+      fileURLToPath(new URL('./repository_docs.py', import.meta.url)), '--root', root, '--write',
+    ], { env });
+    git('add', '.');
+    git('commit', '-qm', 'fixture');
+  };
+  git('init', '-q', '-b', 'feature');
+  git('config', 'core.hooksPath', '/dev/null');
+  commit(turbo([], []));
+  git('switch', '-qc', 'incoming');
+  commit(turbo([], ['expiry']));
+  git('switch', '-q', 'feature');
+  commit(turbo(['cert'], []));
+  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: root, env, encoding: 'utf8' });
+  assert.equal(merge.status, 1, merge.stderr);
+  assert.equal(git('diff', '--name-only', '--diff-filter=U').trim(), output);
+  const parents = ['HEAD', 'MERGE_HEAD'].map((rev) => digest(git('show', `${rev}:${source}`)));
+  const result = spawnSync('python3', [resolver, '--root', root], { env, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const merged = readFileSync(join(root, source));
+  assert.match(merged.toString(), /cert/);
+  assert.match(merged.toString(), /expiry/);
+  const projection = git('show', `:${output}`);
+  assert.equal(git('diff', '--name-only', '--diff-filter=U').trim(), '');
+  assert.match(projection, new RegExp(digest(merged)));
+  for (const parent of parents) assert.equal(projection.includes(parent), false);
+  assert.equal(projection.includes('<<<<<<<'), false);
+  assert.equal(spawnSync('python3', [resolver, '--root', root], { env, encoding: 'utf8' }).status, 0);
 });
