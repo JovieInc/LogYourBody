@@ -1,8 +1,8 @@
 # LogYourBody product API and MCP integration
 
-One remote MCP server lets assistants read the user's LogYourBody hypertrophy plan and log
-sets, including by voice. ChatGPT, Grok and any other MCP client call the same endpoint with
-the same OAuth flow. Tracking issue: LYB-108 (epic LYB-107).
+One remote MCP server exposes actions to read the user's LogYourBody hypertrophy plan and log
+sets. Client and voice availability require independent qualification against that endpoint
+and its per-user OAuth flow. Tracking issue: LYB-108 (epic LYB-107).
 
 LYB-161 extends the planning contract to
 every iOS capability. The inventory below distinguishes checked-in adapters from
@@ -116,11 +116,13 @@ the PR description.
 
 ## ChatGPT
 
-- Developer mode: Settings, Apps, Developer mode, add `https://www.logyourbody.com/api/mcp`.
-  ChatGPT reads the resource metadata, runs OAuth against the Jovie issuer, then lists tools.
-- Voice: in ChatGPT voice mode the model calls the same tools. Inputs are shaped for
-  speech: loose exercise names, `weightUnit: "lb"` converted to kilograms on the server,
-  set numbers filled in automatically.
+- Developer-mode candidate setup: add `https://www.logyourbody.com/api/mcp` in the client's
+  app settings after the issuer prerequisites and hosted-client policy review pass. Verify
+  metadata discovery, per-user OAuth and tool listing in the actual client/version; this
+  procedure is not a successful connection receipt.
+- Voice: tool availability is pending an actual ChatGPT voice-mode test. Training inputs
+  accept loose exercise names and `weightUnit: "lb"` converted to kilograms on the server,
+  with set numbers filled in automatically; those schemas do not prove voice execution.
 - Submission package: [`submission.md`](submission.md).
 
 ## Grok
@@ -317,6 +319,10 @@ need not wait for every client. Full-duplex Siri through AirPods is a founder
 hypothesis, not a verified Apple announcement or an available dependency.
 
 ## Client qualification and focused backlog contracts
+
+LYB-163's [qualification matrix, receipt protocol and adopt-first CLI decision](client-qualification.md)
+make the following contract actionable. All client acceptance remains pending; the decision
+is to use existing official tooling first and build no product CLI without a repeated gap.
 
 Extend LYB-162 for the weight lifecycle
 and LYB-163 for client qualification.
