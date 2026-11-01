@@ -40,6 +40,7 @@ describe('marketing asset capture provenance', () => {
   const generator = 'scripts/marketing/sync-ios-marketing-assets.mjs';
   const manifestPath = 'apps/web/src/generated/marketing-product-assets.json';
   const captureDate = '2026-10-21T02:28:23+00:00';
+  const futureDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   let directory: string;
   let root: string;
 
@@ -153,6 +154,55 @@ describe('marketing asset capture provenance', () => {
     rmSync(path.join(root, '.git'), { recursive: true });
     expect(generate().status).toBe(0);
     expect(manifest().weightLog.capturedAt).toBe(captureDate);
+  });
+
+  it('recovers a future recorded date from complete capture history', () => {
+    const recorded = manifest();
+    recorded.weightLog.capturedAt = futureDate;
+    writeFileSync(path.join(root, manifestPath), JSON.stringify(recorded));
+    expect(generate().status).toBe(0);
+    expect(Date.parse(manifest().weightLog.capturedAt)).toBe(Date.parse(captureDate));
+  });
+
+  it.each(['archive', 'shallow'] as const)(
+    'refuses future recorded provenance without complete history (%s)',
+    (checkout) => {
+      if (checkout === 'shallow') {
+        const clone = path.join(directory, 'shallow');
+        git('clone', '--quiet', '--depth=1', `file://${root}`, clone);
+        root = clone;
+      } else {
+        rmSync(path.join(root, '.git'), { recursive: true });
+      }
+      const recorded = manifest();
+      recorded.weightLog.capturedAt = futureDate;
+      const before = JSON.stringify(recorded);
+      writeFileSync(path.join(root, manifestPath), before);
+      const result = generate();
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('capture timestamp');
+      expect(readFileSync(path.join(root, manifestPath), 'utf8')).toBe(before);
+    },
+  );
+
+  it('refuses a future capture commit instead of emitting a future timestamp', () => {
+    execFileSync(
+      'git',
+      [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.invalid',
+        'commit',
+        '--amend',
+        '--no-edit',
+      ],
+      { cwd: root, env: { ...process.env, GIT_COMMITTER_DATE: futureDate } },
+    );
+    rmSync(path.join(root, manifestPath));
+    const result = generate();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('capture timestamp');
   });
 
   it.each([captureDate, '2026-10-21T02:28:23Z', '2026-10-20T19:28:23-07:00'])(

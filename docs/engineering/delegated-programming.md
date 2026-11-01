@@ -100,6 +100,13 @@ constraint reference. Existing prescriptions, schedule, inputs and completed
 history stay intact. Recording intent does not claim that new work or a movement
 substitution has been applied.
 
+The [LYB-277 wording policy](../../packages/shared-lib/decisions/program-revision-rationale-wording.json)
+allows only the user's utterance verbatim as the stored revision rationale,
+including whitespace. Do not generate a coach sentence, template name or
+trademark. The existing nonblank and 500-character admission checks reject
+invalid input without rewriting it. Training-card presentation and chat copy
+remain owned by LYB-124 and LYB-72 respectively.
+
 The writer uses the existing default-off delegated-programming admission and
 `TrainingRevisionsPort` proposal/decision transaction. That boundary remains
 responsible for owner locking, freshness, active-workout delay and atomic storage

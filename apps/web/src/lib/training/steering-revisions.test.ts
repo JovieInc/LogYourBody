@@ -40,6 +40,12 @@ const record: ProgramSteeringRecord = {
   actor: { kind: 'user', subject: 'owner' },
   rationale: 'Focus on shoulders within my reviewed movement constraint.',
 };
+const rationaleFixture = JSON.parse(
+  readFileSync(
+    `${process.cwd()}/../../packages/shared-lib/fixtures/program-revision-rationale.json`,
+    'utf8',
+  ),
+) as { userUtterance: string; revision: { rationale: string } };
 
 /** In-memory LYB-37 fixture: only this port changes the canonical setup/ledger. */
 function fixture() {
@@ -169,6 +175,30 @@ function fixture() {
 }
 
 afterEach(() => jest.restoreAllMocks());
+
+it('stores the LYB-277 user utterance verbatim in the revision, proposal reason and summary', async () => {
+  const h = fixture();
+  const supplied = { ...record, rationale: rationaleFixture.userUtterance };
+  expect((await persistSteeringRevision({ ...h, record: supplied })).kind).toBe('decided');
+  expect(h.saved().delegated.steering?.rationale).toBe(rationaleFixture.revision.rationale);
+  expect(h.history[0].proposal).toMatchObject({
+    reason: rationaleFixture.revision.rationale,
+    summary: [rationaleFixture.revision.rationale],
+    intent: { record: { rationale: rationaleFixture.revision.rationale } },
+  });
+});
+
+it.each(['', ' \n\t ', 'x'.repeat(501)])(
+  'rejects an invalid rationale without storing it: %j',
+  async (rationale) => {
+    const h = fixture();
+    expect(await persistSteeringRevision({ ...h, record: { ...record, rationale } })).toEqual({
+      kind: 'invalid_request',
+    });
+    expect(h.revisions.createProposal).not.toHaveBeenCalled();
+    expect(h.history).toHaveLength(0);
+  },
+);
 
 it('changes saved priority focus and constraint id through LYB-37, recording exactly one attributed revision without computing a prescription', async () => {
   const h = fixture();
