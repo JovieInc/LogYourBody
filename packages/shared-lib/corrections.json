@@ -5603,5 +5603,45 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "launch-audit-keep-both-size-siblings",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1696",
+    "correction": "PR #1696 / LYB-333, fix-red-95726c4f82 occurrence 14: merge origin/main without rebasing. Both parents extracted a different helper from the launch UI audit to stay under the 500-line company ratchet, so taking one side drops the other. Tently reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing launch UI audit loader so timeline-day checks and the report writer both load through one fail-closed sibling import. Extend the existing required shared-lib audit test to require both module names, both Turbo inputs, and the fail-closed loader, and to reject inlined write_outputs or check_timeline_calendar_day. Each parent audit fails that contract; the merged audit passes. Retain the release-signing provision check. Do not bypass Tently. The harness owns push and PR-body updates and must add exactly one machine line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A missing sibling file fails the audit import, but the loader cannot stop a later edit from inlining one extracted check and deleting the other parent's module."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib launch audit test reads the audit source and Turbo inputs, so a merge that keeps only one size-ratchet extraction fails before the audit can run."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "Cannot load launch UI audit sibling"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "shared-lib-test-wiring-union",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1696",
+    "correction": "PR #1696 / LYB-333, fix-red-95726c4f82 occurrence 16: merge origin/main without rebasing. Both parents added different shared-lib node test files and Turbo cache inputs, so taking one side drops the other's release-signing or signing-expiry coverage. Tently reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing repository-docs resolver with --union-manifests. It unions additive shared-lib test-script tokens and Turbo inputs from the three unmerged stages, preserves repeated inputs, refuses deletions, reorders, replacements, symlink stages and unrelated conflicts, then regenerates the source projection. The existing required pre-commit suite runs the real-Git regressions. Use that command for this merge so release-signing and signing-expiry tests both stay wired. Do not bypass Tently. The harness owns push and PR-body updates and must add exactly one machine line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing merge resolver owns these manifest writes. Keeping every parent test input while refusing removals and reorders prevents a one-sided merge from dropping required coverage."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Additive manifest union keeps every parent test input"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
