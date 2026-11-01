@@ -5563,5 +5563,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-cc900b961c",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41284487184/job/124783086308",
+    "correction": "PR #1679 / LYB-245: the required launch-quality build fails because handleDashboardBodyMetricsChange in a separate DashboardViewLiquid extension calls the private scheduleMetricCacheRefresh method. CI Summary reports that native failure; Tently reports an AI-provider outage without a code finding.",
+    "mechanization": "Make scheduleMetricCacheRefresh module-internal, matching the other dashboard refresh operations used by cross-file extensions. Preserve its main-actor isolation, coalescing, cancellation and deferred cache prewarming. Reuse the required launch-quality Swift compilation as the regression gate: run 41284487184 proves the private declaration fails at the actual extension call. Do not add a duplicate source-string test or weaken any native gate. origin/main is already an ancestor and git merge --no-edit origin/main reports up to date. This Linux host cannot provide the repaired native build or execution receipt; the harness must push and rerun the existing required native and Tently checks.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The method's access boundary is the defect. A module-internal method permits the existing cross-file extension call by construction while keeping the cache task state private; the required Swift compiler continues to reject inaccessible references."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Views/DashboardViewLiquid.swift",
+      "anchor": "    func scheduleMetricCacheRefresh() {"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

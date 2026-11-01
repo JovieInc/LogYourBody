@@ -571,7 +571,7 @@ struct DashboardViewLiquid: View {
     }
 
     @MainActor
-    private func scheduleMetricCacheRefresh() {
+    func scheduleMetricCacheRefresh() {
         // Published values arrive before the model finishes updating its sorted
         // history. Coalesce that burst and snapshot only after the update completes.
         metricCacheBuildID = UUID()
