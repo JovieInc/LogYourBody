@@ -138,6 +138,11 @@ struct HomeV2TimelinePager: View {
     let dateText: (BodyMetrics) -> String
     let onOpenPhoto: () -> Void
     var isNavigating = false
+    var bodyDisplays: [String: PersonalBodyDisplay] = [:]
+    var bodyEstimateEnabled = false
+    @State private var bodyYaw = 0.0
+    @State private var bodyScale = 1.0
+    @AppStorage("personal_body_stage_mode") private var bodyMode = "photo"
 
     var body: some View {
         HomeV2PhotoScrubber(
@@ -147,13 +152,11 @@ struct HomeV2TimelinePager: View {
             isNavigating: isNavigating, identifier: "home_v2_photo"
         ) { isScrubbing in
             if isScrubbing, let metric = snapshot.metric(for: selectedID) {
-                HomeV2TimelinePage(metric: metric, metrics: snapshot.metrics, size: size, unit: unit,
-                                   dateText: dateText(metric), onOpenPhoto: {})
+                page(for: metric, openPhoto: {})
             } else {
                 TabView(selection: $selectedID) {
                     ForEach(snapshot.metrics) { metric in
-                        HomeV2TimelinePage(metric: metric, metrics: snapshot.metrics, size: size, unit: unit,
-                                           dateText: dateText(metric), onOpenPhoto: onOpenPhoto)
+                        page(for: metric, openPhoto: onOpenPhoto)
                             .tag(HomeV2TimelinePolicy.EntryID(metric))
                             .accessibilityHidden(HomeV2TimelinePolicy.EntryID(metric) != selectedID)
                     }
@@ -180,6 +183,22 @@ struct HomeV2TimelinePager: View {
     private func adjust(newer: Bool) {
         if let next = snapshot.adjusted(selectedID, newer: newer) { selectedID = next }
     }
+
+    private func page(for metric: BodyMetrics, openPhoto: @escaping () -> Void) -> some View {
+        HomeV2TimelinePage(
+            metric: metric,
+            metrics: snapshot.metrics,
+            size: size,
+            unit: unit,
+            dateText: dateText(metric),
+            onOpenPhoto: openPhoto,
+            bodyMode: $bodyMode,
+            bodyYaw: $bodyYaw,
+            bodyScale: bodyScale,
+            bodyDisplays: bodyDisplays,
+            bodyEstimateEnabled: bodyEstimateEnabled
+        )
+    }
 }
 
 /// Image bytes are displayed only for their exact owner/URL. A replacement or
@@ -191,7 +210,22 @@ private struct HomeV2TimelinePage: View {
     let unit: String
     let dateText: String
     let onOpenPhoto: () -> Void
+    @Binding var bodyMode: String
+    @Binding var bodyYaw: Double
+    let bodyScale: Double
+    let bodyDisplays: [String: PersonalBodyDisplay]
+    let bodyEstimateEnabled: Bool
     @State private var editorialPhoto: (key: String, image: UIImage?)?
+
+    private var selectedOutline: PersonalBodyDisplay? {
+        bodyDisplays[PersonalBodyDay.key(metric.date)]
+    }
+
+    private var drawableOutline: PersonalBodyShape? {
+        guard bodyEstimateEnabled, let selectedOutline else { return nil }
+        let canDraw = selectedOutline.kind == "settled" || selectedOutline.kind == "transitional"
+        return canDraw ? selectedOutline.shape : nil
+    }
 
     var body: some View {
         Group {
@@ -204,9 +238,47 @@ private struct HomeV2TimelinePage: View {
             }
         }
         .frame(width: size.width, height: size.height)
+        .overlay { estimateCanvas }
+        .overlay(alignment: .top) { estimateMode }
+        .overlay(alignment: .bottom) { estimateFallback }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home_v2_editorial_card")
         .id(HomeV2TimelinePolicy.EntryID(metric))
+    }
+
+    @ViewBuilder
+    private var estimateCanvas: some View {
+        if bodyMode == "estimate", let shape = drawableOutline {
+            PersonalBodyCanvas(
+                shape: shape,
+                label: selectedOutline?.label ?? "Saved date",
+                yaw: $bodyYaw,
+                scale: bodyScale
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var estimateMode: some View {
+        if drawableOutline != nil {
+            PersonalBodyModeControl(mode: bodyMode) { bodyMode = $0 }
+                .padding(8)
+        }
+    }
+
+    @ViewBuilder
+    private var estimateFallback: some View {
+        if bodyEstimateEnabled, bodyMode == "estimate", drawableOutline == nil {
+            Text(selectedOutline?.label ?? "Estimate unavailable for this date")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(HomeV2Tokens.Colors.ink)
+                .padding(.horizontal, 8)
+                .frame(minHeight: JovieTokens.minimumHitTarget)
+                .background(Color.black.opacity(0.35), in: Capsule(style: .continuous))
+                .padding(8)
+                .accessibilityIdentifier("personal_body_fallback")
+                .allowsHitTesting(false)
+        }
     }
 
     private func photo(url: String) -> some View {

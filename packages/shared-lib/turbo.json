@@ -18,6 +18,7 @@
         "$TURBO_ROOT$/apps/ios/LogYourBody/**/*.swift",
         "$TURBO_ROOT$/apps/ios/LogYourBody/Resources/WireframeAvatarFamily.json",
         "$TURBO_ROOT$/packages/shared-lib/src/wireframe-avatar-family.ts",
+        "$TURBO_ROOT$/packages/shared-lib/src/personal-body-estimate.ts",
         "$TURBO_ROOT$/apps/ios/LogYourBodyWidget/**/*.swift",
         "$TURBO_ROOT$/apps/ios/LogYourBodyTests/**/*.swift",
         "$TURBO_ROOT$/apps/ios/LogYourBodyUITests/**/*.swift",

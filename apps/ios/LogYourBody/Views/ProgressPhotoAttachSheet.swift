@@ -95,6 +95,10 @@ struct ProgressPhotoAttachSheet: View {
     @State private var isCameraPresented = false
     @State private var photoSelectionLoadID = UUID()
     @State private var sheetDetent = NativeSheetPresentationPolicy.initialDetent(for: .progressPhotoAttach)
+    @State private var outlineSessionId = UUID().uuidString
+    @State private var attachedMetricId: String?
+    @State private var attachedAccountId: String?
+    @AppStorage(WireframeAvatarStorage.frame) private var outlineFrame = 0.5
     @AccessibilityFocusState private var isStatusFocused: Bool
 
     private var targetDate: Date {
@@ -130,6 +134,7 @@ struct ProgressPhotoAttachSheet: View {
                         header
                         previewPane(height: previewHeight(for: geometry.size.height))
                         statusPane
+                        personalBodyOffer
                         actionPane
                     }
                     .padding(.horizontal, JovieTokens.screenInset)
@@ -332,6 +337,24 @@ struct ProgressPhotoAttachSheet: View {
         .accessibilityIdentifier("progress_photo_attach_status")
     }
 
+    private var offersPersonalOutline: Bool {
+        PersonalBodyPolicy.isEnabled() && !PersonalBodyEstimate.benefitCopy.isEmpty
+    }
+
+    @ViewBuilder
+    private var personalBodyOffer: some View {
+        if isSuccess, offersPersonalOutline {
+            PersonalBodyCaptureOffer(
+                image: selectedImage,
+                accountId: attachedAccountId,
+                photoId: attachedMetricId,
+                sessionId: outlineSessionId,
+                effectiveDate: targetDate,
+                frame: outlineFrame
+            )
+        }
+    }
+
     private var statusIcon: String {
         switch attachStatus {
         case .empty:
@@ -446,6 +469,13 @@ struct ProgressPhotoAttachSheet: View {
 
     private func previewHeight(for availableHeight: CGFloat) -> CGFloat {
         min(260, max(184, availableHeight * 0.30))
+    }
+
+    private func markAttached(metricsId: String, accountId: String) {
+        attachedMetricId = metricsId
+        attachedAccountId = accountId
+        attachStatus = .success
+        HapticManager.shared.successAction()
     }
 
     private func announceStatusChange(_ status: ProgressPhotoAttachStatus) {
@@ -564,8 +594,7 @@ struct ProgressPhotoAttachSheet: View {
                     try writeAdmission()
                     await MainActor.run {
                         guard authManager.ownsAccountSession(ownership) else { return }
-                        attachStatus = .success
-                        HapticManager.shared.successAction()
+                        markAttached(metricsId: metrics.id, accountId: userId)
                     }
                     return
                 }
@@ -581,8 +610,7 @@ struct ProgressPhotoAttachSheet: View {
                 try writeAdmission()
                 await MainActor.run {
                     guard authManager.ownsAccountSession(ownership) else { return }
-                    attachStatus = .success
-                    HapticManager.shared.successAction()
+                    markAttached(metricsId: metrics.id, accountId: userId)
                 }
             } catch {
                 // Preserve any already-admitted original-owner upload; stale callers
