@@ -132,6 +132,53 @@ test('empty entitlement arrays are not required capabilities', () => {
   );
 });
 
+test('profile wildcards cover specific values and a missing capability still fails', () => {
+  const domains = ['applinks:example.com', 'webcredentials:example.com'];
+  assert.deepEqual(
+    capabilityGaps(
+      { 'com.apple.developer.associated-domains': domains },
+      { 'com.apple.developer.associated-domains': ['*'] },
+    ),
+    [],
+  );
+  assert.deepEqual(
+    capabilityGaps({ 'com.apple.developer.associated-domains': domains }, { 'com.apple.developer.associated-domains': '*' }),
+    [],
+  );
+  assert.deepEqual(
+    capabilityGaps(
+      { 'keychain-access-groups': ['TEAMID.com.example.app', 'TEAMID.com.example.shared'] },
+      { 'keychain-access-groups': ['TEAMID.*', 'com.apple.token'] },
+    ),
+    [],
+  );
+  assert.deepEqual(
+    capabilityGaps(
+      { 'keychain-access-groups': ['TEAMID.com.example.app'] },
+      { 'keychain-access-groups': ['OTHER.*'] },
+    ),
+    ['keychain-access-groups'],
+  );
+  assert.deepEqual(
+    capabilityGaps(
+      { 'com.apple.developer.associated-domains': domains },
+      { 'com.apple.developer.associated-domains': ['applinks:example.com'] },
+    ),
+    ['com.apple.developer.associated-domains'],
+  );
+  assert.deepEqual(
+    capabilityGaps(
+      { 'com.apple.developer.associated-domains': domains, 'com.apple.developer.healthkit': true },
+      { 'com.apple.developer.healthkit': true },
+    ),
+    ['com.apple.developer.associated-domains'],
+  );
+  assert.deepEqual(
+    capabilityGaps({ 'com.apple.developer.healthkit': true }, { 'com.apple.developer.healthkit': '*' }),
+    ['com.apple.developer.healthkit'],
+  );
+});
+
 test('profile bytes decode to entitlements and a secret body never leaves the client', async () => {
   const required = { 'com.apple.developer.healthkit': true, 'com.apple.security.application-groups': ['group.one'] };
   const decoded = parseEntitlements(plist(required, { entitlementsKey: true }));

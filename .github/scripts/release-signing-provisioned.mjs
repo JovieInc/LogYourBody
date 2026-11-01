@@ -2,8 +2,9 @@
 // Pull-request gate for release signing (LYB-333).
 // Reads the bundle ids Fastfile.release passes to readonly appstore match,
 // then GETs App Store Connect. Fails when a required id is unregistered,
-// has no active IOS_APP_STORE profile, or that profile lacks an entitlement
-// the target needs. Never creates certificates or profiles, and never prints
+// has no active IOS_APP_STORE profile, or that profile does not allow an
+// entitlement the target needs. A profile "*" or prefix wildcard counts.
+// Never creates certificates or profiles, and never prints
 // key ids, bundle ids, team ids, or profile bytes.
 
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -131,6 +132,29 @@ const WITHHELD = [
   `Runbook: ${RUNBOOK}`,
 ].join('\n');
 
+// Apple's profile allowlist uses "*" and a prefix ending in "*" (TN3125).
+// Associated Domains is stored as ["*"]; the target lists each service:domain.
+// A boolean capability still has to be true, not a wildcard.
+function profilePermits(required, candidate) {
+  if (typeof required !== 'string' || required.length === 0) return false;
+  if (candidate === '*') return true;
+  if (typeof candidate !== 'string') return false;
+  if (candidate === required) return true;
+  if (candidate.length > 1 && candidate.endsWith('*')) return required.startsWith(candidate.slice(0, -1));
+  return false;
+}
+
+function entitlementCovered(required, actual) {
+  if (required === true) return actual === true;
+  if (typeof required === 'string') return profilePermits(required, actual);
+  if (Array.isArray(required)) {
+    if (actual === '*') return required.every((item) => profilePermits(item, '*'));
+    if (!Array.isArray(actual)) return false;
+    return required.every((item) => actual.some((candidate) => profilePermits(item, candidate)));
+  }
+  return false;
+}
+
 export function capabilityGaps(required, actual) {
   const entries = Object.entries(required || {}).filter(([, value]) => {
     if (value === true || (typeof value === 'string' && value.length > 0)) return true;
@@ -140,14 +164,7 @@ export function capabilityGaps(required, actual) {
   if (!actual || typeof actual !== 'object' || Array.isArray(actual)) return null;
   const gaps = [];
   for (const [key, value] of entries) {
-    if (value === true) {
-      if (actual[key] !== true) gaps.push(key);
-    } else if (typeof value === 'string' && value.length > 0) {
-      if (actual[key] !== value) gaps.push(key);
-    } else if (Array.isArray(value) && value.length > 0) {
-      const got = Array.isArray(actual[key]) ? actual[key] : [];
-      if (!value.every((item) => got.includes(item))) gaps.push(key);
-    }
+    if (!entitlementCovered(value, actual[key])) gaps.push(key);
   }
   return gaps;
 }
