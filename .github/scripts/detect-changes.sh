@@ -3,7 +3,7 @@
 #
 # Env: BASE_SHA, HEAD_SHA, GITHUB_EVENT_NAME, GITHUB_OUTPUT, plus GITHUB_REPOSITORY and
 # GH_TOKEN for the push dedupe and the merge-group hold check, PR_DRAFT on pull requests.
-# Writes web, ios_changed, ios_unit, ios_quality and ios_quality_deferred.
+# Writes web, ios_changed, signing, ios_unit, ios_quality and ios_quality_deferred.
 #
 # A merge group's base is the previous group's head, which a shallow main checkout does not
 # contain. Diffing against origin/main instead would inherit every queued PR ahead of this one,
@@ -19,6 +19,9 @@ web_pattern='^(agent/|evals/|apps/web/|packages/|\.github/actions/|\.github/scri
 # inputs, so editing them no longer spends ~45 hosted macOS minutes on the PR). Root package.json
 # and the JS workspace are not inputs: those jobs run xcodebuild, fastlane and python only.
 ios_pattern='^(apps/ios/|scripts/ios/|\.github/actions/(setup-ios-build|setup-ruby-bundler)/|\.github/scripts/(mac-lane\.sh|detect-changes\.sh)$|\.github/workflows/(ci|mac-lane|mac-lane-route)\.yml$|\.github/workflows/ios-(unit|quality)\.yml$)'
+# Release signing provisioning. An unknown diff selects it: matches() is true
+# when the base and head cannot be compared, so a missing diff never skips it.
+signing_pattern='^(apps/ios/fastlane/|(.*/)?project\.pbxproj$|.*\.entitlements$|\.github/scripts/release-signing-provisioned\.mjs$|\.github/scripts/release-signing-provisioned\.test\.mjs$|\.github/scripts/release-match-identifiers\.rb$|\.github/workflows/ci\.yml$)'
 
 have_commit() { git cat-file -e "$1^{commit}" 2>/dev/null; }
 
@@ -47,6 +50,10 @@ echo "web=$web" >> "$GITHUB_OUTPUT"
 ios_changed=false
 matches "$ios_pattern" && ios_changed=true
 echo "ios_changed=$ios_changed" >> "$GITHUB_OUTPUT"
+
+signing=false
+matches "$signing_pattern" && signing=true
+echo "signing=$signing" >> "$GITHUB_OUTPUT"
 
 # macOS capacity is the scarce shared resource, so each iOS job runs once, where it is cheapest
 # and still gates the merge (Unit p50 17 min, Launch Quality p50 28 min, one hosted runner each):
