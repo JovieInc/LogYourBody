@@ -113,3 +113,7 @@ TestFlight beta or authorize client registration, account connection or release.
 LYB-274 authorizes only a CI parity-inventory check after the current TestFlight
 release ships. Feature slices stay unauthorized. The recorded slices live in
 [agent-parity-slices.md](../packages/shared-lib/decisions/agent-parity-slices.md).
+LYB-275 qualifies Claude Code first on a synthetic fixture account only, then
+ChatGPT, then Jovie. Real consented accounts and client registrations are not
+provided. The qualification slices live in
+[client-qualification-order.md](../packages/shared-lib/decisions/client-qualification-order.md).

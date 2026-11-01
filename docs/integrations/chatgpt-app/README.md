@@ -353,6 +353,12 @@ release ships. Feature slices stay unauthorized. The
 [recorded slices](../../../packages/shared-lib/decisions/agent-parity-slices.md)
 are repository-local keys for the inventory check, goals/preferences, trends,
 photos/imports, GLP-1, export/deletion and integration status.
+LYB-275 qualifies Claude Code first on a synthetic fixture account only, then
+ChatGPT, then Jovie. Real consented accounts and client registrations are not
+provided. The
+[qualification order](../../../packages/shared-lib/decisions/client-qualification-order.md)
+names fixture-a and fixture-b and creates one repository-local slice per
+client. It connects no account and registers no client.
 
 | Contract / existing lane                             | Trigger and KPI                                                                                           | Required acceptance before implementation is called complete                                                                                                                |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
