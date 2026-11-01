@@ -5,18 +5,31 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import json
 import re
 import sys
-from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from dataclasses import dataclass
 from pathlib import Path
 
-_timeline_spec = importlib.util.spec_from_file_location(
-    "launch_ui_timeline_day", Path(__file__).with_name("launch_ui_timeline_day.py")
-)
-_timeline = importlib.util.module_from_spec(_timeline_spec)
-_timeline_spec.loader.exec_module(_timeline)
+
+def _load_sibling(module_name: str, filename: str):
+    """Load an extracted audit sibling. A missing module fails closed."""
+    path = Path(__file__).with_name(filename)
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load launch UI audit sibling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except FileNotFoundError as error:
+        raise RuntimeError(f"Cannot load launch UI audit sibling: {path}") from error
+    return module
+
+
+# Keep both size-ratchet extractions: timeline day checks and the report writer.
+_timeline = _load_sibling("launch_ui_timeline_day", "launch_ui_timeline_day.py")
+write_outputs = _load_sibling(
+    "launch_ui_regression_report", "launch-ui-regression-report.py"
+).write_outputs
 
 
 @dataclass
@@ -95,59 +108,6 @@ def require_one_of_tokens(
             detail=detail,
         )
     )
-
-
-def write_outputs(artifact_dir: Path, violations: list[AuditViolation]) -> None:
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-    status = "failed" if violations else "passed"
-    payload = {
-        "schemaVersion": 1,
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
-        "status": status,
-        "violations": [asdict(violation) for violation in violations],
-    }
-    (artifact_dir / "launch-ui-regression-audit.json").write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n"
-    )
-
-    lines = [
-        "# Launch UI Regression Audit",
-        "",
-        f"- Status: {status.capitalize()}",
-        f"- Violations: {len(violations)}",
-        "",
-    ]
-
-    if violations:
-        lines.extend(["## Violations", ""])
-        for violation in violations:
-            lines.append(
-                f"- `{violation.check}` at `{violation.file}:{violation.line}`: "
-                f"{violation.detail}"
-            )
-    else:
-        lines.extend(
-            [
-                "## Covered Contracts",
-                "",
-                "- Geometry constructors explicitly type non-finite constants to avoid Swift overload ambiguity.",
-                "- Dashboard ScrollViews do not use large fake bottom spacers that create dead over-scroll.",
-                "- Onboarding fixed-CTA screens use size-based vertical scroll bounce to avoid empty over-scroll.",
-                "- The removed bottom stats-card hook stays out of app source.",
-                "- Body Score share cards expose layout anchors for UI assertions.",
-                "- Body Score share cards preserve actual photo aspect defaults instead of forcing one crop.",
-                "- Body Score sharing resolves the actual progress photo before presenting the sheet.",
-                "- Today and Progress provenance sheets dismiss through their presenting state binding.",
-                "- The dashboard avatar visual fills a full-width black stage while preserving each transparent asset's native aspect ratio.",
-                "- Dashboard/HUD launch surfaces stay on theme-backed glass or flat surface treatments.",
-                "- Timeline/Stats swipe navigation changes page on release, not during drag updates.",
-                "- Paid users default directly into the timeline HUD without a Statsig or legacy fallback gate.",
-                "- Chat composer stays pinned to the home hero; Timeline/Stats use Jovie swipe and menu, not top tabs.",
-                "- Timeline positions follow the injected calendar day, not elapsed 86400-second offsets.",
-            ]
-        )
-
-    (artifact_dir / "launch-ui-regression-audit.md").write_text("\n".join(lines) + "\n")
 
 
 def main() -> int:
