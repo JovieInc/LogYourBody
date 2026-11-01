@@ -92,8 +92,8 @@ struct LoginView: View {
 
                 VStack(spacing: JovieTokens.sectionGap) {
                     AuthHeader(
-                        title: "Your body, over time.",
-                        subtitle: "Private body-composition tracking that takes seconds, not another habit to manage."
+                        title: LaunchPromiseCopy.headline,
+                        subtitle: LaunchPromiseCopy.explanation
                     )
                     .opacity(hasAppeared ? 1 : 0)
                     .offset(y: reduceMotion || hasAppeared ? 0 : 8)
