@@ -1,25 +1,43 @@
 [
   {
-    "fingerprint": "24cef6eff7f0",
-    "source": "https://github.com/JovieInc/LogYourBody/tree/codex/lyb-277-20261101t082148#lyb-277-task",
-    "correction": "LYB-277: Store only the user's utterance verbatim as the program revision rationale, without a generated coach sentence, template name or trademark. Retain one checked-in wording policy and a fixed utterance fixture under CI.",
-    "mechanization": "Retain the accepted default in the shared-lib decisions directory and validate a fixed revision fixture against the supplied utterance. The existing required shared-lib suite rejects absent, duplicate and renamed policies, changed defaults, altered rationale text and extra wording fields. Preserve whitespace in the existing structured steering schema while retaining nonblank and length checks. The existing persistence regression fails with trimming and passes after its removal, asserting the saved steering record, proposal reason, intent and summary. Card and chat presentation remain outside this slice; the harness owns push and PR operations.",
+    "fingerprint": "marketing-assets-git-capture-instant",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41290965357",
+    "correction": "PR #1683 / LYB-293, fix-red-e3b0c44298 occurrence 75: the complete-history marketing provenance fixture compares ISO timestamp spelling, so Git 2.56's UTC Z output fails against the equivalent +00:00 fixture on the repaired head.",
+    "mechanization": "Extend the existing required web provenance fixture into a real-Git matrix for UTC Z, UTC +00:00 and an equivalent nonzero offset. Compare exact parsed instants for history-derived evidence while retaining byte-exact assertions for preserved manifest dates and all freshness, hash and missing-evidence gates. The two alternate spellings fail with the previous string assertion and pass with instant comparison. Merge origin/main first; it is already an ancestor. Keep adherence offers and production generation unchanged. The harness owns push and PR-body updates and must add exactly one machine line: Machine: built apps/web/src/lib/marketing/__tests__/marketing-product-assets.test.ts.",
     "classification": {
       "codebase": {
         "feasible": false,
-        "rationale": "The existing writer can preserve supplied text without transforming it, but cannot enforce the uniqueness of a checked-in decision or prove future rationale authorship from its single rationale field by construction."
+        "rationale": "The generator already returns valid capture evidence for the same instant. This failure is in a test's representation-sensitive expectation; changing production timestamp spelling would not constrain external Git versions."
       },
       "static": {
         "feasible": true,
-        "rationale": "The existing required shared-lib suite can enforce one accepted policy and exact equality of the revision rationale fixture to its supplied user utterance, with negative controls for alternate text and generated wording fields. The existing web suite verifies verbatim persistence through the actual writer."
+        "rationale": "The existing required web Jest suite can compare exact instants and exercise equivalent timestamp spellings without relaxing capture age, provenance or retained-date assertions."
       }
     },
-    "level": "static",
-    "ruleId": "ci-invariant",
     "guard": {
-      "path": "packages/shared-lib/src/program-revision-rationale-wording.test.ts",
-      "anchor": "program revision rationale wording policy (LYB-277)"
-    }
+      "path": "apps/web/src/lib/marketing/__tests__/marketing-product-assets.test.ts",
+      "anchor": "derives the exact capture instant from complete history (%s)"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "marketing-assets-retain-hash-bound-capture-date",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41289916374",
+    "correction": "PR #1683 / LYB-293, fix-red-95726c4f82 occurrence 8: merge-group JavaScript/TypeScript fails the marketing asset freshness assertion because shallow Git history dates an unchanged screenshot from a future synthetic merge commit. Tently separately reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing marketing asset sync generator to retain capture timestamps only for matching source paths and SHA-256 bytes. Missing evidence requires complete committed asset history; shallow boundaries, uncommitted bytes and source archives cannot refresh capture age. Exercise the actual generator in temporary Git repositories through the existing required web Jest suite, including a future synthetic merge cloned at depth one, repeat sync, archive extraction, complete-history recovery and missing, malformed or mismatched provenance. The regressions fail against the prior generator and pass after repair. Preserve the existing nonfuture and 60-day freshness assertions. Merge origin/main first and keep the adherence offer implementation intact. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/marketing/sync-ios-marketing-assets.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator can bind capture provenance to source content and refuse incomplete evidence before writing a manifest, preventing synthetic merge and extraction timestamps from falsely establishing freshness."
+      }
+    },
+    "guard": {
+      "path": "scripts/marketing/sync-ios-marketing-assets.mjs",
+      "anchor": "// Capture provenance follows the image bytes, never checkout or synthetic merge time."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "lyb-web-landing-only-v1",
@@ -5505,5 +5523,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "24cef6eff7f0",
+    "source": "https://github.com/JovieInc/LogYourBody/tree/codex/lyb-277-20261101t082148#lyb-277-task",
+    "correction": "LYB-277: Store only the user's utterance verbatim as the program revision rationale, without a generated coach sentence, template name or trademark. Retain one checked-in wording policy and a fixed utterance fixture under CI.",
+    "mechanization": "Retain the accepted default in the shared-lib decisions directory and validate a fixed revision fixture against the supplied utterance. The existing required shared-lib suite rejects absent, duplicate and renamed policies, changed defaults, altered rationale text and extra wording fields. Preserve whitespace in the existing structured steering schema while retaining nonblank and length checks. The existing persistence regression fails with trimming and passes after its removal, asserting the saved steering record, proposal reason, intent and summary. Card and chat presentation remain outside this slice; the harness owns push and PR operations.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The existing writer can preserve supplied text without transforming it, but cannot enforce the uniqueness of a checked-in decision or prove future rationale authorship from its single rationale field by construction."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib suite can enforce one accepted policy and exact equality of the revision rationale fixture to its supplied user utterance, with negative controls for alternate text and generated wording fields. The existing web suite verifies verbatim persistence through the actual writer."
+      }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant",
+    "guard": {
+      "path": "packages/shared-lib/src/program-revision-rationale-wording.test.ts",
+      "anchor": "program revision rationale wording policy (LYB-277)"
+    }
   }
 ]

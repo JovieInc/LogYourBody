@@ -69,6 +69,11 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
 
 ## Legal And Store Review
 
+- Before coached-tier launch, complete the counsel sign-off and consent,
+  policy, rights-request and medication-safety evidence in the
+  [LYB-328 review](../../../../docs/compliance/health-data-consent-and-claims-review.md).
+  The review currently records unresolved blockers and no launch clearance.
+  Passing CI, document acceptance and system permissions do not clear this hold.
 - Terms and privacy links open in-app from the paywall.
 - App Store metadata has current support and privacy URLs.
 - Public support, privacy, and terms URLs return HTTP 200.

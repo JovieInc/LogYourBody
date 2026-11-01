@@ -111,6 +111,32 @@ export const endpoints = {
         'Washington Attorney General complaint link in the supplied consumer health data privacy policy.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-328',
+      reason:
+        'LYB-328 source review and counsel handoff for health-data consent and wellness claims; not a runtime endpoint.',
+    },
+    {
+      value: 'https://app.leg.wa.gov/RCW/default.aspx?cite=19.373&full=true',
+      reason:
+        'Washington My Health My Data Act primary source for the LYB-328 review; not a runtime endpoint.',
+    },
+    {
+      value: 'https://www.cppa.ca.gov/faq.html',
+      reason:
+        'California Privacy Protection Agency primary guidance for the LYB-328 sensitive-information review; not a runtime endpoint.',
+    },
+    {
+      value: 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/',
+      reason:
+        'Authoritative GDPR reference for the LYB-328 counsel handoff; full-text retrieval was challenge-blocked.',
+    },
+    {
+      value:
+        'https://europa.eu/youreurope/business/governance-and-sustainability/digital-and-data-compliance/data-protection-gdpr/index_en.htm',
+      reason:
+        'European Commission GDPR guidance checked for the LYB-328 review; not a runtime endpoint.',
+    },
+    {
       value: 'https://oidc.vercel.com/jovie',
       reason:
         'Vercel OIDC issuer and JWKS for authenticated production Summer customer voice replies.',
