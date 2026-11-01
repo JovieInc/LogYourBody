@@ -1,0 +1,15 @@
+{
+  "launch.baseline": ["LaunchJourneyTests/testBaselineDenialAndNoDataRecoverToOneAction()"],
+  "launch.deadline": ["LaunchJourneyTests/testDatedOutcomeSurvivesAndEditRecomputes()"],
+  "launch.deadline-replan": ["LaunchJourneyTests/testDateEditRecomputesWithoutExtendingExpired()"],
+  "launch.directive": ["LaunchJourneyTests/testOneNextActionForReadyPlan()"],
+  "launch.drift": ["LaunchJourneyTests/testDriftChangesTheSingleAction()"],
+  "launch.memory-isolation": ["LaunchJourneyTests/testHealthMemoryIsolationFailClosed()"],
+  "launch.navigation": ["LaunchJourneyTests/testHiddenSurfaceRecoveryHasAnExit()"],
+  "launch.promise": ["LaunchJourneyTests/testPromiseCopyStatesTheDate()"],
+  "launch.recovery": ["LaunchJourneyTests/testOfflineStaleAndConflictRecover()"],
+  "launch.return": ["LaunchJourneyTests/testExpiredAndMaintenanceDoNotExtendTheDate()"],
+  "launch.safety": ["LaunchJourneyTests/testUnavailableSafetyAndUnsafeDatesFailClosed()"],
+  "launch.stats": ["LaunchJourneyTests/testStatsSurfaceProjectsEveryState()"],
+  "launch.timeline": ["LaunchJourneyTests/testTimelineSurfaceProjectsEveryState()"]
+}

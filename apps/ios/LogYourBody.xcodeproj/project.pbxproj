@@ -20,6 +20,9 @@
 		A26100000000000000000005 /* QuickPillRankerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26100000000000000000006 /* QuickPillRankerTests.swift */; };
 		B26920261025000000000002 /* BackwardPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26920261025000000000001 /* BackwardPlanner.swift */; };
 		B26920261025000000000004 /* BackwardPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26920261025000000000003 /* BackwardPlannerTests.swift */; };
+		B18320261101000000000002 /* LaunchJourney.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18320261101000000000001 /* LaunchJourney.swift */; };
+		B18320261101000000000004 /* LaunchJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18320261101000000000003 /* LaunchJourneyTests.swift */; };
+		B18320261101000000000006 /* LaunchJourneyUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18320261101000000000005 /* LaunchJourneyUI.swift */; };
 		B26920261025000000000006 /* lyb-launch-contract.json in Resources */ = {isa = PBXBuildFile; fileRef = B26920261025000000000005 /* lyb-launch-contract.json */; };
 		A19900000000000000000001 /* StoreKitPurchaseRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */; };
 		A16800000000000000000001 /* ContextualMetricShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16800000000000000000002 /* ContextualMetricShare.swift */; };
@@ -608,6 +611,9 @@
 		A26100000000000000000006 /* QuickPillRankerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickPillRankerTests.swift; sourceTree = "<group>"; };
 		B26920261025000000000001 /* BackwardPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackwardPlanner.swift; sourceTree = "<group>"; };
 		B26920261025000000000003 /* BackwardPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackwardPlannerTests.swift; sourceTree = "<group>"; };
+		B18320261101000000000001 /* LaunchJourney.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchJourney.swift; sourceTree = "<group>"; };
+		B18320261101000000000003 /* LaunchJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchJourneyTests.swift; sourceTree = "<group>"; };
+		B18320261101000000000005 /* LaunchJourneyUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchJourneyUI.swift; sourceTree = "<group>"; };
 		B26920261025000000000005 /* lyb-launch-contract.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "Fixtures/lyb-launch-contract.json"; sourceTree = "<group>"; };
 		A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitPurchaseRestoreTests.swift; sourceTree = "<group>"; };
 		A16800000000000000000002 /* ContextualMetricShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContextualMetricShare.swift; path = Components/ContextualMetricShare.swift; sourceTree = "<group>"; };
@@ -1462,6 +1468,7 @@
 				AD2600042F00000100ABCDEF /* HomeFocusSelectorTests.swift */,
 				E24920261025000400000001 /* WorkoutReconciliationPromptTests.swift */,
 				B26920261025000000000003 /* BackwardPlannerTests.swift */,
+				B18320261101000000000003 /* LaunchJourneyTests.swift */,
 				B27020261029000000000003 /* OutcomeFeasibilityTests.swift */,
 				B26920261025000000000005 /* lyb-launch-contract.json */,
 				896E3815B745A313FCD93C78 /* DesignSystem */,
@@ -1672,6 +1679,8 @@
 				E24920261025000200000001 /* CoreDataWorkoutReconciliationStore.swift */,
 				E24920261025000100000001 /* WorkoutReconciliationPolicy.swift */,
 				B26920261025000000000001 /* BackwardPlanner.swift */,
+				B18320261101000000000001 /* LaunchJourney.swift */,
+				B18320261101000000000005 /* LaunchJourneyUI.swift */,
 				B27020261029000000000001 /* OutcomeFeasibility.swift */,
 				C7A700012F20000000C0A701 /* ChatService.swift */,
 				A26100000000000000000002 /* QuickPillRanker.swift */,
@@ -2432,6 +2441,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B26920261025000000000004 /* BackwardPlannerTests.swift in Sources */,
+				B18320261101000000000004 /* LaunchJourneyTests.swift in Sources */,
 				B27020261029000000000004 /* OutcomeFeasibilityTests.swift in Sources */,
 				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
 				E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */,
@@ -2635,6 +2645,8 @@
 				F11620261025000000000006 /* TrainingRestTimerView.swift in Sources */,
 				F11620261025000000000008 /* TrainingRestActivityAttributes.swift in Sources */,
 				B26920261025000000000002 /* BackwardPlanner.swift in Sources */,
+				B18320261101000000000002 /* LaunchJourney.swift in Sources */,
+				B18320261101000000000006 /* LaunchJourneyUI.swift in Sources */,
 				B27020261029000000000002 /* OutcomeFeasibility.swift in Sources */,
 				AD8F12EA2ED6AA76003C4559 /* AnalyticsService.swift in Sources */,
 				FE13A3A300000000000000C1 /* FeatureReleasePolicy.swift in Sources */,

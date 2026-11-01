@@ -5,6 +5,36 @@ final class HomeV2ShareRecoveryUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testLaunchJourneyAtLargestTextKeepsMenuAndOutcomeEditorReachable() {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestLaunchJourneyFixture",
+            "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        let directive = app.descendants(matching: .any)["launch_directive_timeline"]
+        XCTAssertTrue(directive.waitForExistence(timeout: 30))
+        XCTAssertLessThanOrEqual(directive.frame.height, 161)
+        let menu = app.buttons["photo_timeline_root_menu"]
+        XCTAssertTrue(menu.isHittable)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(menu.frame))
+        let scroll = app.scrollViews["launch_directive_scroll"]
+        XCTAssertTrue(scroll.exists, "Large text must scroll without consuming the home")
+        let next = app.buttons["launch_next_action"]
+        for _ in 0..<8 {
+            if next.isHittable && scroll.frame.contains(next.frame) { break }
+            scroll.swipeUp()
+        }
+        XCTAssertTrue(next.isHittable)
+        XCTAssertTrue(scroll.frame.contains(next.frame))
+        next.tap()
+        XCTAssertTrue(app.textFields["launch_outcome_date"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["launch_outcome_save"].exists)
+        capture(app, named: "launch-journey-largest-text-outcome-editor")
+    }
+
     func testSinglePhotoToolsExplainCompareAndShareAndReturnToViewer() {
         let app = launch(fixture: "-lybUITestHomeV2SinglePhotoFixture")
         for tool in ["compare", "share"] {

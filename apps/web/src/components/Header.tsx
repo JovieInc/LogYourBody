@@ -13,11 +13,7 @@ interface HeaderProps {
   showFeatures?: boolean;
 }
 
-const links = [
-  { href: '/about', label: 'About' },
-  { href: '/blog', label: 'Blog' },
-  { href: '/download/ios', label: 'iOS' },
-];
+const links = [{ href: '/download/ios', label: 'iOS' }];
 
 export function Header({ showFeatures = false, onFeatureClick }: HeaderProps) {
   const [open, setOpen] = useState(false);

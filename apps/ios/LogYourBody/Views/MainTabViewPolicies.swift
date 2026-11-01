@@ -117,7 +117,7 @@ enum ComposerLoggingSelectorPhase: Equatable {
     case dragSelection
 }
 
-struct ComposerLoggingSelectorState: Equatable {
+struct LoggingSelectorPrototypeState: Equatable {
     private(set) var phase: ComposerLoggingSelectorPhase = .composer
     private(set) var highlightedMode: ComposerLoggingMode?
 
@@ -186,11 +186,9 @@ enum ComposerLoggingPrototypePolicy {
         #if DEBUG
         if arguments.contains(fixtureArgument) { return true }
         #endif
-
-        let checkGate = isGateEnabled ?? {
-            AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0)
-        }
-        return checkGate(gateKey)
+        // Release cannot turn the hidden logging prototype back on.
+        _ = isGateEnabled
+        return false
     }
 }
 

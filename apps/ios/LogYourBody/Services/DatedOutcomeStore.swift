@@ -35,7 +35,7 @@ final class DatedOutcomeStore {
     /// A no-op Save emits none. A failed save publishes nothing and restores the context.
     @discardableResult
     func save(_ value: DatedOutcome) throws -> DatedOutcomeEdit? {
-        guard enabled() else { throw DatedOutcomeError.unavailable }
+        // Local relaunch persistence does not wait for the cloud gate. synchronize() stays gated.
         let owner = try requireOwner()
         try value.validate()
         let edit: DatedOutcomeEdit? = try context.performAndWait {

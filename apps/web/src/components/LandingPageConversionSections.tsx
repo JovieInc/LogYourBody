@@ -85,7 +85,7 @@ export function LandingPageConversionSections({
                   </div>
 
                   {/* Mobile mockup - positioned to overlap */}
-                  <div className="border-linear-border/50 bg-linear-card/80 absolute -bottom-8 -right-8 w-48 rounded-2xl border p-4 shadow-xl backdrop-blur-sm">
+                  <div className="border-linear-border/50 bg-linear-card/80 absolute -right-8 -bottom-8 w-48 rounded-2xl border p-4 shadow-xl backdrop-blur-sm">
                     <div className="mb-3 flex justify-center">
                       <div className="bg-linear-border/50 h-1 w-12 rounded-full"></div>
                     </div>
@@ -98,7 +98,7 @@ export function LandingPageConversionSections({
                   </div>
 
                   {/* Sync indicator */}
-                  <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+                  <div className="absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
                     <div className="bg-linear-bg/90 border-linear-border/50 rounded-full border p-3 shadow-lg backdrop-blur-sm">
                       <Zap className="h-6 w-6 animate-pulse text-white" />
                     </div>
@@ -358,17 +358,17 @@ export function LandingPageConversionSections({
               {/* Left side apps */}
               <div className="absolute left-1/2 flex -translate-x-[140px]">
                 <div className="relative -mr-3 transition-transform hover:z-10 hover:-translate-y-1">
-                  <div className="border-3 border-linear-bg flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
+                  <div className="border-linear-bg flex h-12 w-12 items-center justify-center rounded-full border-3 bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
                     <span className="text-xs font-bold text-white">MFP</span>
                   </div>
                 </div>
                 <div className="relative -mr-3 transition-transform hover:z-10 hover:-translate-y-1">
-                  <div className="border-3 border-linear-bg flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg">
+                  <div className="border-linear-bg flex h-12 w-12 items-center justify-center rounded-full border-3 bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg">
                     <span className="text-xs font-bold text-white">S</span>
                   </div>
                 </div>
                 <div className="relative transition-transform hover:z-10 hover:-translate-y-1">
-                  <div className="border-3 border-linear-bg flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 shadow-lg">
+                  <div className="border-linear-bg flex h-12 w-12 items-center justify-center rounded-full border-3 bg-gradient-to-br from-blue-600 to-cyan-600 shadow-lg">
                     <span className="text-xs font-bold text-white">G</span>
                   </div>
                 </div>
@@ -377,17 +377,17 @@ export function LandingPageConversionSections({
               {/* Right side apps */}
               <div className="absolute left-1/2 flex translate-x-[44px]">
                 <div className="relative -mr-3 transition-transform hover:z-10 hover:-translate-y-1">
-                  <div className="border-3 border-linear-bg flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-teal-600 shadow-lg">
+                  <div className="border-linear-bg flex h-12 w-12 items-center justify-center rounded-full border-3 bg-gradient-to-br from-teal-500 to-teal-600 shadow-lg">
                     <span className="text-xs font-bold text-white">F</span>
                   </div>
                 </div>
                 <div className="relative -mr-3 transition-transform hover:z-10 hover:-translate-y-1">
-                  <div className="border-3 border-linear-bg flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-gray-700 to-gray-800 shadow-lg">
+                  <div className="border-linear-bg flex h-12 w-12 items-center justify-center rounded-full border-3 bg-gradient-to-br from-gray-700 to-gray-800 shadow-lg">
                     <span className="text-xs font-bold text-white">W</span>
                   </div>
                 </div>
                 <div className="relative transition-transform hover:z-10 hover:-translate-y-1">
-                  <div className="border-3 border-linear-bg flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-purple-600 shadow-lg">
+                  <div className="border-linear-bg flex h-12 w-12 items-center justify-center rounded-full border-3 bg-gradient-to-br from-purple-500 to-purple-600 shadow-lg">
                     <span className="text-xs font-bold text-white">O</span>
                   </div>
                 </div>
@@ -408,7 +408,7 @@ export function LandingPageConversionSections({
         <div className="from-linear-purple/5 to-linear-purple/5 absolute inset-0 bg-gradient-to-br via-transparent" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(94,106,210,0.1),transparent)]" />
 
-        <div className="container relative z-10 mx-auto px-4 sm:px-6">
+        <div className="relative z-10 container mx-auto px-4 sm:px-6">
           <div className="mx-auto max-w-4xl text-center">
             <Badge className="bg-linear-purple/10 border-linear-purple/20 mb-8 text-white">
               Ready to get started?
@@ -431,7 +431,7 @@ export function LandingPageConversionSections({
                   Start Tracking Today
                 </Button>
               </Link>
-              <Link href="/about">
+              <Link href="/support">
                 <Button
                   variant="ghost"
                   className="border-linear-border/50 text-linear-text-secondary hover:bg-linear-border/30 hover:text-linear-text rounded-xl border px-8 py-4 text-base backdrop-blur-sm transition-all"

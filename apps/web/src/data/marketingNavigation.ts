@@ -17,24 +17,15 @@ export interface MarketingFooterColumn {
 export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
   {
     title: 'Product',
-    links: [
-      { href: '/download', label: 'Download' },
-      { href: '/changelog', label: 'Changelog' },
-      { href: '/blog', label: 'Blog' },
-    ],
+    links: [{ href: '/download', label: 'Download' }],
   },
   {
     title: 'Company',
-    links: [
-      { href: '/about', label: 'About' },
-      { href: '/careers', label: 'Careers' },
-      { href: '/brand', label: 'Brand' },
-    ],
+    links: [{ href: '/support', label: 'Support' }],
   },
   {
     title: 'Resources',
     links: [
-      { href: '/support', label: 'Support' },
       { href: '/security', label: 'Security' },
       { href: logYourBody.links.status, label: 'Status', external: true },
     ],

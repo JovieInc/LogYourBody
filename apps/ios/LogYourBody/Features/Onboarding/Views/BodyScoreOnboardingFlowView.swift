@@ -32,7 +32,7 @@ struct BodyScoreOnboardingFlowView: View {
             case .bodyFatNumeric:
                 BodyScoreBodyFatNumericView(viewModel: viewModel)
             case .bodyFatVisual:
-                BodyScoreBodyFatVisualView(viewModel: viewModel)
+                BodyScoreBodyFatChoiceView(viewModel: viewModel)
             case .loading:
                 BodyScoreLoadingView(viewModel: viewModel)
             case .bodyScore, .defaultHomeMode:

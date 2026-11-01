@@ -50,16 +50,12 @@ extension DashboardViewLiquid {
         .worldClassScreen(.home)
     }
 
-    private var homeChatDraftBinding: Binding<String> {
-        let ownership = authManager.captureAccountSession()
-        return AccountSessionChatDraft.binding(storage: $homeChatDraft, owner: ownership) {
-            guard let ownership else { return false }
-            return authManager.ownsAccountSession(ownership)
-        }
-    }
-
     var photoTimelineRoot: some View {
         VStack(spacing: 0) {
+            if isLaunchJourneyEnabled {
+                launchJourneyDirective
+            }
+
             photoTimelineRootNavigation
                 .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.top, 8)

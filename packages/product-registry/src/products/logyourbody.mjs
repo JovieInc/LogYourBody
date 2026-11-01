@@ -390,10 +390,10 @@ export const logYourBody = {
   ],
   messages: {
     landing: {
-      headline: 'Know if the work is working.',
+      headline: 'Your body-composition goal, planned around your next date.',
       subheading:
-        'Weight, body fat, lean mass, and progress photos in one private timeline that shows the trend.',
-      framingLine: 'One timeline. The signal, without the noise.',
+        'Set an outcome and a date. LogYourBody follows your photos and measurements, spots drift, and gives you one next action.',
+      framingLine: 'Dates guide the plan. They do not guarantee a result.',
       primaryCta: 'Download on the App Store',
     },
     waitlist: {

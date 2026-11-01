@@ -51,17 +51,13 @@ describe('marketing discovery routes', () => {
     expect(urls.some((url) => url.includes('/dashboard'))).toBe(false);
   });
 
-  it('includes published article URLs with safely encoded slugs', async () => {
+  it('does not list hidden blog routes', async () => {
     jest.mocked(getAllPosts).mockResolvedValueOnce([
       { slug: 'progress & context', date: '2026-10-14' },
       { slug: 'understand-your-trend', date: '2026-10-15' },
     ] as Awaited<ReturnType<typeof getAllPosts>>);
     const entries = await sitemap();
-    expect(entries.slice(-2).map((entry) => entry.url)).toEqual([
-      'https://www.logyourbody.com/blog/progress%20%26%20context',
-      'https://www.logyourbody.com/blog/understand-your-trend',
-    ]);
-    // A publication date is not evidence of when an article was last modified.
+    expect(entries.map((entry) => entry.url).some((url) => url.includes('/blog'))).toBe(false);
     for (const entry of entries) expect(entry).not.toHaveProperty('lastModified');
   });
 

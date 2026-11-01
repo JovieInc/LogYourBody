@@ -4,16 +4,20 @@ import path from 'node:path';
 import type { Metadata } from 'next';
 import { logYourBody } from '@jovieinc/product-registry';
 import { PUBLIC_MARKETING_ROUTES } from '@/data/publicMarketingRoutes';
-import { getAllTags, getPostBySlug } from '@/lib/blog';
 import {
   getRedirectUrl,
   unstable_getResponseFromNextConfig,
 } from 'next/experimental/testing/server';
 import nextConfig from '../../../next.config';
 import { accumulateMetadata, type MetadataItems } from 'next/dist/lib/metadata/resolve-metadata';
+import { getURLFromRedirectError } from 'next/dist/client/components/redirect';
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 
 jest.mock('server-only', () => ({}));
-jest.mock('next/navigation', () => ({ notFound: jest.requireActual('next/navigation').notFound }));
+jest.mock('next/navigation', () => ({
+  notFound: jest.requireActual('next/navigation').notFound,
+  redirect: jest.requireActual('next/navigation').redirect,
+}));
 jest.mock('next/font/local', () => () => ({ variable: 'font' }));
 jest.mock('@vercel/analytics/next', () => ({ Analytics: () => null }));
 jest.mock('@vercel/speed-insights/next', () => ({ SpeedInsights: () => null }));
@@ -29,7 +33,19 @@ jest.mock('@/lib/blog', () => ({ getAllTags: jest.fn(), getPostBySlug: jest.fn()
 const appRoot = path.join(process.cwd(), 'src/app');
 // Redirect-only acquisition routes emit no indexable document.
 const aliases: Record<string, string> = { '/download/ios': '/' };
-const redirectPages = ['download/page.tsx', 'landing/page.tsx', 'mobile/page.tsx'];
+const redirectPages: Record<string, string> = {
+  'download/page.tsx': '/download/ios',
+  'landing/page.tsx': '/',
+  'mobile/page.tsx': '/download/ios',
+  'about/page.tsx': '/',
+  'blog/page.tsx': '/',
+  'blog/[slug]/page.tsx': '/',
+  'blog/tag/[tag]/page.tsx': '/',
+  'brand/page.tsx': '/',
+  'careers/page.tsx': '/',
+  'changelog/page.tsx': '/',
+  'download/android/page.tsx': '/download/ios',
+};
 
 function publicPages(directory = appRoot): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -40,8 +56,7 @@ function publicPages(directory = appRoot): string[] {
       return publicPages(file);
     }
     if (!/^page\.[jt]sx?$/.test(entry.name)) return [];
-    if (redirectPages.includes(relative) && /\bredirect\(/.test(readFileSync(file, 'utf8')))
-      return [];
+    if (redirectPages[relative] && /\bredirect\(/.test(readFileSync(file, 'utf8'))) return [];
     return [relative];
   });
 }
@@ -115,42 +130,28 @@ describe('public route metadata contract (LYB-223)', () => {
     },
   );
 
-  it('requires metadata coverage for every dynamic public route', () => {
-    expect(
-      publicPages()
-        .filter((file) => file.includes('['))
-        .sort(),
-    ).toEqual(['blog/[slug]/page.tsx', 'blog/tag/[tag]/page.tsx']);
-  });
+  it.each(Object.entries(redirectPages))(
+    '%s recovers to %s without an indexable document',
+    (file, destination) => {
+      const { default: Page } = require(path.join(appRoot, file));
+      let result: unknown;
+      try {
+        Page();
+      } catch (error) {
+        result = error;
+      }
+      expect(isRedirectError(result)).toBe(true);
+      if (!isRedirectError(result)) throw new Error('Expected a real Next redirect');
+      expect(getURLFromRedirectError(result)).toBe(destination);
+    },
+  );
 
-  it('canonicalizes each published article to its own encoded path', async () => {
-    jest.mocked(getPostBySlug).mockResolvedValue({
-      slug: 'progress-trends',
-      title: 'Progress trends',
-      excerpt: 'Trend context.',
-    } as Awaited<ReturnType<typeof getPostBySlug>>);
-    const { generateMetadata } = require('../blog/[slug]/page');
-    await assertMetadata(
-      await generateMetadata({ params: Promise.resolve({ slug: 'progress-trends' }) }),
-      '/blog/progress-trends',
-    );
-    jest.mocked(getPostBySlug).mockResolvedValue(null);
-    await expect(
-      generateMetadata({ params: Promise.resolve({ slug: 'unpublished' }) }),
-    ).rejects.toThrow();
-  });
-
-  it('canonicalizes tag pages and withholds unknown tags', async () => {
-    jest.mocked(getAllTags).mockResolvedValue(['Progress Tracking', 'Training & Recovery']);
-    const { generateMetadata } = require('../blog/tag/[tag]/page');
-    for (const tag of ['progress-tracking', 'training-&-recovery']) {
-      await assertMetadata(
-        await generateMetadata({ params: Promise.resolve({ tag }) }),
-        `/blog/tag/${encodeURIComponent(tag)}`,
-      );
+  it('keeps hidden blog routes out of the public inventory', () => {
+    expect(publicPages().filter((file) => file.includes('['))).toEqual([]);
+    for (const file of ['blog/[slug]/page.tsx', 'blog/tag/[tag]/page.tsx', 'blog/page.tsx']) {
+      const source = readFileSync(path.join(appRoot, file), 'utf8');
+      expect(source).toContain("redirect('/')");
+      expect(source).not.toContain('generateMetadata');
     }
-    await expect(
-      generateMetadata({ params: Promise.resolve({ tag: 'unknown' }) }),
-    ).rejects.toThrow();
   });
 });
