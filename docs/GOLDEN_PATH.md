@@ -3,7 +3,10 @@
 **October 16, 2026 reconciliation (LYB-179):** The paid manual-log journey below
 is retained as v1 reliability/regression history. LYB-173 supersedes its claim to
 be the entire product loop: automatic reliable observation and one credible,
-steerable decision now lead; timeline remains inspectable detail. Preserve every
+steerable decision now lead. October 28, 2026 makes the body through time the
+Home canvas. That timeline is the
+home canvas and stays inspectable. Raw provider metadata does not replace the
+one action. Preserve every
 existing Golden Path gate. Do not treat a trial phase transition, calculation,
 navigation or durable save alone as an insight impression, coaching activation
 or cash receipt. Use the [current funnel contract](marketing/funnel-evidence-contract.md)

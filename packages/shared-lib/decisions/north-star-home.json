@@ -1,0 +1,45 @@
+{
+  "id": "LYB-173",
+  "status": "accepted",
+  "recorded_on": "2026-11-01",
+  "question": "After October 28, 2026, what is Home, and what must this contract leave to existing owners?",
+  "decision": "Home is the user's body through time, with one useful contextual action. October 14 still forbids a raw provider-metadata home and all-at-once first-run. This record does not implement Home, ingestion, coaching, 3D, or web, and it does not take over child owners.",
+  "roadmap": "docs/product-development-roadmap.md",
+  "current_section": {
+    "start": "## October 16 supersession: current product behavior",
+    "end": "## Product API and MCP parity — LYB-161"
+  },
+  "required_current_phrases": [
+    "Home is the user's body through time",
+    "selectable male or female wireframe",
+    "One useful contextual action",
+    "do not dominate Home",
+    "Chat remains a control plane, not the whole UI",
+    "only inside LYB-311",
+    "replaces a blanket deferral of all 3D work",
+    "never shown as captured evidence",
+    "Paid R1 has no mandatory composer, chat, or advanced-3D dependency",
+    "LYB-100 keeps web landing-only",
+    "LYB-164 does not authorize an authenticated web app",
+    "iOS native responsive cards",
+    "A daily duration target is not default onboarding",
+    "no second onboarding or Home implementation",
+    "invents no BodySpec MCP event support",
+    "JOV-8332",
+    "A merge alone does not complete a stage"
+  ],
+  "forbidden_current_phrases": [
+    "supersedes the timeline-first home",
+    "the timeline is historical detail",
+    "Timeline and stats are detail surfaces"
+  ],
+  "preserved_history_phrase": "The timeline is the product.",
+  "aligned_documents": [
+    "docs/marketing/funnel-evidence-contract.md",
+    "docs/research/growth-playbook-2026-09-27.md",
+    "docs/USER_JOURNEYS.md",
+    "docs/product/outcome-map.md",
+    "docs/GOLDEN_PATH.md",
+    "docs/product/home-photo-visibility.md"
+  ]
+}
