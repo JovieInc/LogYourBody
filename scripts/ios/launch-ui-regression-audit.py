@@ -13,12 +13,35 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
-from launch_ui_opacity_audit import check_optional_cgfloat_opacity
-from launch_ui_timeline_audit import (
-    AuditViolation,
-    check_timeline_calendar_day,
-    line_number,
+from launch_ui_timeline_audit import AuditViolation, line_number
+
+
+def _load_sibling(module_name: str, filename: str, export: str):
+    """Load one extracted audit sibling. A missing module or export fails closed."""
+    path = Path(__file__).with_name(filename)
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load launch UI audit sibling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except FileNotFoundError as error:
+        raise RuntimeError(f"Cannot load launch UI audit sibling: {path}") from error
+    loaded = getattr(module, export, None)
+    if loaded is None:
+        raise RuntimeError(f"Cannot load launch UI audit sibling: {path}")
+    return loaded
+
+
+# Keep every size-ratchet extraction. Dropping one fails closed.
+_AUDIT_SIBLINGS = (
+    ("launch_ui_timeline_day", "launch_ui_timeline_day.py", "check_timeline_calendar_day"),
+    ("launch_ui_opacity_audit", "launch_ui_opacity_audit.py", "check_optional_cgfloat_opacity"),
+    ("launch_ui_regression_report", "launch-ui-regression-report.py", "write_outputs"),
 )
+check_timeline_calendar_day, check_optional_cgfloat_opacity, write_outputs = [
+    _load_sibling(*sibling) for sibling in _AUDIT_SIBLINGS
+]
 
 
 def read_sources(paths: list[Path]) -> dict[Path, str]:
@@ -97,19 +120,6 @@ def require_one_of_tokens(
             detail=detail,
         )
     )
-
-
-def _load_report_writer():
-    path = Path(__file__).with_name("launch-ui-regression-report.py")
-    spec = importlib.util.spec_from_file_location("launch_ui_regression_report", path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Cannot load launch UI report writer: {path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.write_outputs
-
-
-write_outputs = _load_report_writer()
 
 
 def main() -> int:
@@ -466,7 +476,7 @@ def main() -> int:
         ))
 
     # Timeline positions follow the injected calendar day, not elapsed 86400-second offsets.
-    check_timeline_calendar_day(root, violations)
+    check_timeline_calendar_day(root, violations, AuditViolation, line_number)
 
     write_outputs(args.artifact_dir, violations)
     if violations:

@@ -318,6 +318,30 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 self.assert_rejected("dashboard.checkin_card_hit_region")
                 path.write_text(source)
 
+    def test_every_size_ratchet_sibling_loads_or_the_audit_fails_closed(self):
+        loaded = [
+            AUDIT._load_sibling(module_name, filename, export)
+            for module_name, filename, export in AUDIT._AUDIT_SIBLINGS
+        ]
+        self.assertEqual(
+            [item[0] for item in AUDIT._AUDIT_SIBLINGS],
+            [
+                "launch_ui_timeline_day",
+                "launch_ui_opacity_audit",
+                "launch_ui_regression_report",
+            ],
+        )
+        for export in loaded:
+            self.assertTrue(callable(export))
+        with self.assertRaises(RuntimeError) as missing_file:
+            AUDIT._load_sibling("missing_sibling", "missing_launch_ui_sibling.py", "missing")
+        self.assertIn("Cannot load launch UI audit sibling", str(missing_file.exception))
+        with self.assertRaises(RuntimeError) as missing_export:
+            AUDIT._load_sibling(
+                "launch_ui_timeline_day", "launch_ui_timeline_day.py", "not_an_export",
+            )
+        self.assertIn("Cannot load launch UI audit sibling", str(missing_export.exception))
+
     def test_optional_cgfloat_opacity_must_be_explicit_double(self):
         policy = self.app / "Services/PersonMaskPolicy.swift"
         compare = self.app / "Views/HomeV2/HomeV2CompareView.swift"

@@ -86,6 +86,13 @@ def merge_sections(root, name):
     return ours.rstrip("\n") + "\n\n" + "\n\n".join(additions) + "\n"
 
 
+def union_manifests(root):
+    """Additive manifest union keeps every parent test input."""
+    # A conflicted correction ledger stays for its own resolver.
+    from manifest_union import apply_manifest_union
+    apply_manifest_union(root)
+
+
 def resolve_staged(root):
     root = Path(root).resolve()
     registry = staged_bytes(root, "repository-docs.json")
@@ -268,7 +275,9 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
         ["git", "diff", "--name-only", "--diff-filter=U", "--relative", "-z"],
         cwd=root, check=True, capture_output=True,
     ).stdout.decode().split("\0")
-    unresolved = sorted(set(conflicts) - {"", output})
+    # A conflicted correction ledger stays for its own resolver.
+    from manifest_union import LEDGER
+    unresolved = sorted(set(conflicts) - {"", output, LEDGER})
     conflicted_pin = None
     if reviewed_project_sha256 is not None and DIAGNOSTIC_WORKFLOW in unresolved:
         conflicted_pin = reviewed_conflicted_pin(root, reviewed_project_sha256)
@@ -363,10 +372,14 @@ def main():
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
     mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
+    mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
     args = parser.parse_args()
     try:
         if args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
+        elif args.union_manifests:
+            union_manifests(args.root)
+            resolve(args.root)
         elif args.staged:
             resolve_staged(args.root)
         else:
