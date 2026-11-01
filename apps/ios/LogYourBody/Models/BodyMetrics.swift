@@ -129,7 +129,7 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
     private var bodyFatEntryMethod: String?
     private var weightOperationIdStorage: String?
     private var weightRevisionStorage: Int?
-    private var extraFields: [String: ReportedMeasurementJSON] = [:]
+    var extraFields: [String: ReportedMeasurementJSON] = [:]
 
     var weightOperationId: String? { weightOperationIdStorage }
     var weightRevision: Int? { weightRevisionStorage }
@@ -403,19 +403,6 @@ extension BodyMetricSourceMetadata {
         if !context.isEmpty {
             updated.extraFields["healthkit_context"] = .objectValue(context.mapValues { .text($0) })
         }
-        return updated
-    }
-
-    var weeklyPhotoProvenance: WeeklyPhotoProvenance? {
-        guard let fields = extraFields[WeeklyPhotoProvenance.storageKey]?.object else { return nil }
-        return WeeklyPhotoProvenance(storage: fields.compactMapValues(\.string))
-    }
-
-    func recordingWeeklyPhoto(_ provenance: WeeklyPhotoProvenance) -> Self {
-        var updated = self
-        updated.extraFields[WeeklyPhotoProvenance.storageKey] = .objectValue(
-            provenance.storageFields.mapValues { .text($0) }
-        )
         return updated
     }
 

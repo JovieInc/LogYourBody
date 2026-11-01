@@ -332,58 +332,30 @@ struct DashboardViewLiquid: View {
                 loadGlp1WeeklyCheckInDataIfNeeded()
             }
 
-        let withSheetsAndNavigation = withSyncAndState
-            .sheet(isPresented: $showAddEntrySheet) {
-                AddEntrySheet(
-                    isPresented: $showAddEntrySheet,
-                    initialTab: addEntryInitialTab,
-                    includesGlp1Entry: addEntryIncludesGlp1Entry,
-                    initialDate: addEntryInitialDate,
-                    initialWeight: addEntryInitialWeight,
-                    initialBodyFat: addEntryInitialBodyFat,
-                    initialBodyFatMethod: addEntryInitialBodyFatMethod,
-                    isHomeV2LogEntry: isHomeV2LoggingWeight,
-                    onWeightSaved: handleHomeV2WeightEntrySaved,
-                    onBodyFatSaved: handleHomeV2BodyFatEntrySaved
-                )
-                    .environmentObject(authManager)
-            }
-            .sheet(isPresented: $showSyncDetails) {
-                DashboardSyncDetailsSheet(
-                    isPresented: $showSyncDetails,
-                    syncManager: realtimeSyncManager
-                )
-            }
-            .sheet(isPresented: $isProgressPhotoAttachPresented) {
-                ProgressPhotoAttachSheet(
-                    targetMetric: progressPhotoAttachTarget,
-                    fallbackDate: progressPhotoAttachFallbackDate,
-                    photoHistory: WeeklyPhotoCheckInPolicy.history(from: bodyMetrics),
-                    previousPhotoURL: weeklyPhotoOutlineURL,
-                    onComplete: {
-                        await handleProgressPhotoAttachComplete()
-                    },
-                    onCheckInSaved: { outcome in
-                        pendingWeeklyPhotoMoment = outcome.selectedMoment
-                        pendingWeeklyCompare = outcome.offersComparison && outcome.originalImageUsable
-                    }
-                )
-                .environmentObject(authManager)
-            }
-            .onChange(of: isProgressPhotoAttachPresented) { _, presented in
-                guard !presented else { return }
-                let moment = pendingWeeklyPhotoMoment
-                let compare = pendingWeeklyCompare
-                pendingWeeklyPhotoMoment = nil
-                pendingWeeklyCompare = false
-                progressPhotoAttachFallbackOverride = nil
-                if let moment {
-                    selectClosestMetric(to: moment)
+        let withSheetsAndNavigation = weeklyPhotoAttachSheet(
+            on: withSyncAndState
+                .sheet(isPresented: $showAddEntrySheet) {
+                    AddEntrySheet(
+                        isPresented: $showAddEntrySheet,
+                        initialTab: addEntryInitialTab,
+                        includesGlp1Entry: addEntryIncludesGlp1Entry,
+                        initialDate: addEntryInitialDate,
+                        initialWeight: addEntryInitialWeight,
+                        initialBodyFat: addEntryInitialBodyFat,
+                        initialBodyFatMethod: addEntryInitialBodyFatMethod,
+                        isHomeV2LogEntry: isHomeV2LoggingWeight,
+                        onWeightSaved: handleHomeV2WeightEntrySaved,
+                        onBodyFatSaved: handleHomeV2BodyFatEntrySaved
+                    )
+                        .environmentObject(authManager)
                 }
-                guard compare, HomeV2Policy.isEnabled(), let pair = homeV2DefaultPair else { return }
-                homeV2PhotoRoute = .compare(pair)
-                isHomeV2ViewerPresented = true
-            }
+                .sheet(isPresented: $showSyncDetails) {
+                    DashboardSyncDetailsSheet(
+                        isPresented: $showSyncDetails,
+                        syncManager: realtimeSyncManager
+                    )
+                }
+        )
             .navigationDestination(isPresented: $isMetricDetailActive) {
                 fullMetricChartView
             }

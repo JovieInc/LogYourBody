@@ -153,14 +153,7 @@ extension DashboardViewLiquid {
             Text("Your entry is still saved. Try Undo again.")
         }
         .task(id: authManager.currentUser?.id) {
-            guard let userId = authManager.currentUser?.id else { return }
-            let changed = await PhotoMetadataService.shared.backfillWeeklyPhotoProvenance(userId: userId)
-            guard changed > 0 else { return }
-            await viewModel.refreshData(
-                authManager: authManager,
-                realtimeSyncManager: realtimeSyncManager
-            )
-            refreshGlobalTimelineStore()
+            await refreshWeeklyPhotoProvenanceIfNeeded()
         }
     }
 
@@ -421,22 +414,6 @@ extension DashboardViewLiquid {
         return globalTimelineStore.weeklyBuckets.last
     }
 
-    var progressPhotoAttachFallbackDate: Date {
-        if let progressPhotoAttachFallbackOverride {
-            return progressPhotoAttachFallbackOverride
-        }
-        return currentMetric?.date ?? globalTimelineStore.cursor?.date ?? activeTimelineBucket?.endDate ?? Date()
-    }
-
-    /// The newest other diary photo, used only as an optional pose outline.
-    var weeklyPhotoOutlineURL: String? {
-        let excluded = progressPhotoAttachTarget?.id
-        return bodyMetrics
-            .filter { PhotoTimelineHUDPolicy.hasUsablePhoto($0) && $0.id != excluded }
-            .max { $0.date < $1.date }?
-            .photoUrl
-    }
-
     var progressPhotoAttachMetric: BodyMetrics? {
         if let currentMetric {
             return currentMetric
@@ -451,14 +428,6 @@ extension DashboardViewLiquid {
     func presentProgressPhotoAttach(for metric: BodyMetrics?) {
         progressPhotoAttachFallbackOverride = nil
         progressPhotoAttachTarget = metric
-        HapticManager.shared.selection()
-        isProgressPhotoAttachPresented = true
-    }
-
-    /// Weekly check-in attaches to today, even if the timeline is scrubbed elsewhere.
-    func presentWeeklyPhotoCheckIn() {
-        progressPhotoAttachFallbackOverride = Date()
-        progressPhotoAttachTarget = homeV2DisplayedTodayMetric()
         HapticManager.shared.selection()
         isProgressPhotoAttachPresented = true
     }
