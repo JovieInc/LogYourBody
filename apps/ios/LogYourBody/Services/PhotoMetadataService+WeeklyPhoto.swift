@@ -64,7 +64,11 @@ extension PhotoMetadataService {
         coreDataManager: CoreDataManager = .shared,
         writeAdmission: CoreDataManager.WriteAdmission? = nil
     ) async throws -> Bool {
-        try writeAdmission?()
+        // WriteAdmission is @MainActor. This method is nonisolated, so the
+        // check has to hop to the main actor before the background save.
+        if let writeAdmission {
+            try await writeAdmission()
+        }
         let saved = try await withCheckedThrowingContinuation { continuation in
             coreDataManager.persistentContainer.performBackgroundTask { context in
                 do {
