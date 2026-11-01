@@ -1,9 +1,10 @@
 # LogYourBody product outcome map and IA proposal
 
 **October 16, 2026 supersession (LYB-179):** LYB-173 now governs automatic-first,
-one-decision coaching with steerable native UI and inspectable history. It
-supersedes this proposal's timeline-as-main-product and training-as-secondary
-direction. The September 27 audit, v1 activation definitions, assumptions and
+one-decision coaching with steerable native UI and inspectable history.
+October 28, 2026 makes the body through time the Home canvas and keeps one
+contextual action. This proposal's raw analytics console and
+training-as-the-product direction stay superseded. The September 27 audit, v1 activation definitions, assumptions and
 revenue model below remain dated history, not observed outcomes or live offers.
 The current Pro registry references remain $9.99/month / $69.99/year USD with a
 three-day trial; no older premium/coaching package proposal establishes an offer.

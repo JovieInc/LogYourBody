@@ -13,6 +13,8 @@ does not override that preference.
 
 This follows the [brand ethos](brand-ethos.md)'s user-agency constraint and
 retains the [LYB-173 product direction](../product-development-roadmap.md#october-16-supersession-current-product-behavior).
+The October 28 Home, the user's body through time, uses this same chosen wireframe when a
+photo is absent or the user has hidden photos.
 
 ## Boundary
 

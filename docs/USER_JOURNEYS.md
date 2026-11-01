@@ -3,8 +3,10 @@
 **October 16, 2026 reconciliation (LYB-179):** The v1 journey/test inventory below
 is historical source context, not a current execution or release receipt.
 LYB-173's automatic-first observation, one credible decision and progressive
-onboarding supersede timeline-first/manual-first product direction; existing
-tests and owners remain. See the [reconciled roadmap](product-development-roadmap.md)
+onboarding still govern. October 28, 2026 makes the body through time the Home
+default and keeps one contextual action. That supersedes all-at-once first-run
+and a raw metadata home, not the body timeline itself. Existing tests and
+owners remain. See the [reconciled roadmap](product-development-roadmap.md)
 and [funnel evidence contract](marketing/funnel-evidence-contract.md). Neither a
 render marker nor subscription transition proves coaching activation or cash.
 

@@ -9,7 +9,9 @@ do not relabel its cohorts or compare their rates with a new coaching definition
 read October 16, is the product behavior and release sequencing authority:
 permissioned automatic observation, one credible decision/action, persistent
 steering, contextual skippable onboarding, and inspectable/correctable history.
-Timeline and stats are detail surfaces. This measurement slice adds no onboarding,
+October 28, 2026 makes the body through time the Home canvas and keeps one
+contextual action. Stats and raw provider history stay inspectable detail.
+This measurement slice adds no onboarding,
 import, sharing, coaching or home implementation.
 
 ### What qualifies

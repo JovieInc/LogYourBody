@@ -1,22 +1,56 @@
 # LogYourBody Product Roadmap And Build Guardrails
 
-Last reconciled: 2026-10-31 (LYB-161; preserves LYB-179 product supersession)
+Last reconciled: 2026-11-01 (LYB-173 October 28 home contract; preserves LYB-161 and LYB-179)
 
 ## October 16 supersession: current product behavior
 
-[LYB-173](https://linear.app/jovie/issue/LYB-173/p0-lyb-north-star-automatic-first-one-decision-coaching-and-living),
-dated October 14 and verified October 16, supersedes the timeline-first home and
-all-at-once first-run direction in the September 26 v1 roadmap preserved below.
-Observe permissioned reliable data automatically; foreground one credible
-goal-relative decision/action or earned win; keep steering, correction and
-historical detail reachable. Ask only for valuable missing information and use
-contextual, skippable onboarding. The deterministic engine still owns training
-prescriptions; privacy and safety constraints still apply.
+[LYB-173](https://linear.app/jovie/issue/LYB-173/p0-lyb-north-star-automatic-first-one-decision-coaching-and-living)
+is the product behavior and release-sequencing contract. The October 14 text,
+verified October 16, still supersedes all-at-once first-run and a raw
+provider-metadata home in the September 26 v1 roadmap preserved below. Observe
+permissioned reliable data automatically. Foreground one credible goal-relative
+decision, action, or earned win. Keep steering, correction, and provenance
+reachable. Ask only for valuable missing information. Use contextual, skippable
+onboarding. The deterministic engine still owns training prescriptions. Privacy
+and safety constraints still apply. Avoid medical diagnosis. Do not take an
+unsupported action or silently change a consequential plan.
 
-Existing first-run, ingestion, native design, coaching, release and coverage
-owners implement that staged contract. This reconciliation creates no second
-onboarding/home implementation or web expansion. Golden Path persistence,
-auth/paywall and reliability gates remain required regression coverage.
+### October 28, 2026: body-through-time Home
+
+Founder direction on October 28 updates the older line that timeline and stats
+are not the home default. Home is the user's body through time: easy weekly
+photos, a subdued background, consistent framing, and a scrub timeline. When
+photos are absent, show a selectable male or female wireframe. One useful
+contextual action stays on that canvas, with progressive skippable capture
+guidance, authentic source photos, provenance, and supported uncertainty. Raw
+timeline and provider metadata stay inspectable and do not dominate Home. Chat
+remains a control plane, not the whole UI.
+
+Optional rotatable personal 3D is in scope only inside LYB-311. That bounded
+program replaces a blanket deferral of all 3D work. Generic avatars stay
+illustrative until calibrated. Personalized reconstruction and body-change
+claims wait for their recorded validation gates. An AI weekly average or other
+synthetic transformation is never shown as captured evidence.
+
+Paid R1 is the body timeline, Stats, and imports, and it can ship on its own.
+R2 chat and R3 programming stay separate releases. Paid R1 has no mandatory
+composer, chat, or advanced-3D dependency. LYB-100 keeps web landing-only.
+LYB-164 does not authorize an authenticated web app. Canonical planning UI is
+iOS native responsive cards until a separate product and platform approval.
+[LYB-174](https://linear.app/jovie/issue/LYB-174/p0-rolling-hypertrophy-schedule-adherence-aware-sessions-and)
+owns rolling, adherence-aware sessions and the optional time budget. Session
+duration is computed from useful volume, exercise and rest selection, and
+recovery. A daily duration target is not default onboarding.
+
+Existing first-run, ingestion, native design, coaching, release, and coverage
+owners implement their stages. This reconciliation creates no second
+onboarding or Home implementation, takes over no active PR, flag, or
+certification, and invents no BodySpec MCP event support. Golden Path
+persistence, auth, paywall, and reliability gates remain required regression
+coverage. Stage completion still needs installed TestFlight journey proof,
+source-permission variations, offline, empty, and error paths, and the
+self-improving failed-fixture path in JOV-8332. A merge alone does not complete
+a stage.
 
 The old activation and D7/D30 definitions below are **v1 cohort history**, not
 coaching activation. Use the [current funnel evidence contract](marketing/funnel-evidence-contract.md)
