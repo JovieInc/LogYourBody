@@ -2,6 +2,60 @@
 
 Reviewed 2026-09-27. This policy applies to LogYourBody's US consumer wellness and exercise coaching surfaces. It is a product communication standard, not legal advice or a regulatory classification.
 
+## Recurring source review
+
+Mission: keep primary-source guidance and product claims aligned.
+Audience: Tim White and delegated compliance reviewers.
+
+**Owner:** Tim White, accountable for completion and any legal/clinical review
+needed. **Interval:** quarterly, on March 27, June 27, September 27, and December 27. **Next review due:** 2026-12-27, tracked by the assigned low-priority
+[LYB-356 review checklist](https://linear.app/jovie/issue/LYB-356), established by
+[LYB-191](https://linear.app/jovie/issue/LYB-191). Review sooner when a primary
+source changes or product claims, medication scope, or health-data use changes.
+
+The [quarterly calendar reminder](claims-policy-review.ics) repeats every three
+months with a seven-day display alert. Import it once into the owner's calendar
+to receive calendar notifications; import and notification delivery are not
+verified here. The live Linear checklist is assigned and dated. Before closing
+each review, create and link its successor with the same checklist, owner, low
+priority, and next quarterly due date, then update the next-review date and issue
+link above. Linear recurrence is carried forward by that checklist; native
+automatic scheduling is not configured. A late review does not reset the cadence.
+
+This is low-priority compliance hygiene. An overdue reminder or review alone
+does not block App Store submission. A concrete compliance defect found during
+review retains its own release controls, including the separate
+[GLP-1 quarantine/clearance issue, LYB-190](https://linear.app/jovie/issue/LYB-190).
+
+For every review:
+
+- [ ] Retrieve every document in **Primary sources** from its official URL in the
+      private compliance source register. Compare current text with the previous
+      retained snapshot, including replacement/superseding guidance and changed
+      section numbering. Cover Apple App Review 1.4.1 / 5.1.1 / 5.1.3 and the
+      cited HealthKit guidance; FDA General Wellness, CDS, and SaMD; FTC health
+      claims and endorsement guides.
+- [ ] Record retrieval date, source version/issue date, previous and current
+      snapshots, changed sections or an explicit no-change result, reviewer, and
+      impact decision in the private register. If a source or prior snapshot is
+      unavailable, record the gap and follow-up; do not mark it reviewed.
+- [ ] Confirm quarantine/clearance in LYB-190 matches the current shipped product,
+      feature-gate defaults and rollout state, coach instructions, and claims.
+      Check native GLP-1 logging/check-in separately from coach material against
+      the [product scope](../product/icp.md). Link the written clearance receipt
+      or record the unresolved mismatch in LYB-190. A shipped logging feature,
+      closed issue, or completed calendar event does not itself establish clearance.
+- [ ] Update affected policy, corpus, guardrails, and evals, or link an owned
+      follow-up with its release impact. Retain a receipt in the review issue
+      with review date, reviewer, product commit/build, source diff/register
+      references, GLP-1 status, and follow-up links. Keep private register contents
+      out of the public repository.
+- [ ] Advance each source's **Reviewed** date only after its comparison and impact
+      assessment are complete; advance the policy's top-level **Reviewed** date
+      only after the full review. Adding a cadence or reminder is not a source
+      review. Create and link the next quarterly review before closing this one,
+      and update the next-review date and reminder link above.
+
 ## Product purpose and claims
 
 The coach supports general body-composition understanding and exercise training. It does not provide medical services or make claims about diagnosing, treating, curing, preventing, or managing a disease or health condition. Keep measured values, estimates, population references, and user-selected goals distinct. Explain the method and uncertainty of consumer measurements; do not imply clinical accuracy without validation for that exact use.

@@ -5425,5 +5425,63 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "claims-policy-quarterly-primary-source-review",
+    "source": "https://linear.app/jovie/issue/LYB-191",
+    "correction": "LYB-191: Retain a quarterly owner, recurring reminder and review checklist for claims-policy FDA/FTC/Apple sources, including the LYB-190 GLP-1 quarantine/clearance check. Cadence hygiene alone must not block App Store submission.",
+    "mechanization": "Document the owner and source-diff checklist; create the assigned low-priority LYB-356 review due 2026-12-27 with an explicit successor checklist. Retain a quarterly RFC 5545 reminder and validate its recurrence, folded CRLF export, seven-day display alert, policy link and GLP-1 follow-up in the existing required shared-lib suite. Negative controls reject one-off or annual events, a missing alarm and a missing quarantine link. The guard checks reminder configuration without a date-age release gate and does not certify completion of legal review, native Linear recurrence or calendar import/delivery. The lanes harness owns push and PR operations. Machine: built docs/compliance/claims-policy-review.ics.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The exported calendar and external Linear checklist are configuration artifacts; application runtime logic cannot prevent removal or breakage of their review cadence."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib test suite can validate the calendar export, indefinite three-month recurrence, display alarm and links to the policy checklist and GLP-1 issue. Negative controls prove reminder regressions fail. Actual regulatory interpretation and review completion remain human obligations outside this configuration guard."
+      }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant",
+    "guard": {
+      "path": "packages/shared-lib/src/claims-policy-review.test.ts",
+      "anchor": "quarterly claims-policy review reminder (LYB-191)"
+    }
+  },
+  {
+    "fingerprint": "fix-red-95726c4f82",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1678",
+    "correction": "PR #1678 / LYB-191, occurrence 3: merge origin/main without rebasing, preserve both parents' correction receipts and the quarterly claims-policy review cadence, and extend the existing repair machine. A concurrent parent-ref change must not authorize a ledger repair against stale merge evidence.",
+    "mechanization": "Resolve the actual ledger conflict with the existing classifier, retaining all 277 parent receipts. Extend its write, stage and verification boundary to recheck HEAD and MERGE_HEAD as well as the index. Expand the existing required concurrency matrix across both parent refs and all three repair/check modes; the six new negative controls fail before the change and pass after it. All 68 classifier cases pass with the unchanged 100% line, branch and function coverage gates. Replay the actual PR parents with the extended resolver and verify the staged ledger exactly matches the committed union. Tently reports an AI-provider outage rather than a source defect; do not bypass its gate. The harness owns push and PR-body updates and must include exactly one machine line: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair command owns ledger writes, staging and successful merge verification. Rechecking both parent refs at that boundary prevents stale merge evidence from authorizing those operations even when indexed bytes are unchanged."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "merge parents changed during validation; retry from the current merge"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-72cbcd2e3b",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1678",
+    "correction": "PR #1678 / LYB-191: Repair the JavaScript CI concurrency fixtures on modern Git without weakening merge-parent validation or the 100% classifier coverage gates. MERGE_HEAD is a pseudoref and cannot be mutated with update-ref.",
+    "mechanization": "Extend the existing concurrency fixture with one parent mutation/restoration helper. Write MERGE_HEAD through its Git-resolved pseudoref path, retain update-ref for HEAD, and require readback of every mutation before asserting rejection or safe retry. Preserve all nine index/HEAD/MERGE_HEAD cases across resolver, staged resolver and verifier modes in the existing required shared-lib suite. Include the classifier diagnostic if fixture setup fails. The claims-policy cadence stays intact; the harness owns push and PR updates. Machine: built scripts/correction-classifier-concurrency.test.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing Git fixture owns parent mutation and restoration. A shared helper selecting the supported pseudoref write path prevents unsupported update-ref calls by construction, with readback proving the concurrent change actually occurs."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier-concurrency.test.mjs",
+      "anchor": "the parent mutation must take effect"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

@@ -856,8 +856,8 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         assert.equal(status, 0);
         assert.equal(
           commands.filter((args) => args.includes('rev-parse')).length,
-          1,
-          'resolve the repository and both merge parents in one Git call',
+          2,
+          'snapshot the repository and both parents, then confirm parents stayed unchanged',
         );
         assert.equal(
           commands.filter((args) => args.includes('ls-files')).length,
@@ -869,7 +869,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
           2,
           'batch the ledgers, then all staged and immutable parent guards',
         );
-        assert.equal(commands.length, 5, 'verification must retain a fixed Git process budget');
+        assert.equal(commands.length, 6, 'verification must retain a fixed Git process budget');
         assert.equal(
           commands.filter((args) => args.includes('show')).length,
           0,

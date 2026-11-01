@@ -219,11 +219,17 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
       const readIndex = () => git('--literal-pathspecs', 'ls-files', '--stage', '-z');
       const indexSnapshot = readIndex();
       const index = indexSnapshot.split('\0');
-      const assertIndexUnchanged = () =>
+      const assertMergeUnchanged = () => {
         assert.ok(
           readIndex() === indexSnapshot,
           'merge index changed during validation; retry from the current index',
         );
+        assert.equal(
+          git('rev-parse', 'HEAD', 'MERGE_HEAD').trim(),
+          parents.join('\n'),
+          'merge parents changed during validation; retry from the current merge',
+        );
+      };
       // Verify the whole merge is conflict-free, including staged retries.
       assertLedgerMergeReady(root);
       // Only regular indexed files can provide staged guard evidence.
@@ -296,7 +302,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
           staged,
           'staged retry refuses unstaged ledger edits; review and stage them explicitly',
         );
-        assertIndexUnchanged();
+        assertMergeUnchanged();
         logger.log('correction-classifier: verified staged ledger against both merge parents');
         return 0;
       }
@@ -342,7 +348,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
         verifyMerge(result);
         stageResolution = () => git('add', '--', LEDGER_PATH);
       }
-      assertIndexUnchanged();
+      assertMergeUnchanged();
     } else {
       path = args[0] ?? resolve(ROOT, LEDGER_PATH);
       const receipts = JSON.parse(readFileSync(path, 'utf8'));

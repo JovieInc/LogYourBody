@@ -1,0 +1,33 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//LogYourBody//Claims Policy Review//EN
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+UID:lyb-191-claims-policy-review@logyourbody.com
+DTSTAMP:20261101T055622Z
+DTSTART;VALUE=DATE:20261227
+DTEND;VALUE=DATE:20261228
+RRULE:FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=27
+SUMMARY:Review LogYourBody claims policy (FDA/FTC/Apple)
+DESCRIPTION:Owner: Tim White. Quarterly low-priority compliance
+  hygiene.\nComplete the policy checklist:
+  https://github.com/JovieInc/LogYourBody/blob/main/docs/compliance/claims-
+ policy.md#recurring-source-review\nDiff FDA/FTC/Apple primary sources
+  against retained snapshots in the private register. Record changes or
+  no-change findings and update Reviewed dates only after completing the
+  review.\nConfirm GLP-1 quarantine/clearance matches product:
+  https://linear.app/jovie/issue/LYB-190 \nInitial assigned checklist:
+  https://linear.app/jovie/issue/LYB-356 \nCreate and link the next
+  quarterly Linear review before closing each review. An overdue review
+  alone does not block App Store submission.
+URL:https://github.com/JovieInc/LogYourBody/blob/main/docs/compliance/claim
+ s-policy.md#recurring-source-review
+PRIORITY:9
+TRANSP:TRANSPARENT
+BEGIN:VALARM
+ACTION:DISPLAY
+TRIGGER:-P7D
+DESCRIPTION:Review FDA/FTC/Apple sources and GLP-1 status (LYB-191)
+END:VALARM
+END:VEVENT
+END:VCALENDAR
