@@ -5483,5 +5483,125 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-95726c4f82",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679",
+    "correction": "PR #1679 / LYB-245, occurrence 4 in 14 days: merge origin/main without rebasing and repair the generated repository source-map conflict while preserving sync-state copy, receipt placement and every parent correction receipt. Tently failed because its AI provider was unreachable, with no code finding.",
+    "mechanization": "Extend the existing source-map repair machine to reject conflict markers in every staged input before generating or staging the projection. Six real-Git negative controls fail against the previous resolver and pass after the change, including standard, diff3, short and CRLF markers and a clean working copy hiding marked staged source. Clean staged retries preserve unrelated working edits and remain idempotent. The existing required pre-commit-lint test entrypoint runs these regressions. Use the extended --staged resolver for this instance and retain the reviewed merged-project digest. The harness owns pushing and PR edits and must include exactly one machine line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair command owns ledger writes, staging and successful merge verification. Rechecking both parent refs at that boundary prevents stale merge evidence from authorizing those operations even when indexed bytes are unchanged."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "merge parents changed during validation; retry from the current merge"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "swift-catch-statement-position",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41282526154/job/124777328731",
+    "correction": "PR #1679 / LYB-245: the required iOS Static Audits job rejects the receipt dismissal task because catch starts on a new line after the do block. Local SwiftLint without SourceKit skips statement_position and cannot establish that this rule passes.",
+    "mechanization": "Keep catch on the same line as the preceding closing brace. Reuse the existing required SourceKit-backed SwiftLint statement_position gate, retaining its Swift toolchain setup and every native test. The immutable hosted audit artifact proves the original source fails. Retain the source-map repair machine already extended in this PR, run its regression suite and use its --staged path on this repaired index. The harness owns pushing and PR edits and must retain exactly one machine declaration: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Runtime receipt logic cannot prevent Swift source formatting regressions. Changing cancellation behavior would not address the source-position requirement."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required iOS Static Audits job installs Swift and enables SourceKit so SwiftLint deterministically rejects misplaced catch statements throughout the native sources. Its hosted failure is the regression proof; this host without SourceKit cannot execute that rule."
+      }
+    },
+    "guard": {
+      "path": ".github/workflows/ci.yml",
+      "anchor": "# SwiftLint's SourceKit rules (statement_position, ...) need a Swift toolchain; the static"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "privacy-tests-separate-message-content-from-operational-metadata",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41282526154/job/124777328706",
+    "correction": "PR #1679: JavaScript/TypeScript failed because the customer-voice privacy test matched the health sentinel 93 inside a valid forwarded timestamp ending in .935Z. Runtime support redaction was correct; the whole-record substring oracle was time-dependent.",
+    "mechanization": "Extend the existing inbound privacy test with fixed .000Z and the recorded .935Z clocks, restoring real timers after each case. Assert the entire stored record against its exact approved event, salted sender hash, reply destination and stage timestamps, and retain the health-sentinel scan on the complete event. The .935Z case fails against the original assertion while the other 23 cases pass. This preserves unknown-field rejection and every no-health-data and no-console-log assertion without changing runtime capture or privacy controls. Retain the source-map machine already extended in this PR; the harness owns pushing and the single PR-body machine declaration.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The application already persists a fixed category summary and legitimate operational timestamps. Altering runtime timestamps or redaction would not repair the test oracle's accidental digit collision."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required web test suite can exercise both clock values and compare all allowed saved fields exactly while scanning message fields for health sentinels, preventing false failures without allowing additional persisted data."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/customer-voice/customer-voice.test.ts",
+      "anchor": "accepts signed input, classifies canaries and never logs health data at %s"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-95726c4f82",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679#repair-20261101-occurrence-5",
+    "correction": "PR #1679 / LYB-245, occurrence 5 in 14 days: merge origin/main without rebasing, preserve sync-state copy and receipt placement, retain every correction receipt, and extend the existing repair machine. Concurrent working-ledger edits must not be overwritten or receive a stale successful verdict.",
+    "mechanization": "Align the shared repair fingerprint annotations explicitly to the incoming codebase classifier guard, retaining each parent receipt identity and its original correction and mechanization text. Extend that existing classifier to snapshot and recheck working-ledger bytes alongside the index and both merge parents before writing, staging or returning success. Add the working-ledger target to all three existing concurrency modes. The three negative controls fail before the change, while the original nine cases pass; all 71 classifier cases then pass with unchanged 100% line, branch and function coverage gates. Replay the actual PR parents and use the extended staged verifier on the reviewed union. Tently check 124779536021 reports an AI-provider outage with no code finding; preserve the gate for the harness push. The harness owns push and PR edits and must use exactly one PR-body machine declaration: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair command owns ledger writes, staging and successful merge verification. Rechecking both parent refs at that boundary prevents stale merge evidence from authorizing those operations even when indexed bytes are unchanged."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "merge parents changed during validation; retry from the current merge"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-cc900b961c",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41284487184/job/124783086308",
+    "correction": "PR #1679 / LYB-245: the required launch-quality build fails because handleDashboardBodyMetricsChange in a separate DashboardViewLiquid extension calls the private scheduleMetricCacheRefresh method. CI Summary reports that native failure; Tently reports an AI-provider outage without a code finding.",
+    "mechanization": "Make scheduleMetricCacheRefresh module-internal, matching the other dashboard refresh operations used by cross-file extensions. Preserve its main-actor isolation, coalescing, cancellation and deferred cache prewarming. Reuse the required launch-quality Swift compilation as the regression gate: run 41284487184 proves the private declaration fails at the actual extension call. Do not add a duplicate source-string test or weaken any native gate. origin/main is already an ancestor and git merge --no-edit origin/main reports up to date. This Linux host cannot provide the repaired native build or execution receipt; the harness must push and rerun the existing required native and Tently checks.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The method's access boundary is the defect. A module-internal method permits the existing cross-file extension call by construction while keeping the cache task state private; the required Swift compiler continues to reject inaccessible references."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Views/DashboardViewLiquid.swift",
+      "anchor": "    func scheduleMetricCacheRefresh() {"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "swiftui-reduce-motion-environment-is-read-only",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41285773987/job/124786814816",
+    "correction": "PR #1679 / LYB-245 (fix-red-cc900b961c occurrence 2): Launch Quality cannot compile HealthSyncPresentationTests because its render snapshot writes the read-only accessibilityReduceMotion environment. CI Summary reflects that native build failure. Tently check 124786645463 reports an unreachable AI provider without a code finding.",
+    "mechanization": "Disable snapshot animation through a SwiftUI transaction instead of assigning a get-only environment value. Extend the existing required shared-lib Reduce Motion guard from app sources to the unit-test and UI-test targets. The expanded guard fails specifically on HealthSyncPresentationTests.swift before the fix while the other 336 tests pass, then all 337 pass after the fix. Preserve every native test, copy, snapshot combination, feature gate and production motion behavior. The harness owns pushing and PR edits and should use the single declaration: Machine: built packages/shared-lib/src/swiftui-environment-writes.test.ts. The existing native compiler remains an independent gate; this Linux host cannot establish native build, execution or coverage success.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Runtime app logic cannot prevent future source edits from invoking an unsupported SwiftUI modifier, including within debug-only preview code."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic source regression in the existing required shared-lib test task detects the unsupported environment write on Linux before the native compiler independently rejects it on macOS."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/swiftui-environment-writes.test.ts",
+      "anchor": "keeps native views and previews free of read-only Reduce Motion writes (LYB-153)"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

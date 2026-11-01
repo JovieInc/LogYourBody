@@ -29,9 +29,13 @@ def restore_dependency_artifacts_on_failure(root, output):
 
 
 def staged_bytes(root, name):
-    return subprocess.run(
+    source = subprocess.run(
         ["git", "show", ":" + name], cwd=root, check=True, capture_output=True,
     ).stdout
+    # A clean projection must not conceal unresolved markers in its staged inputs.
+    if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", source):
+        raise ValueError("resolve staged conflict markers first: " + name)
+    return source
 
 
 def merge_sections(root, name):

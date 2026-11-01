@@ -1,6 +1,15 @@
 import SwiftUI
 
 extension DashboardViewLiquid {
+    func handleDashboardBodyMetricsChange(_ metrics: [BodyMetrics]) {
+        if layoutMode == .photoTimelineHUD, HomeV2Policy.isEnabled(), HealthSyncPresentationPolicy.isEnabled() {
+            healthSyncPresentation.observe(metrics, owner: authManager.captureAccountSession())
+        }
+        reconcileHomeV2Timeline(with: metrics)
+        scheduleDashboardDerivedStateRefresh()
+        scheduleMetricCacheRefresh()
+    }
+
     enum LayoutMode {
         case legacyTabbed
         case photoTimelineHUD

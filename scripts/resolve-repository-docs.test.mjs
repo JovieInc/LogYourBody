@@ -93,6 +93,54 @@ test('documentation merge requires an active conflict and a regular documentatio
   assert.notEqual(f.resolve().status, 0, 'ordinary commits cannot generate a merge');
 });
 
+for (const [name, marker] of [
+  ['source', '<<<<<<< HEAD\n'],
+  ['source', '||||||| base\n'],
+  ['source', '=======\n'],
+  ['source', '>>>>>>> main\n'],
+  ['source', '|| base\r\n'],
+  ['README.md', '<< HEAD\r\n'],
+]) {
+  test(`staged projection refuses ${name} marker ${JSON.stringify(marker)} and permits a clean retry`, (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'lyb-doc-source-markers-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+    git('init', '-q', '-b', 'repair');
+    git('config', 'core.hooksPath', '/dev/null');
+    writeFileSync(join(root, 'repository-docs.json'), JSON.stringify({
+      schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+      sources: [{ path: 'source', purpose: 'Merged source' }], imports: [], output: 'SOURCES.md',
+    }));
+    for (const path of ['README.md', 'source']) writeFileSync(join(root, path), 'Clean input\n');
+    git('add', '.');
+    git('commit', '-qm', 'fixture');
+    const resolve = () => spawnSync('python3', [resolver, '--root', root, '--staged'], {
+      env, encoding: 'utf8',
+    });
+    assert.equal(resolve().status, 0);
+    const before = readFileSync(join(root, 'SOURCES.md'), 'utf8');
+    writeFileSync(join(root, name), `Staged resolution\n${marker}`);
+    git('add', name);
+    // A clean working copy must not hide unresolved markers in the staged source.
+    writeFileSync(join(root, name), 'Clean input\n');
+    const index = git('ls-files', '--stage');
+    const refused = resolve();
+    assert.notEqual(refused.status, 0, refused.stdout);
+    assert.match(refused.stderr, /resolve staged conflict markers first:/);
+    assert.equal(readFileSync(join(root, 'SOURCES.md'), 'utf8'), before);
+    assert.equal(git('ls-files', '--stage'), index);
+    git('add', name);
+    // Conversely, unstaged markers must not invalidate the clean staged snapshot.
+    writeFileSync(join(root, name), marker);
+    const retry = resolve();
+    assert.equal(retry.status, 0, retry.stderr);
+    assert.equal(readFileSync(join(root, 'SOURCES.md'), 'utf8'), before);
+    assert.equal(git('show', ':SOURCES.md'), before);
+    assert.equal(readFileSync(join(root, name), 'utf8'), marker);
+    assert.equal(resolve().status, 0, 'clean staged retry remains idempotent');
+  });
+}
+
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
   for (const present of [true, false]) {
     test(`dependency repair ${mode} restores ${present ? 'existing' : 'missing'} outputs after staging fails`, (t) => {

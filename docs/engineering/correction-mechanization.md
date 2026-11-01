@@ -152,5 +152,10 @@ cannot change the reviewed staged snapshot. Refusal preserves the ledger and ind
 Both resolution modes and staged verification refuse an index that changes during
 validation, before writing the ledger or returning success. Retry the same command
 against the current index; the refusal preserves the other writer's staged changes.
+
+The classifier also snapshots the working ledger and rechecks its bytes after
+validating the index and both merge parents. An edit during validation refuses
+resolution, staging and a successful verification verdict without overwriting
+the other writer. Review the working ledger and retry against the current merge.
 They also recheck `HEAD` and `MERGE_HEAD` before writing or returning success;
 changed parents invalidate the review even when the index is unchanged.
