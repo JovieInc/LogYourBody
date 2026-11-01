@@ -116,7 +116,7 @@ final class PersonalBodyEstimateTests: XCTestCase {
 
         let unavailable = PersonalBodyEstimate.step(
             existing: nil,
-            request: request(route: .external, consentGranted: true, online: false)
+            request: request(online: false, route: .external, consentGranted: true)
         )
         XCTAssertEqual(unavailable.job.failure, Optional("provider-unavailable"))
         XCTAssertNil(unavailable.snapshot)

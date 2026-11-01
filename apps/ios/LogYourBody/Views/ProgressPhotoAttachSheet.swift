@@ -89,19 +89,16 @@ struct ProgressPhotoAttachSheet: View {
     let fallbackDate: Date
     let onComplete: () async -> Void
 
-    @State private var selectedImage: UIImage?
+    @State var selectedImage: UIImage?
     @State private var selectedImageDate: Date?
-    @State private var attachStatus: ProgressPhotoAttachStatus = .empty
+    @State var attachStatus: ProgressPhotoAttachStatus = .empty
     @State private var isCameraPresented = false
     @State private var photoSelectionLoadID = UUID()
     @State private var sheetDetent = NativeSheetPresentationPolicy.initialDetent(for: .progressPhotoAttach)
-    @State private var outlineSessionId = UUID().uuidString
-    @State private var attachedMetricId: String?
-    @State private var attachedAccountId: String?
-    @AppStorage(WireframeAvatarStorage.frame) private var outlineFrame = 0.5
+    @State var outlineAttachment = PersonalBodyOutlineAttachment()
     @AccessibilityFocusState private var isStatusFocused: Bool
 
-    private var targetDate: Date {
+    var targetDate: Date {
         targetMetric?.date ?? selectedImageDate ?? fallbackDate
     }
 
@@ -109,7 +106,7 @@ struct ProgressPhotoAttachSheet: View {
         ProgressPhotoAttachPolicy.isBusy(status: attachStatus)
     }
 
-    private var isSuccess: Bool {
+    var isSuccess: Bool {
         if case .success = attachStatus {
             return true
         }
@@ -337,24 +334,6 @@ struct ProgressPhotoAttachSheet: View {
         .accessibilityIdentifier("progress_photo_attach_status")
     }
 
-    private var offersPersonalOutline: Bool {
-        PersonalBodyPolicy.isEnabled() && !PersonalBodyEstimate.benefitCopy.isEmpty
-    }
-
-    @ViewBuilder
-    private var personalBodyOffer: some View {
-        if isSuccess, offersPersonalOutline {
-            PersonalBodyCaptureOffer(
-                image: selectedImage,
-                accountId: attachedAccountId,
-                photoId: attachedMetricId,
-                sessionId: outlineSessionId,
-                effectiveDate: targetDate,
-                frame: outlineFrame
-            )
-        }
-    }
-
     private var statusIcon: String {
         switch attachStatus {
         case .empty:
@@ -469,13 +448,6 @@ struct ProgressPhotoAttachSheet: View {
 
     private func previewHeight(for availableHeight: CGFloat) -> CGFloat {
         min(260, max(184, availableHeight * 0.30))
-    }
-
-    private func markAttached(metricsId: String, accountId: String) {
-        attachedMetricId = metricsId
-        attachedAccountId = accountId
-        attachStatus = .success
-        HapticManager.shared.successAction()
     }
 
     private func announceStatusChange(_ status: ProgressPhotoAttachStatus) {

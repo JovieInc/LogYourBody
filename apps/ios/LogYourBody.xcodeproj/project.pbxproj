@@ -202,6 +202,8 @@
 		B317A11A0000000000000006 /* PersonalBodyPoseReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A0000000000000005 /* PersonalBodyPoseReader.swift */; };
 		B317A11A0000000000000008 /* PersonalBodyStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A0000000000000007 /* PersonalBodyStage.swift */; };
 		B317A11A000000000000000A /* PersonalBodyEstimateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A0000000000000009 /* PersonalBodyEstimateTests.swift */; };
+		B317A11A000000000000000C /* PersonalBodyViewKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A000000000000000B /* PersonalBodyViewKind.swift */; };
+		B317A11A000000000000000E /* ProgressPhotoAttachSheet+PersonalBody.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A000000000000000D /* ProgressPhotoAttachSheet+PersonalBody.swift */; };
 		AD3145E22F0A030100ABCDEF /* DashboardMetricsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */; };
 		AD3145E42F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145E32F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift */; };
 		AD3145F22F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145F12F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift */; };
@@ -809,6 +811,7 @@
 		AD3134002F01313400D134A1 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyWeighInReminderPromptView.swift; sourceTree = "<group>"; };
 		AD3145A12F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressPhotoAttachSheet.swift; sourceTree = "<group>"; };
+		B317A11A000000000000000D /* ProgressPhotoAttachSheet+PersonalBody.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProgressPhotoAttachSheet+PersonalBody.swift"; sourceTree = "<group>"; };
 		AD3145B12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineHUD.swift"; sourceTree = "<group>"; };
 		AD3145B22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineAnalytics.swift"; sourceTree = "<group>"; };
 		AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineInsights.swift"; sourceTree = "<group>"; };
@@ -820,6 +823,7 @@
 		B317A11A0000000000000003 /* PersonalBodyEstimateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PersonalBodyEstimateStore.swift; path = Components/PersonalBodyEstimateStore.swift; sourceTree = "<group>"; };
 		B317A11A0000000000000005 /* PersonalBodyPoseReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PersonalBodyPoseReader.swift; path = Components/PersonalBodyPoseReader.swift; sourceTree = "<group>"; };
 		B317A11A0000000000000007 /* PersonalBodyStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PersonalBodyStage.swift; path = Components/PersonalBodyStage.swift; sourceTree = "<group>"; };
+		B317A11A000000000000000B /* PersonalBodyViewKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PersonalBodyViewKind.swift; path = Components/PersonalBodyViewKind.swift; sourceTree = "<group>"; };
 		B317A11A0000000000000009 /* PersonalBodyEstimateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalBodyEstimateTests.swift; sourceTree = "<group>"; };
 		AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricsSection.swift; sourceTree = "<group>"; };
 		AD3145E32F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+Glp1MetricCard.swift"; sourceTree = "<group>"; };
@@ -1343,6 +1347,7 @@
 				B317A11A0000000000000003 /* PersonalBodyEstimateStore.swift */,
 				B317A11A0000000000000005 /* PersonalBodyPoseReader.swift */,
 				B317A11A0000000000000007 /* PersonalBodyStage.swift */,
+				B317A11A000000000000000B /* PersonalBodyViewKind.swift */,
 				ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */,
 				ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */,
 				ADA4B74E2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift */,
@@ -1853,6 +1858,7 @@
 				ADDC48742E2D8A6B003C97E7 /* LegalConsentView.swift */,
 				ADDC48752E2D8A6B003C97E7 /* OptimizedProgressPhotoView.swift */,
 				AD3145A12F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift */,
+				B317A11A000000000000000D /* ProgressPhotoAttachSheet+PersonalBody.swift */,
 				ADDC48772E2D8A6B003C97E7 /* ProgressPhotoCarouselView.swift */,
 				ADA922F02E22E7D500B82C49 /* SecuritySessionsView.swift */,
 				AD8552532E19A2A1003552EE /* ProfileSettingsPolicy.swift */,
@@ -2703,6 +2709,7 @@
 				B317A11A0000000000000004 /* PersonalBodyEstimateStore.swift in Sources */,
 				B317A11A0000000000000006 /* PersonalBodyPoseReader.swift in Sources */,
 				B317A11A0000000000000008 /* PersonalBodyStage.swift in Sources */,
+				B317A11A000000000000000C /* PersonalBodyViewKind.swift in Sources */,
 				AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */,
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
@@ -2731,6 +2738,7 @@
 				E4C0A5110000000000000002 /* MesocycleCanvas.swift in Sources */,
 				E41302026025000000000002 /* DelegatedTrainingView.swift in Sources */,
 				AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */,
+				B317A11A000000000000000E /* ProgressPhotoAttachSheet+PersonalBody.swift in Sources */,
 				AD3145C12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift in Sources */,
 				AD3145C22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift in Sources */,
 				AD3145C32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift in Sources */,

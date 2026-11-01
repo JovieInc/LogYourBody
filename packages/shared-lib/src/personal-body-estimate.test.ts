@@ -292,6 +292,7 @@ it('keeps the estimate inside the photo stage and off the scrubber hot path', ()
   const surface = read('apps/ios/LogYourBody/Views/HomeV2/HomeV2Surface.swift');
   const hero = read('apps/ios/LogYourBody/Views/HomeV2/HomeV2TimelineHero.swift');
   const sheet = read('apps/ios/LogYourBody/Views/ProgressPhotoAttachSheet.swift');
+  const offer = read('apps/ios/LogYourBody/Views/ProgressPhotoAttachSheet+PersonalBody.swift');
   const stage = read('apps/ios/LogYourBody/Components/PersonalBodyStage.swift');
   const domain = read('apps/ios/LogYourBody/Components/PersonalBodyEstimate.swift');
   const emptyStage = read('apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift');
@@ -301,7 +302,8 @@ it('keeps the estimate inside the photo stage and off the scrubber hot path', ()
   expect(hero).not.toContain('PersonalBodyJobs');
   expect(domain).toContain('adjust the personal outline for this date');
   expect(domain).toContain('does not measure body fat');
-  expect(sheet).toContain('benefitCopy');
+  expect(sheet).toContain('personalBodyOffer');
+  expect(offer).toContain('benefitCopy');
   expect(stage).toContain('personal_body_stage');
   expect(stage).toContain('Not a body-fat measurement');
   expect(stage).not.toContain('ProgressView');
