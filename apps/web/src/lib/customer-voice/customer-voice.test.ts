@@ -248,30 +248,44 @@ describe('raw-body inbound authentication', () => {
     );
     expect(verifyInboundHmac(body, signature, '')).toBe(false);
   });
-  it('accepts signed input, classifies canaries and never logs health data', async () => {
-    const logs = ['log', 'info', 'error', 'warn'].map((name) =>
-      jest.spyOn(console, name as 'log').mockImplementation(() => {}),
-    );
-    try {
-      const { store, read } = memoryStore();
-      const capture = createCustomerVoiceCapture({
-        store,
-        handoff: { forward: async () => ({}) },
-        salt: () => SALT,
-      });
-      const handle = createInboundVoiceHandler({ secret: () => SECRET, capture });
-      const response = await handle(
-        request(JSON.stringify({ ...raw, from: 'browse-ready+canary@jov.ie' })),
+  it.each(['2026-11-01T06:55:41.000Z', '2026-11-01T06:55:41.935Z'])(
+    'accepts signed input, classifies canaries and never logs health data at %s',
+    async (forwardedAt) => {
+      jest.useFakeTimers({ now: new Date(forwardedAt) });
+      const logs = ['log', 'info', 'error', 'warn'].map((name) =>
+        jest.spyOn(console, name as 'log').mockImplementation(() => {}),
       );
-      expect(response.status).toBe(202);
-      expect(response.headers.get('cache-control')).toBe('no-store');
-      expect(read()?.event.test).toBe(true);
-      expect(JSON.stringify(read())).not.toMatch(/93|diagnosis/);
-      logs.forEach((log) => expect(log).not.toHaveBeenCalled());
-    } finally {
-      logs.forEach((log) => log.mockRestore());
-    }
-  });
+      try {
+        const { store, read } = memoryStore();
+        const capture = createCustomerVoiceCapture({
+          store,
+          handoff: { forward: async () => ({}) },
+          salt: () => SALT,
+        });
+        const handle = createInboundVoiceHandler({ secret: () => SECRET, capture });
+        const response = await handle(
+          request(JSON.stringify({ ...raw, from: 'browse-ready+canary@jov.ie' })),
+        );
+        expect(response.status).toBe(202);
+        expect(response.headers.get('cache-control')).toBe('no-store');
+        expect(read()?.event.test).toBe(true);
+        expect(read()).toEqual({
+          event: { ...event(), test: true },
+          senderHash: createHash('sha256')
+            .update('browse-ready+canary@jov.ie')
+            .update(SALT)
+            .digest('hex'),
+          replyTo: 'browse-ready+canary@jov.ie',
+          stages: { received: AT, forwarded: forwardedAt },
+        });
+        expect(JSON.stringify(read()?.event)).not.toMatch(/93|diagnosis/);
+        logs.forEach((log) => expect(log).not.toHaveBeenCalled());
+      } finally {
+        logs.forEach((log) => log.mockRestore());
+        jest.useRealTimers();
+      }
+    },
+  );
   it('fails closed for configuration, auth, invalid input, oversized streams and storage', async () => {
     const capture = jest.fn().mockResolvedValue({ id: ID, handoff: 'unavailable' });
     const handle = createInboundVoiceHandler({ secret: () => SECRET, capture });

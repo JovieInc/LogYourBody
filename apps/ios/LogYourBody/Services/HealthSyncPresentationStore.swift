@@ -165,8 +165,11 @@ final class HealthSyncPresentationStore {
             receipt = next
             if let next {
                 dismissal = Task {
-                    do { try await Task.sleep(for: .seconds(max(0, next.expiresAt.timeIntervalSinceNow))) }
-                    catch { return }
+                    do {
+                        try await Task.sleep(for: .seconds(max(0, next.expiresAt.timeIntervalSinceNow)))
+                    } catch {
+                        return
+                    }
                     dismissReceipt(id: next.id)
                 }
             }

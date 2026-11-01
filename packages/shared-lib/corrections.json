@@ -5443,5 +5443,49 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "swift-catch-statement-position",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41282526154/job/124777328731",
+    "correction": "PR #1679 / LYB-245: the required iOS Static Audits job rejects the receipt dismissal task because catch starts on a new line after the do block. Local SwiftLint without SourceKit skips statement_position and cannot establish that this rule passes.",
+    "mechanization": "Keep catch on the same line as the preceding closing brace. Reuse the existing required SourceKit-backed SwiftLint statement_position gate, retaining its Swift toolchain setup and every native test. The immutable hosted audit artifact proves the original source fails. Retain the source-map repair machine already extended in this PR, run its regression suite and use its --staged path on this repaired index. The harness owns pushing and PR edits and must retain exactly one machine declaration: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Runtime receipt logic cannot prevent Swift source formatting regressions. Changing cancellation behavior would not address the source-position requirement."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required iOS Static Audits job installs Swift and enables SourceKit so SwiftLint deterministically rejects misplaced catch statements throughout the native sources. Its hosted failure is the regression proof; this host without SourceKit cannot execute that rule."
+      }
+    },
+    "guard": {
+      "path": ".github/workflows/ci.yml",
+      "anchor": "# SwiftLint's SourceKit rules (statement_position, ...) need a Swift toolchain; the static"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "privacy-tests-separate-message-content-from-operational-metadata",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41282526154/job/124777328706",
+    "correction": "PR #1679: JavaScript/TypeScript failed because the customer-voice privacy test matched the health sentinel 93 inside a valid forwarded timestamp ending in .935Z. Runtime support redaction was correct; the whole-record substring oracle was time-dependent.",
+    "mechanization": "Extend the existing inbound privacy test with fixed .000Z and the recorded .935Z clocks, restoring real timers after each case. Assert the entire stored record against its exact approved event, salted sender hash, reply destination and stage timestamps, and retain the health-sentinel scan on the complete event. The .935Z case fails against the original assertion while the other 23 cases pass. This preserves unknown-field rejection and every no-health-data and no-console-log assertion without changing runtime capture or privacy controls. Retain the source-map machine already extended in this PR; the harness owns pushing and the single PR-body machine declaration.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The application already persists a fixed category summary and legitimate operational timestamps. Altering runtime timestamps or redaction would not repair the test oracle's accidental digit collision."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required web test suite can exercise both clock values and compare all allowed saved fields exactly while scanning message fields for health sentinels, preventing false failures without allowing additional persisted data."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/customer-voice/customer-voice.test.ts",
+      "anchor": "accepts signed input, classifies canaries and never logs health data at %s"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
