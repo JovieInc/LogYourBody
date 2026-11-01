@@ -17,5 +17,4 @@ extension BodyMetricSourceMetadata {
         )
         return updated
     }
-
 }

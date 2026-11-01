@@ -66,12 +66,13 @@ struct WeeklyPhotoAttachPreparation: Sendable {
 }
 
 enum WeeklyPhotoCheckInTelemetry {
-    /// The default tracker is main-actor isolated, so this call is too.
+    /// A default value is nonisolated, so the main-actor tracker is resolved in the body.
     @MainActor
     static func emit(
         _ metrics: [WeeklyPhotoHabitMetric],
-        tracker: AnalyticsTracking = AppServicePorts.analyticsTracker
+        tracker supplied: AnalyticsTracking? = nil
     ) {
+        let tracker = supplied ?? AppServicePorts.analyticsTracker
         for metric in metrics where metric.countsTowardHabit || metric.event == WeeklyPhotoCheckInPolicy.captureSaved ||
             metric.event == WeeklyPhotoCheckInPolicy.captureFailed {
             tracker.track(event: metric.event, properties: metric.properties)
