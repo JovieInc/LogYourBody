@@ -1977,7 +1977,7 @@
     },
     "guard": {
       "path": "apps/web/src/app/__tests__/marketing-discovery.test.tsx",
-      "anchor": "includes published article URLs with safely encoded slugs"
+      "anchor": "does not list hidden blog routes"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
