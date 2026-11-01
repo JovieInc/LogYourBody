@@ -8,17 +8,21 @@ Dispatch the same workflow manually to read again. `dry_run` prints the report a
 
 App Store Connect `GET` only:
 
-- Apple Distribution and legacy iOS Distribution certificates (`IOS_DISTRIBUTION`, `DISTRIBUTION`). The report uses the soonest certificate that is not yet expired. Already-expired leftovers do not hide a newer valid certificate. If every distribution certificate is expired or missing, the report says so.
-- Active App Store provisioning profiles (`IOS_APP_STORE`) for `com.logyourbody.app` and its extensions. Each profile gets its own days count.
+- Required bundle IDs from `app_identifier` in [`apps/ios/fastlane/Matchfile`](../../apps/ios/fastlane/Matchfile). That list is the source of truth. The readonly match workaround in `Fastfile.release` (LYB-310) can omit an identifier for one archive; it does not remove that identifier from this check.
+- For each required bundle ID, the active App Store profile (`IOS_APP_STORE`), the days left on that profile, and the distribution certificate type embedded in it. When several active profiles exist for one bundle ID, the report uses the one with the most days left. A required ID with no active profile is `missing`.
+- The distribution certificate embedded in those profiles (`IOS_DISTRIBUTION` or `DISTRIBUTION`), with its days left. Other valid distribution certificates are `unused`. Already-expired certificates that no required profile embeds are omitted. They do not hide an in-use certificate, and they do not change the warn or escalate level.
 - The App Store Connect API key used by release automation. Apple team API keys do not expire. A successful read reports `asc api key: no expiration date`. A rejected read is treated as expired.
+
+Report lines name a profile by bundle ID and a certificate by type. They do not include serial numbers, key IDs, certificate bytes, or profile bytes. A profile line looks like `com.logyourbody.app IOS_APP_STORE: 180 days (IOS_DISTRIBUTION, 400 days)`: the profile expires in 180 days and embeds an `IOS_DISTRIBUTION` certificate that expires in 400 days.
 
 ## When it files
 
 One Linear issue on team LYB, fingerprint `remediation:signing-expiry`.
 
-- Under 30 days: open or reopen that issue at High priority.
-- Under 7 days, or a missing or unreadable asset: the same issue, Urgent priority, with `ESCALATED` in the description and comment.
-- 30 days or more, and an authenticated key with no expiration date: resolve the open issue if one exists. Do not open a new one.
+- Under 30 days on a required profile or an in-use distribution certificate: open or reopen that issue at High priority.
+- Under 7 days, or a missing or unreadable required profile, certificate, or API key: the same issue, Urgent priority, with `ESCALATED` in the description and comment. A required bundle ID with no active App Store profile is missing and escalates.
+- Unused distribution certificates do not open, raise, or keep that issue open.
+- 30 days or more on every required profile and in-use certificate, and an authenticated key with no expiration date: resolve the open issue if one exists. Do not open a new one.
 
 30 days exactly is not under 30. 7 days exactly stays High and does not escalate. The issue body contains only the asset kind and the day count, plus this runbook path.
 
@@ -50,4 +54,4 @@ bundle exec fastlane setup_provisioning type:appstore readonly:false force:false
 
 [`.github/workflows/regenerate-certificates.yml`](../../.github/workflows/regenerate-certificates.yml) is manual. It runs `match_nuke` and deletes the certificates and profiles in the Match repository. Dispatch it only after the refresh above cannot produce a usable distribution certificate, and only by typing `NUKE-AND-REGENERATE` into the confirm input. There is no schedule. The expiry check never starts this workflow.
 
-Related: LYB-141, LYB-74, LYB-65.
+Related: LYB-141, LYB-332, LYB-285, LYB-310, LYB-74, LYB-65.
