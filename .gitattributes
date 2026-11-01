@@ -1,0 +1,2 @@
+# Preserve RFC 5545 calendar exports, including CRLF content lines.
+docs/compliance/claims-policy-review.ics -text whitespace=cr-at-eol

@@ -527,6 +527,19 @@ export const endpoints = {
       reason: 'LYB-230 source evidence for public web claims lint coverage.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-190',
+      reason:
+        'GLP-1 quarantine and clearance reconciliation required during claims-policy reviews.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-191',
+      reason: 'Quarterly claims-policy primary-source review cadence and ownership.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-356',
+      reason: 'Initial assigned quarterly FDA/FTC/Apple source-review checklist, due 2026-12-27.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-232',
       reason:
         'LYB-232 source evidence for Statsig client-key injection into the production web build.',

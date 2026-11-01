@@ -5385,5 +5385,27 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "claims-policy-quarterly-primary-source-review",
+    "source": "https://linear.app/jovie/issue/LYB-191",
+    "correction": "LYB-191: Retain a quarterly owner, recurring reminder and review checklist for claims-policy FDA/FTC/Apple sources, including the LYB-190 GLP-1 quarantine/clearance check. Cadence hygiene alone must not block App Store submission.",
+    "mechanization": "Document the owner and source-diff checklist; create the assigned low-priority LYB-356 review due 2026-12-27 with an explicit successor checklist. Retain a quarterly RFC 5545 reminder and validate its recurrence, folded CRLF export, seven-day display alert, policy link and GLP-1 follow-up in the existing required shared-lib suite. Negative controls reject one-off or annual events, a missing alarm and a missing quarantine link. The guard checks reminder configuration without a date-age release gate and does not certify completion of legal review, native Linear recurrence or calendar import/delivery. The lanes harness owns push and PR operations. Machine: built docs/compliance/claims-policy-review.ics.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The exported calendar and external Linear checklist are configuration artifacts; application runtime logic cannot prevent removal or breakage of their review cadence."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib test suite can validate the calendar export, indefinite three-month recurrence, display alarm and links to the policy checklist and GLP-1 issue. Negative controls prove reminder regressions fail. Actual regulatory interpretation and review completion remain human obligations outside this configuration guard."
+      }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant",
+    "guard": {
+      "path": "packages/shared-lib/src/claims-policy-review.test.ts",
+      "anchor": "quarterly claims-policy review reminder (LYB-191)"
+    }
   }
 ]
