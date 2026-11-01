@@ -2145,11 +2145,14 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     # Refreshing the policy digest remains an explicit review of the project diff.
     reviewed_project = (_REPO_ROOT / project_name).read_bytes()
     assert hashlib.sha256(reviewed_project).hexdigest() == dependencies[project_name]
-    # Routine resolver changes do not authorize new diagnostic tooling either.
+    # Every positive dependency comes from current source; stale pins must fail CI.
+    # Refreshing a tooling pin still requires explicit review of its source diff.
     resolver_name = 'scripts/ios/resolve-simulator-destination.sh'
-    reviewed_resolver = gzip.decompress(
-        (_REPO_ROOT / 'scripts/tests/fixtures/reviewed-diagnostic-resolver.sh.gz').read_bytes())
+    reviewed_resolver = (_REPO_ROOT / resolver_name).read_bytes()
     assert hashlib.sha256(reviewed_resolver).hexdigest() == dependencies[resolver_name]
+    previous_resolver = gzip.decompress(
+        (_REPO_ROOT / 'scripts/tests/fixtures/reviewed-diagnostic-resolver.sh.gz').read_bytes())
+    assert hashlib.sha256(previous_resolver).hexdigest() == 'd7c8e3a881c8fa4196270c7e8f9c90ad79f74f7c495de0b22f86246b042ce060'
     # Keep the prior reviewed project immutable as a refusal fixture in shallow CI.
     previous_project = gzip.decompress(
         (_REPO_ROOT / 'scripts/tests/fixtures/reviewed-diagnostic-project.pbxproj.gz').read_bytes())
@@ -2220,7 +2223,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     sentinel_dir = tmp_path / 'sentinels'
     sentinel_dir.mkdir()
     marker = tmp_path / 'forbidden-helper-or-native-execution'
-    # Bootstrap's pinned importer calls node; the pinned resolver calls xcodebuild.
+    # Bootstrap's pinned importer calls node; the pinned resolver calls xcrun.
     # No candidate helper or native tool should be reached by this trusted CLI.
     for name in ['node', 'xcodebuild', 'xcrun', 'ruby']:
         executable = sentinel_dir / name
@@ -2229,14 +2232,13 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
 
     fixtures = ['positive', 'previous-reviewed-project', 'frozen-main-audit', 'frozen-branch-audit', 'previous-main-audit', 'previous-branch-audit', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
-                'dependency-symlink', 'changed-project', 'wrong-resolver', 'current-resolver']
+                'dependency-symlink', 'changed-project', 'wrong-resolver', 'previous-reviewed-resolver']
     for scenario in fixtures:
         root = (tmp_path / scenario / 'repo').resolve()
         root.mkdir(parents=True)
         for name, digest in dependencies.items():
             source = _REPO_ROOT / name
-            data = (reviewed_project if name == project_name else
-                    reviewed_resolver if name == resolver_name else source.read_bytes())
+            data = source.read_bytes()
             assert source.is_file() and not source.is_symlink()
             assert hashlib.sha256(data).hexdigest() == digest
             target = root / name
@@ -2275,8 +2277,8 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         elif scenario == 'wrong-resolver':
             resolver = root / 'scripts/ios/resolve-simulator-destination.sh'
             resolver.write_bytes(resolver.read_bytes() + b'\n')
-        elif scenario == 'current-resolver':
-            (root / resolver_name).write_bytes((_REPO_ROOT / resolver_name).read_bytes())
+        elif scenario == 'previous-reviewed-resolver':
+            (root / resolver_name).write_bytes(previous_resolver)
         elif scenario == 'missing-dependency':
             helper.unlink()
         elif scenario == 'dependency-symlink':
