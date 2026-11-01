@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "marketing-assets-reject-future-capture-provenance",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1685",
+    "correction": "PR #1685 / LYB-277, fix-red-95726c4f82 occurrence 10: merge origin/main without rebasing and preserve verbatim program-revision rationale. Merge-group run 41290991865 fails marketing screenshot freshness because synthetic Git history emits a future capture date; Tently separately reports an AI-provider outage.",
+    "mechanization": "Merge main's hash-bound provenance repair and resolve the correction ledger with the existing classifier, retaining all 282 parent receipts. Extend the same marketing asset generator to reject future timestamps in retained manifests and complete Git history, recovering from complete history when possible. Four real-generator regressions fail against the merged main generator and pass after the extension; the existing required web suite runs them without changing its nonfuture or 60-day freshness gates. Run the extended generator on this checkout and retain the unchanged canonical capture manifest. The harness retains push and PR-body ownership and must add exactly one line: Machine: built scripts/marketing/sync-ios-marketing-assets.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator owns capture timestamp admission and can prevent future provenance from reaching its generated manifest, including when a saved timestamp matches the source hash. Incomplete or future Git evidence must fail rather than refresh the asset's age."
+      }
+    },
+    "guard": {
+      "path": "scripts/marketing/sync-ios-marketing-assets.mjs",
+      "anchor": "Date.parse(previous.capturedAt) <= latestCaptureTime"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "marketing-assets-git-capture-instant",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41290965357",
     "correction": "PR #1683 / LYB-293, fix-red-e3b0c44298 occurrence 75: the complete-history marketing provenance fixture compares ISO timestamp spelling, so Git 2.56's UTC Z output fails against the equivalent +00:00 fixture on the repaired head.",
@@ -5523,5 +5541,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "24cef6eff7f0",
+    "source": "https://github.com/JovieInc/LogYourBody/tree/codex/lyb-277-20261101t082148#lyb-277-task",
+    "correction": "LYB-277: Store only the user's utterance verbatim as the program revision rationale, without a generated coach sentence, template name or trademark. Retain one checked-in wording policy and a fixed utterance fixture under CI.",
+    "mechanization": "Retain the accepted default in the shared-lib decisions directory and validate a fixed revision fixture against the supplied utterance. The existing required shared-lib suite rejects absent, duplicate and renamed policies, changed defaults, altered rationale text and extra wording fields. Preserve whitespace in the existing structured steering schema while retaining nonblank and length checks. The existing persistence regression fails with trimming and passes after its removal, asserting the saved steering record, proposal reason, intent and summary. Card and chat presentation remain outside this slice; the harness owns push and PR operations.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The existing writer can preserve supplied text without transforming it, but cannot enforce the uniqueness of a checked-in decision or prove future rationale authorship from its single rationale field by construction."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib suite can enforce one accepted policy and exact equality of the revision rationale fixture to its supplied user utterance, with negative controls for alternate text and generated wording fields. The existing web suite verifies verbatim persistence through the actual writer."
+      }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant",
+    "guard": {
+      "path": "packages/shared-lib/src/program-revision-rationale-wording.test.ts",
+      "anchor": "program revision rationale wording policy (LYB-277)"
+    }
   }
 ]

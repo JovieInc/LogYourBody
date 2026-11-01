@@ -23,7 +23,12 @@ export const programSteeringRecordSchema = z
       .nullable(),
     constraintId: z.string().trim().min(1).max(200).nullable(),
     actor: revisionActorSchema,
-    rationale: z.string().trim().min(1).max(500),
+    // LYB-277: validate without rewriting the user's stored utterance.
+    rationale: z
+      .string()
+      .min(1)
+      .max(500)
+      .refine((value) => value.trim().length > 0),
   })
   .strict();
 export type ProgramSteeringRecord = z.infer<typeof programSteeringRecordSchema>;

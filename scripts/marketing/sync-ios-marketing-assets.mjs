@@ -49,11 +49,13 @@ function pngDimensions(buffer) {
 
 function capturedAtFor(id, source, sourceBuffer) {
   // Capture provenance follows the image bytes, never checkout or synthetic merge time.
+  const latestCaptureTime = Date.now();
   const previous = previousManifest[id];
   if (
     previous?.source === source &&
     previous.sourceSha256 === sha256(sourceBuffer) &&
-    Number.isFinite(Date.parse(previous.capturedAt))
+    Number.isFinite(Date.parse(previous.capturedAt)) &&
+    Date.parse(previous.capturedAt) <= latestCaptureTime
   ) {
     return previous.capturedAt;
   }
@@ -74,7 +76,7 @@ function capturedAtFor(id, source, sourceBuffer) {
       ...options,
       encoding: 'utf8',
     }).trim();
-    if (Number.isFinite(Date.parse(value))) return value;
+    if (Number.isFinite(Date.parse(value)) && Date.parse(value) <= latestCaptureTime) return value;
   } catch {
     // Extraction time and shallow merge commits are not evidence of a new capture.
   }
