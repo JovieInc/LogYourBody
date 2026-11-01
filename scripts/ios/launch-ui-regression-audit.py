@@ -299,6 +299,17 @@ def main() -> int:
             check="dashboard.observation_plot", file=str(card_path.relative_to(root)), line=1,
             detail="Stats truth must plot dated observations without interpolated continuous history.",
         ))
+    if ".allowsHitTesting(false)" not in observation_chart:
+        violations.append(AuditViolation(
+            check="dashboard.observation_chart_ignores_hits", file=str(card_path.relative_to(root)), line=1,
+            detail="The stats card chart must ignore hits so the card button opens details.",
+        ))
+    card_button = card_source.split("private func cardButton", 1)[-1].split("private var cardSurface", 1)[0]
+    if "button.highPriorityGesture(TapGesture().onEnded { action.handler() })" not in card_button:
+        violations.append(AuditViolation(
+            check="dashboard.card_tap_opens_detail", file=str(card_path.relative_to(root)), line=1,
+            detail="The stats card tap must open details even when the list drag takes the touch.",
+        ))
     require_token(
         root=root, path=app_dir / "Helpers/DashboardMetricFormatting.swift",
         token="if requiresComparison && first.date == last.date { return nil }",

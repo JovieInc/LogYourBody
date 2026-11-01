@@ -242,16 +242,30 @@ public struct MetricSummaryCard: View {
 
     public var body: some View {
         if let action = primaryAction(actionsEnabled: actionsEnabled) {
-            Button(action: action.handler) {
-                cardSurface
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityLabel(actionsEnabled ? "\(accessibilityLabel), \(action.title)" : accessibilityLabel)
-            .accessibilityHint(actionsEnabled ? actionHint(actionsEnabled: true) ?? "" : accessibilityHint ?? "")
+            cardButton(action)
         } else {
             cardSurface
                 .accessibilityAddTraits(.isStaticText)
+        }
+    }
+
+    /// The stats list installs a drag on the whole card. A touch XCTest attributes
+    /// to this button can be taken by that drag, or by the chart inside the label,
+    /// and the detail screen never pushes. The high-priority tap is the card action.
+    @ViewBuilder
+    private func cardButton(_ action: CardAction) -> some View {
+        let button = Button(action: action.handler) {
+            cardSurface
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(actionsEnabled ? "\(accessibilityLabel), \(action.title)" : accessibilityLabel)
+        .accessibilityHint(actionsEnabled ? actionHint(actionsEnabled: true) ?? "" : accessibilityHint ?? "")
+
+        if case .data = state {
+            button.highPriorityGesture(TapGesture().onEnded { action.handler() })
+        } else {
+            button
         }
     }
 
@@ -484,6 +498,7 @@ public struct MetricSummaryCard: View {
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .accessibilityHidden(true)
+        .allowsHitTesting(false)
     }
 
     private func legacyChart(for content: Content) -> some View {
@@ -555,6 +570,7 @@ public struct MetricSummaryCard: View {
         .accessibilityLabel(content.chartAccessibilityLabel ?? "Trend chart")
         .accessibilityValue(content.chartAccessibilityValue ?? "Latest value \(content.value) \(content.unit)")
         .accessibilityHidden(isAccessibilityCategory)
+        .allowsHitTesting(false)
         .transaction { if reduceMotion { $0.animation = nil } }
     }
 

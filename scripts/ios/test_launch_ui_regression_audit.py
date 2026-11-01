@@ -213,6 +213,22 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                      'LineMark(x: .value("Observation date", date)')
         self.assert_rejected("dashboard.observation_plot")
 
+    def test_observation_chart_cannot_take_the_card_tap(self):
+        self.replace(
+            "DesignSystem/Organisms/MetricSummaryCard.swift",
+            ".accessibilityHidden(true)\n        .allowsHitTesting(false)",
+            ".accessibilityHidden(true)",
+        )
+        self.assert_rejected("dashboard.observation_chart_ignores_hits")
+
+    def test_card_tap_still_opens_detail_when_the_list_drag_takes_the_touch(self):
+        self.replace(
+            "DesignSystem/Organisms/MetricSummaryCard.swift",
+            "button.highPriorityGesture(TapGesture().onEnded { action.handler() })",
+            "button",
+        )
+        self.assert_rejected("dashboard.card_tap_opens_detail")
+
     def test_single_timestamp_cannot_establish_no_change(self):
         self.replace("Helpers/DashboardMetricFormatting.swift",
                      "if requiresComparison && first.date == last.date { return nil }", "")

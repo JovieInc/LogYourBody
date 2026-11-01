@@ -5715,5 +5715,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "stats-truth-card-tap-opens-detail",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 6: Launch Quality run 41357153982 fails testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance. The weight card tap is synthesized and the app returns to idle immediately, so metric_detail_headline never appears. The same test passed on run 41336887265 before the wireframe merge. Tently reports an AI-provider outage and no source finding.",
+    "mechanization": "Keep the decorative stats chart from hit-testing, and give the data card a high-priority tap that runs the same detail handler when the list drag takes the button touch. Extend the existing launch UI regression audit so removing either the chart's allowsHitTesting(false) or that tap is rejected. Those mutations fail on the old card and pass after this change. Origin/main is already merged as 5dea9cc3b. Native XCTest stays unverified on this Linux host. The harness owns push and PR-body edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The card chart no longer takes the touch, and the card's own tap opens metric detail even when the surrounding drag recognizer claims the button."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "The stats card tap must open details even when the list drag takes the touch."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
