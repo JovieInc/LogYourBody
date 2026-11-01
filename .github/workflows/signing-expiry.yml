@@ -1,8 +1,10 @@
 name: Signing expiry check
 
-# Read-only LYB-141 check. Reports days to expiry for the Apple Distribution
-# certificate, active App Store profiles, and the App Store Connect API key.
-# Under 30 days it files or reopens one LYB issue (remediation:signing-expiry).
+# Read-only LYB-141 check. Reports days to expiry for the App Store profiles
+# Matchfile requires, the distribution certificates those profiles embed, and
+# the App Store Connect API key. A missing required profile is Urgent. Unused
+# distribution certificates are listed and do not raise the issue. Under 30
+# days it files or reopens one LYB issue (remediation:signing-expiry).
 # Under 7 days that same issue is Urgent. This workflow never creates,
 # revokes, rotates, or nukes signing material. Renew before nuke:
 # docs/engineering/signing-expiry.md
@@ -20,11 +22,15 @@ on:
   pull_request:
     paths:
       - .github/scripts/signing-expiry.mjs
+      - .github/scripts/signing-expiry-report.mjs
       - .github/scripts/signing-expiry.test.mjs
+      - .github/scripts/signing-expiry-client.test.mjs
+      - .github/scripts/signing-expiry-fixtures.mjs
       - .github/scripts/app-store-readiness.mjs
       - .github/scripts/lib/linear-issue-intake.mjs
       - .github/workflows/signing-expiry.yml
       - docs/engineering/signing-expiry.md
+      - apps/ios/fastlane/Matchfile
 
 permissions: {}
 
@@ -49,7 +55,7 @@ jobs:
           node-version: 22
 
       - name: Unit tests
-        run: node --test .github/scripts/signing-expiry.test.mjs
+        run: node --test .github/scripts/signing-expiry.test.mjs .github/scripts/signing-expiry-client.test.mjs
 
       - name: Read expiry and file if needed
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
