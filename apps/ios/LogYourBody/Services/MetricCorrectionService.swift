@@ -65,6 +65,7 @@ final class MetricCorrectionService {
     private let isEnabled: @MainActor () -> Bool
     private let admission: @MainActor (String) throws -> CoreDataManager.WriteAdmission
     private let syncTrigger: @MainActor () -> Void
+    private let invalidateVisualizationDerivatives: @MainActor (String, [String]) async -> Void
 
     init(
         coreDataManager: CoreDataManager = .shared,
@@ -82,12 +83,18 @@ final class MetricCorrectionService {
         syncTrigger: @escaping @MainActor () -> Void = {
             RealtimeSyncManager.shared.updatePendingSyncCount()
             RealtimeSyncManager.shared.syncIfNeeded()
+        },
+        invalidateVisualizationDerivatives: @escaping @MainActor (String, [String]) async -> Void = { accountId, evidenceIds in
+            try? await BodyVisualizationLedger.shared.invalidateDerivatives(
+                accountId: accountId, evidenceIds: evidenceIds
+            )
         }
     ) {
         self.coreDataManager = coreDataManager
         self.isEnabled = isEnabled
         self.admission = admission
         self.syncTrigger = syncTrigger
+        self.invalidateVisualizationDerivatives = invalidateVisualizationDerivatives
     }
 
     func exclude(_ metric: BodyMetrics) async throws -> PhotoMetricsUpdateResult {
@@ -137,6 +144,7 @@ final class MetricCorrectionService {
         let result = try await coreDataManager.updateMetricOverlayAndWait(
             expected: metric, excluded: excluded, correctedValue: correctedValue, writeAdmission: writeAdmission
         )
+        await invalidateVisualizationDerivatives(metric.userId, [metric.id])
         syncTrigger()
         return result
     }

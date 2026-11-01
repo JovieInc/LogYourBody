@@ -56,3 +56,9 @@ and LYB-171. Other LYB-311 work is outside this decision.
 
 This slice changes documentation only: no native app code, secrets, package
 manifests, provider configuration, or health artifacts are added or changed.
+
+LYB-315 later stores versioned visualization snapshots and local derived
+placeholders in the account's application-support directory. Authentic photos
+may only reference the existing progress-photo prefix above. That work adds no
+provider, credential, or upload. The interface is
+[body visualization snapshots](../engineering/body-visualization-snapshots.md).
