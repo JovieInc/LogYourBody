@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "marketing-assets-retain-hash-bound-capture-date",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41289916374",
+    "correction": "PR #1683 / LYB-293, fix-red-95726c4f82 occurrence 8: merge-group JavaScript/TypeScript fails the marketing asset freshness assertion because shallow Git history dates an unchanged screenshot from a future synthetic merge commit. Tently separately reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing marketing asset sync generator to retain capture timestamps only for matching source paths and SHA-256 bytes. Missing evidence requires complete committed asset history; shallow boundaries, uncommitted bytes and source archives cannot refresh capture age. Exercise the actual generator in temporary Git repositories through the existing required web Jest suite, including a future synthetic merge cloned at depth one, repeat sync, archive extraction, complete-history recovery and missing, malformed or mismatched provenance. The regressions fail against the prior generator and pass after repair. Preserve the existing nonfuture and 60-day freshness assertions. Merge origin/main first and keep the adherence offer implementation intact. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/marketing/sync-ios-marketing-assets.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator can bind capture provenance to source content and refuse incomplete evidence before writing a manifest, preventing synthetic merge and extraction timestamps from falsely establishing freshness."
+      }
+    },
+    "guard": {
+      "path": "scripts/marketing/sync-ios-marketing-assets.mjs",
+      "anchor": "// Capture provenance follows the image bytes, never checkout or synthetic merge time."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "lyb-web-landing-only-v1",
     "source": "https://github.com/JovieInc/LogYourBody/tree/codex/lyb-100-20261101t042159#lyb-100-task",
     "correction": "Tim's lyb-web-landing-only-v1 lock: after 1.2.0 submission, remove authenticated web app UI and navigation while retaining the landing, marketing/legal pages and first-party iOS APIs.",
