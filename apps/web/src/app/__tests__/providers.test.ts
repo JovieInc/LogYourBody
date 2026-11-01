@@ -1,33 +1,17 @@
-import { needsProductAuthRuntime } from '../providers';
+import { createElement } from 'react';
+import { render, screen } from '@testing-library/react';
+import { Providers } from '../providers';
 
-describe('needsProductAuthRuntime', () => {
-  it.each([
-    '/',
-    '/about',
-    '/blog/body-composition',
-    '/brand',
-    '/careers',
-    '/changelog',
-    '/delete-account',
-    '/download/ios',
-    '/health-disclosure',
-    '/consumer-health-data',
-    '/privacy',
-    '/support',
-    '/terms',
-  ])('keeps %s free of the product auth runtime', (pathname) => {
-    expect(needsProductAuthRuntime(pathname)).toBe(false);
-  });
+jest.mock('@/contexts/ProductAuthContext', () => {
+  throw new Error('Marketing must not load product auth');
+});
+jest.mock('@/components/PWAProvider', () => {
+  throw new Error('Marketing must not load the PWA app runtime');
+});
 
-  it.each([
-    '/signin',
-    '/signup',
-    '/dashboard',
-    '/landing',
-    '/onboarding',
-    '/settings/profile',
-    '/unknown',
-  ])('keeps product auth runtime enabled for %s', (pathname) => {
-    expect(needsProductAuthRuntime(pathname)).toBe(true);
+describe('landing-only providers (LYB-100)', () => {
+  it('renders public content without loading account or PWA providers', () => {
+    render(createElement(Providers, null, createElement('p', null, 'Public content')));
+    expect(screen.getByText('Public content')).toBeVisible();
   });
 });

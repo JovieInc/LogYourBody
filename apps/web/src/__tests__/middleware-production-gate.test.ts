@@ -128,7 +128,7 @@ describe('middleware production debug/test gate', () => {
     expect(response?.headers.get('Cache-Control')).toBe('no-store');
   });
 
-  it('keeps normal protected routes behind product auth in production', async () => {
+  it('lets Next return a 404 for retired app pages even with a web session', async () => {
     process.env.VERCEL_ENV = 'production';
     const {
       default: middleware,
@@ -140,24 +140,44 @@ describe('middleware production debug/test gate', () => {
     });
 
     expect(shouldBlockDebugRoute('/dashboard')).toBe(false);
-    expect(shouldUseProductAuthMiddleware(request)).toBe(true);
+    expect(shouldUseProductAuthMiddleware(request)).toBe(false);
 
     const response = await middleware(request);
 
     expect(response?.status).toBe(200);
   });
 
-  it('redirects an unauthenticated protected route to the sign-in surface', async () => {
+  it('does not redirect a retired app page to sign-in', async () => {
     const { default: middleware } = await import('../middleware');
     const response = await middleware(
       new NextRequest('https://logyourbody.com/dashboard?tab=trend'),
     );
 
-    expect(response?.status).toBe(307);
-    expect(response?.headers.get('location')).toBe(
-      'https://logyourbody.com/signin?returnTo=%2Fdashboard%3Ftab%3Dtrend',
-    );
+    expect(response?.status).toBe(200);
+    expect(response?.headers.get('location')).toBeNull();
   });
+
+  it.each(['/api/weights', '/api/auth/delete-account', '/api/parse-pdf', '/api/parse-pdf-v2'])(
+    'preserves API authentication without redirecting %s to retired UI',
+    async (pathname) => {
+      const { default: middleware } = await import('../middleware');
+      const url = `https://logyourbody.com${pathname}`;
+      for (const authorization of ['', 'Basic invalid', 'Bearer', 'Bearer invalid token']) {
+        const response = await middleware(new NextRequest(url, { headers: { authorization } }));
+        expect(response.status).toBe(401);
+        expect(response.headers.get('location')).toBeNull();
+        expect(await response.json()).toEqual({ error: 'Unauthorized' });
+      }
+      // Presence only: the API handler still validates the bearer token.
+      const native = await middleware(
+        new NextRequest(url, {
+          headers: { authorization: 'Bearer native-token' },
+        }),
+      );
+      expect(native.status).toBe(200);
+      expect(native.headers.get('location')).toBeNull();
+    },
+  );
 
   it.each(['/api/parse-pdf', '/api/parse-pdf-v2'])(
     'keeps advanced import API route %s behind product auth in production',

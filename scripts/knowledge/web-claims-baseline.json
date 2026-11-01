@@ -2,14 +2,6 @@
   "schema": "lyb.correction-ratchet/v1",
   "findings": [
     {
-      "path": "apps/web/src/app/settings/subscription/page.tsx",
-      "key": "[free-trial-claim] <strong>{daysLeftInTrial} days left</strong> in your free trial. Upgrade now to keep"
-    },
-    {
-      "path": "apps/web/src/app/settings/subscription/page.tsx",
-      "key": "[free-trial-claim] Free Trial"
-    },
-    {
       "path": "apps/web/src/components/LandingPage.tsx",
       "key": "[free-trial-claim] Start Free Trial"
     },

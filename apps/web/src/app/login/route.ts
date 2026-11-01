@@ -1,5 +1,6 @@
-import { redirect } from 'next/navigation'
+import { redirect } from 'next/navigation';
 
-export async function GET() {
-  redirect('/signin')
+// Retain legacy auth destinations used by OAuth error callbacks and bookmarks.
+export function GET() {
+  redirect('/');
 }
