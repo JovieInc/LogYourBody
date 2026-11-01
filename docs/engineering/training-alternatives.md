@@ -73,6 +73,12 @@ hold remains visible even when the separate readiness UI gate is off. Copy says
 to avoid training through pain and seek medical evaluation for persistent,
 worsening or neurologic symptoms. It provides no diagnosis or guarantee.
 
+The accepted [LYB-257 pain-guidance decision](../product/exercise-swap-pain-guidance.md)
+records the exact replacement copy, any-pain trigger and explicit pain-gone
+requirement. Its created `exercise_swap_pain_guidance` UI/logic slice owns
+implementing that wording and resolution flow; this guide's existing runtime
+description does not establish that the follow-up is implemented.
+
 ## Rollout and evidence
 
 Both server switches must be true: `LYB_HYPERTROPHY_COACH_API_ENABLED` and the new
