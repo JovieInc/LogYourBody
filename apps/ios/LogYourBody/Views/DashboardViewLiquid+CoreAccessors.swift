@@ -1,6 +1,11 @@
 import SwiftUI
 
 extension DashboardViewLiquid {
+    enum LayoutMode {
+        case legacyTabbed
+        case photoTimelineHUD
+    }
+
     // MARK: - Goal Helpers
 
     /// Returns the user-selected FFMI goal. Population references never become

@@ -236,13 +236,17 @@ enum LaunchJourney {
         return outcome.constraints.maintenance.contains { $0.start <= today && today <= $0.end }
     }
 
-    private static func day(_ date: Date) -> String {
+    private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
+        return formatter
+    }()
+
+    private static func day(_ date: Date) -> String {
+        dayFormatter.string(from: date)
     }
 
     private static func label(_ outcome: DatedOutcome) -> String {

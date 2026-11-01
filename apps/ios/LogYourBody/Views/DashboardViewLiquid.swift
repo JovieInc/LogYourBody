@@ -12,11 +12,6 @@ import CoreData
 @preconcurrency import Combine
 
 struct DashboardViewLiquid: View {
-    enum LayoutMode {
-        case legacyTabbed
-        case photoTimelineHUD
-    }
-
     let layoutMode: LayoutMode
     @Binding private var releaseReviewDestination: ReleaseReviewDestination?
 

@@ -118,6 +118,39 @@ private func existingValue(_ outcome: DatedOutcome) -> Double {
 }
 
 extension DashboardViewLiquid {
+    var homeChatDraftBinding: Binding<String> {
+        let ownership = authManager.captureAccountSession()
+        return AccountSessionChatDraft.binding(storage: $homeChatDraft, owner: ownership) {
+            guard let ownership else { return false }
+            return authManager.ownsAccountSession(ownership)
+        }
+    }
+
+    var launchJourneyDirective: some View {
+        LaunchDirectiveCard(
+            presentation: launchJourneyPresentation,
+            note: launchHoldNote,
+            onAction: { performLaunchNextAction(launchJourneyPresentation) }
+        )
+        .padding(.horizontal, JovieTokens.screenInset)
+        .padding(.top, 8)
+    }
+
+    var launchJourneyOutcomeEditor: some View {
+        LaunchOutcomeEditor(
+            existing: (try? realtimeSyncManager.datedOutcomeStore.load())?.value,
+            errorText: launchOutcomeError
+        ) { outcome in
+            do {
+                try realtimeSyncManager.datedOutcomeStore.save(outcome)
+                launchOutcomeError = nil
+                showsLaunchOutcomeEditor = false
+            } catch {
+                launchOutcomeError = "That outcome could not be saved. Revise the date or value."
+            }
+        }
+    }
+
     var launchJourneyPresentation: LaunchJourney.Presentation {
         let surface: LaunchJourney.Surface
         if isHomeChatExpanded || selectedPhotoTimelineRootPage == .chat {
