@@ -1,6 +1,6 @@
 # LogYourBody Product Roadmap And Build Guardrails
 
-Last reconciled: 2026-11-01 (LYB-173 October 28 home contract; LYB-274 parity-slice decision; preserves LYB-161 and LYB-179)
+Last reconciled: 2026-11-01 (LYB-173 October 28 home contract; LYB-274 parity-slice decision; LYB-275 client-qualification order; preserves LYB-161 and LYB-179)
 
 ## October 16 supersession: current product behavior
 
@@ -105,7 +105,11 @@ release or the separate, higher-priority latest-main TestFlight delivery. Except
 for the single post-shipment inventory check recorded in LYB-274, this plan
 authorizes no implementation, deployment, account connection, dependency
 installation, marketplace publication, Apple capability/signing change, release
-metadata/checklist/workflow change, or release-PR mutation. Keep linked planning
+metadata/checklist/workflow change, or release-PR mutation. LYB-275 is a further
+exception limited to synthetic-fixture qualification of Claude Code, then
+ChatGPT, then Jovie. That exception still authorizes no account connection,
+client registration, credential storage, admission label, or real user data.
+Keep linked planning
 items in Backlog without dispatch, admission labels, locks or release-blocking
 relations; retain existing owners and branches.
 
@@ -127,6 +131,26 @@ Repository slice keys are not Linear issue IDs, admission labels, or dispatch.
 Real-device TestFlight evidence stays with LYB-161. The
 [slice record](../packages/shared-lib/decisions/agent-parity-slices.md) is the
 specification.
+
+### LYB-275 client qualification order
+
+Recommended default adopted under LYB-275's ships-if-unanswered instruction.
+LYB-275 qualifies Claude Code first on a synthetic fixture account only, then
+ChatGPT, then Jovie. Real consented accounts and client registrations are not
+provided. The account owner provides those accounts, public client IDs, and
+exact approved redirects, and only after that client's synthetic run passes.
+This decision provides two synthetic fixtures only: fixture-a and fixture-b,
+with no real user data and no credentials.
+
+Only Claude Code may start, and only on those synthetic fixtures. ChatGPT
+starts after the Claude Code synthetic run passes. Jovie starts after the
+ChatGPT synthetic run passes. A synthetic pass does not qualify another client
+and does not authorize a real account connection. Recorded qualification slices
+are Claude Code, ChatGPT, and Jovie. Repository slice keys are not Linear issue
+IDs, admission labels, or dispatch. This record connects no account and
+registers no client. Real-device TestFlight evidence stays with LYB-161. The
+[qualification record](../packages/shared-lib/decisions/client-qualification-order.md)
+is the specification.
 
 ## September 26 roadmap — preserved v1 history
 
