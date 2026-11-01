@@ -22,7 +22,10 @@ on:
   pull_request:
     paths:
       - .github/scripts/signing-expiry.mjs
+      - .github/scripts/signing-expiry-report.mjs
       - .github/scripts/signing-expiry.test.mjs
+      - .github/scripts/signing-expiry-client.test.mjs
+      - .github/scripts/signing-expiry-fixtures.mjs
       - .github/scripts/app-store-readiness.mjs
       - .github/scripts/lib/linear-issue-intake.mjs
       - .github/workflows/signing-expiry.yml
@@ -52,7 +55,7 @@ jobs:
           node-version: 22
 
       - name: Unit tests
-        run: node --test .github/scripts/signing-expiry.test.mjs
+        run: node --test .github/scripts/signing-expiry.test.mjs .github/scripts/signing-expiry-client.test.mjs
 
       - name: Read expiry and file if needed
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
