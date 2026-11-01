@@ -138,6 +138,93 @@ def resolve_staged(root):
     print("repository-docs: regenerated and staged " + config["output"] + " from index")
 
 
+DIAGNOSTIC_PROJECT = "apps/ios/LogYourBody.xcodeproj/project.pbxproj"
+DIAGNOSTIC_WORKFLOW = ".github/workflows/ios-ui-diagnostics.yml"
+DIAGNOSTIC_PIN = re.compile(
+    r"(?m)^( +'" + re.escape(DIAGNOSTIC_PROJECT) + r"': ')[0-9a-f]{64}(',)$"
+)
+
+
+def git_bytes(root, *args):
+    return subprocess.run(
+        ["git", *args], cwd=root, check=True, capture_output=True,
+    ).stdout
+
+
+def conflicted_diagnostic_template(root):
+    """Return one parent workflow when every stage differs only by the project pin."""
+    entries = [
+        entry for entry in git_bytes(
+            root, "ls-files", "--unmerged", "-z", "--", DIAGNOSTIC_WORKFLOW,
+        ).decode().split("\0") if entry
+    ]
+    stages = [entry.split("\t", 1)[0].split() for entry in entries]
+    if len(stages) != 3 or {row[2] for row in stages if len(row) == 3} != {"1", "2", "3"}:
+        raise ValueError("diagnostic pin repair requires all three workflow stages")
+    if any(row[0] not in {"100644", "100755"} for row in stages):
+        raise ValueError("diagnostic pin repair requires a regular workflow file")
+    texts = []
+    for stage in ("1", "2", "3"):
+        text = git_bytes(root, "show", f":{stage}:{DIAGNOSTIC_WORKFLOW}").decode()
+        if re.search(r"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", text):
+            raise ValueError("diagnostic pin repair refuses conflict markers in a parent")
+        masked, count = DIAGNOSTIC_PIN.subn(
+            lambda match: match.group(1) + ("0" * 64) + match.group(2), text, count=1,
+        )
+        if count != 1:
+            raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+        texts.append((text, masked))
+    if len({masked for _text, masked in texts}) != 1:
+        raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+    return texts[1][0]
+
+
+def reviewed_conflicted_pin(root, expected):
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise ValueError("reviewed project SHA-256 must be 64 lowercase hex characters")
+    for name in (DIAGNOSTIC_PROJECT, DIAGNOSTIC_WORKFLOW):
+        path = root / name
+        if any(parent.is_symlink() for parent in (path, *path.parents) if parent != root.parent):
+            raise ValueError("reviewed project repair refuses symlinks: " + name)
+    try:
+        project = staged_bytes(root, DIAGNOSTIC_PROJECT)
+    except subprocess.CalledProcessError as error:
+        raise ValueError("resolve source conflicts first: " + DIAGNOSTIC_PROJECT) from error
+    if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", project):
+        raise ValueError("resolve staged conflict markers first: " + DIAGNOSTIC_PROJECT)
+    if repository_docs.digest(project) != expected:
+        raise ValueError("reviewed project SHA-256 does not match merged source")
+    template = conflicted_diagnostic_template(root)
+    # A conflicted diagnostic pin is replaced only by the reviewed project digest.
+    # Only an explicit reviewed digest may update this trust boundary; never derive it here.
+    updated, count = DIAGNOSTIC_PIN.subn(
+        lambda match: match.group(1) + expected + match.group(2), template, count=1,
+    )
+    if count != 1:
+        raise ValueError("expected exactly one diagnostic project pin")
+    return DIAGNOSTIC_WORKFLOW, updated
+
+
+def stage_conflicted_diagnostic_pin(root, pin_update, output):
+    workflow, updated = pin_update
+    path = repository_docs.local(root, workflow)
+    original = path.read_bytes()
+    index = git_bytes(root, "ls-files", "--stage", "--", workflow)
+    try:
+        # Validate immutable imports before replacing the conflicted pin.
+        errors = repository_docs.run(root)
+        if errors and errors != ["source projection stale: " + output]:
+            raise ValueError("; ".join(errors))
+        path.write_bytes(updated.encode())
+        subprocess.run(["git", "add", "--", workflow], cwd=root, check=True)
+        resolve_staged(root)
+    except (ValueError, OSError, subprocess.CalledProcessError):
+        path.write_bytes(original)
+        subprocess.run(["git", "update-index", "--force-remove", "--", workflow], cwd=root, check=True)
+        subprocess.run(["git", "update-index", "--index-info"], cwd=root, input=index, check=True)
+        raise
+
+
 def reviewed_project_pin(root, expected):
     project = "apps/ios/LogYourBody.xcodeproj/project.pbxproj"
     workflow = ".github/workflows/ios-ui-diagnostics.yml"
@@ -165,6 +252,14 @@ def reviewed_project_pin(root, expected):
     return workflow, updated
 
 
+def projection_is_unmerged(root, output):
+    result = subprocess.run(
+        ["git", "ls-files", "--unmerged", "--", output],
+        cwd=root, check=True, capture_output=True, text=True,
+    )
+    return bool(result.stdout.strip())
+
+
 def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_project_sha256=None):
     root = Path(root).resolve()
     config = json.loads(repository_docs.local(root, "repository-docs.json").read_text())
@@ -174,8 +269,29 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
         cwd=root, check=True, capture_output=True,
     ).stdout.decode().split("\0")
     unresolved = sorted(set(conflicts) - {"", output})
+    conflicted_pin = None
+    if reviewed_project_sha256 is not None and DIAGNOSTIC_WORKFLOW in unresolved:
+        conflicted_pin = reviewed_conflicted_pin(root, reviewed_project_sha256)
+        unresolved = [name for name in unresolved if name != DIAGNOSTIC_WORKFLOW]
     if unresolved:
         raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
+    if conflicted_pin is not None:
+        stage_conflicted_diagnostic_pin(root, conflicted_pin, output)
+        return
+    # A conflicted source map is rebuilt from the merged index.
+    # Unstaged worktree bytes and either parent's projection cannot change fingerprints.
+    # The worktree registry still fails closed: import and path errors are not a stale map.
+    if (
+        not refresh_lockfile
+        and not verify_lockfile
+        and reviewed_project_sha256 is None
+        and projection_is_unmerged(root, output)
+    ):
+        errors = repository_docs.run(root)
+        if errors and errors != ["source projection stale: " + output]:
+            raise ValueError("; ".join(errors))
+        resolve_staged(root)
+        return
     pin_update = None
     if reviewed_project_sha256 is not None:
         pin_update = reviewed_project_pin(root, reviewed_project_sha256)

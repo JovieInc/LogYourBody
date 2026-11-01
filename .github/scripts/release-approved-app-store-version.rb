@@ -353,7 +353,7 @@ monitor = AppStoreReleaseHealth::Monitor.new(
   end
 )
 health_verified = true
-# Monitor every live rollout, even if APP_VERSION/project points at a newer submission.
+# Monitor every live rollout, even when APP_VERSION selects another submission.
 versions.select { |item| SUCCESS_STATES.include?(item.dig("attributes", "appVersionState")) }.each do |live|
   phase = monitor.phased_release(live)
   next unless phase && %w[ACTIVE PAUSED].include?(phase.dig("attributes", "phasedReleaseState"))

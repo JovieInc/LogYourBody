@@ -21,17 +21,27 @@ from launch_ui_timeline_audit import (
 )
 
 
+def read_sources(paths: list[Path]) -> dict[Path, str]:
+    """Read each Swift file once; the traced behavior suite repeats this audit."""
+    texts: dict[Path, str] = {}
+    for path in paths:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            texts[path] = handle.read()
+    return texts
+
+
 def add_pattern_violations(
     *,
     root: Path,
     paths: list[Path],
+    texts: dict[Path, str],
     pattern: re.Pattern[str],
     check: str,
     detail: str,
     violations: list[AuditViolation],
 ) -> None:
     for path in paths:
-        text = path.read_text(errors="replace")
+        text = texts[path]
         for match in pattern.finditer(text):
             violations.append(
                 AuditViolation(
@@ -47,12 +57,13 @@ def require_token(
     *,
     root: Path,
     path: Path,
+    texts: dict[Path, str],
     token: str,
     check: str,
     detail: str,
     violations: list[AuditViolation],
 ) -> None:
-    text = path.read_text(errors="replace")
+    text = texts[path]
     if token in text:
         return
     violations.append(
@@ -69,12 +80,13 @@ def require_one_of_tokens(
     *,
     root: Path,
     path: Path,
+    texts: dict[Path, str],
     tokens: tuple[str, ...],
     check: str,
     detail: str,
     violations: list[AuditViolation],
 ) -> None:
-    text = path.read_text(errors="replace")
+    text = texts[path]
     if any(token in text for token in tokens):
         return
     violations.append(
@@ -119,10 +131,13 @@ def main() -> int:
         )
         for path in (root / "apps/ios" / directory).rglob("*.swift")
     )
+    # One read per file. Repeating read_text inside every check blows the traced 30s suite.
+    texts = read_sources(native_swift_files)
     violations: list[AuditViolation] = []
 
     add_pattern_violations(
         root=root,
+        texts=texts,
         paths=native_swift_files,
         pattern=re.compile(
             r"\b(?:CGPoint|CGSize|CGRect|CGVector|CGAffineTransform)\s*\("
@@ -132,10 +147,11 @@ def main() -> int:
         detail="Qualify non-finite geometry arguments with CGFloat or Double to avoid ambiguous overloads.",
         violations=violations,
     )
-    check_optional_cgfloat_opacity(root, native_swift_files, violations)
+    check_optional_cgfloat_opacity(root, native_swift_files, violations, texts)
 
     add_pattern_violations(
         root=root,
+        texts=texts,
         paths=app_swift_files,
         pattern=re.compile(r"Spacer\s*\(\s*minLength:\s*(?:1[2-9]\d|[2-9]\d{2,})"),
         check="overscroll.no_large_fake_bottom_spacers",
@@ -145,6 +161,7 @@ def main() -> int:
 
     require_token(
         root=root,
+        texts=texts,
         path=app_dir / "Features/Onboarding/Components/OnboardingMolecules.swift",
         token=".scrollBounceBehavior(.basedOnSize, axes: .vertical)",
         check="onboarding.fixed_cta_size_based_bounce",
@@ -154,6 +171,7 @@ def main() -> int:
 
     add_pattern_violations(
         root=root,
+        texts=texts,
         paths=app_swift_files,
         pattern=re.compile(r"photo_timeline_hud_stats_button"),
         check="timeline.no_bottom_stats_card",
@@ -173,6 +191,7 @@ def main() -> int:
     ]:
         require_token(
             root=root,
+            texts=texts,
             path=share_card,
             token=token,
             check="share_card.required_layout_anchor",
@@ -186,16 +205,17 @@ def main() -> int:
         "ViewThatFits(in: .vertical)", "ScrollView {\n                content",
         ".frame(maxHeight: 160)",
     ]:
-        require_token(root=root, path=launch_ui, token=token,
+        require_token(root=root, path=launch_ui, texts=texts, token=token,
                       check="launch.bounded_scrollable_directive",
                       detail="The directive must fit or scroll within a bounded header.",
                       violations=violations)
     require_token(root=root, path=app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift",
+                  texts=texts,
                   token="if isLaunchJourneyEnabled {\n                launchJourneyDirective",
                   check="launch.gated_directive",
                   detail="The deadline journey must be opt-in through its feature gate.",
                   violations=violations)
-    directive = launch_ui.read_text().split("var launchJourneyDirective: some View {", 1)[-1].split(
+    directive = texts[launch_ui].split("var launchJourneyDirective: some View {", 1)[-1].split(
         "var launchJourneyOutcomeEditor:", 1
     )[0]
     if ".sheet(isPresented: $showsLaunchOutcomeEditor)" not in directive:
@@ -204,7 +224,8 @@ def main() -> int:
             detail="Attach the outcome editor to its directive, away from home provenance presenters."
         ))
     add_pattern_violations(
-        root=root, paths=[app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"],
+        root=root,
+        texts=texts, paths=[app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"],
         pattern=re.compile(r"\.sheet\(isPresented: \$showsLaunchOutcomeEditor\)"),
         check="launch.local_editor_presenter", detail="The root must not own the outcome-editor sheet.",
         violations=violations,
@@ -221,6 +242,7 @@ def main() -> int:
     ]:
         require_token(
             root=root,
+            texts=texts,
             path=app_dir / relative_path,
             token=token,
             check="provenance.presenting_binding_dismissal",
@@ -237,6 +259,7 @@ def main() -> int:
     ]:
         require_token(
             root=root,
+            texts=texts,
             path=dashboard_components,
             token=token,
             check="avatar.full_width_transparent_stage",
@@ -254,6 +277,7 @@ def main() -> int:
     ]:
         require_token(
             root=root,
+            texts=texts,
             path=app_dir / relative_path,
             token=token,
             check="dashboard.stats_card_composition",
@@ -269,14 +293,15 @@ def main() -> int:
          "if usesStatsTruth {\n            return Color.metricTextSecondary"),
     ]:
         require_token(
-            root=root, path=app_dir / relative_path, token=token,
+            root=root,
+            texts=texts, path=app_dir / relative_path, token=token,
             check="dashboard.neutral_trend_direction",
             detail="Stats truth must keep direction neutral without a validated safe goal comparison.",
             violations=violations,
         )
 
     card_path = app_dir / "DesignSystem/Organisms/MetricSummaryCard.swift"
-    card_source = card_path.read_text()
+    card_source = texts[card_path]
     observation_chart = card_source.split("private func observationChart", 1)[-1].split("private func legacyChart", 1)[0]
     if ("PointMark(x: .value(\"Observation date\", date)" not in observation_chart
             or re.search(r"\b(?:LineMark|AreaMark)\s*\(|\.interpolationMethod", observation_chart)):
@@ -285,7 +310,8 @@ def main() -> int:
             detail="Stats truth must plot dated observations without interpolated continuous history.",
         ))
     require_token(
-        root=root, path=app_dir / "Helpers/DashboardMetricFormatting.swift",
+        root=root,
+        texts=texts, path=app_dir / "Helpers/DashboardMetricFormatting.swift",
         token="if requiresComparison && first.date == last.date { return nil }",
         check="dashboard.minimum_comparison_samples",
         detail="One timestamp cannot establish no change.", violations=violations,
@@ -293,7 +319,7 @@ def main() -> int:
 
     # Identified chart containers must not overwrite their interactive plot's identity.
     detail_path = app_dir / "Components/FullMetricChartView+Part01.swift"
-    detail_source = detail_path.read_text()
+    detail_source = texts[detail_path]
     chart_card = detail_source.split("var chartCard: some View {", 1)[-1].split("@ViewBuilder", 1)[0]
     if not re.search(
         r'\.accessibilityElement\(children:\s*\.contain\)\s*'
@@ -313,6 +339,7 @@ def main() -> int:
     for path in system_b_surface_files:
         require_one_of_tokens(
             root=root,
+            texts=texts,
             path=path,
             tokens=(
                 ".systemBGlassSurface(",
@@ -342,6 +369,7 @@ def main() -> int:
     ]
     add_pattern_violations(
         root=root,
+        texts=texts,
         paths=system_b_dashboard_files,
         pattern=re.compile(
             r"Color\.(?:metric|liquid|app|white|black)\b|"
@@ -357,6 +385,7 @@ def main() -> int:
     main_tab_view_policies = app_dir / "Views/MainTabViewPolicies.swift"
     require_token(
         root=root,
+        texts=texts,
         path=main_tab_view_policies,
         token="static func surface() -> PaidAppSurface {\n        .photoTimelineHUD",
         check="routing.timeline_hud_default",
@@ -366,6 +395,7 @@ def main() -> int:
 
     add_pattern_violations(
         root=root,
+        texts=texts,
         paths=[main_tab_view, main_tab_view_policies],
         pattern=re.compile(r"AnalyticsService\.shared\.isFeatureEnabled|Statsig\.checkGate"),
         check="routing.no_feature_gate_default_surface",
@@ -375,6 +405,7 @@ def main() -> int:
 
     require_token(
         root=root,
+        texts=texts,
         path=app_dir / "Views/OptimizedProgressPhotoView.swift",
         token="static func resolvedImage(for urlString: String?) async -> UIImage?",
         check="share_card.actual_photo_resolution",
@@ -383,6 +414,7 @@ def main() -> int:
     )
     require_token(
         root=root,
+        texts=texts,
         path=app_dir / "Views/DashboardViewLiquid+HomeTimelineControls.swift",
         token="makeBodyScoreSharePayloadResolvingPhoto",
         check="share_card.actual_photo_resolution",
@@ -392,6 +424,7 @@ def main() -> int:
 
     add_pattern_violations(
         root=root,
+        texts=texts,
         paths=[app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"],
         pattern=re.compile(r"\.onChanged\s*\{[^}]*updatePhotoTimelineRootPage", re.DOTALL),
         check="timeline.swipe_release_only",
@@ -401,7 +434,7 @@ def main() -> int:
 
     # Header navigation drags must not own either button's touch region.
     hud_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
-    hud = hud_path.read_text()
+    hud = texts[hud_path]
     header_call = hud.split("photoTimelineRootNavigation\n", 1)[-1].split("photoTimelineHomeContent\n", 1)[0]
     header = hud.split("private var photoTimelineRootNavigation: some View {", 1)[-1].split(
         "private var photoTimelineSwipe:", 1
@@ -418,7 +451,7 @@ def main() -> int:
         ))
 
     checkin_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
-    checkin_card = checkin_path.read_text().split("var hudGlp1WeeklyCheckIn:", 1)[-1].split(
+    checkin_card = texts[checkin_path].split("var hudGlp1WeeklyCheckIn:", 1)[-1].split(
         "var isPhaseInsightEnabled:", 1
     )[0]
     if not re.search(

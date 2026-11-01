@@ -29,22 +29,28 @@ python3 scripts/repository_docs.py --root /path/to/this-repo --write \
 
 After merging a branch, resolve source conflicts first, then run
 `python3 scripts/resolve-repository-docs.py` to regenerate and stage the source
-map from the merged sources. This wraps the pinned generator and refuses to
-write while any other file is unmerged or a shared import fails parity. It
-stages only the generated output; review the source diff before committing.
+map from the merged sources. A conflicted map is rebuilt from the merged index,
+so unstaged source edits and either parent projection cannot change its
+fingerprints. This wraps the pinned generator and refuses to write while any
+other file is unmerged or a shared import fails parity. It stages only the
+generated output; review the source diff before committing.
 
 When a merged Xcode project changes the diagnostic workflow's exact project pin,
-review and stage the project and workflow first, retaining one project-pin line.
-Then refresh that pin and the source map together using the reviewed digest:
+stage the merged project. If that workflow conflict differs only by the pin,
+pass the merged project's digest. The resolver writes that pin and rebuilds a
+conflicted source map from the index, ignoring unstaged source bytes. It refuses
+a digest that does not match the staged project, any other workflow difference,
+and every other unmerged path.
 
 ```sh
 python3 scripts/resolve-repository-docs.py --reviewed-project-sha256 <reviewed-merged-project-sha256>
 ```
 
-This explicit mode verifies the supplied digest against the staged project,
-refuses unstaged edits, symlinks, conflict markers and ambiguous pins, and stages
-only the updated workflow and source map. Other diagnostic pins and all trust
-checks remain intact. Ordinary repair and commit hooks never grant this review.
+Staging the workflow yourself, with one project-pin line, still works. This
+explicit mode verifies the supplied digest against the staged project, refuses
+unstaged edits, symlinks, conflict markers and ambiguous pins, and stages only
+the updated workflow and source map. Other diagnostic pins and all trust checks
+remain intact. Ordinary repair and commit hooks never grant this review.
 
 The pre-commit hook runs `python3 scripts/resolve-repository-docs.py --staged`
 after formatting and correction classification, and before the merge ledger

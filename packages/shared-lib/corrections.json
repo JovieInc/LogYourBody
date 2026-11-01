@@ -1,5 +1,41 @@
 [
   {
+    "fingerprint": "conflicted-diagnostic-project-pin",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1700",
+    "correction": "PR #1700 / LYB-313, fix-red-95726c4f82 occurrence 18: merge origin/main without rebasing. Both parents changed the Xcode project, so the diagnostic workflow pin and the generated source map conflict. Neither parent pin matches the merged project. Tently reports an AI-provider outage and no source finding; do not bypass that gate.",
+    "mechanization": "Extend the source-map resolver so an explicit reviewed project digest replaces a workflow conflict that differs only in that pin, then rebuilds the conflicted source map from the index. A wrong digest, a broader workflow conflict, and an unresolved project leave the files and index unchanged. The new real-Git regressions fail on the previous resolver and pass after the extension. Use that command for this merge. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The resolver owns the workflow pin write and the projection staging during a merge. Accepting only an explicit digest that matches the staged project prevents either parent pin, or a derived hash, from becoming the committed trust boundary."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "A conflicted diagnostic pin is replaced only by the reviewed project digest."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "conflicted-source-map-index-rebuild",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1702",
+    "correction": "PR #1702 / LYB-337, fix-red-95726c4f82 occurrence 16: merge origin/main without rebasing. The generated source map conflicts because each parent changed a different fingerprint. Tently reports an AI-provider outage and no source finding; do not bypass that gate. Rebuilding the map from a dirty worktree would publish unstaged bytes as the committed fingerprints.",
+    "mechanization": "Extend the existing source-map resolver so an unmerged projection is rebuilt from the merged index and staged, leaving unstaged source edits untouched and refusing any other unmerged path. The new real-Git regression fails while the resolver reads the worktree and passes after the index rebuild; the unmerged-input refusal stays in the same required suite. Use that command to stage this merge's map. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The resolver owns writing and staging the projection during a merge. Reading stage-zero sources prevents unstaged worktree bytes and either parent projection from becoming the committed fingerprints."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "A conflicted source map is rebuilt from the merged index."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "marketing-assets-reject-future-capture-provenance",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1685",
     "correction": "PR #1685 / LYB-277, fix-red-95726c4f82 occurrence 10: merge origin/main without rebasing and preserve verbatim program-revision rationale. Merge-group run 41290991865 fails marketing screenshot freshness because synthetic Git history emits a future capture date; Tently separately reports an AI-provider outage.",

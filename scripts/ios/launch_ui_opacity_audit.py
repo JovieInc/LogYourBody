@@ -69,13 +69,16 @@ def _opacity_arguments(text: str):
 
 
 def check_optional_cgfloat_opacity(
-    root: Path, paths: list[Path], violations: list[AuditViolation]
+    root: Path,
+    paths: list[Path],
+    violations: list[AuditViolation],
+    texts: dict[Path, str] | None = None,
 ) -> None:
     """SwiftUI opacity accepts CGFloat, but not CGFloat? from optional chaining."""
     names: set[str] = set()
     candidates: list[tuple[Path, str]] = []
     for path in paths:
-        text = path.read_text(errors="replace")
+        text = texts[path] if texts is not None else path.read_text(errors="replace")
         if "CGFloat" in text:
             for match in _CGFLOAT_BINDING.finditer(text):
                 names.add(next(group for group in match.groups() if group))
