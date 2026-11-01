@@ -418,6 +418,32 @@ def main() -> int:
             detail="Attach the header swipe only to the full-height title hit region, outside the menu and detail buttons.",
         ))
 
+    # The edge swipe must stay on the content below the header. Padding before
+    # the gesture, or a parent overlay, lets that drag share the menu button.
+    root_body = hud.split("var photoTimelineRoot: some View {", 1)[-1].split(
+        "private var photoTimelineToolbarTitle", 1
+    )[0]
+    content_chain = root_body.split("photoTimelineHomeContent\n", 1)[-1].split(
+        "if !isHomeV2CheckIn", 1
+    )[0]
+    parent_chain = root_body.split("if !isHomeV2CheckIn", 1)[-1]
+    edge = ".highPriorityGesture(photoTimelineSwipe)"
+    overlay = content_chain.split(".overlay(alignment: .leading)", 1)[-1].split("\n        }", 1)[0]
+    padding_before_gesture = (
+        ".padding(" in overlay and overlay.find(".padding(") < overlay.find(edge)
+    )
+    if (
+        edge not in overlay
+        or edge in parent_chain
+        or edge in root_body.split("photoTimelineHomeContent", 1)[0]
+        or ".contentShape(Rectangle())" not in overlay
+        or padding_before_gesture
+    ):
+        violations.append(AuditViolation(
+            check="timeline.edge_swipe_excludes_header", file=str(hud_path.relative_to(root)), line=1,
+            detail="Attach the edge swipe to the content below the header, with its hit shape before any padding.",
+        ))
+
     checkin_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
     checkin_card = checkin_path.read_text().split("var hudGlp1WeeklyCheckIn:", 1)[-1].split(
         "var isPhaseInsightEnabled:", 1

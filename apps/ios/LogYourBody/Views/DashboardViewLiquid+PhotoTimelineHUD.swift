@@ -63,6 +63,17 @@ extension DashboardViewLiquid {
 
             photoTimelineHomeContent
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? 0 : .infinity)
+                // The edge swipe lives on the content, below the header. A
+                // high-priority drag that shares the menu button's edge drops
+                // the Open Menu tap before the sidebar can present.
+                .overlay(alignment: .leading) {
+                    Color.clear
+                        .frame(width: 20)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(photoTimelineSwipe)
+                        .accessibilityHidden(true)
+                }
                 .opacity(isHomeChatExpanded ? 0 : 1)
                 .allowsHitTesting(!isHomeChatExpanded)
                 .accessibilityHidden(isHomeChatExpanded)
@@ -93,14 +104,6 @@ extension DashboardViewLiquid {
         )
         .onChange(of: selectedPhotoTimelineRootPage) { _, _ in
             isHomeChatExpanded = false
-        }
-        .overlay(alignment: .leading) {
-            Color.clear
-                .frame(width: 20)
-                .padding(.top, 56)
-                .contentShape(Rectangle())
-                .highPriorityGesture(photoTimelineSwipe)
-                .accessibilityHidden(true)
         }
         .fullScreenCover(isPresented: $isHomeV2ViewerPresented) {
             homeV2PhotoViewer
