@@ -266,9 +266,7 @@ struct DashboardViewLiquid: View {
             }
 
         let withSyncAndState = withLifecycle
-            .onReceive(HealthSyncCoordinator.shared.$syncStatus) { status in
-                healthSyncPresentation.updateSyncStatus(status)
-            }
+            .onReceive(HealthSyncCoordinator.shared.$syncStatus, perform: healthSyncPresentation.updateSyncStatus)
             .onChange(of: realtimeSyncManager.syncStatus) { oldStatus, newStatus in
                 previousSyncStatus = oldStatus
                 handleSyncStatusChange(from: oldStatus, to: newStatus)
@@ -280,14 +278,7 @@ struct DashboardViewLiquid: View {
                 scheduleDashboardDerivedStateRefresh(rebuildDailyMetricsLookup: true)
                 scheduleMetricCacheRefresh()
             }
-            .onReceive(viewModel.$bodyMetrics) { metrics in
-                if layoutMode == .photoTimelineHUD, HomeV2Policy.isEnabled(), HealthSyncPresentationPolicy.isEnabled() {
-                    healthSyncPresentation.observe(metrics, owner: authManager.captureAccountSession())
-                }
-                reconcileHomeV2Timeline(with: metrics)
-                scheduleDashboardDerivedStateRefresh()
-                scheduleMetricCacheRefresh()
-            }
+            .onReceive(viewModel.$bodyMetrics, perform: handleDashboardBodyMetricsChange)
             .onChange(of: authManager.captureAccountSession()) { _, owner in
                 invalidateDashboardShareContext(currentOwner: owner)
                 homeV2EditingSession = nil
@@ -361,23 +352,7 @@ struct DashboardViewLiquid: View {
                     syncManager: realtimeSyncManager
                 )
             }
-            .sheet(isPresented: $showsRecentHealthReadings) {
-                HomeV2RecentReadings(
-                    store: healthSyncPresentation,
-                    unit: homeV2DisplayUnit,
-                    correctionsEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
-                        flagKey: MetricCorrectionService.featureGate
-                    ),
-                    ownsSession: authManager.ownsAccountSession,
-                    onChanged: {
-                        if let userId = authManager.currentUser?.id {
-                            BodyScoreCache.shared.invalidate(for: userId)
-                            BodyScoreRecalculationService.shared.scheduleRecalculation()
-                        }
-                        Task { await refreshHomeV2AfterWrite(selecting: nil) }
-                    }
-                )
-            }
+            .sheet(isPresented: $showsRecentHealthReadings) { homeV2RecentReadingsSheet }
             .sheet(isPresented: $isProgressPhotoAttachPresented) {
                 ProgressPhotoAttachSheet(
                     targetMetric: progressPhotoAttachTarget,

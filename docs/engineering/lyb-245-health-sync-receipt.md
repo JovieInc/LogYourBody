@@ -87,3 +87,35 @@ native runner before rollout. No TestFlight or release evidence is claimed.
 GBrain query, write to `logyourbody-lyb-245-health-sync-receipt`, and readback of
 that slug all failed to connect to `127.0.0.1:7801`. Neither remote persistence
 nor readback was verified; this document retains the decision locally.
+
+## PR #1679 repair handoff
+
+Mission: preserve LYB-245 while making the branch mergeable through existing gates.
+Audience: the lanes harness and repository reviewers.
+
+Merged `origin/main` at `3f3f05bcd` without rebasing. Rebuilt the conflicted source
+map from staged inputs and refreshed only the diagnostic workflow's reviewed
+project digest for the merged Xcode graph. Moved the recent-readings sheet content
+and metrics callback into existing dashboard extensions to retain the unchanged
+800-line source baseline. Copy, placement, feature gates and native tests remain.
+
+Extended `scripts/resolve-repository-docs.py` to refuse unresolved conflict markers
+in staged source inputs before generating the map. Six real-Git regressions fail
+before the change and pass afterward; the two existing required merge-tooling
+suites pass all 105 tests. Diagnostic runner-routing tests pass all 65 cases.
+Root `corepack pnpm lint`, `corepack pnpm typecheck`, `corepack pnpm test`, pinned
+`pnpm product:check`, the Swift architecture guard, vendor-boundary check,
+`test_training_rest_project.py`, source-map parity and its 10 Python tests pass.
+Scoped strict SwiftLint passes for the three extracted dashboard files, with the
+same five unavailable SourceKit rules. Both-parent correction coverage passes
+at 191/191 mechanized rules. Native execution and coverage still require macOS.
+
+Tently check `124772519463` reports an unreachable AI provider, with no code
+finding. It has no Actions run; `gh run view --log-failed` returns 404. A new
+harness push must rerun the external review; no check was bypassed.
+
+The harness owns pushing and PR edits. Add exactly one machine declaration to
+the PR body: `Machine: built scripts/resolve-repository-docs.py`.
+Intent-eval: n/a - mechanical merge repair and behavior-preserving extraction.
+GBrain write to `logyourbody-pr1679-merge-repair` and readback both failed to
+connect to `127.0.0.1:7801`; persistence and readback remain unverified.

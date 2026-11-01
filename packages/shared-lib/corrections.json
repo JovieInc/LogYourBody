@@ -5425,5 +5425,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-95726c4f82",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679",
+    "correction": "PR #1679 / LYB-245, occurrence 4 in 14 days: merge origin/main without rebasing and repair the generated repository source-map conflict while preserving sync-state copy, receipt placement and every parent correction receipt. Tently failed because its AI provider was unreachable, with no code finding.",
+    "mechanization": "Extend the existing source-map repair machine to reject conflict markers in every staged input before generating or staging the projection. Six real-Git negative controls fail against the previous resolver and pass after the change, including standard, diff3, short and CRLF markers and a clean working copy hiding marked staged source. Clean staged retries preserve unrelated working edits and remain idempotent. The existing required pre-commit-lint test entrypoint runs these regressions. Use the extended --staged resolver for this instance and retain the reviewed merged-project digest. The harness owns pushing and PR edits and must include exactly one machine line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator owns staged source reads. Refusing unresolved source markers before writing a clean derived map prevents the repair from concealing a malformed staged merge by construction, without another workflow or weaker gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "# A clean projection must not conceal unresolved markers in its staged inputs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
