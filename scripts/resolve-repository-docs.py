@@ -86,6 +86,12 @@ def merge_sections(root, name):
     return ours.rstrip("\n") + "\n\n" + "\n\n".join(additions) + "\n"
 
 
+def union_manifests(root):
+    """Additive manifest union keeps every parent test input."""
+    from manifest_union import apply_manifest_union
+    apply_manifest_union(root)
+
+
 def resolve_staged(root):
     root = Path(root).resolve()
     registry = staged_bytes(root, "repository-docs.json")
@@ -247,10 +253,14 @@ def main():
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
     mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
+    mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
     args = parser.parse_args()
     try:
         if args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
+        elif args.union_manifests:
+            union_manifests(args.root)
+            resolve(args.root)
         elif args.staged:
             resolve_staged(args.root)
         else:
