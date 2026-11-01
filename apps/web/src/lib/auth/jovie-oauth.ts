@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { NextRequest, NextResponse } from 'next/server';
 import { authCookies, type JovieUserInfo } from '@/lib/auth/constants';
 import { endpoints } from '@/lib/generated/endpoints.generated';
+import { PUBLIC_MARKETING_ROUTES } from '@/data/publicMarketingRoutes';
 
 export { authCookies } from '@/lib/auth/constants';
 export type { JovieUserInfo } from '@/lib/auth/constants';
@@ -45,14 +46,21 @@ export function pkceChallenge(verifier: string) {
 }
 
 export function safeReturnTo(value: string | null | undefined) {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/onboarding';
-  return value;
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/';
+  try {
+    const origin = endpoints.hosts.marketing.url;
+    const url = new URL(value, origin);
+    return url.origin === origin && PUBLIC_MARKETING_ROUTES.some((route) => route === url.pathname)
+      ? `${url.pathname}${url.search}${url.hash}`
+      : '/';
+  } catch {
+    return '/';
+  }
 }
 
 async function parseOAuthResponse(response: Response): Promise<JovieTokenSet> {
   const payload = (await response.json().catch(() => null)) as
-    | (Partial<JovieTokenSet> & { error?: string; error_description?: string })
-    | null;
+    (Partial<JovieTokenSet> & { error?: string; error_description?: string }) | null;
   if (!response.ok || !payload?.access_token || !payload.token_type) {
     throw new Error(payload?.error_description || payload?.error || 'OAuth token exchange failed');
   }

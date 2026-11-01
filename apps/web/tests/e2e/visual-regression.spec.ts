@@ -3,8 +3,6 @@ import { test, expect } from '@playwright/test';
 // List of all public routes to test
 const publicRoutes = [
   { path: '/', name: 'home' },
-  { path: '/login', name: 'login' },
-  { path: '/signup', name: 'signup' },
   { path: '/about', name: 'about' },
   { path: '/privacy', name: 'privacy' },
   { path: '/terms', name: 'terms' },
@@ -65,51 +63,48 @@ test.describe('Visual Regression Tests', () => {
     });
   }
 
-  // Test specific UI states
-  test('login form interaction states', async ({ page }, testInfo) => {
-    await page.goto('/login');
-    await page.waitForLoadState('networkidle');
-
-    // Disable animations
-    await page.addStyleTag({
-      content: `
-        *, *::before, *::after {
-          animation-duration: 0s !important;
-          transition-duration: 0s !important;
+  // The app is iOS-only; exercise the retired URLs through the real web server.
+  for (const path of [
+    '/dashboard',
+    '/log',
+    '/photos',
+    '/settings',
+    '/settings/profile',
+    '/settings/account',
+    '/settings/preferences',
+    '/settings/notifications',
+    '/settings/subscription',
+    '/settings/data-export',
+    '/onboarding',
+    '/steps',
+    '/import',
+    '/training/canvas',
+  ]) {
+    test(`${path} is retired with and without a session`, async ({ page, context }) => {
+      for (const authenticated of [false, true]) {
+        if (authenticated) {
+          await context.addCookies([
+            {
+              name: 'lyb_access_token',
+              value: 'retired-web-session',
+              url: 'http://127.0.0.1:' + (process.env.PORT ?? '3000'),
+            },
+          ]);
         }
-      `,
+        const response = await page.goto(path);
+        expect(response?.status()).toBe(404);
+        expect(new URL(page.url()).pathname).toBe(path);
+      }
     });
+  }
 
-    const projectName = testInfo.project.name;
-
-    // Test form focus state
-    await page.focus('input[type="email"]');
-    const focusScreenshot = await page.screenshot({
-      fullPage: true,
-      animations: visualRegressionConfig.animations,
+  for (const path of ['/login', '/signin', '/signup']) {
+    test(`${path} redirects to the landing page`, async ({ page }) => {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(200);
+      expect(new URL(page.url()).pathname).toBe('/');
     });
-
-    expect(focusScreenshot).toMatchSnapshot(`login-form-focus-${projectName}.png`, {
-      maxDiffPixels: visualRegressionConfig.maxDiffPixels,
-      maxDiffPixelRatio: visualRegressionConfig.maxDiffPixelRatio,
-      threshold: visualRegressionConfig.threshold,
-    });
-
-    // Test form with error state (submit empty form)
-    await page.click('button[type="submit"]');
-    await page.waitForTimeout(100); // Wait for error messages
-
-    const errorScreenshot = await page.screenshot({
-      fullPage: true,
-      animations: visualRegressionConfig.animations,
-    });
-
-    expect(errorScreenshot).toMatchSnapshot(`login-form-error-${projectName}.png`, {
-      maxDiffPixels: visualRegressionConfig.maxDiffPixels,
-      maxDiffPixelRatio: visualRegressionConfig.maxDiffPixelRatio,
-      threshold: visualRegressionConfig.threshold,
-    });
-  });
+  }
 
   // Test responsive navigation
   test('navigation menu states', async ({ page }, testInfo) => {

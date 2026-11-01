@@ -107,68 +107,8 @@
     {
       "kind": "deleted-reachable",
       "disposition": "delete",
-      "id": "web:/dashboard",
-      "path": "apps/web/src/app/dashboard/page.tsx"
-    },
-    {
-      "kind": "deleted-reachable",
-      "disposition": "delete",
       "id": "web:/download/android",
       "path": "apps/web/src/app/download/android/page.tsx"
-    },
-    {
-      "kind": "deleted-reachable",
-      "disposition": "delete",
-      "id": "web:/import",
-      "path": "apps/web/src/app/import/page.tsx"
-    },
-    {
-      "kind": "deleted-reachable",
-      "disposition": "delete",
-      "id": "web:/log",
-      "path": "apps/web/src/app/log/page.tsx"
-    },
-    {
-      "kind": "deleted-reachable",
-      "disposition": "delete",
-      "id": "web:/onboarding",
-      "path": "apps/web/src/app/onboarding/page.tsx"
-    },
-    {
-      "kind": "deleted-reachable",
-      "disposition": "delete",
-      "id": "web:/photos",
-      "path": "apps/web/src/app/photos/page.tsx"
-    },
-    {
-      "kind": "hidden-reachable",
-      "disposition": "hide",
-      "id": "web:/settings/notifications",
-      "path": "apps/web/src/app/settings/notifications/page.tsx"
-    },
-    {
-      "kind": "hidden-reachable",
-      "disposition": "hide",
-      "id": "web:/settings/preferences",
-      "path": "apps/web/src/app/settings/preferences/page.tsx"
-    },
-    {
-      "kind": "hidden-reachable",
-      "disposition": "hide",
-      "id": "web:/settings/profile",
-      "path": "apps/web/src/app/settings/profile/page.tsx"
-    },
-    {
-      "kind": "deleted-reachable",
-      "disposition": "delete",
-      "id": "web:/steps",
-      "path": "apps/web/src/app/steps/page.tsx"
-    },
-    {
-      "kind": "unlisted",
-      "disposition": null,
-      "id": "web:/training/canvas",
-      "path": "apps/web/src/app/training/canvas/page.tsx"
     }
   ]
 }
