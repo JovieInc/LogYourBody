@@ -90,30 +90,55 @@ final class LaunchJourneyTests: XCTestCase {
 
     func testHealthMemoryIsolationFailClosed() {
         var store = HealthMemoryStore()
+        XCTAssertEqual(HealthMemoryStore.isolationKeyFields, ["userId", "productId"])
+        XCTAssertEqual(HealthMemoryStore.failClosedCode, "safetyUnavailable")
         let recorded = Date(timeIntervalSince1970: 1_700_000_000)
         XCTAssertFalse(store.remember(HealthMemoryClaim(
             userId: "", productId: "lyb", text: "80 kg", provenance: .measured, recordedAt: recorded
-        )))
+        ), safetyAvailable: true))
         XCTAssertFalse(store.remember(HealthMemoryClaim(
-            userId: "user-a", productId: "other", text: "80 kg", provenance: .measured, recordedAt: recorded
-        )))
+            userId: "user-a", productId: "", text: "80 kg", provenance: .measured, recordedAt: recorded
+        ), safetyAvailable: true))
+        XCTAssertFalse(store.remember(HealthMemoryClaim(
+            userId: "user-a", productId: "lyb", text: "80 kg", provenance: .userDeclared, recordedAt: recorded
+        ), safetyAvailable: false))
+        XCTAssertTrue(store.claims.isEmpty)
+
         XCTAssertTrue(store.remember(HealthMemoryClaim(
             userId: "user-a", productId: "lyb", text: "80 kg", provenance: .userDeclared, recordedAt: recorded
-        )))
+        ), safetyAvailable: true))
         XCTAssertTrue(store.remember(HealthMemoryClaim(
-            userId: "user-b", productId: "lyb", text: "secret", provenance: .measured, recordedAt: recorded
-        )))
-        XCTAssertEqual(store.retrieve(userId: "user-a", productId: "lyb", safetyAvailable: false), .safetyUnavailable)
+            userId: "user-b", productId: "other", text: "secret", provenance: .measured, recordedAt: recorded
+        ), safetyAvailable: true))
+        let beforeDeniedWrite = store.claims
+        XCTAssertFalse(store.remember(HealthMemoryClaim(
+            userId: "user-a", productId: "lyb", text: "leaked", provenance: .measured, recordedAt: recorded
+        ), safetyAvailable: false))
+        XCTAssertEqual(store.claims, beforeDeniedWrite)
+
+        let unavailable = store.retrieve(userId: "user-a", productId: "lyb", safetyAvailable: false)
+        XCTAssertEqual(unavailable, .safetyUnavailable)
+        XCTAssertEqual(unavailable.code, HealthMemoryStore.failClosedCode)
+        if case .records = unavailable {
+            XCTFail("Unavailable safety check returned memory")
+        }
         XCTAssertEqual(store.retrieve(userId: "", productId: "lyb", safetyAvailable: true), .isolated)
-        XCTAssertEqual(store.retrieve(userId: "user-a", productId: "other", safetyAvailable: true), .isolated)
+        XCTAssertEqual(store.retrieve(userId: "user-a", productId: "other", safetyAvailable: true), .records([]))
+        XCTAssertEqual(store.retrieve(userId: "user-b", productId: "lyb", safetyAvailable: true), .records([]))
         guard case let .records(records) = store.retrieve(userId: "user-a", productId: "lyb", safetyAvailable: true) else {
             return XCTFail("Expected the caller's records")
         }
         XCTAssertEqual(records.map(\.text), ["80 kg"])
+        XCTAssertEqual(records.map(\.userId), ["user-a"])
+        XCTAssertEqual(records.map(\.productId), ["lyb"])
         XCTAssertEqual(records.map(\.provenance), [.userDeclared])
+        guard case let .records(otherProduct) = store.retrieve(userId: "user-b", productId: "other", safetyAvailable: true) else {
+            return XCTFail("Expected the other product partition")
+        }
+        XCTAssertEqual(otherProduct.map(\.text), ["secret"])
         store.clearUser("user-a")
         XCTAssertEqual(store.retrieve(userId: "user-a", productId: "lyb", safetyAvailable: true), .records([]))
-        guard case let .records(remaining) = store.retrieve(userId: "user-b", productId: "lyb", safetyAvailable: true) else {
+        guard case let .records(remaining) = store.retrieve(userId: "user-b", productId: "other", safetyAvailable: true) else {
             return XCTFail("Expected the other user to keep their record")
         }
         XCTAssertEqual(remaining.map(\.text), ["secret"])
