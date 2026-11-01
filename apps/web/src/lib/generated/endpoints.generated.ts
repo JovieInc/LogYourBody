@@ -513,6 +513,11 @@ export const endpoints = {
         'Source receipt for distinct exercise/setup selection, observed tolerability, approval and correction regression guards.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-298',
+      reason:
+        'Source receipt for the concerning-pain movement pause policy and exact clinician-evaluation message; not a runtime endpoint.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-189',
       reason:
         'LYB-189 source evidence and Tim/legal review handoff for the Apple Health privacy disclosure.',

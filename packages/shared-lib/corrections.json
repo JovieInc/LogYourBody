@@ -5483,5 +5483,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "746733c9ca17",
+    "source": "https://linear.app/jovie/issue/LYB-298",
+    "correction": "LYB-298: Persistent pain, worsening pain or neurologic symptoms must pause the movement with no swap and no continued coaching. Keep trunk fatigue, missing feedback and joint pain without those flags outside this concerning-pain trigger; use the exact authorized clinician-evaluation sentence without injury-prevention, zero-load or safety assurances.",
+    "mechanization": "Add one typed movement-pain policy and shared message, consumed by selection and swap approval while retaining the broader existing symptom and session holds. The existing required web Jest discovery runs policy, selector and approval regressions; exact string equality and a prohibited-claims assertion lock the copy. Negative controls independently disable each trigger and append injury-prevention, zero-spinal-load and safe-to-continue-coaching claims; each must fail the policy tests. No LYB-114 observation schema, questionnaire, prescription or rollout changes. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One pure policy returns a discriminated movement pause with swapAllowed and coachingAllowed fixed to false, and owns the canonical message. Selection retains stronger exclusions and the approval boundary suppresses all controls for either a movement pause or selector symptom hold."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/pain-policy.test.ts",
+      "anchor": "concerning-pain movement policy (LYB-298)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
