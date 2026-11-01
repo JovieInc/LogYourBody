@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "marketing-assets-git-capture-instant",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41290965357",
+    "correction": "PR #1683 / LYB-293, fix-red-e3b0c44298 occurrence 75: the complete-history marketing provenance fixture compares ISO timestamp spelling, so Git 2.56's UTC Z output fails against the equivalent +00:00 fixture on the repaired head.",
+    "mechanization": "Extend the existing required web provenance fixture into a real-Git matrix for UTC Z, UTC +00:00 and an equivalent nonzero offset. Compare exact parsed instants for history-derived evidence while retaining byte-exact assertions for preserved manifest dates and all freshness, hash and missing-evidence gates. The two alternate spellings fail with the previous string assertion and pass with instant comparison. Merge origin/main first; it is already an ancestor. Keep adherence offers and production generation unchanged. The harness owns push and PR-body updates and must add exactly one machine line: Machine: built apps/web/src/lib/marketing/__tests__/marketing-product-assets.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The generator already returns valid capture evidence for the same instant. This failure is in a test's representation-sensitive expectation; changing production timestamp spelling would not constrain external Git versions."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required web Jest suite can compare exact instants and exercise equivalent timestamp spellings without relaxing capture age, provenance or retained-date assertions."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/marketing/__tests__/marketing-product-assets.test.ts",
+      "anchor": "derives the exact capture instant from complete history (%s)"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "marketing-assets-retain-hash-bound-capture-date",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41289916374",
     "correction": "PR #1683 / LYB-293, fix-red-95726c4f82 occurrence 8: merge-group JavaScript/TypeScript fails the marketing asset freshness assertion because shallow Git history dates an unchanged screenshot from a future synthetic merge commit. Tently separately reports an AI-provider outage without code findings.",

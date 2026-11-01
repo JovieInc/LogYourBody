@@ -155,11 +155,14 @@ describe('marketing asset capture provenance', () => {
     expect(manifest().weightLog.capturedAt).toBe(captureDate);
   });
 
-  it('derives missing capture evidence from complete history', () => {
-    rmSync(path.join(root, manifestPath));
-    expect(generate().status).toBe(0);
-    expect(manifest().weightLog.capturedAt).toBe(captureDate);
-  });
+  it.each([captureDate, '2026-10-21T02:28:23Z', '2026-10-20T19:28:23-07:00'])(
+    'derives the exact capture instant from complete history (%s)',
+    (expectedCaptureDate) => {
+      rmSync(path.join(root, manifestPath));
+      expect(generate().status).toBe(0);
+      expect(Date.parse(manifest().weightLog.capturedAt)).toBe(Date.parse(expectedCaptureDate));
+    },
+  );
 
   it('refuses a shallow boundary without matching recorded evidence', () => {
     const clone = path.join(directory, 'shallow');
