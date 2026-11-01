@@ -12,11 +12,6 @@ import CoreData
 @preconcurrency import Combine
 
 struct DashboardViewLiquid: View {
-    enum LayoutMode {
-        case legacyTabbed
-        case photoTimelineHUD
-    }
-
     let layoutMode: LayoutMode
     @Binding private var releaseReviewDestination: ReleaseReviewDestination?
 
@@ -96,6 +91,9 @@ struct DashboardViewLiquid: View {
     @State private var isPhotosTabEnabled = true
     @State var selectedPhotoTimelineRootPage: PhotoTimelineRootPage = .timeline
     @State var isHomeChatExpanded = false
+    @State var showsLaunchOutcomeEditor = false
+    @State var launchOutcomeError: String?
+    @State var launchHoldNote: String?
     @State var homeChatDraft = AccountSessionChatDraft()
     @State var isShowingPhotoTimelineMenu = false
     @State var isPhotoTimelineSettingsPresented = false

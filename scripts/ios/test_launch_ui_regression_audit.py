@@ -144,6 +144,29 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         path.write_text(path.read_text() + "\nlet legacyColor = Color.white\n")
         self.assert_rejected("dashboard.system_b_theme_tokens")
 
+    def test_launch_directive_requires_bounded_scroll_fallback(self):
+        for before in [".frame(maxHeight: 160)", "ViewThatFits(in: .vertical)",
+                       "ScrollView {\n                content"]:
+            with self.subTest(before=before):
+                path = self.app / "Services/LaunchJourneyUI.swift"
+                source = path.read_text()
+                self.replace("Services/LaunchJourneyUI.swift", before, "VStack { content }")
+                self.assert_rejected("launch.bounded_scrollable_directive")
+                path.write_text(source)
+
+    def test_launch_directive_requires_feature_gate(self):
+        self.replace("Views/DashboardViewLiquid+PhotoTimelineHUD.swift",
+                     "if isLaunchJourneyEnabled {", "if true {")
+        self.assert_rejected("launch.gated_directive")
+
+    def test_launch_editor_cannot_wrap_home_provenance_presenters(self):
+        modifier = ".sheet(isPresented: $showsLaunchOutcomeEditor) { launchJourneyOutcomeEditor }"
+        self.replace("Services/LaunchJourneyUI.swift",
+                     ".sheet(isPresented: $showsLaunchOutcomeEditor)", ".background")
+        path = self.app / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
+        path.write_text(path.read_text() + "\n" + modifier + "\n")
+        self.assert_rejected("launch.local_editor_presenter")
+
     def test_provenance_sheet_requires_presenting_binding(self):
         self.replace("Views/HomeV2/HomeV2MetricEditorial.swift", "@Binding var isPresented: Bool",
                      "var isPresented: Bool")

@@ -133,10 +133,16 @@ final class DatedOutcomeStoreTests: XCTestCase {
         XCTAssertEqual(emitted.count, 1)
     }
 
-    func testDefaultOffGateAndInvalidDataCannotWriteRequests() throws {
+    func testDefaultOffGateAndInvalidDataCannotWriteRequests() async throws {
         let store = store(context(try coordinator()))
         gate = false
-        XCTAssertThrowsError(try store.save(value))
+        let saved = try XCTUnwrap(store.save(value))
+        XCTAssertEqual(try store.load()?.value, value)
+        XCTAssertEqual(try store.pendingEdits(), [saved])
+        let remote = OutcomeRemoteFixture()
+        try await store.synchronize(remote: remote, token: "synthetic", isCurrent: { true })
+        XCTAssertTrue(remote.requests.isEmpty, "Cloud sync stays gated while the local value survives")
+        XCTAssertEqual(try store.pendingEdits(), [saved])
         gate = true
         var invalid = value
         invalid.outcomeDate = "2027-02-30"
@@ -147,8 +153,8 @@ final class DatedOutcomeStoreTests: XCTestCase {
         invalid = value
         invalid.constraints.availability.sessionsPerWeek = 7
         XCTAssertThrowsError(try store.save(invalid))
-        XCTAssertNil(try store.load())
-        XCTAssertTrue(emitted.isEmpty)
+        XCTAssertEqual(try store.load()?.value, value)
+        XCTAssertEqual(emitted, [saved])
     }
 
     func testRemoteApplyNeverOverwritesPendingEditOrEmitsRequest() throws {

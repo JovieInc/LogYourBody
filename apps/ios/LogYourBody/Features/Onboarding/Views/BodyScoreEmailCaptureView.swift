@@ -19,7 +19,6 @@ struct BodyScoreEmailCaptureView: View {
             subtitle: "We’ll associate this address with your profile before secure sign-in.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .emailCapture),
-            screen: .email,
             content: {
                 VStack(spacing: 24) {
                     VStack(alignment: .leading, spacing: 12) {

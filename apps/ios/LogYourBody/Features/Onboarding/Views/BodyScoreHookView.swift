@@ -20,8 +20,8 @@ struct BodyScoreHookView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Are you losing fat or lean mass?",
-            subtitle: "Start with the numbers you already have.",
+            title: LaunchJourney.promiseHeadline,
+            subtitle: LaunchJourney.promiseExplanation,
             showsBackButton: false,
             progress: viewModel.progress(for: .hook),
             screen: .bodyScoreIntro

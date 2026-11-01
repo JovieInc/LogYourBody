@@ -458,27 +458,12 @@ final class LogYourBodyUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(
-            app.descendants(matching: .any)["world_class_screen_whatsNew"]
+            app.descendants(matching: .any)["photo_timeline_root_page_timeline"]
                 .waitForExistence(timeout: 20)
         )
-        XCTAssertTrue(app.staticTexts["What’s New"].exists)
-        XCTAssertTrue(app.staticTexts["Your progress, in one place"].exists)
-        XCTAssertTrue(app.staticTexts["whats-new-metadata-version-label"].exists)
-        XCTAssertTrue(app.staticTexts["whats-new-metadata-version-value"].exists)
-        XCTAssertTrue(app.staticTexts["whats-new-metadata-build-label"].exists)
-        XCTAssertTrue(app.staticTexts["whats-new-metadata-build-value"].exists)
-        XCTAssertFalse(app.staticTexts["Opens Timeline"].exists)
-        attachScreenshot(named: "whats-new-corrected-hierarchy", from: app)
-
-        let reviewButton = app.buttons["whats-new-review-photo-timeline-review"]
-        XCTAssertTrue(reviewButton.isHittable)
-        reviewButton.tap()
-
-        XCTAssertTrue(
-            app.descendants(matching: .any)["photo_timeline_root_page_timeline"]
-                .waitForExistence(timeout: 8)
-        )
         XCTAssertFalse(app.descendants(matching: .any)["world_class_screen_whatsNew"].exists)
+        XCTAssertFalse(app.staticTexts["What’s New"].exists)
+        attachScreenshot(named: "whats-new-corrected-hierarchy", from: app)
 
         app.terminate()
         app.launchArguments = ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"]
@@ -2006,7 +1991,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(shareSheet.waitForNonExistence(timeout: 3))
 
         openBodyScoreShareSheet(in: app)
-        XCTAssertTrue(
+        XCTAssertFalse(
             app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists
         )
         // Hardware escape (Esc) path mirrors the VoiceOver escape action.
@@ -2264,7 +2249,7 @@ final class LogYourBodyUITests: XCTestCase {
         importButton.tap()
 
         XCTAssertTrue(app.navigationBars["Import Photos"].waitForExistence(timeout: 8))
-        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_importPhotos"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["world_class_screen_importPhotos"].exists)
         XCTAssertTrue(app.buttons["Start Scanning"].exists)
     }
 
@@ -2925,7 +2910,7 @@ final class LogYourBodyUITests: XCTestCase {
             share.tap()
             let sheet = app.descendants(matching: .any)["body_score_share_sheet"]
             XCTAssertTrue(sheet.waitForExistence(timeout: 5))
-            XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists)
+            XCTAssertFalse(app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists)
             let summary = sheet.descendants(matching: .any)["body_score_share_summary"]
             XCTAssertTrue(summary.exists)
             XCTAssertTrue(summary.staticTexts["body_score_share_score"].exists)
@@ -3419,7 +3404,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         launch(app, with: ["-lybUITestBodyScoreOnboardingFixture", "-lybUITestOnboardingV2Fixture"])
         XCTAssertTrue(
-            app.staticTexts["Are you losing fat or lean mass?"].waitForExistence(timeout: 30),
+            app.staticTexts["Your body-composition goal, planned around your next date."].waitForExistence(timeout: 30),
             "The gate no longer forks the first run: everyone starts at Your data"
         )
         XCTAssertFalse(app.descendants(matching: .any)["home_v2_first_run_health"].exists)
@@ -4226,7 +4211,7 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     private func assertAndCaptureOnboardingFixedCTA(in app: XCUIApplication) throws {
-        XCTAssertTrue(app.staticTexts["Are you losing fat or lean mass?"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Your body-composition goal, planned around your next date."].waitForExistence(timeout: 10))
 
         let footer = app.descendants(matching: .any)["body_score_onboarding_hook_footer"].firstMatch
         let primary = app.buttons["body_score_onboarding_import_scan_button"]
@@ -4300,8 +4285,8 @@ final class LogYourBodyUITests: XCTestCase {
         let shareSheet = app.descendants(matching: .any)["body_score_share_sheet"]
         let shareCard = app.descendants(matching: .any)["body_score_share_card"]
         let shareScreen = app.descendants(matching: .any)["world_class_screen_shareBodyScore"]
-        var shareScreenVisible = shareScreen.waitForExistence(timeout: 8)
-        if !shareScreenVisible {
+        var shareSheetVisible = shareSheet.waitForExistence(timeout: 8)
+        if !shareSheetVisible {
             // A tap synthesized while the timeline stage re-lays out can land on
             // a stale accessibility element; re-resolve and tap once before failing.
             let retryShareButton = app.descendants(matching: .any)["body_score_hero_share_button"].firstMatch
@@ -4309,11 +4294,12 @@ final class LogYourBodyUITests: XCTestCase {
                 scrollUntilHittable(retryShareButton, in: app)
                 if retryShareButton.isHittable {
                     retryShareButton.tap()
-                    shareScreenVisible = shareScreen.waitForExistence(timeout: 8)
+                    shareSheetVisible = shareSheet.waitForExistence(timeout: 8)
                 }
             }
         }
-        XCTAssertTrue(shareScreenVisible)
+        XCTAssertTrue(shareSheetVisible)
+        XCTAssertFalse(shareScreen.exists)
         // Sheet identifier is preferred; card must remain discoverable for launch quality.
         let sheetVisible = shareSheet.waitForExistence(timeout: 8)
         let cardVisible = shareCard.waitForExistence(timeout: sheetVisible ? 4 : 8)

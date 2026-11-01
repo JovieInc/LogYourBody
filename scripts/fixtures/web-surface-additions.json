@@ -1,6 +1,7 @@
 {
   "schema": "lyb.web-surface-additions/v1",
   "surfaces": {
-    "web:/consumer-health-data": "launch"
+    "web:/consumer-health-data": "launch",
+    "web:/training/canvas": "delete"
   }
 }

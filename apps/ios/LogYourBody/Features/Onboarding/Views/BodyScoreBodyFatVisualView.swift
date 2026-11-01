@@ -25,7 +25,6 @@ struct BodyScoreBodyFatVisualView: View {
             subtitle: "This is an estimate. You can replace it with a measured value anytime.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .bodyFatVisual),
-            screen: .visualEstimate,
             content: {
                 VStack(spacing: JovieTokens.itemGap) {
                     ForEach(Self.visualEstimates) { estimate in
