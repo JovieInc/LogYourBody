@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "24cef6eff7f0",
+    "source": "https://github.com/JovieInc/LogYourBody/tree/codex/lyb-277-20261101t082148#lyb-277-task",
+    "correction": "LYB-277: Store only the user's utterance verbatim as the program revision rationale, without a generated coach sentence, template name or trademark. Retain one checked-in wording policy and a fixed utterance fixture under CI.",
+    "mechanization": "Retain the accepted default in the shared-lib decisions directory and validate a fixed revision fixture against the supplied utterance. The existing required shared-lib suite rejects absent, duplicate and renamed policies, changed defaults, altered rationale text and extra wording fields. Preserve whitespace in the existing structured steering schema while retaining nonblank and length checks. The existing persistence regression fails with trimming and passes after its removal, asserting the saved steering record, proposal reason, intent and summary. Card and chat presentation remain outside this slice; the harness owns push and PR operations.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The existing writer can preserve supplied text without transforming it, but cannot enforce the uniqueness of a checked-in decision or prove future rationale authorship from its single rationale field by construction."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib suite can enforce one accepted policy and exact equality of the revision rationale fixture to its supplied user utterance, with negative controls for alternate text and generated wording fields. The existing web suite verifies verbatim persistence through the actual writer."
+      }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant",
+    "guard": {
+      "path": "packages/shared-lib/src/program-revision-rationale-wording.test.ts",
+      "anchor": "program revision rationale wording policy (LYB-277)"
+    }
+  },
+  {
     "fingerprint": "lyb-web-landing-only-v1",
     "source": "https://github.com/JovieInc/LogYourBody/tree/codex/lyb-100-20261101t042159#lyb-100-task",
     "correction": "Tim's lyb-web-landing-only-v1 lock: after 1.2.0 submission, remove authenticated web app UI and navigation while retaining the landing, marketing/legal pages and first-party iOS APIs.",
