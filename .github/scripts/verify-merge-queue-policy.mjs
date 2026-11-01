@@ -44,6 +44,41 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+export function verifyCompanyGuards(ciWorkflow, companyGuardsWorkflow) {
+  const job = (workflow, name) =>
+    workflow.match(new RegExp(`\\n  ${name}:\\n[\\s\\S]*?(?=\\n  [\\w-]+:|$)`))?.[0] ?? '';
+  const caller = job(ciWorkflow, 'company-guards');
+  const detection = job(ciWorkflow, 'detect-changes').split('\n    steps:')[0];
+  const summary = job(ciWorkflow, 'ci-summary');
+  const shared = job(companyGuardsWorkflow, 'company-guards');
+  assert(
+    caller.includes('    uses: ./.github/workflows/company-guards.yml\n'),
+    'Company Guards must run the canonical reusable workflow',
+  );
+  assert(
+    /\n    needs: company-guards\n/.test(detection),
+    'Company Guards must gate Detect Changes',
+  );
+  for (const block of [caller, detection, shared]) {
+    assert(
+      !/\n    (?:if|continue-on-error):/.test(block),
+      'Company Guards and detection must not be conditional or advisory',
+    );
+  }
+  assert(
+    /\n  workflow_call:\s*\n/.test(companyGuardsWorkflow) &&
+      /uses: JovieInc\/ci\/\.github\/workflows\/company-guards.yml@[a-f0-9]{40}\n/.test(shared),
+    'Company Guards must expose the pinned company workflow through workflow_call',
+  );
+  assert(
+    /\n    if: always\(\)\n/.test(summary) &&
+      /\n    needs: \[detect-changes,/.test(summary) &&
+      summary.includes('needs.detect-changes.result }}" != "success"'),
+    'Company Guards failures must reach the required CI Summary',
+  );
+  return true;
+}
+
 export function verifyPolicy({ policy, ciWorkflow, enrollmentWorkflow, tokenEnrollmentWorkflow }) {
   assert(policy.schema_version === 1, 'policy schema_version must be 1');
   assert(policy.repository === 'JovieInc/LogYourBody', 'policy must remain repository-local');
@@ -103,6 +138,10 @@ export function verifyRepository(rootDirectory) {
   const policyPath = path.join(rootDirectory, '.github/merge-queue-policy.json');
   const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
   const ciWorkflow = fs.readFileSync(path.join(rootDirectory, '.github/workflows/ci.yml'), 'utf8');
+  verifyCompanyGuards(
+    ciWorkflow,
+    fs.readFileSync(path.join(rootDirectory, '.github/workflows/company-guards.yml'), 'utf8'),
+  );
   const enrollmentWorkflow = fs.readFileSync(
     path.join(rootDirectory, policy.auto_enrollment.workflow),
     'utf8',
