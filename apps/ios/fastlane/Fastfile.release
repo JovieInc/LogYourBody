@@ -419,7 +419,14 @@ end
           git_branch: ENV["MATCH_GIT_BRANCH"].to_s.empty? ? "main" : ENV["MATCH_GIT_BRANCH"],
           git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
           team_id: ENV["APPLE_TEAM_ID"],
-          generate_apple_certs: false, # Never generate certs due to OpenSSL issues and cert limits
+          # Write mode can create a certificate. generate_apple_certs selects
+          # Apple Distribution (portal type DISTRIBUTION) for app store and ad
+          # hoc, and Apple Development for development. Release lanes and the
+          # Xcode project sign with "Apple Distribution". false selects the
+          # legacy iOS Distribution type, which those lanes will not use.
+          # Readonly syncs install the certificate already stored in Match.
+          # docs/engineering/signing-expiry.md
+          generate_apple_certs: !readonly,
           skip_provisioning_profiles: false,
           platform: "ios",
           verbose: true,

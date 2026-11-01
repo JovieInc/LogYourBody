@@ -46,6 +46,18 @@ bundle exec fastlane setup_provisioning type:appstore readonly:false force:false
 
 `force:false` is required. `force:true` revokes the current distribution certificate. Do not set `MATCH_READONLY=false` on release jobs. Do not run `match_nuke`, the `nuke_all_certs` lane, or `regenerate_profiles`.
 
+This refresh can create a certificate. Write mode asks Match for an **Apple Distribution** certificate (portal type `DISTRIBUTION`, via `generate_apple_certs`). Release lanes sign with `code_sign_identity: "Apple Distribution"`, and the Xcode project sets `CODE_SIGN_IDENTITY` to the same identity. Step 1 only installs the certificate already stored in Match. `scripts/ios/test_distribution_cert_identity.rb` fails when a write-mode distribution sync would create a different identity.
+
+Before the next release, confirm the installed distribution identity on the machine that ran the refresh:
+
+```sh
+security find-identity -v -p codesigning
+```
+
+Continue only when the distribution line Match installed reads `Apple Distribution:`. Match prints that common name in its summary table. A legacy iOS Distribution certificate (`iPhone Distribution:`) will not satisfy the release lanes. Do not archive until the `Apple Distribution:` identity is the one installed.
+
+If Match reports that the stored certificate is not valid, this refresh did not create a replacement. Do not archive. Go to step 3 only when this refresh cannot leave a usable Apple Distribution certificate.
+
 ### 3. Nuke only after refresh cannot
 
 [`.github/workflows/regenerate-certificates.yml`](../../.github/workflows/regenerate-certificates.yml) is manual. It runs `match_nuke` and deletes the certificates and profiles in the Match repository. Dispatch it only after the refresh above cannot produce a usable distribution certificate, and only by typing `NUKE-AND-REGENERATE` into the confirm input. There is no schedule. The expiry check never starts this workflow.
