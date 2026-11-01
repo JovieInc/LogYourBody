@@ -66,49 +66,14 @@ test.describe('Visual Regression Tests', () => {
   }
 
   // Test specific UI states
-  test('login form interaction states', async ({ page }, testInfo) => {
-    await page.goto('/login');
-    await page.waitForLoadState('networkidle');
-
-    // Disable animations
-    await page.addStyleTag({
-      content: `
-        *, *::before, *::after {
-          animation-duration: 0s !important;
-          transition-duration: 0s !important;
-        }
-      `,
-    });
-
-    const projectName = testInfo.project.name;
-
-    // Test form focus state
-    await page.focus('input[type="email"]');
-    const focusScreenshot = await page.screenshot({
-      fullPage: true,
-      animations: visualRegressionConfig.animations,
-    });
-
-    expect(focusScreenshot).toMatchSnapshot(`login-form-focus-${projectName}.png`, {
-      maxDiffPixels: visualRegressionConfig.maxDiffPixels,
-      maxDiffPixelRatio: visualRegressionConfig.maxDiffPixelRatio,
-      threshold: visualRegressionConfig.threshold,
-    });
-
-    // Test form with error state (submit empty form)
-    await page.click('button[type="submit"]');
-    await page.waitForTimeout(100); // Wait for error messages
-
-    const errorScreenshot = await page.screenshot({
-      fullPage: true,
-      animations: visualRegressionConfig.animations,
-    });
-
-    expect(errorScreenshot).toMatchSnapshot(`login-form-error-${projectName}.png`, {
-      maxDiffPixels: visualRegressionConfig.maxDiffPixels,
-      maxDiffPixelRatio: visualRegressionConfig.maxDiffPixelRatio,
-      threshold: visualRegressionConfig.threshold,
-    });
+  test('legacy authentication entry points lead to the iPhone landing page', async ({ page }) => {
+    for (const path of ['/login', '/signin', '/signup']) {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(200);
+      await expect(page).toHaveURL(/\/download\/ios$/);
+      await expect(page.locator('input[type="password"]')).toHaveCount(0);
+      await expect(page.locator('a[href="/api/auth/login"]')).toHaveCount(0);
+    }
   });
 
   // Test responsive navigation

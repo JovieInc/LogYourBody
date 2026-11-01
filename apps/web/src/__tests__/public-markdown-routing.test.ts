@@ -209,7 +209,7 @@ it.each([
   const req = request(path, 'text/markdown', { [PUBLIC_MARKDOWN_HEADER]: '1' });
   const response = await middleware(req);
   expect(fetchMock).not.toHaveBeenCalled();
-  if (response.status === 307) return;
+  if (response.status === 307 || response.status === 404) return;
   expect(forwardedHeaders(response, req).has(PUBLIC_MARKDOWN_HEADER)).toBe(false);
 });
 

@@ -36,7 +36,7 @@ describe('marketing discovery routes', () => {
     expect(value.rules).toEqual(expect.objectContaining({ userAgent: '*', allow: '/' }));
   });
 
-  it('disallows legacy auth routes until they are retired (LYB-100)', () => {
+  it('keeps legacy auth redirects out of search results (LYB-100)', () => {
     expect(robots().rules).toEqual(
       expect.objectContaining({ disallow: expect.arrayContaining(['/signin', '/signup']) }),
     );

@@ -4,7 +4,20 @@ Public metadata uses `https://www.logyourbody.com`, matching the existing Vercel
 serving domain. The product registry owns this origin and public links. The root
 layout supplies `metadataBase` and the title template; each public page supplies
 its own canonical and title. `/download/ios` intentionally canonicalizes to `/`
-because it renders the same landing content. Product routes remain in LYB-100.
+because it renders the same landing content.
+
+LYB-100 enforces `lyb-web-landing-only-v1`: the product app is iOS-only.
+Dashboard, logging, photos, settings, onboarding, steps, import, and training
+UI routes are retired with HTTP 404. Legacy `/signin`, `/signup`, and `/login`
+URLs redirect to `/download/ios`; OAuth return destinations no longer default
+to or retain retired product paths. First-party API handlers remain in place
+for iOS, including their existing authentication checks. Public marketing,
+support, account-deletion guidance, and legal pages remain available.
+
+The sequencing prerequisite was met before this cleanup: the release runbook
+records version 1.2.0 as `WAITING_FOR_REVIEW` on October 31, 2026, in
+[approved-release run 41177144249](https://github.com/JovieInc/LogYourBody/actions/runs/41177144249).
+This establishes submission, without asserting a later App Review outcome.
 
 The required web tests discover public page files, execute their metadata, and
 reject missing or mismatched canonicals and doubled brand titles. Dynamic blog
@@ -44,8 +57,8 @@ sitemap URLs with that inventory and check the inventory against public page
 files, excluding legacy auth and dynamic blog routes. Both the sitemap and
 robots host/sitemap directives use the registry's serving origin. Modification
 dates are omitted until reliable content or build timestamps are available.
-Legacy `/signin` and `/signup` remain blocked in robots until LYB-100 retires
-them.
+Legacy `/signin` and `/signup` redirects and retired product paths remain
+disallowed in robots; none are included in the public sitemap.
 
 Tim decision flagged: should `/blog` stay in the header and footer while there
 are zero published posts? Navigation remains unchanged pending that product

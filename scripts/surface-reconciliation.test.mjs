@@ -210,7 +210,8 @@ test('redirect tombstones and unmounted hide or delete surfaces stay quiet', () 
     const files = redTree();
     delete files['apps/web/src/app/extra/page.tsx'];
     delete files['apps/ios/LogYourBody/Views/EmailView.swift'];
-    files['apps/ios/LogYourBody/Views/MainTabViewPolicies.swift'] = `enum PaidAppSurface: Equatable {
+    files['apps/ios/LogYourBody/Views/MainTabViewPolicies.swift'] =
+      `enum PaidAppSurface: Equatable {
     case weightLoggerMVP
     case photoTimelineHUD
 }
@@ -228,7 +229,8 @@ case .photoTimelineHUD:
     Timeline()
 }
 `;
-    files['apps/ios/LogYourBody/Views/SecretScreen.swift'] = 'struct SecretScreen<Content: View>: View {}\n';
+    files['apps/ios/LogYourBody/Views/SecretScreen.swift'] =
+      'struct SecretScreen<Content: View>: View {}\n';
     writeTree(root, files);
     const { inventory } = loadInventory(
       writeInventory(root, {
@@ -266,9 +268,7 @@ test('an unlisted native screen reports the registry path', () => {
 `,
       'apps/ios/LogYourBody/Views/Canvas.swift': 'struct MesocycleCanvasScreen: View {}\n',
     });
-    const { inventory } = loadInventory(
-      writeInventory(root, { 'ios.screen.home': 'launch' }),
-    );
+    const { inventory } = loadInventory(writeInventory(root, { 'ios.screen.home': 'launch' }));
     const findings = findingsFor(enumerateSurfaces(root), inventory);
     assert.deepEqual(
       findings.map((finding) => [finding.kind, finding.id, finding.path]),
@@ -382,7 +382,7 @@ test('the repository matches its baseline and keeps deleted modes off launch rou
   assert.equal(baseline.inventoryDigest, digest);
   assert.deepEqual(findings, baseline.findings);
   const ids = new Set(findings.map((finding) => finding.id));
-  assert.equal(ids.has('web:/training/canvas'), true);
+  assert.equal(ids.has('web:/training/canvas'), false);
   assert.equal(ids.has('ios.screen.email'), true);
   assert.equal(ids.has('ios.sheet.trainingLiveSession'), true);
   assert.equal(ids.has('ios.mode.weightLoggerMVP'), false);
@@ -393,8 +393,8 @@ test('the repository matches its baseline and keeps deleted modes off launch rou
   assert.equal(ids.has('ios.screen.home'), false);
   const output = execFileSync(process.execPath, [script], { cwd: REPO_ROOT, encoding: 'utf8' });
   assert.match(output, /surface reconciliation: pass/);
-  assert.match(output, /web:\/training\/canvas/);
-  assert.match(output, /apps\/web\/src\/app\/training\/canvas\/page\.tsx/);
+  assert.doesNotMatch(output, /web:\/training\/canvas/);
+  assert.doesNotMatch(output, /apps\/web\/src\/app\/training\/canvas\/page\.tsx/);
   assert.match(output, /ios\.screen\.email/);
 });
 

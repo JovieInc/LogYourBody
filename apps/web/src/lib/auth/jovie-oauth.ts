@@ -45,14 +45,19 @@ export function pkceChallenge(verifier: string) {
 }
 
 export function safeReturnTo(value: string | null | undefined) {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/onboarding';
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/download/ios';
+  const pathname = new URL(value, endpoints.hosts.marketing.url).pathname;
+  if (
+    /^\/(?:dashboard|log|photos|settings|onboarding|steps|import|training)(?:\/|$)/.test(pathname)
+  ) {
+    return '/download/ios';
+  }
   return value;
 }
 
 async function parseOAuthResponse(response: Response): Promise<JovieTokenSet> {
   const payload = (await response.json().catch(() => null)) as
-    | (Partial<JovieTokenSet> & { error?: string; error_description?: string })
-    | null;
+    (Partial<JovieTokenSet> & { error?: string; error_description?: string }) | null;
   if (!response.ok || !payload?.access_token || !payload.token_type) {
     throw new Error(payload?.error_description || payload?.error || 'OAuth token exchange failed');
   }

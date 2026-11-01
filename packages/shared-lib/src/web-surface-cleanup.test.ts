@@ -24,6 +24,62 @@ function listFiles(dir: string): string[] {
 }
 
 describe('web surface cleanup', () => {
+  it('enforces lyb-web-landing-only-v1 for every mounted web page', () => {
+    const publicPages = listFiles(fileURLToPath(webAppRouteDir))
+      .filter((path) => /\/page\.(?:[jt]sx?)$/.test(path))
+      .map((path) => path.replace(/^apps\/web\/src\/app\//, '').replace(/\/page\.[jt]sx?$/, ''));
+
+    expect(publicPages.sort()).toEqual(
+      [
+        'about',
+        'blog',
+        'blog/[slug]',
+        'blog/tag/[tag]',
+        'brand',
+        'careers',
+        'changelog',
+        'consumer-health-data',
+        'delete-account',
+        'download',
+        'download/android',
+        'download/ios',
+        'health-disclosure',
+        'landing',
+        'mobile',
+        'page.tsx',
+        'privacy',
+        'security',
+        'signin',
+        'signup',
+        'support',
+        'terms',
+      ].sort(),
+    );
+  });
+
+  it('keeps production navigation free of links to retired app routes', () => {
+    const deadLinks = listFiles(fileURLToPath(new URL('../../../apps/web/src/', import.meta.url)))
+      .filter((path) => /\.[jt]sx?$/.test(path) && !/(?:__tests__|\.(?:test|spec)\.)/.test(path))
+      .flatMap((path) => {
+        const source = readFileSync(new URL(path, repoRoot), 'utf8');
+        const links = source.match(
+          /(?:href\s*[:=]\s*\{?\s*|router\.(?:push|replace)\(\s*)['"`]\/(?:dashboard|log|photos|settings|onboarding|steps|import|training)(?:[/'"`?#])/g,
+        );
+        return links ? [{ path, links }] : [];
+      });
+    expect(deadLinks).toEqual([]);
+  });
+
+  it('removes product navigation and installed web-app shortcuts', () => {
+    expect(
+      existsSync(new URL('../../../apps/web/src/components/MobileNavbar.tsx', import.meta.url)),
+    ).toBe(false);
+    const manifest = JSON.parse(
+      readFileSync(new URL('../../../apps/web/public/site.webmanifest', import.meta.url), 'utf8'),
+    );
+    expect(manifest.shortcuts ?? []).toEqual([]);
+  });
+
   it('retires the unused store redirect and unpublished Android listing', () => {
     expect(existsSync(new URL('api/app-store-redirect/route.ts', webAppRouteDir))).toBe(false);
     expect(

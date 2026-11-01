@@ -199,6 +199,7 @@ export const logYourBody = {
       { value: 'https://docs.sentry.io/api/releases/retrieve-release-health-session-statistics/', reason: 'Official release-health API contract cited by the LYB-139 runbook.' },
       { value: 'https://github.com/fixture/repo/issues/42', reason: 'LYB-139 HTTP-only fixture remediation URL; never contacted.' },
       { value: 'https://linear.app/jovie/issue/LYB-139', reason: 'LYB-139 source evidence for App Store release health and phased rollout pausing.' },
+      { value: 'https://linear.app/jovie/issue/LYB-100', reason: 'LYB-100 source evidence for the landing-only web surface lock.' },
       { value: 'https://api.github.com', reason: 'GitHub REST API used by CI scripts.' },
       { value: 'https://api.linear.app', reason: 'Linear GraphQL API used by CI remediation intake.' },
       { value: 'https://linear.app/jovie/issue/LYB-40', reason: 'LYB-40 source evidence for share export lifecycle and confirmed Photos writes.' },

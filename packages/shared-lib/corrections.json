@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "lyb-web-landing-only-v1",
+    "correction": "Tim / LYB-100: after 1.2.0 submission, web is landing-only and the product app is iOS-only. Remove authenticated UI routes and navigation while preserving all first-party API handlers and public marketing/legal pages.",
+    "source": "https://linear.app/jovie/issue/LYB-100",
+    "mechanization": "Remove product route implementations and navigation, retire their URL trees before Markdown/auth handling, and replace obsolete UI assertions with retirement regressions. Extend the existing required shared-lib web-surface suite with a complete public-page inventory and navigation/manifest checks. Its two new regressions failed against the original routes and navbar before cleanup. Shrink only resolved surface-reconciliation findings. Machine: built packages/shared-lib/src/web-surface-cleanup.test.ts. The harness owns push and PR operations.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Deleting the current routes prevents their execution, but application code alone cannot prevent a later change from reintroducing authenticated Next.js pages or dead navigation."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required web-surface suite can enumerate every mounted page and assert the public route inventory, absent product navigation, and retired manifest shortcuts."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/web-surface-cleanup.test.ts",
+      "anchor": "enforces lyb-web-landing-only-v1 for every mounted web page"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "dependency-update-lockfile-and-source-parity",
     "correction": "PR #1667 (fix-red-1423773703): The glob 14.0.2 dependency update left the source map stale, failing Detect Changes, parity and CI Summary. Repeated dependency repairs must remain retryable when Git staging fails after dependency verification.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1667",

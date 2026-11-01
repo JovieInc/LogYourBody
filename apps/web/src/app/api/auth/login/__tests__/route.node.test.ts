@@ -21,7 +21,7 @@ describe('GET /api/auth/login', () => {
     expect(location.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(response.cookies.get('lyb_oauth_state')?.value).toBe(location.searchParams.get('state'));
     expect(response.cookies.get('lyb_oauth_verifier')?.value).toBeTruthy();
-    expect(response.cookies.get('lyb_oauth_return_to')?.value).toBe('/dashboard');
+    expect(response.cookies.get('lyb_oauth_return_to')?.value).toBe('/download/ios');
   });
 
   it('does not accept an external return URL', async () => {
@@ -29,6 +29,34 @@ describe('GET /api/auth/login', () => {
       new NextRequest('http://localhost:3000/api/auth/login?returnTo=https%3A%2F%2Fevil.example'),
     );
 
-    expect(response.cookies.get('lyb_oauth_return_to')?.value).toBe('/onboarding');
+    expect(response.cookies.get('lyb_oauth_return_to')?.value).toBe('/download/ios');
+  });
+
+  it.each([
+    '/log',
+    '/photos',
+    '/settings/profile',
+    '/onboarding',
+    '/steps',
+    '/import',
+    '/training/canvas',
+  ])(
+    'retires an old OAuth destination %s without changing the authorization flow',
+    async (returnTo) => {
+      const response = await GET(
+        new NextRequest(
+          `http://localhost:3000/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+        ),
+      );
+      expect(response.cookies.get('lyb_oauth_return_to')?.value).toBe('/download/ios');
+      expect(response.status).toBe(307);
+    },
+  );
+
+  it('preserves a public OAuth return destination and its query', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost:3000/api/auth/login?returnTo=%2Fsupport%3Fsource%3Dios'),
+    );
+    expect(response.cookies.get('lyb_oauth_return_to')?.value).toBe('/support?source=ios');
   });
 });

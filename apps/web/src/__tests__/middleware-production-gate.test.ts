@@ -128,35 +128,56 @@ describe('middleware production debug/test gate', () => {
     expect(response?.headers.get('Cache-Control')).toBe('no-store');
   });
 
-  it('keeps normal protected routes behind product auth in production', async () => {
-    process.env.VERCEL_ENV = 'production';
-    const {
-      default: middleware,
-      shouldBlockDebugRoute,
-      shouldUseProductAuthMiddleware,
-    } = await import('../middleware');
-    const request = new NextRequest('https://logyourbody.com/dashboard', {
-      headers: { cookie: 'lyb_access_token=test-token' },
-    });
-
-    expect(shouldBlockDebugRoute('/dashboard')).toBe(false);
-    expect(shouldUseProductAuthMiddleware(request)).toBe(true);
-
-    const response = await middleware(request);
-
-    expect(response?.status).toBe(200);
+  it.each([
+    '/dashboard',
+    '/dashboard/',
+    '/dashboard?tab=trend',
+    '/log',
+    '/photos',
+    '/settings',
+    '/settings/profile',
+    '/onboarding',
+    '/steps',
+    '/import',
+    '/training/canvas',
+  ])('returns 404 for retired product UI %s with and without a session', async (pathname) => {
+    const { default: middleware, shouldUseProductAuthMiddleware } = await import('../middleware');
+    for (const cookie of ['', 'lyb_access_token=test-token', 'lyb_refresh_token=test-token']) {
+      const request = new NextRequest(`https://logyourbody.com${pathname}`, {
+        headers: { cookie, Accept: 'text/markdown' },
+      });
+      expect(shouldUseProductAuthMiddleware(request)).toBe(false);
+      const response = await middleware(request);
+      expect(response.status).toBe(404);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(response.headers.get('location')).toBeNull();
+    }
   });
 
-  it('redirects an unauthenticated protected route to the sign-in surface', async () => {
+  it.each(['/api/weights', '/api/auth/delete-account', '/api/parse-pdf', '/api/parse-pdf-v2'])(
+    'preserves authentication for API %s',
+    async (pathname) => {
+      const { default: middleware, shouldUseProductAuthMiddleware } = await import('../middleware');
+      const request = new NextRequest(`https://logyourbody.com${pathname}`);
+      expect(shouldUseProductAuthMiddleware(request)).toBe(true);
+      expect((await middleware(request)).status).toBe(307);
+    },
+  );
+
+  it.each([
+    '/api/auth/mobile/profile',
+    '/api/auth/mobile/photos',
+    '/api/auth/mobile/sync/v1/body-metrics',
+    '/api/auth/mobile/training/v1/canvas',
+  ])('preserves the iOS bearer API path %s', async (pathname) => {
     const { default: middleware } = await import('../middleware');
     const response = await middleware(
-      new NextRequest('https://logyourbody.com/dashboard?tab=trend'),
+      new NextRequest(`https://logyourbody.com${pathname}`, {
+        headers: { Authorization: 'Bearer ios-token' },
+      }),
     );
-
-    expect(response?.status).toBe(307);
-    expect(response?.headers.get('location')).toBe(
-      'https://logyourbody.com/signin?returnTo=%2Fdashboard%3Ftab%3Dtrend',
-    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('location')).toBeNull();
   });
 
   it.each(['/api/parse-pdf', '/api/parse-pdf-v2'])(

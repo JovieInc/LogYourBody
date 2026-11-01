@@ -9,17 +9,22 @@ import {
 } from '@/lib/marketing/public-markdown';
 
 const protectedRoutePrefixes = [
-  '/dashboard',
-  '/log',
   '/api/weights',
   '/api/auth/delete-account',
   '/api/parse-pdf',
   '/api/parse-pdf-v2',
-  '/onboarding',
-  '/settings',
+];
+
+// lyb-web-landing-only-v1: product UI lives in the native iOS app.
+const retiredAppRoutes = [
+  '/dashboard',
+  '/log',
   '/photos',
+  '/settings',
+  '/onboarding',
   '/steps',
   '/import',
+  '/training',
 ];
 
 const productionDebugRoutePatterns = [
@@ -76,6 +81,11 @@ export default async function middleware(req: NextRequest) {
     return response;
   }
   if (shouldBlockDebugRoute(req.nextUrl.pathname)) {
+    return new NextResponse(null, { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  }
+
+  const pathname = normalizePathname(req.nextUrl.pathname);
+  if (retiredAppRoutes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
     return new NextResponse(null, { status: 404, headers: { 'Cache-Control': 'no-store' } });
   }
 

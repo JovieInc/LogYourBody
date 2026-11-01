@@ -426,6 +426,10 @@ export const endpoints = {
       reason: 'LYB-139 source evidence for App Store release health and phased rollout pausing.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-100',
+      reason: 'LYB-100 source evidence for the landing-only web surface lock.',
+    },
+    {
       value: 'https://api.github.com',
       reason: 'GitHub REST API used by CI scripts.',
     },
