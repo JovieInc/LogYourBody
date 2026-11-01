@@ -93,29 +93,53 @@ nor readback was verified; this document retains the decision locally.
 Mission: preserve LYB-245 while making the branch mergeable through existing gates.
 Audience: the lanes harness and repository reviewers.
 
-Merged `origin/main` at `3f3f05bcd` without rebasing. Rebuilt the conflicted source
-map from staged inputs and refreshed only the diagnostic workflow's reviewed
-project digest for the merged Xcode graph. Moved the recent-readings sheet content
-and metrics callback into existing dashboard extensions to retain the unchanged
-800-line source baseline. Copy, placement, feature gates and native tests remain.
+Merged `origin/main` at `f42e131c133d00c8250945602abd68cbe10afc8a`
+without rebasing, in merge commit `b97f83c69`. The only conflict was the correction
+ledger. Retained all 282 parent receipts, including their correction and
+mechanization text, and explicitly aligned the shared `fix-red-95726c4f82`
+annotations to the incoming codebase classifier guard. Recorded occurrence 5 as
+receipt 283. The sync-state copy, receipt placement, feature gates and native
+behavior tests are preserved.
 
-Extended `scripts/resolve-repository-docs.py` to refuse unresolved conflict markers
-in staged source inputs before generating the map. Six real-Git regressions fail
-before the change and pass afterward; the two existing required merge-tooling
-suites pass all 105 tests. Diagnostic runner-routing tests pass all 65 cases.
-Root `corepack pnpm lint`, `corepack pnpm typecheck`, `corepack pnpm test`, pinned
-`pnpm product:check`, the Swift architecture guard, vendor-boundary check,
-`test_training_rest_project.py`, source-map parity and its 10 Python tests pass.
-Scoped strict SwiftLint passes for the three extracted dashboard files, with the
-same five unavailable SourceKit rules. Both-parent correction coverage passes
-at 191/191 mechanized rules. Native execution and coverage still require macOS.
+Extended `scripts/correction-classifier.mjs` to snapshot the working ledger and
+recheck its bytes alongside the index and both parents before writing, staging
+or returning success. Three new concurrency controls fail against the previous
+classifier, while its nine original concurrency cases pass. All 71 classifier
+cases pass after the change with the unchanged 100% line, branch and function
+coverage gates. The existing required shared-lib suite executes these cases.
+Replayed the exact PR/main parents in a temporary local clone and used the
+extended `--check-merge` command on the reviewed staged union with all 283
+receipts. Both-parent correction coverage passed at 195/195 mechanized rules.
 
-Tently check `124772519463` reports an unreachable AI provider, with no code
-finding. It has no Actions run; `gh run view --log-failed` returns 404. A new
-harness push must rerun the external review; no check was bypassed.
+Verification on Node 22.23.2 and pinned pnpm 10.34.1:
 
-The harness owns pushing and PR edits. Add exactly one machine declaration to
-the PR body: `Machine: built scripts/resolve-repository-docs.py`.
-Intent-eval: n/a - mechanical merge repair and behavior-preserving extraction.
-GBrain write to `logyourbody-pr1679-merge-repair` and readback both failed to
-connect to `127.0.0.1:7801`; persistence and readback remain unverified.
+- `corepack pnpm lint`, `corepack pnpm typecheck`, `corepack pnpm test`, and
+  `corepack pnpm product:check` passed. The web suite passed 175 suites and 1,694
+  tests; shared-lib passed 56 Vitest files and 335 tests plus its Node suites.
+- The full classifier command passed: `node --test --experimental-test-coverage --test-coverage-include=scripts/correction-classifier.mjs --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 scripts/correction-classifier.test.mjs scripts/correction-classifier-concurrency.test.mjs`.
+- `python3 scripts/repository_docs.py`,
+  `node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main`,
+  `node scripts/ios/swift-arch/guard.mjs`,
+  `node scripts/check-vendor-boundaries.js`, and
+  `python3 scripts/ios/test_training_rest_project.py` passed.
+- `corepack pnpm lint:swift` reported zero violations in 531 files. This Linux
+  toolchain skips five SourceKit-dependent rules. Xcode execution, native render
+  review and native coverage remain unverified and require the real native runner.
+
+The first sandboxed concurrency run stalled in Git's batch reader; a bounded
+host-process rerun supplied the three failing controls and subsequent green
+results. The web build changed only an unrelated generated marketing capture
+timestamp; restored that artifact to its committed bytes.
+
+Tently check `124779536021` reports an unreachable AI provider and no code finding.
+`gh run view 41283330678 --log-failed` reports that Actions CI is still running;
+Tently is external and its check ID returns Actions 404. A harness push must rerun
+that review. No check or gate was bypassed.
+
+The harness owns pushing and PR edits. Put exactly one machine declaration in the
+PR body: `Machine: built scripts/correction-classifier.mjs`.
+Intent-eval: n/a - mechanical merge repair and developer-tool concurrency guard.
+The initial sandboxed GBrain query could not reach `127.0.0.1:7801`. Host-process
+access succeeded: write and matching-content readback of
+`logyourbody-pr1679-merge-repair-occurrence-5` verified brain persistence. Its
+optional repository write-through mirror was skipped with `repo_not_found`.

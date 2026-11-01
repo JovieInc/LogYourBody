@@ -219,6 +219,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
       const readIndex = () => git('--literal-pathspecs', 'ls-files', '--stage', '-z');
       const indexSnapshot = readIndex();
       const index = indexSnapshot.split('\0');
+      const working = readSource(LEDGER_PATH, { root });
       const assertMergeUnchanged = () => {
         assert.ok(
           readIndex() === indexSnapshot,
@@ -228,6 +229,11 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
           git('rev-parse', 'HEAD', 'MERGE_HEAD').trim(),
           parents.join('\n'),
           'merge parents changed during validation; retry from the current merge',
+        );
+        assert.equal(
+          readSource(LEDGER_PATH, { root }),
+          working,
+          'merge ledger changed during validation; retry from the current working file',
         );
       };
       // Verify the whole merge is conflict-free, including staged retries.
@@ -306,7 +312,6 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
         logger.log('correction-classifier: verified staged ledger against both merge parents');
         return 0;
       }
-      const working = readSource(LEDGER_PATH, { root }); // Refuse symlinked output.
       if (!/^(?:<+|\|+|=+|>+)(?: |$)/m.test(working)) {
         // Validate manual input, but require explicit staging if it differs from the union.
         classifyLedger(JSON.parse(working));

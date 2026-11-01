@@ -5545,5 +5545,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-95726c4f82",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679#repair-20261101-occurrence-5",
+    "correction": "PR #1679 / LYB-245, occurrence 5 in 14 days: merge origin/main without rebasing, preserve sync-state copy and receipt placement, retain every correction receipt, and extend the existing repair machine. Concurrent working-ledger edits must not be overwritten or receive a stale successful verdict.",
+    "mechanization": "Align the shared repair fingerprint annotations explicitly to the incoming codebase classifier guard, retaining each parent receipt identity and its original correction and mechanization text. Extend that existing classifier to snapshot and recheck working-ledger bytes alongside the index and both merge parents before writing, staging or returning success. Add the working-ledger target to all three existing concurrency modes. The three negative controls fail before the change, while the original nine cases pass; all 71 classifier cases then pass with unchanged 100% line, branch and function coverage gates. Replay the actual PR parents and use the extended staged verifier on the reviewed union. Tently check 124779536021 reports an AI-provider outage with no code finding; preserve the gate for the harness push. The harness owns push and PR edits and must use exactly one PR-body machine declaration: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair command owns ledger writes, staging and successful merge verification. Rechecking both parent refs at that boundary prevents stale merge evidence from authorizing those operations even when indexed bytes are unchanged."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "merge parents changed during validation; retry from the current merge"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
