@@ -20,6 +20,18 @@ release operation. Preserve existing owner/state/labels and LYB-108/120/121/122
 branches. Current beta, held release PR and latest-main TestFlight remain
 grandfathered with no new release dependency. The harness owns push/PR/merge.
 
+## LYB-275 account list and order
+
+LYB-275 qualifies Claude Code first on a synthetic fixture account only, then
+ChatGPT, then Jovie. Real consented accounts and client registrations are not
+provided. The provided accounts are synthetic fixtures fixture-a and fixture-b
+only. The account owner (Tim) supplies a consented nonproduction account, the
+public client ID, and the exact approved redirect after that client's synthetic
+run passes. This runbook still authorizes no client registration or account
+connection. No client is qualified by that decision. The
+[order record](../../../packages/shared-lib/decisions/client-qualification-order.md)
+is the authorization source.
+
 ## Qualification matrix
 
 The supported first lifecycle is manual weight create/read/correct/delete from
