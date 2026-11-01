@@ -1,5 +1,13 @@
 import Foundation
 
+/// Approved launch copy: JovieInc/Jovie#21838 at 197a96ff21c53cb4ccd8f6c1e3d733058b8c1cf7.
+enum LaunchPromiseCopy {
+    static let headline = "Your body-composition goal, planned around your next date."
+    static let explanation =
+        "Set an outcome and a date. LogYourBody follows your photos and measurements, spots drift, and gives you one next action."
+    static let framing = "Dates guide the plan. They do not guarantee a result."
+}
+
 /// Dated launch decision for timeline, body score, and Jovi. Optional GLP-1 and
 /// DEXA inputs never change the plan or add medication commentary. Missing
 /// safety policy fails closed. A date is never extended.
@@ -19,10 +27,6 @@ enum LaunchJourney {
         return checkGate(gateKey)
     }
 
-    static let promiseHeadline = "Your body-composition goal, planned around your next date."
-    static let promiseExplanation =
-        "Set an outcome and a date. LogYourBody follows your photos and measurements, spots drift, and gives you one next action."
-    static let promiseFraming = "Dates guide the plan. They do not guarantee a result."
     static let productId = "lyb"
     static let hiddenSurfaceMessage = "This step isn't part of your dated plan."
     static let hiddenSurfaceAction = "Back to coach"
@@ -119,7 +123,7 @@ enum LaunchJourney {
             ))
         }
         guard let outcome = input.outcome else {
-            return (.noData, Action(title: "Set an outcome and a date", detail: promiseExplanation))
+            return (.noData, Action(title: "Set an outcome and a date", detail: LaunchPromiseCopy.explanation))
         }
         let metricReadings = usable.filter { $0.metric == outcome.outcome.metric }
         let feasibility = OutcomeFeasibility(now: input.now, thresholds: input.thresholds)
