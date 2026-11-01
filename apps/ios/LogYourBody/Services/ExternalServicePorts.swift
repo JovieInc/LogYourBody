@@ -261,6 +261,7 @@ struct AppPhotosPicker<Label: View>: View {
 
 protocol PhotoLibraryManaging {
     func authorizationStatus() -> AppAuthorizationState
+    func weeklyLibraryAccess() -> WeeklyPhotoLibraryAccess
     func deleteAssets(localIdentifiers: [String]) async throws
     func saveImage(_ image: UIImage) async -> Bool
 }
@@ -306,9 +307,26 @@ struct LivePhotoLibraryAdapter: PhotoLibraryManaging {
     }
 
     func authorizationStatus() -> AppAuthorizationState {
-        switch PHPhotoLibrary.authorizationStatus(for: .readWrite) {
+        switch weeklyLibraryAccess() {
         case .authorized, .limited:
             return .authorized
+        case .notDetermined:
+            return .notDetermined
+        case .denied:
+            return .denied
+        case .restricted:
+            return .restricted
+        case .unknown:
+            return .unknown
+        }
+    }
+
+    func weeklyLibraryAccess() -> WeeklyPhotoLibraryAccess {
+        switch PHPhotoLibrary.authorizationStatus(for: .readWrite) {
+        case .authorized:
+            return .authorized
+        case .limited:
+            return .limited
         case .notDetermined:
             return .notDetermined
         case .denied:

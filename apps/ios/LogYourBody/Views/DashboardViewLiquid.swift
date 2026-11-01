@@ -117,6 +117,9 @@ struct DashboardViewLiquid: View {
     @State var isStatsDestinationActive = false
     @State var isProgressPhotoAttachPresented = false
     @State var progressPhotoAttachTarget: BodyMetrics?
+    @State var progressPhotoAttachFallbackOverride: Date?
+    @State var pendingWeeklyPhotoMoment: Date?
+    @State var pendingWeeklyCompare = false
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
     @State var bodyScoreShareCapture = AccountBoundShareCapture()
@@ -355,11 +358,31 @@ struct DashboardViewLiquid: View {
                 ProgressPhotoAttachSheet(
                     targetMetric: progressPhotoAttachTarget,
                     fallbackDate: progressPhotoAttachFallbackDate,
+                    photoHistory: WeeklyPhotoCheckInPolicy.history(from: bodyMetrics),
+                    previousPhotoURL: weeklyPhotoOutlineURL,
                     onComplete: {
                         await handleProgressPhotoAttachComplete()
+                    },
+                    onCheckInSaved: { outcome in
+                        pendingWeeklyPhotoMoment = outcome.selectedMoment
+                        pendingWeeklyCompare = outcome.offersComparison && outcome.originalImageUsable
                     }
                 )
                 .environmentObject(authManager)
+            }
+            .onChange(of: isProgressPhotoAttachPresented) { _, presented in
+                guard !presented else { return }
+                let moment = pendingWeeklyPhotoMoment
+                let compare = pendingWeeklyCompare
+                pendingWeeklyPhotoMoment = nil
+                pendingWeeklyCompare = false
+                progressPhotoAttachFallbackOverride = nil
+                if let moment {
+                    selectClosestMetric(to: moment)
+                }
+                guard compare, HomeV2Policy.isEnabled(), let pair = homeV2DefaultPair else { return }
+                homeV2PhotoRoute = .compare(pair)
+                isHomeV2ViewerPresented = true
             }
             .navigationDestination(isPresented: $isMetricDetailActive) {
                 fullMetricChartView

@@ -406,6 +406,19 @@ extension BodyMetricSourceMetadata {
         return updated
     }
 
+    var weeklyPhotoProvenance: WeeklyPhotoProvenance? {
+        guard let fields = extraFields[WeeklyPhotoProvenance.storageKey]?.object else { return nil }
+        return WeeklyPhotoProvenance(storage: fields.compactMapValues(\.string))
+    }
+
+    func recordingWeeklyPhoto(_ provenance: WeeklyPhotoProvenance) -> Self {
+        var updated = self
+        updated.extraFields[WeeklyPhotoProvenance.storageKey] = .objectValue(
+            provenance.storageFields.mapValues { .text($0) }
+        )
+        return updated
+    }
+
     var healthKitSampleKey: [String]? {
         guard let sampleId, let sourceBundleId else { return nil }
         return [sourceBundleId, sampleId]

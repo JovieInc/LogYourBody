@@ -79,6 +79,14 @@ extension DashboardViewLiquid {
             onDone: { homeV2Logged = nil },
             onUndo: { Task { await undoHomeV2Logged() } },
             onProvenancePresentationChange: { isHomeV2MetricProvenancePresented = $0 },
+            weeklyPhotoPrompt: WeeklyPhotoCheckInPolicy.prompt(
+                metrics: bodyMetrics,
+                dismissedWeekKey: UserDefaults.standard.string(
+                    forKey: WeeklyPhotoCheckInPolicy.dismissedWeekDefaultsKey
+                ),
+                enabled: WeeklyPhotoCheckInPolicy.promptsAreEnabled()
+            ),
+            onAddWeeklyPhoto: { presentWeeklyPhotoCheckIn() },
             isPhotoScrubNavigating: isHomeV2PhotoScrubNavigating
         )
         .task(id: homeV2StepsRequest(on: metric.date)) {

@@ -330,6 +330,33 @@ enum AnalyticsEventPolicy {
         "trial_start": subscription
     ]
 
+    private static let weeklyPhoto: [String: [String: Set<String>]] = [
+        "weekly_photo_capture_started": [
+            "source": ["camera", "library"],
+            "history": ["zero", "one", "two_or_more"],
+            "access": ["authorized", "limited", "unknown"]
+        ],
+        "weekly_photo_capture_saved": [
+            "source": ["camera", "library"],
+            "history": ["zero", "one", "two_or_more"],
+            "delivery": ["local", "uploaded"],
+            "habit": booleans
+        ],
+        "weekly_photo_capture_failed": [
+            "source": ["camera", "library", "unknown"],
+            "outcome": ["permission_denied", "interrupted", "cancelled", "offline", "empty", "duplicate"]
+        ],
+        "weekly_photo_first_usable": [
+            "elapsed_bucket": ["under_2s", "under_10s", "under_60s", "over_60s"]
+        ],
+        "weekly_photo_second_return": [
+            "history": ["one"]
+        ],
+        "weekly_photo_week_retained": [
+            "habit": ["true"]
+        ]
+    ]
+
     static var legacyEventNames: Set<String> { Set(rules.keys) }
 
     static func payload(event: String, properties: [String: String]?) -> Payload? {
@@ -339,6 +366,9 @@ enum AnalyticsEventPolicy {
                 properties: BenefitEventSchema.sanitized(event: event, properties: properties)
             )
         }
+        if let allowed = weeklyPhoto[event] {
+            return filtered(event: event, properties: properties, allowed: allowed)
+        }
         guard let allowed = rules[event] else { return nil }
 
         if event == "entry_saved" {
@@ -347,8 +377,16 @@ enum AnalyticsEventPolicy {
             guard let type = properties?["type"], ["weight", "body_fat", "photos"].contains(type) else { return nil }
         }
 
-        let filtered = properties?.filter { key, value in allowed[key]?.contains(value) == true } ?? [:]
-        return Payload(event: event, properties: filtered.isEmpty ? nil : filtered)
+        return filtered(event: event, properties: properties, allowed: allowed)
+    }
+
+    private static func filtered(
+        event: String,
+        properties: [String: String]?,
+        allowed: [String: Set<String>]
+    ) -> Payload {
+        let kept = properties?.filter { key, value in allowed[key]?.contains(value) == true } ?? [:]
+        return Payload(event: event, properties: kept.isEmpty ? nil : kept)
     }
 }
 

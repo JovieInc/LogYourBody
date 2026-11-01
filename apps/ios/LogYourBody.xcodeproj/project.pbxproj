@@ -82,6 +82,8 @@
 		417364FB8DBF56DE4302BA11 /* SessionListOrderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 031C0B385F7C300284AA6A5F /* SessionListOrderingTests.swift */; };
 		4212B84EECB988D56259A5FD /* ErrorTrackingServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E493B38B586CB7B2C6FB452 /* ErrorTrackingServiceTests.swift */; };
 		4266EBC42CCDE9B0AB079FB7 /* HomeV2PhotoJourneyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80FA8107D65954647EF3709 /* HomeV2PhotoJourneyPolicy.swift */; };
+		A3120312C100000000000002 /* WeeklyPhotoCheckInPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3120312C100000000000001 /* WeeklyPhotoCheckInPrompt.swift */; };
+		A3120312A100000000000002 /* WeeklyPhotoCheckInPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3120312A100000000000001 /* WeeklyPhotoCheckInPolicy.swift */; };
 		42B0784EAF04F40C031D0186 /* DailyReminderPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 095D9694F1EA5B5091B0AE8B /* DailyReminderPolicyTests.swift */; };
 		437B26CA4B494BC0EF95A673 /* TimelineBucketCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86EEBD8D36DAF492B449176A /* TimelineBucketCalculatorTests.swift */; };
 		43ED1CCFAE5CC7DA20E6DB3E /* BaseTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEFB074F9FFF63EE8FD17BA /* BaseTextField.swift */; };
@@ -145,6 +147,7 @@
 		8F1D82C327BC8A6B5FB2A6DB /* BodyMetricLoggingAndInsightTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192238EEFD8161597A0B99AA /* BodyMetricLoggingAndInsightTests.swift */; };
 		8FB91216C622624E0F7815CC /* HealthSyncPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C662CF613D4755CA2B93A43 /* HealthSyncPipelineTests.swift */; };
 		91DA2456348FBCCDC9343F30 /* ProgressPhotoAttachPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EBF62AD8F9F25BB301D998 /* ProgressPhotoAttachPolicyTests.swift */; };
+		A3120312B100000000000002 /* WeeklyPhotoCheckInPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3120312B100000000000001 /* WeeklyPhotoCheckInPolicyTests.swift */; };
 		929DE2322E275AEB79624023 /* RevenueCatManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29553DC6811B06CAE2621869 /* RevenueCatManager+Part01.swift */; };
 		93335DCBFB7D09586F330149 /* BodySpecAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A2D877BFA93E04F9E168FA7 /* BodySpecAPITests.swift */; };
 		93AEA1AF2FA4E6E91E7B482A /* LoadingManagerHealthSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36A9ED1D5319B495A194EE88 /* LoadingManagerHealthSyncTests.swift */; };
@@ -695,6 +698,7 @@
 		D5DBE937361342FBA97F2B58 /* AuthBillingLifecycleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "AuthBillingLifecycleTests.swift"; sourceTree = "<group>"; };
 		509C2DEE545A83990C02B1BE /* HomeV2ShareView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2ShareView.swift; sourceTree = "<group>"; };
 		50EBF62AD8F9F25BB301D998 /* ProgressPhotoAttachPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProgressPhotoAttachPolicyTests.swift; sourceTree = "<group>"; };
+		A3120312B100000000000001 /* WeeklyPhotoCheckInPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WeeklyPhotoCheckInPolicyTests.swift; sourceTree = "<group>"; };
 		53C0B4CD7942CEEF6E37A0AC /* HomeV2PhotoToolsSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2PhotoToolsSheet.swift; sourceTree = "<group>"; };
 		55090E3269B8A8F8E45E46D0 /* SecondaryMetricsRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SecondaryMetricsRow.swift; path = DesignSystem/Organisms/SecondaryMetricsRow.swift; sourceTree = "<group>"; };
 		5586EC0657B1F9E652068FBA /* OnboardingFlowViewModel+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "OnboardingFlowViewModel+Part02.swift"; path = "OnboardingFlowViewModel+Part02.swift"; sourceTree = "<group>"; };
@@ -1044,6 +1048,7 @@
 		ADF287AC2E1507AF00198D6F /* setup-xcode-config.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "setup-xcode-config.sh"; sourceTree = "<group>"; };
 		ADF5C1B12E1CD2FD00E3FB4D /* AddEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddEntrySheet.swift; sourceTree = "<group>"; };
 		ADF5C1B32E1CDB9C00E3FB4D /* PhotoMetadataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoMetadataService.swift; sourceTree = "<group>"; };
+		A3120312A100000000000001 /* WeeklyPhotoCheckInPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyPhotoCheckInPolicy.swift; sourceTree = "<group>"; };
 		ADF5C1B52E1CF89E00E3FB4D /* BackgroundPhotoUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPhotoUploadService.swift; sourceTree = "<group>"; };
 		ADF5C1C42E1DFE7900E3FB4D /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		ADF5C1EA2E1E1B1B00E3FB4D /* ProfilePreparationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilePreparationView.swift; sourceTree = "<group>"; };
@@ -1068,6 +1073,7 @@
 		B3C4D0104A77000100ABCDEF /* DexaPDFImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DexaPDFImportSheet.swift; sourceTree = "<group>"; };
 		B4BF04D15583E3AE1CA4A836 /* View+Styles.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "View+Styles.swift"; path = "View+Styles.swift"; sourceTree = "<group>"; };
 		B80FA8107D65954647EF3709 /* HomeV2PhotoJourneyPolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2PhotoJourneyPolicy.swift; sourceTree = "<group>"; };
+		A3120312C100000000000001 /* WeeklyPhotoCheckInPrompt.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WeeklyPhotoCheckInPrompt.swift; sourceTree = "<group>"; };
 		BA9844F348C4675E22E4592F /* HomeV2TrendChart.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2TrendChart.swift; sourceTree = "<group>"; };
 		BBB847A2050F3135D62950A1 /* AuthFormField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthFormField.swift; path = DesignSystem/Molecules/AuthFormField.swift; sourceTree = "<group>"; };
 		BC71479CEEDEAD772518C5E9 /* BodyMetricAppIntentsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyMetricAppIntentsTests.swift; sourceTree = "<group>"; };
@@ -1395,6 +1401,7 @@
 				D6C9C472B04458CEC52B54DD /* HomeV2ProgressView.swift */,
 				A170ED170000000000000001 /* HomeV2MetricEditorial.swift */,
 				B80FA8107D65954647EF3709 /* HomeV2PhotoJourneyPolicy.swift */,
+				A3120312C100000000000001 /* WeeklyPhotoCheckInPrompt.swift */,
 				6B2C7FB705AB09C1ED795CC9 /* HomeV2PhotoTimelineRuler.swift */,
 				53C0B4CD7942CEEF6E37A0AC /* HomeV2PhotoToolsSheet.swift */,
 				C3AACE4608B68E543112CF52 /* HomeV2CompareView.swift */,
@@ -1535,6 +1542,7 @@
 				2BDF63906AA2DF9D7BEC1CA0 /* PhotoUploadBatchPolicyTests.swift */,
 				D6047B9B9F0280ED4CEC0DFB /* PreferenceGoalValidatorTests.swift */,
 				50EBF62AD8F9F25BB301D998 /* ProgressPhotoAttachPolicyTests.swift */,
+				A3120312B100000000000001 /* WeeklyPhotoCheckInPolicyTests.swift */,
 				4FE602CA4F092CAB186EE952 /* RevenueCatFlowTests.swift */,
 				D5DBE937361342FBA97F2B58 /* AuthBillingLifecycleTests.swift */,
 				7899ADA31AC216735A9FE299 /* RevenueCatProductConfigurationTests.swift */,
@@ -1733,6 +1741,7 @@
 				FE13A3A300000000000000C2 /* FeatureReleasePolicy.swift */,
 				AD8552932E1CC15B003552EE /* BackgroundRemovalService.swift */,
 				ADF5C1B32E1CDB9C00E3FB4D /* PhotoMetadataService.swift */,
+				A3120312A100000000000001 /* WeeklyPhotoCheckInPolicy.swift */,
 				75034CADEA1D4697BDCB5555 /* ImageCacheService.swift */,
 				26820261025000000000005 /* ProductAPIClient+DatedOutcome.swift */,
 				ADFC6A232E187717004FCE40 /* ProductAPIClient.swift */,
@@ -2532,6 +2541,7 @@
 				8DDCF5DB348BB94E94C669D0 /* PhotoUploadBatchPolicyTests.swift in Sources */,
 				BE37C87CC62A611B794DC9B9 /* PreferenceGoalValidatorTests.swift in Sources */,
 				91DA2456348FBCCDC9343F30 /* ProgressPhotoAttachPolicyTests.swift in Sources */,
+				A3120312B100000000000002 /* WeeklyPhotoCheckInPolicyTests.swift in Sources */,
 				A4856A2B9E1FC174F9F1739F /* RevenueCatFlowTests.swift in Sources */,
 				E2E530F646B04158935304E2 /* AuthBillingLifecycleTests.swift in Sources */,
 				D47F9BD18CBEE2413DF244FC /* RevenueCatProductConfigurationTests.swift in Sources */,
@@ -2743,6 +2753,7 @@
 				E1A2630100000000000000A2 /* EarnedWinDetector.swift in Sources */,
 				ADDC47BD2E2D89F3003C97E7 /* BackgroundRemovalService.swift in Sources */,
 				ADDC47BE2E2D89F3003C97E7 /* PhotoMetadataService.swift in Sources */,
+				A3120312A100000000000002 /* WeeklyPhotoCheckInPolicy.swift in Sources */,
 				9B5611E2F8314E22A5BF7889 /* ImageCacheService.swift in Sources */,
 				26820261025000000000006 /* ProductAPIClient+DatedOutcome.swift in Sources */,
 				ADDC47BF2E2D89F3003C97E7 /* ProductAPIClient.swift in Sources */,
@@ -2961,6 +2972,7 @@
 				A170ED170000000000000002 /* HomeV2MetricEditorial.swift in Sources */,
 				987BBA9243F88C752E3E19E8 /* DashboardViewLiquid+HomeV2Progress.swift in Sources */,
 				4266EBC42CCDE9B0AB079FB7 /* HomeV2PhotoJourneyPolicy.swift in Sources */,
+				A3120312C100000000000002 /* WeeklyPhotoCheckInPrompt.swift in Sources */,
 				232F6B14662F9FC0F3C3A5A3 /* HomeV2PhotoTimelineRuler.swift in Sources */,
 				BDBF72C61DE5AE80FF6BE044 /* HomeV2PhotoToolsSheet.swift in Sources */,
 				251017544917A27E427E1991 /* HomeV2CompareView.swift in Sources */,

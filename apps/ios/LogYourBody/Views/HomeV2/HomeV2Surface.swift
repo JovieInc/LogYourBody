@@ -33,6 +33,8 @@ struct HomeV2Surface: View {
     let onDone: () -> Void
     let onUndo: () -> Void
     var onProvenancePresentationChange: (Bool) -> Void = { _ in }
+    var weeklyPhotoPrompt: WeeklyPhotoCheckInPolicy.Prompt?
+    var onAddWeeklyPhoto: () -> Void = {}
     var isPhotoScrubNavigating = false
 
     @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
@@ -53,6 +55,9 @@ struct HomeV2Surface: View {
                         unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto,
                         isNavigating: isPhotoScrubNavigating || showsProvenance
                     )
+                    if let weeklyPhotoPrompt {
+                        WeeklyPhotoCheckInPrompt(prompt: weeklyPhotoPrompt, onAdd: onAddWeeklyPhoto)
+                    }
                     photoNumberBlock
                     if hasAnyPhotoInHistory {
                         HomeV2DisclosureLink(
