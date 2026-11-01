@@ -30,6 +30,11 @@ FDA's current General Wellness guidance covers qualifying low-risk products with
 
 Medication decisions, amounts, and titration are outside the coach's scope. GLP-1 material remains quarantined unless the separate clearance checklist is completed and documented. Symptoms, injury, severe distress, or medication concerns should be redirected to a qualified healthcare professional. For immediate danger or urgent symptoms, direct the person to local emergency services.
 
+Before coached-tier launch, complete the counsel sign-off and source/runtime
+evidence in the [LYB-328 consent and claims review](health-data-consent-and-claims-review.md).
+That review records unresolved consent, disclosure and mobile-chat safety
+findings. This policy and a passing claims scan do not provide launch clearance.
+
 Approved escalation language:
 
 > Please contact a qualified healthcare professional for advice about your situation. I can help with general exercise information.
