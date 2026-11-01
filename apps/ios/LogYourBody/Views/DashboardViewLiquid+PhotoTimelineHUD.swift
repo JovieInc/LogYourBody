@@ -60,6 +60,14 @@ extension DashboardViewLiquid {
 
     var photoTimelineRoot: some View {
         VStack(spacing: 0) {
+            LaunchDirectiveCard(
+                presentation: launchJourneyPresentation,
+                note: launchHoldNote,
+                onAction: { performLaunchNextAction(launchJourneyPresentation) }
+            )
+            .padding(.horizontal, JovieTokens.screenInset)
+            .padding(.top, 8)
+
             photoTimelineRootNavigation
                 .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.top, 8)
@@ -97,6 +105,20 @@ extension DashboardViewLiquid {
         )
         .onChange(of: selectedPhotoTimelineRootPage) { _, _ in
             isHomeChatExpanded = false
+        }
+        .sheet(isPresented: $showsLaunchOutcomeEditor) {
+            LaunchOutcomeEditor(
+                existing: (try? realtimeSyncManager.datedOutcomeStore.load())?.value,
+                errorText: launchOutcomeError
+            ) { outcome in
+                do {
+                    try realtimeSyncManager.datedOutcomeStore.save(outcome)
+                    launchOutcomeError = nil
+                    showsLaunchOutcomeEditor = false
+                } catch {
+                    launchOutcomeError = "That outcome could not be saved. Revise the date or value."
+                }
+            }
         }
         .overlay(alignment: .leading) {
             Color.clear

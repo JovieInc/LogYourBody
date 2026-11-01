@@ -3,6 +3,8 @@ import type { ChatModelMessage } from '@/lib/ports/chat-model';
 import type { StoredChatMessage } from '@/lib/ports/chat-conversations';
 import type { ProductUserRecord } from '@/lib/ports/user-directory';
 import type { NextWorkoutResult } from '@/lib/training/service';
+import { coachPersonaGuardrailsEnabled } from '@/lib/flags/coach-persona';
+import { HEALTH_MEMORY_PRODUCT_ID, retrieveHealthMemory } from './health-memory';
 import { coachPersonaAppendix, splitCallerContext } from './coach-scaffold';
 
 const MAX_HISTORY_MESSAGES = 20;
@@ -82,7 +84,16 @@ export function buildChatModelMessages(input: {
   trainingOutput?: NextWorkoutResult | null;
   voiceMode?: boolean;
 }): ChatModelMessage[] {
-  const bodyContext = JSON.stringify(splitCallerContext(input.user, input.metrics).health);
+  const safetyAvailable = coachPersonaGuardrailsEnabled();
+  const memory = retrieveHealthMemory({
+    records: [],
+    userId: input.user?.subject ?? '',
+    productId: HEALTH_MEMORY_PRODUCT_ID,
+    safetyAvailable,
+  });
+  const bodyContext = JSON.stringify(
+    memory.ok ? splitCallerContext(input.user, input.metrics).health : { status: memory.reason },
+  );
   const voiceModeInstructions = input.voiceMode
     ? '\n\nVoice reply mode is active. Write only the words to be spoken. Use one brief, direct imperative line with no preface or filler. Keep it to about 12 words and no more than two substantive sentences. Short command fragments such as “Stop here. Rack it. Two minutes.” are acceptable. If the user explicitly asks a question, answer it directly and concisely; the length limit may be exceeded only as needed to answer that question.'
     : '';

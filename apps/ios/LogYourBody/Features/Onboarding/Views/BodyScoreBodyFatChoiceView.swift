@@ -7,8 +7,7 @@ struct BodyScoreBodyFatChoiceView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
 
     private let options: [(title: String, subtitle: String, source: BodyFatInputSource, icon: String)] = [
-        ("Enter a measured value", "From a scan, smart scale, calipers, or DEXA.", .manualValue, "checkmark.circle"),
-        ("Choose an estimated range", "Use neutral descriptions without comparing bodies.", .visualEstimate, "eye.fill")
+        ("Enter a measured value", "From a scan, smart scale, calipers, or DEXA.", .manualValue, "checkmark.circle")
     ]
 
     var body: some View {

@@ -25,7 +25,7 @@ jest.mock('../page', () => {
     return (
       <div className="bg-linear-bg min-h-screen pb-16 md:pb-0">
         <header role="banner" className="sticky top-0 z-10">
-          <a href="/dashboard">Back</a>
+          <a href="/">Back</a>
           <div>Settings</div>
           <div>test@example.com</div>
         </header>
@@ -33,10 +33,8 @@ jest.mock('../page', () => {
         <main role="main">
           {/* Settings menu items */}
           <div>
-            <a href="/settings/profile">Profile</a>
             <a href="/settings/account">Account &amp; Security</a>
-            <a href="/settings/preferences">Preferences</a>
-            <a href="/settings/notifications">Notifications</a>
+            <a href="/settings/data-export">Export Data</a>
             <div>
               <a href="/settings/subscription">Subscription</a>
               <span>Free</span>
@@ -58,7 +56,7 @@ jest.mock('../page', () => {
           <footer>
             <a href="/terms">Terms</a>
             <a href="/privacy">Privacy</a>
-            <a href="/about">About</a>
+            <a href="/support">Support</a>
           </footer>
         </main>
 
@@ -116,34 +114,29 @@ describe('Settings Page Mobile Experience', () => {
     render(<SettingsPage />);
 
     const backButton = screen.getByRole('link', { name: /back/i });
-    expect(backButton).toHaveAttribute('href', '/dashboard');
+    expect(backButton).toHaveAttribute('href', '/');
   });
 
   it('should display all settings menu items', () => {
     render(<SettingsPage />);
 
     // Check all menu items are present
-    expect(screen.getByText('Profile')).toBeInTheDocument();
+    expect(screen.queryByText('Profile')).not.toBeInTheDocument();
     expect(screen.getByText('Account & Security')).toBeInTheDocument();
-    expect(screen.getByText('Preferences')).toBeInTheDocument();
-    expect(screen.getByText('Notifications')).toBeInTheDocument();
+    expect(screen.queryByText('Preferences')).not.toBeInTheDocument();
+    expect(screen.queryByText('Notifications')).not.toBeInTheDocument();
     expect(screen.getByText('Subscription')).toBeInTheDocument();
+    expect(screen.getByText('Export Data')).toBeInTheDocument();
   });
 
   it('should navigate to correct pages when menu items are clicked', () => {
     render(<SettingsPage />);
 
-    // Profile link
-    const profileLink = screen.getByText('Profile').closest('a');
-    expect(profileLink).toHaveAttribute('href', '/settings/profile');
-
-    // Account link
     const accountLink = screen.getByText('Account & Security').closest('a');
     expect(accountLink).toHaveAttribute('href', '/settings/account');
 
-    // Preferences link
-    const preferencesLink = screen.getByText('Preferences').closest('a');
-    expect(preferencesLink).toHaveAttribute('href', '/settings/preferences');
+    const exportLink = screen.getByText('Export Data').closest('a');
+    expect(exportLink).toHaveAttribute('href', '/settings/data-export');
   });
 
   it('should display user email in header', () => {
@@ -174,7 +167,7 @@ describe('Settings Page Mobile Experience', () => {
 
     expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms');
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy');
-    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
+    expect(screen.getByRole('link', { name: 'Support' })).toHaveAttribute('href', '/support');
   });
 
   it('should have sticky header', () => {

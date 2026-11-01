@@ -89,7 +89,7 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         XCTAssertFalse(
             ComposerLoggingPrototypePolicy.isEnabled(arguments: [], isGateEnabled: { _ in false })
         )
-        XCTAssertTrue(
+        XCTAssertFalse(
             ComposerLoggingPrototypePolicy.isEnabled(arguments: [], isGateEnabled: { key in
                 key == ComposerLoggingPrototypePolicy.gateKey
             })
@@ -104,7 +104,7 @@ final class LaunchSurfacePolicyTests: XCTestCase {
     }
 
     func testComposerLoggingTapSelectionRequiresOneOptionActivation() {
-        var selector = ComposerLoggingSelectorState()
+        var selector = LoggingSelectorPrototypeState()
 
         selector.toggleTapSelection()
         selector.toggleTapSelection()
@@ -120,7 +120,7 @@ final class LaunchSurfacePolicyTests: XCTestCase {
     }
 
     func testComposerLoggingDragSelectionTracksTargetsAndReleaseOnlyReturnsInputType() {
-        var selector = ComposerLoggingSelectorState()
+        var selector = LoggingSelectorPrototypeState()
 
         selector.beginDragSelection()
         XCTAssertTrue(selector.updateDragSelection(over: .weight))
@@ -133,7 +133,7 @@ final class LaunchSurfacePolicyTests: XCTestCase {
     }
 
     func testComposerLoggingDragCancellationAndInterruptionRestoreComposer() {
-        var selector = ComposerLoggingSelectorState()
+        var selector = LoggingSelectorPrototypeState()
 
         selector.beginDragSelection()
         XCTAssertTrue(selector.updateDragSelection(over: .bodyFat))

@@ -122,7 +122,7 @@ struct BulkPhotoImportView: View {
                 hasStartedScan = true
             }
         }
-        .worldClassScreen(.importPhotos)
+
     }
 
     @ViewBuilder

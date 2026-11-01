@@ -138,7 +138,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         ]
         app.launch()
 
-        let title = app.staticTexts["Are you losing fat or lean mass?"]
+        let title = app.staticTexts["Your body-composition goal, planned around your next date."]
         XCTAssertTrue(title.waitForExistence(timeout: 10))
         let footer = app.descendants(matching: .any)["body_score_onboarding_hook_footer"].firstMatch
         let scroll = app.scrollViews["onboarding_scaffold_scroll"]
@@ -203,7 +203,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     }
 
     private func assertHookStep(in app: XCUIApplication) {
-        XCTAssertTrue(app.staticTexts["Are you losing fat or lean mass?"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Your body-composition goal, planned around your next date."].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_bodyScoreIntro"].exists)
 
         // One primary path (the scan), Apple Health second, typing last.
@@ -255,7 +255,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         let back = app.buttons["Back"]
         XCTAssertTrue(back.waitForExistence(timeout: 3))
         back.tap()
-        XCTAssertTrue(app.staticTexts["Are you losing fat or lean mass?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Your body-composition goal, planned around your next date."].waitForExistence(timeout: 5))
     }
 
     private func completeBasicsStep(in app: XCUIApplication) {

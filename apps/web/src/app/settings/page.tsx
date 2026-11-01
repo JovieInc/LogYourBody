@@ -6,18 +6,7 @@ import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  Loader2,
-  User,
-  Shield,
-  Bell,
-  Globe,
-  ChevronRight,
-  ArrowLeft,
-  Heart,
-  LogOut,
-  Download,
-} from 'lucide-react';
+import { Loader2, Shield, ChevronRight, ArrowLeft, Heart, LogOut, Download } from 'lucide-react';
 import Link from 'next/link';
 import { MobileNavbar } from '@/components/MobileNavbar';
 import { VersionDisplay } from '@/components/VersionDisplay';
@@ -51,31 +40,10 @@ export default function SettingsPage() {
 
   const settingsItems = [
     {
-      title: 'Profile',
-      description: 'Personal information and avatar',
-      icon: User,
-      href: '/settings/profile',
-      badge: null,
-    },
-    {
       title: 'Account & Security',
       description: 'Phone and authentication',
       icon: Shield,
       href: '/settings/account',
-      badge: null,
-    },
-    {
-      title: 'Preferences',
-      description: 'Units and measurement preferences',
-      icon: Globe,
-      href: '/settings/preferences',
-      badge: null,
-    },
-    {
-      title: 'Notifications',
-      description: 'Reminders and email preferences',
-      icon: Bell,
-      href: '/settings/notifications',
       badge: null,
     },
     {
@@ -101,7 +69,7 @@ export default function SettingsPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/dashboard">
+              <Link href="/">
                 <Button variant="ghost" size="icon">
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
@@ -199,10 +167,10 @@ export default function SettingsPage() {
               </Link>
               <span className="text-linear-text-tertiary">•</span>
               <Link
-                href="/about"
+                href="/support"
                 className="text-linear-text-tertiary hover:text-linear-text text-xs"
               >
-                About
+                Support
               </Link>
             </div>
           </div>

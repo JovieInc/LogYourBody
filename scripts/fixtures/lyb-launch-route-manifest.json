@@ -1,0 +1,366 @@
+{
+  "schema": "lyb-native-certification/v2",
+  "sourceIssue": "LYB-271",
+  "launchContract": {
+    "schema": "lyb-launch-contract/v1",
+    "digest": "697ae849faa806850bbfcb54b3977b00797f6d0bf9b86ccf6b57d6d2c0bbe0d7",
+    "primarySurfaces": ["ios.screen.photoTimeline", "ios.screen.stats", "ios.screen.chat"],
+    "surfaces": {
+      "ios.mode.legacyFullDashboardBeta": "delete",
+      "ios.mode.photoTimelineHUD": "launch",
+      "ios.mode.weightLoggerMVP": "delete",
+      "ios.prototype.composerLoggingSelector": "hide",
+      "ios.screen.activeSessions": "launch",
+      "ios.screen.addProgressPhoto": "launch",
+      "ios.screen.appleHealth": "launch",
+      "ios.screen.biometricLock": "launch",
+      "ios.screen.bodyFatMethod": "repair",
+      "ios.screen.bodyFatValue": "launch",
+      "ios.screen.bodyScoreIntro": "repair",
+      "ios.screen.bodyScoreReveal": "repair",
+      "ios.screen.bugReport": "launch",
+      "ios.screen.calculation": "launch",
+      "ios.screen.chat": "repair",
+      "ios.screen.chooseHomeView": "delete",
+      "ios.screen.completeProfile": "repair",
+      "ios.screen.confirmImportedData": "launch",
+      "ios.screen.dailyReminder": "launch",
+      "ios.screen.deleteAccount": "launch",
+      "ios.screen.editProfile": "launch",
+      "ios.screen.email": "hide",
+      "ios.screen.exportData": "launch",
+      "ios.screen.firstProgressPhoto": "repair",
+      "ios.screen.glp1CheckIn": "repair",
+      "ios.screen.height": "launch",
+      "ios.screen.home": "repair",
+      "ios.screen.importPhotos": "hide",
+      "ios.screen.integrations": "launch",
+      "ios.screen.launch": "repair",
+      "ios.screen.legalConsent": "launch",
+      "ios.screen.logBodyFat": "launch",
+      "ios.screen.logWeight": "launch",
+      "ios.screen.metricDetail": "launch",
+      "ios.screen.paywall": "launch",
+      "ios.screen.photoTimeline": "launch",
+      "ios.screen.planUnavailable": "repair",
+      "ios.screen.privacyAndData": "launch",
+      "ios.screen.restorePurchases": "launch",
+      "ios.screen.settings": "launch",
+      "ios.screen.sexAtBirth": "launch",
+      "ios.screen.shareBodyScore": "hide",
+      "ios.screen.signIn": "launch",
+      "ios.screen.stats": "repair",
+      "ios.screen.syncDetails": "launch",
+      "ios.screen.trackingAndGoals": "repair",
+      "ios.screen.verifyAccount": "hide",
+      "ios.screen.visualEstimate": "hide",
+      "ios.screen.weight": "launch",
+      "ios.screen.whatsNew": "hide",
+      "ios.sheet.dexaImport": "launch",
+      "ios.sheet.trainingLiveSession": "hide",
+      "ios.sheet.voiceSetReview": "hide",
+      "web:/": "repair",
+      "web:/about": "hide",
+      "web:/blog": "hide",
+      "web:/blog/[slug]": "hide",
+      "web:/blog/tag/[tag]": "hide",
+      "web:/brand": "hide",
+      "web:/careers": "hide",
+      "web:/changelog": "hide",
+      "web:/dashboard": "delete",
+      "web:/delete-account": "launch",
+      "web:/download": "launch",
+      "web:/download/android": "delete",
+      "web:/download/ios": "launch",
+      "web:/health-disclosure": "launch",
+      "web:/import": "delete",
+      "web:/landing": "delete",
+      "web:/log": "delete",
+      "web:/mobile": "delete",
+      "web:/onboarding": "delete",
+      "web:/photos": "delete",
+      "web:/privacy": "launch",
+      "web:/security": "launch",
+      "web:/settings": "launch",
+      "web:/settings/account": "launch",
+      "web:/settings/data-export": "launch",
+      "web:/settings/notifications": "hide",
+      "web:/settings/preferences": "hide",
+      "web:/settings/profile": "hide",
+      "web:/settings/subscription": "launch",
+      "web:/signin": "repair",
+      "web:/signup": "repair",
+      "web:/steps": "delete",
+      "web:/support": "launch",
+      "web:/terms": "launch"
+    }
+  },
+  "paths": [
+    {
+      "id": "launch.baseline",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["baseline-manual"],
+      "testIds": ["LaunchJourneyTests/testBaselineDenialAndNoDataRecoverToOneAction()"]
+    },
+    {
+      "id": "launch.deadline",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["outcome-date"],
+      "testIds": ["LaunchJourneyTests/testDatedOutcomeSurvivesAndEditRecomputes()"]
+    },
+    {
+      "id": "launch.deadline-replan",
+      "tier": "service_integration",
+      "requiredCaptures": [],
+      "testIds": ["LaunchJourneyTests/testDateEditRecomputesWithoutExtendingExpired()"]
+    },
+    {
+      "id": "launch.directive",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["next-action"],
+      "testIds": ["LaunchJourneyTests/testOneNextActionForReadyPlan()"]
+    },
+    {
+      "id": "launch.drift",
+      "tier": "service_integration",
+      "requiredCaptures": [],
+      "testIds": ["LaunchJourneyTests/testDriftChangesTheSingleAction()"]
+    },
+    {
+      "id": "launch.memory-isolation",
+      "tier": "service_integration",
+      "requiredCaptures": [],
+      "testIds": ["LaunchJourneyTests/testHealthMemoryIsolationFailClosed()"]
+    },
+    {
+      "id": "launch.navigation",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["launch-navigation"],
+      "testIds": ["LaunchJourneyTests/testHiddenSurfaceRecoveryHasAnExit()"]
+    },
+    {
+      "id": "launch.promise",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["launch-promise"],
+      "testIds": ["LaunchJourneyTests/testPromiseCopyStatesTheDate()"]
+    },
+    {
+      "id": "launch.recovery",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["launch-recovery"],
+      "testIds": ["LaunchJourneyTests/testOfflineStaleAndConflictRecover()"]
+    },
+    {
+      "id": "launch.return",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["return-next-action"],
+      "testIds": ["LaunchJourneyTests/testExpiredAndMaintenanceDoNotExtendTheDate()"]
+    },
+    {
+      "id": "launch.safety",
+      "tier": "service_integration",
+      "requiredCaptures": [],
+      "testIds": ["LaunchJourneyTests/testUnavailableSafetyAndUnsafeDatesFailClosed()"]
+    },
+    {
+      "id": "launch.stats",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["launch-stats"],
+      "testIds": ["LaunchJourneyTests/testStatsSurfaceProjectsEveryState()"]
+    },
+    {
+      "id": "launch.timeline",
+      "tier": "simulator_interaction",
+      "requiredCaptures": ["launch-timeline"],
+      "testIds": ["LaunchJourneyTests/testTimelineSurfaceProjectsEveryState()"]
+    }
+  ],
+  "routes": [
+    {
+      "surface": "ios.screen.photoTimeline",
+      "states": [
+        {
+          "id": "ready",
+          "pathIds": ["launch.timeline", "launch.stats", "launch.directive"]
+        },
+        {
+          "id": "denial",
+          "pathIds": ["launch.baseline", "launch.recovery"]
+        },
+        {
+          "id": "no-data",
+          "pathIds": ["launch.baseline", "launch.timeline", "launch.stats", "launch.recovery"]
+        },
+        {
+          "id": "offline",
+          "pathIds": ["launch.recovery"]
+        },
+        {
+          "id": "stale",
+          "pathIds": ["launch.stats", "launch.drift", "launch.recovery"]
+        },
+        {
+          "id": "conflicting",
+          "pathIds": ["launch.drift", "launch.recovery"]
+        },
+        {
+          "id": "unsafe-date",
+          "pathIds": ["launch.deadline", "launch.safety"]
+        },
+        {
+          "id": "impossible-date",
+          "pathIds": ["launch.deadline", "launch.safety"]
+        },
+        {
+          "id": "expired-date",
+          "pathIds": ["launch.return"]
+        },
+        {
+          "id": "maintenance",
+          "pathIds": ["launch.deadline", "launch.return"]
+        }
+      ]
+    },
+    {
+      "surface": "ios.screen.stats",
+      "states": [
+        {
+          "id": "ready",
+          "pathIds": ["launch.timeline", "launch.stats", "launch.directive"]
+        },
+        {
+          "id": "denial",
+          "pathIds": ["launch.baseline", "launch.recovery"]
+        },
+        {
+          "id": "no-data",
+          "pathIds": ["launch.baseline", "launch.timeline", "launch.stats", "launch.recovery"]
+        },
+        {
+          "id": "offline",
+          "pathIds": ["launch.recovery"]
+        },
+        {
+          "id": "stale",
+          "pathIds": ["launch.stats", "launch.drift", "launch.recovery"]
+        },
+        {
+          "id": "conflicting",
+          "pathIds": ["launch.drift", "launch.recovery"]
+        },
+        {
+          "id": "unsafe-date",
+          "pathIds": ["launch.deadline", "launch.safety"]
+        },
+        {
+          "id": "impossible-date",
+          "pathIds": ["launch.deadline", "launch.safety"]
+        },
+        {
+          "id": "expired-date",
+          "pathIds": ["launch.return"]
+        },
+        {
+          "id": "maintenance",
+          "pathIds": ["launch.deadline", "launch.return"]
+        }
+      ]
+    },
+    {
+      "surface": "ios.screen.chat",
+      "states": [
+        {
+          "id": "ready",
+          "pathIds": ["launch.timeline", "launch.stats", "launch.directive"]
+        },
+        {
+          "id": "denial",
+          "pathIds": ["launch.baseline", "launch.recovery"]
+        },
+        {
+          "id": "no-data",
+          "pathIds": ["launch.baseline", "launch.timeline", "launch.stats", "launch.recovery"]
+        },
+        {
+          "id": "offline",
+          "pathIds": ["launch.recovery"]
+        },
+        {
+          "id": "stale",
+          "pathIds": ["launch.stats", "launch.drift", "launch.recovery"]
+        },
+        {
+          "id": "conflicting",
+          "pathIds": ["launch.drift", "launch.recovery"]
+        },
+        {
+          "id": "unsafe-date",
+          "pathIds": ["launch.deadline", "launch.safety"]
+        },
+        {
+          "id": "impossible-date",
+          "pathIds": ["launch.deadline", "launch.safety"]
+        },
+        {
+          "id": "expired-date",
+          "pathIds": ["launch.return"]
+        },
+        {
+          "id": "maintenance",
+          "pathIds": ["launch.deadline", "launch.return"]
+        }
+      ]
+    }
+  ],
+  "observedNativeSurfaces": [
+    "ios.mode.legacyFullDashboardBeta",
+    "ios.mode.photoTimelineHUD",
+    "ios.mode.weightLoggerMVP",
+    "ios.screen.activeSessions",
+    "ios.screen.addProgressPhoto",
+    "ios.screen.appleHealth",
+    "ios.screen.biometricLock",
+    "ios.screen.bodyFatMethod",
+    "ios.screen.bodyFatValue",
+    "ios.screen.bodyScoreIntro",
+    "ios.screen.bodyScoreReveal",
+    "ios.screen.bugReport",
+    "ios.screen.calculation",
+    "ios.screen.chat",
+    "ios.screen.chooseHomeView",
+    "ios.screen.completeProfile",
+    "ios.screen.confirmImportedData",
+    "ios.screen.dailyReminder",
+    "ios.screen.deleteAccount",
+    "ios.screen.editProfile",
+    "ios.screen.email",
+    "ios.screen.exportData",
+    "ios.screen.firstProgressPhoto",
+    "ios.screen.glp1CheckIn",
+    "ios.screen.height",
+    "ios.screen.home",
+    "ios.screen.importPhotos",
+    "ios.screen.integrations",
+    "ios.screen.launch",
+    "ios.screen.legalConsent",
+    "ios.screen.logBodyFat",
+    "ios.screen.logWeight",
+    "ios.screen.metricDetail",
+    "ios.screen.paywall",
+    "ios.screen.photoTimeline",
+    "ios.screen.planUnavailable",
+    "ios.screen.privacyAndData",
+    "ios.screen.restorePurchases",
+    "ios.screen.settings",
+    "ios.screen.sexAtBirth",
+    "ios.screen.shareBodyScore",
+    "ios.screen.signIn",
+    "ios.screen.stats",
+    "ios.screen.syncDetails",
+    "ios.screen.trackingAndGoals",
+    "ios.screen.verifyAccount",
+    "ios.screen.visualEstimate",
+    "ios.screen.weight",
+    "ios.screen.whatsNew"
+  ]
+}

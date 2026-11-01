@@ -782,7 +782,7 @@ struct BodyScoreShareSheet: View {
         ZStack {
             sheetSurface
         }
-        .worldClassScreen(.shareBodyScore)
+
     }
 
     private var sheetSurface: some View {

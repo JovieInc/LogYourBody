@@ -50,58 +50,103 @@ describe('buildChatModelMessages', () => {
     expect(systemMessage.content).toContain('Authorized body context (server-scoped to this user)');
   });
 
-  it('passes only the approved profile and metric fields to the model', () => {
-    const [systemMessage, userMessage] = buildChatModelMessages({
-      user: {
-        subject: 'test-user',
-        email: 'not-forwarded@example.test',
-        profileData: {
-          height: 170,
-          height_unit: 'cm',
-          goal_weight: 72,
-          goal_weight_unit: 'kg',
-          privateNote: 'not forwarded',
-        },
-      },
-      metrics: [
-        {
-          id: 'test-metric',
-          user_subject: 'test-user',
-          date: '2026-09-25',
-          weight: 72,
-          weight_unit: 'kg',
-          body_fat_percentage: 20,
-          body_fat_method: 'test',
-          muscle_mass: 55,
-          waist: null,
-          neck: null,
-          hip: null,
-          notes: 'not forwarded',
-          photo_url: 'not-forwarded',
-          data_source: 'test',
-          source_metadata: {},
-          created_at: '2026-09-25T00:00:00Z',
-          updated_at: '2026-09-25T00:00:00Z',
-        },
-      ],
-      conversationMessages: [
-        {
-          id: 'test-message',
-          role: 'user',
-          content: 'Summarize the available data.',
-          clientMessageId: null,
-          createdAt: '2026-09-25T00:00:00Z',
-        },
-      ],
-    });
+  it('fails closed when coach safety checks are unavailable', () => {
+    const previous = process.env.LYB_COACH_PERSONA_GUARDRAILS_V1;
+    delete process.env.LYB_COACH_PERSONA_GUARDRAILS_V1;
+    try {
+      const [systemMessage] = buildChatModelMessages({
+        user: { subject: 'test-user', email: 'not-forwarded@example.test' },
+        metrics: [
+          {
+            id: 'test-metric',
+            user_subject: 'test-user',
+            date: '2026-09-25',
+            weight: 72,
+            weight_unit: 'kg',
+            body_fat_percentage: 20,
+            body_fat_method: 'test',
+            muscle_mass: 55,
+            waist: null,
+            neck: null,
+            hip: null,
+            notes: 'not forwarded',
+            photo_url: 'not-forwarded',
+            data_source: 'test',
+            source_metadata: {},
+            created_at: '2026-09-25T00:00:00Z',
+            updated_at: '2026-09-25T00:00:00Z',
+          },
+        ],
+        conversationMessages: [],
+      });
+      expect(systemMessage.content).toContain('"status":"safetyUnavailable"');
+      expect(systemMessage.content).not.toContain('"weight":72');
+      expect(systemMessage.content).not.toContain('not-forwarded@example.test');
+    } finally {
+      if (previous === undefined) delete process.env.LYB_COACH_PERSONA_GUARDRAILS_V1;
+      else process.env.LYB_COACH_PERSONA_GUARDRAILS_V1 = previous;
+    }
+  });
 
-    expect(systemMessage.content).toContain(
-      '"height":170,"heightUnit":"cm","goalWeight":72,"goalWeightUnit":"kg"',
-    );
-    expect(systemMessage.content).toContain('"bodyFatPercentage":20,"muscleMass":55');
-    expect(systemMessage.content).not.toContain('not-forwarded');
-    expect(systemMessage.content).not.toContain('privateNote');
-    expect(userMessage).toEqual({ role: 'user', content: 'Summarize the available data.' });
+  it('passes only the approved profile and metric fields to the model', () => {
+    const previous = process.env.LYB_COACH_PERSONA_GUARDRAILS_V1;
+    process.env.LYB_COACH_PERSONA_GUARDRAILS_V1 = '1';
+    try {
+      const [systemMessage, userMessage] = buildChatModelMessages({
+        user: {
+          subject: 'test-user',
+          email: 'not-forwarded@example.test',
+          profileData: {
+            height: 170,
+            height_unit: 'cm',
+            goal_weight: 72,
+            goal_weight_unit: 'kg',
+            privateNote: 'not forwarded',
+          },
+        },
+        metrics: [
+          {
+            id: 'test-metric',
+            user_subject: 'test-user',
+            date: '2026-09-25',
+            weight: 72,
+            weight_unit: 'kg',
+            body_fat_percentage: 20,
+            body_fat_method: 'test',
+            muscle_mass: 55,
+            waist: null,
+            neck: null,
+            hip: null,
+            notes: 'not forwarded',
+            photo_url: 'not-forwarded',
+            data_source: 'test',
+            source_metadata: {},
+            created_at: '2026-09-25T00:00:00Z',
+            updated_at: '2026-09-25T00:00:00Z',
+          },
+        ],
+        conversationMessages: [
+          {
+            id: 'test-message',
+            role: 'user',
+            content: 'Summarize the available data.',
+            clientMessageId: null,
+            createdAt: '2026-09-25T00:00:00Z',
+          },
+        ],
+      });
+
+      expect(systemMessage.content).toContain(
+        '"height":170,"heightUnit":"cm","goalWeight":72,"goalWeightUnit":"kg"',
+      );
+      expect(systemMessage.content).toContain('"bodyFatPercentage":20,"muscleMass":55');
+      expect(systemMessage.content).not.toContain('not-forwarded');
+      expect(systemMessage.content).not.toContain('privateNote');
+      expect(userMessage).toEqual({ role: 'user', content: 'Summarize the available data.' });
+    } finally {
+      if (previous === undefined) delete process.env.LYB_COACH_PERSONA_GUARDRAILS_V1;
+      else process.env.LYB_COACH_PERSONA_GUARDRAILS_V1 = previous;
+    }
   });
 
   it('passes prescription numbers and citations only from a returned engine session', () => {

@@ -13,7 +13,6 @@ struct BodyScoreAccountCreationView: View {
             subtitle: "Continue with Apple to protect your Body Score and sync it across devices.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .account),
-            screen: .verifyAccount,
             content: {
                 VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
                     OnboardingTextFieldRow(

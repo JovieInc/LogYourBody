@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authCookies } from '@/lib/auth/constants';
+import { launchScopeRedirect } from '@/lib/launch-scope';
 import { prefersMarkdown, varyOnAccept } from '@/lib/marketing/accept-markdown';
 import {
   homepageMarkdown,
@@ -77,6 +78,11 @@ export default async function middleware(req: NextRequest) {
   }
   if (shouldBlockDebugRoute(req.nextUrl.pathname)) {
     return new NextResponse(null, { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  }
+
+  const scoped = launchScopeRedirect(req.nextUrl.pathname);
+  if (scoped) {
+    return NextResponse.redirect(new URL(scoped, req.url));
   }
 
   if (wantsMarkdown && (await publicMarkdownEnabled())) {

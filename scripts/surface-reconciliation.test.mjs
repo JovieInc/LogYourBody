@@ -204,6 +204,27 @@ test('a fixture tree fails on one unlisted surface and one reachable hidden surf
   }
 });
 
+test('debug-only symbol references are not launch routes', () => {
+  const root = mkdtempSync(join(tmpdir(), 'surface-debug-'));
+  try {
+    writeTree(root, {
+      'apps/ios/LogYourBody/DesignSystem/Theme.swift': `enum WorldClassScreen: String {
+    case home
+}
+`,
+      'apps/ios/LogYourBody/Views/TrainingViews.swift': `struct TrainingLiveSessionView: View {}
+#if DEBUG
+TrainingLiveSessionView()
+#endif
+`,
+    });
+    const { inventory } = loadInventory(writeInventory(root, { 'ios.screen.home': 'launch' }));
+    assert.deepEqual(findingsFor(enumerateSurfaces(root), inventory), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('redirect tombstones and unmounted hide or delete surfaces stay quiet', () => {
   const root = mkdtempSync(join(tmpdir(), 'surface-clean-'));
   try {
@@ -382,9 +403,9 @@ test('the repository matches its baseline and keeps deleted modes off launch rou
   assert.equal(baseline.inventoryDigest, digest);
   assert.deepEqual(findings, baseline.findings);
   const ids = new Set(findings.map((finding) => finding.id));
-  assert.equal(ids.has('web:/training/canvas'), true);
-  assert.equal(ids.has('ios.screen.email'), true);
-  assert.equal(ids.has('ios.sheet.trainingLiveSession'), true);
+  assert.equal(ids.has('web:/training/canvas'), false);
+  assert.equal(ids.has('ios.screen.email'), false);
+  assert.equal(ids.has('ios.sheet.trainingLiveSession'), false);
   assert.equal(ids.has('ios.mode.weightLoggerMVP'), false);
   assert.equal(ids.has('ios.mode.legacyFullDashboardBeta'), false);
   assert.equal(ids.has('ios.screen.chooseHomeView'), false);
@@ -393,9 +414,9 @@ test('the repository matches its baseline and keeps deleted modes off launch rou
   assert.equal(ids.has('ios.screen.home'), false);
   const output = execFileSync(process.execPath, [script], { cwd: REPO_ROOT, encoding: 'utf8' });
   assert.match(output, /surface reconciliation: pass/);
-  assert.match(output, /web:\/training\/canvas/);
-  assert.match(output, /apps\/web\/src\/app\/training\/canvas\/page\.tsx/);
-  assert.match(output, /ios\.screen\.email/);
+  assert.match(output, /\(no drift\)/);
+  assert.doesNotMatch(output, /web:\/training\/canvas/);
+  assert.doesNotMatch(output, /ios\.screen\.email/);
 });
 
 function baselineFile(inventoryText, findings) {

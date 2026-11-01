@@ -319,6 +319,10 @@ function chatBody(message = 'How am I doing?') {
 }
 
 describe('/api/auth/mobile/chat/v1', () => {
+  afterEach(() => {
+    delete process.env.LYB_COACH_PERSONA_GUARDRAILS_V1;
+  });
+
   it('chat and voice persist a reviewable steering proposal without a model-generated change claim', async () => {
     const h = makeHarness(undefined, {
       content: 'Draft ready. Keep the exact cable curl variant. Your saved plan has not changed.',
@@ -345,6 +349,8 @@ describe('/api/auth/mobile/chat/v1', () => {
   });
 
   it('streams, persists, reloads, and scopes authorized body context', async () => {
+    const previous = process.env.LYB_COACH_PERSONA_GUARDRAILS_V1;
+    process.env.LYB_COACH_PERSONA_GUARDRAILS_V1 = '1';
     const { handlers, model, getUser, listMetrics } = makeHarness();
     const response = await handlers.POST(
       request('POST', 'user-a', { ...chatBody(), voiceMode: true }),
@@ -366,6 +372,9 @@ describe('/api/auth/mobile/chat/v1', () => {
     expect(modelContext[0].content).not.toContain('example.com');
     expect(modelContext[0].content).not.toContain('bodyspec_dexa');
     expect(modelContext[0].content).not.toContain('private');
+
+    if (previous === undefined) delete process.env.LYB_COACH_PERSONA_GUARDRAILS_V1;
+    else process.env.LYB_COACH_PERSONA_GUARDRAILS_V1 = previous;
 
     const reload = await handlers.GET(request('GET', 'user-a'));
     expect(reload.status).toBe(200);

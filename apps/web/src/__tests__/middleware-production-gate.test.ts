@@ -135,11 +135,11 @@ describe('middleware production debug/test gate', () => {
       shouldBlockDebugRoute,
       shouldUseProductAuthMiddleware,
     } = await import('../middleware');
-    const request = new NextRequest('https://logyourbody.com/dashboard', {
+    const request = new NextRequest('https://logyourbody.com/settings', {
       headers: { cookie: 'lyb_access_token=test-token' },
     });
 
-    expect(shouldBlockDebugRoute('/dashboard')).toBe(false);
+    expect(shouldBlockDebugRoute('/settings')).toBe(false);
     expect(shouldUseProductAuthMiddleware(request)).toBe(true);
 
     const response = await middleware(request);
@@ -147,15 +147,25 @@ describe('middleware production debug/test gate', () => {
     expect(response?.status).toBe(200);
   });
 
-  it('redirects an unauthenticated protected route to the sign-in surface', async () => {
+  it('sends a deleted product route home before sign-in', async () => {
     const { default: middleware } = await import('../middleware');
     const response = await middleware(
       new NextRequest('https://logyourbody.com/dashboard?tab=trend'),
     );
 
     expect(response?.status).toBe(307);
+    expect(response?.headers.get('location')).toBe('https://logyourbody.com/');
+  });
+
+  it('redirects an unauthenticated protected route to the sign-in surface', async () => {
+    const { default: middleware } = await import('../middleware');
+    const response = await middleware(
+      new NextRequest('https://logyourbody.com/settings?tab=account'),
+    );
+
+    expect(response?.status).toBe(307);
     expect(response?.headers.get('location')).toBe(
-      'https://logyourbody.com/signin?returnTo=%2Fdashboard%3Ftab%3Dtrend',
+      'https://logyourbody.com/signin?returnTo=%2Fsettings%3Ftab%3Daccount',
     );
   });
 
@@ -193,7 +203,7 @@ describe('middleware production debug/test gate', () => {
     expect(response?.status).toBe(200);
   });
 
-  it('keeps normal public routes reachable in production', async () => {
+  it('sends hidden marketing routes back to the launch entry', async () => {
     process.env.VERCEL_ENV = 'production';
     const { default: middleware, shouldBlockDebugRoute } = await import('../middleware');
     const request = new NextRequest('https://logyourbody.com/about');
@@ -202,7 +212,8 @@ describe('middleware production debug/test gate', () => {
 
     const response = await middleware(request);
 
-    expect(response?.status).toBe(200);
+    expect(response?.status).toBe(307);
+    expect(response?.headers.get('location')).toBe('https://logyourbody.com/');
   });
 
   it.each(['/', '/download/ios', '/privacy', '/support'])(

@@ -94,6 +94,9 @@ struct DashboardViewLiquid: View {
     @State private var isPhotosTabEnabled = true
     @State var selectedPhotoTimelineRootPage: PhotoTimelineRootPage = .timeline
     @State var isHomeChatExpanded = false
+    @State var showsLaunchOutcomeEditor = false
+    @State var launchOutcomeError: String?
+    @State var launchHoldNote: String?
     @State var homeChatDraft = AccountSessionChatDraft()
     @State var isShowingPhotoTimelineMenu = false
     @State var isPhotoTimelineSettingsPresented = false

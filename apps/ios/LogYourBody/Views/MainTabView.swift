@@ -681,8 +681,7 @@ private struct ChatMessage: Identifiable, Equatable {
     static let welcome = ChatMessage(
         id: "chat-welcome",
         role: .assistant,
-        text: "Ask about your measurements, trends, or progress photos. " +
-            "I’ll use only the body context authorized for your account.",
+        text: "\(LaunchJourney.promiseHeadline) \(LaunchJourney.promiseExplanation)",
         clientMessageId: nil,
         replyToClientMessageId: nil,
         delivery: .complete
@@ -728,7 +727,7 @@ struct ChatTabView: View {
     @ScaledMetric(relativeTo: .body) private var composerMultilineThreshold: CGFloat =
         ChatComposerGeometry.multilineTextHeightThreshold
     @State private var composerTextHeight: CGFloat = 0
-    @State private var loggingSelector = ComposerLoggingSelectorState()
+    @State private var loggingSelector = LoggingSelectorPrototypeState()
     @State private var loggingTargetFrames: [ComposerLoggingMode: CGRect] = [:]
     @State private var didRecognizeLoggingHold = false
     @State private var isRoutingLoggingMode = false
@@ -846,84 +845,16 @@ struct ChatTabView: View {
                 }
             case .program(let ownership):
                 delegatedTrainingView(ownership: ownership)
-            case .session(let session, let ownership):
-                TrainingLiveSessionView(
-                    session: session,
-                    ownerId: ownership.subject,
-                    cardsEnabled: trainingCardsEnabled,
-                    voiceEnabled: voiceCoachEnabled,
-                    readinessEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
-                        flagKey: TrainingReadinessPolicy.featureGate
-                    ),
-                    restTimerEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
-                        flagKey: TrainingRestPolicy.featureGate
-                    ),
-                    numericScrubEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
-                        flagKey: TrainingNumericDimension.featureGate
-                    ),
-                    progressEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
-                        flagKey: TrainingProgressPolicy.featureGate
-                    ),
-                    progressDecision: trainingErrorMessage == nil ? trainingResponse?.decision : nil,
-                    isCurrent: { authManager.ownsAccountSession(ownership) },
-                    onLogSet: { exercise, setNumber, reps, loadKg, rir in
-                        try await logTrainingSet(
-                            ownership: ownership,
-                            request: TrainingSetLogRequest(
-                                sessionId: session.id, exerciseId: exercise.id, setNumber: setNumber,
-                                reps: reps, loadKg: loadKg, rir: rir
-                            )
-                        )
-                    },
-                    onCorrectSet: { request in
-                        try await correctTrainingSet(ownership: ownership, request: request)
-                    },
-                    onUndoSet: { request in
-                        try await undoTrainingSet(ownership: ownership, request: request)
-                    },
-                    onWorkoutAction: { request in
-                        try await applyTrainingAction(ownership: ownership, request: request)
-                    },
-                    onVoiceIntent: { activeSession, transcript, currentSet, lastCompletedSet in
-                        try await parseTrainingVoice(
-                            ownership: ownership,
-                            session: activeSession,
-                            transcript: transcript,
-                            currentSet: currentSet,
-                            lastCompletedSet: lastCompletedSet
-                        )
-                    },
-                    onFeedback: { request in
-                        try await recordTrainingFeedback(
-                            ownership: ownership,
-                            request: request
-                        )
-                    },
-                    onLoadProgress: {
-                        try await loadTrainingProgress(ownership: ownership)
-                    },
-                    onReviewSelection: AppServicePorts.analyticsTracker.isFeatureEnabled(
-                        flagKey: TrainingSelectionPolicy.featureGate
-                    ) ? { request in
-                        try await reviewTrainingSelection(ownership: ownership, request: request)
-                    } : nil
-                )
-            case .voiceSetReview(let session, let heard):
-                VoiceSetReviewView(session: session, heard: heard) { proposal in
-                    commitVoiceSet(proposal)
-                }
+            case .session, .voiceSetReview:
+                LaunchHiddenSurfaceRecovery { trainingPresentation = nil }
             case .cycleReview(let ownership):
                 TrainingCycleReviewView(
                     isCurrent: { authManager.ownsAccountSession(ownership) },
                     accessToken: { await chatAccessToken() },
                     onApplied: { await loadTrainingNext() }
                 )
-            case .canvas(let ownership):
-                MesocycleCanvasScreen(
-                    ownership: ownership,
-                    isCurrentAccount: { authManager.ownsAccountSession(ownership) },
-                    accessToken: { await chatAccessToken() }
-                )
+            case .canvas:
+                LaunchHiddenSurfaceRecovery { trainingPresentation = nil }
             }
         }
     }

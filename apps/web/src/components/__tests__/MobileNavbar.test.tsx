@@ -3,74 +3,17 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MobileNavbar } from '../MobileNavbar';
 import { useRouter, usePathname } from 'next/navigation';
 
-// Mock next/navigation
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
   usePathname: jest.fn(),
 }));
 
-// Mock lucide-react icons
-jest.mock('lucide-react', () => ({
-  Home: ({ className }: { className?: string }) => <svg className={className} />,
-  Plus: ({ className }: { className?: string }) => <svg className={className} />,
-  Settings: ({ className }: { className?: string }) => <svg className={className} />,
-}));
-
-jest.mock('../MobileNavbar', () => {
-  const React = require('react') as typeof import('react');
-  const { usePathname, useRouter } = require('next/navigation') as typeof import('next/navigation');
-
-  const MobileNavbar: React.FC = () => {
-    const pathname = usePathname();
-    const router = useRouter();
-
-    if (pathname === '/log' || pathname.startsWith('/settings')) {
-      return null;
-    }
-
-    const navItems = [
-      { label: 'Dashboard', href: '/dashboard', isCenter: false },
-      { label: 'Add Data', href: '/log', isCenter: true },
-      { label: 'Settings', href: '/settings', isCenter: false },
-    ];
-
-    return (
-      <div className="bg-linear-bg border-linear-border fixed right-0 bottom-0 left-0 z-50 border-t md:hidden">
-        <div className="flex h-14 items-center justify-around px-4">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            const isCenter = item.isCenter;
-
-            return (
-              <button
-                key={item.href}
-                onClick={() => router.push(item.href)}
-                className="relative flex h-full flex-1 items-center justify-center"
-                aria-label={item.label}
-              >
-                {isCenter ? (
-                  <div className="bg-linear-purple flex h-12 w-12 items-center justify-center rounded-full shadow-lg">
-                    <svg className="h-5 w-5 text-white" />
-                  </div>
-                ) : (
-                  <svg
-                    className={`h-6 w-6 transition-colors ${
-                      isActive ? 'text-linear-purple' : 'text-linear-text-secondary'
-                    }`}
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  return {
-    __esModule: true,
-    MobileNavbar,
-  };
+jest.mock('lucide-react', () => {
+  const React = require('react');
+  function Icon(props: { className?: string }) {
+    return React.createElement('svg', props);
+  }
+  return { __esModule: true, default: Icon, Home: Icon, Settings: Icon };
 });
 
 describe('MobileNavbar', () => {
@@ -83,14 +26,15 @@ describe('MobileNavbar', () => {
     });
   });
 
-  it('should render on dashboard page', () => {
-    (usePathname as jest.Mock).mockReturnValue('/dashboard');
+  it('should render the launch home and settings actions', () => {
+    (usePathname as jest.Mock).mockReturnValue('/');
 
     render(<MobileNavbar />);
 
-    expect(screen.getByLabelText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByLabelText('Add Data')).toBeInTheDocument();
+    expect(screen.getByLabelText('Home')).toBeInTheDocument();
     expect(screen.getByLabelText('Settings')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Add Data')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Dashboard')).not.toBeInTheDocument();
   });
 
   it('should not render on log page', () => {
@@ -110,50 +54,34 @@ describe('MobileNavbar', () => {
   });
 
   it('should highlight active route', () => {
-    (usePathname as jest.Mock).mockReturnValue('/dashboard');
+    (usePathname as jest.Mock).mockReturnValue('/');
 
     render(<MobileNavbar />);
 
-    const dashboardButton = screen.getByLabelText('Dashboard');
+    const homeButton = screen.getByLabelText('Home');
     const settingsButton = screen.getByLabelText('Settings');
 
-    // Check that dashboard icon has active color
-    const dashboardIcon = dashboardButton.querySelector('svg');
-    expect(dashboardIcon).toHaveClass('text-linear-purple');
+    const homeIcon = homeButton.querySelector('svg');
+    expect(homeIcon).toHaveClass('text-linear-purple');
 
-    // Check that settings icon has inactive color
     const settingsIcon = settingsButton.querySelector('svg');
     expect(settingsIcon).toHaveClass('text-linear-text-secondary');
   });
 
   it('should navigate when buttons are clicked', () => {
-    (usePathname as jest.Mock).mockReturnValue('/dashboard');
+    (usePathname as jest.Mock).mockReturnValue('/');
 
     render(<MobileNavbar />);
 
-    // Click settings button
     fireEvent.click(screen.getByLabelText('Settings'));
     expect(mockPush).toHaveBeenCalledWith('/settings');
 
-    // Click add data button
-    fireEvent.click(screen.getByLabelText('Add Data'));
-    expect(mockPush).toHaveBeenCalledWith('/log');
-  });
-
-  it('should style center button differently', () => {
-    (usePathname as jest.Mock).mockReturnValue('/dashboard');
-
-    render(<MobileNavbar />);
-
-    const addButton = screen.getByLabelText('Add Data');
-    const centerButtonContainer = addButton.querySelector('.bg-linear-purple');
-
-    expect(centerButtonContainer).toBeInTheDocument();
-    expect(centerButtonContainer).toHaveClass('rounded-full', 'shadow-lg');
+    fireEvent.click(screen.getByLabelText('Home'));
+    expect(mockPush).toHaveBeenCalledWith('/');
   });
 
   it('should be hidden on desktop', () => {
-    (usePathname as jest.Mock).mockReturnValue('/dashboard');
+    (usePathname as jest.Mock).mockReturnValue('/');
 
     const { container } = render(<MobileNavbar />);
 
@@ -162,7 +90,7 @@ describe('MobileNavbar', () => {
   });
 
   it('should have correct height and positioning', () => {
-    (usePathname as jest.Mock).mockReturnValue('/dashboard');
+    (usePathname as jest.Mock).mockReturnValue('/');
 
     const { container } = render(<MobileNavbar />);
 

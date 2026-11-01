@@ -4,7 +4,6 @@ import path from 'node:path';
 import type { Metadata } from 'next';
 import { logYourBody } from '@jovieinc/product-registry';
 import { PUBLIC_MARKETING_ROUTES } from '@/data/publicMarketingRoutes';
-import { getAllTags, getPostBySlug } from '@/lib/blog';
 import {
   getRedirectUrl,
   unstable_getResponseFromNextConfig,
@@ -25,7 +24,6 @@ jest.mock('@/components/MarkdownRenderer', () => ({ MarkdownRenderer: () => null
 jest.mock('@/app/LaunchLanding', () => ({ LaunchLanding: () => null }));
 jest.mock('@/lib/flags/publicLanding.server', () => ({ readEditorialHomepageRollout: jest.fn() }));
 jest.mock('@/lib/ports/auth-ui', () => ({ AuthSignUp: () => null }));
-jest.mock('@/lib/blog', () => ({ getAllTags: jest.fn(), getPostBySlug: jest.fn() }));
 
 const appRoot = path.join(process.cwd(), 'src/app');
 // LYB-100 owns product routes. Redirect-only acquisition routes emit no indexable document.
@@ -127,42 +125,12 @@ describe('public route metadata contract (LYB-223)', () => {
     },
   );
 
-  it('requires metadata coverage for every dynamic public route', () => {
-    expect(
-      publicPages()
-        .filter((file) => file.includes('['))
-        .sort(),
-    ).toEqual(['blog/[slug]/page.tsx', 'blog/tag/[tag]/page.tsx']);
-  });
-
-  it('canonicalizes each published article to its own encoded path', async () => {
-    jest.mocked(getPostBySlug).mockResolvedValue({
-      slug: 'progress-trends',
-      title: 'Progress trends',
-      excerpt: 'Trend context.',
-    } as Awaited<ReturnType<typeof getPostBySlug>>);
-    const { generateMetadata } = require('../blog/[slug]/page');
-    await assertMetadata(
-      await generateMetadata({ params: Promise.resolve({ slug: 'progress-trends' }) }),
-      '/blog/progress-trends',
-    );
-    jest.mocked(getPostBySlug).mockResolvedValue(null);
-    await expect(
-      generateMetadata({ params: Promise.resolve({ slug: 'unpublished' }) }),
-    ).rejects.toThrow();
-  });
-
-  it('canonicalizes tag pages and withholds unknown tags', async () => {
-    jest.mocked(getAllTags).mockResolvedValue(['Progress Tracking', 'Training & Recovery']);
-    const { generateMetadata } = require('../blog/tag/[tag]/page');
-    for (const tag of ['progress-tracking', 'training-&-recovery']) {
-      await assertMetadata(
-        await generateMetadata({ params: Promise.resolve({ tag }) }),
-        `/blog/tag/${encodeURIComponent(tag)}`,
-      );
+  it('keeps hidden blog routes out of the public inventory', () => {
+    expect(publicPages().filter((file) => file.includes('['))).toEqual([]);
+    for (const file of ['blog/[slug]/page.tsx', 'blog/tag/[tag]/page.tsx', 'blog/page.tsx']) {
+      const source = readFileSync(path.join(appRoot, file), 'utf8');
+      expect(source).toContain("redirect('/')");
+      expect(source).not.toContain('generateMetadata');
     }
-    await expect(
-      generateMetadata({ params: Promise.resolve({ tag: 'unknown' }) }),
-    ).rejects.toThrow();
   });
 });
