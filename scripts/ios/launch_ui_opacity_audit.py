@@ -13,18 +13,31 @@ _CGFLOAT_BINDING = re.compile(
     r"|\bfunc\s+([A-Za-z_]\w*)\s*\([^;\n]*\)\s*->\s*CGFloat\b"
 )
 _MEMBER = re.compile(r"\?\.([A-Za-z_]\w*)\b")
+# One nested call covers the opacity arguments in this tree, including Double(...).
+# A per-character walk is traced on every audit run and blows the 30s coverage limit.
+_OPACITY_CALL = re.compile(
+    r"\.opacity\((?P<arg>(?:[^()]|\([^()]*\))*)\)",
+    re.DOTALL,
+)
+_DOUBLE_CAST = re.compile(
+    r"(?<![\w])Double\((?:[^()]|\([^()]*\))*\)",
+    re.DOTALL,
+)
 _DETAIL = "Convert optional CGFloat opacity to Double; SwiftUI does not implicitly convert CGFloat?."
 
 
-def _cgfloat_names(paths: list[Path]) -> set[str]:
-    names: set[str] = set()
-    for path in paths:
-        for match in _CGFLOAT_BINDING.finditer(path.read_text(errors="replace")):
-            names.add(next(group for group in match.groups() if group))
-    return names
+def _without_double_casts(argument: str) -> str:
+    """Drop Double(...) conversions so a wrapped CGFloat member is allowed."""
+    previous = None
+    current = argument
+    while current != previous:
+        previous = current
+        current = _DOUBLE_CAST.sub("", current)
+    return current
 
 
-def _opacity_arguments(text: str):
+def _walk_opacity_arguments(text: str):
+    """Paren walk for the rare argument the one-level pattern cannot close."""
     needle = ".opacity("
     start = 0
     while True:
@@ -46,36 +59,32 @@ def _opacity_arguments(text: str):
         start = index
 
 
-def _without_double_casts(argument: str) -> str:
-    """Drop Double(...) conversions so a wrapped CGFloat member is allowed."""
-    kept: list[str] = []
-    index = 0
-    while index < len(argument):
-        previous = argument[index - 1] if index else ""
-        if argument.startswith("Double(", index) and not (previous.isalnum() or previous == "_"):
-            index += len("Double(")
-            depth = 1
-            while index < len(argument) and depth:
-                if argument[index] == "(":
-                    depth += 1
-                elif argument[index] == ")":
-                    depth -= 1
-                index += 1
-            continue
-        kept.append(argument[index])
-        index += 1
-    return "".join(kept)
+def _opacity_arguments(text: str):
+    matches = list(_OPACITY_CALL.finditer(text))
+    if len(matches) == text.count(".opacity("):
+        for match in matches:
+            yield match.start("arg"), match.group("arg")
+        return
+    yield from _walk_opacity_arguments(text)
 
 
 def check_optional_cgfloat_opacity(
     root: Path, paths: list[Path], violations: list[AuditViolation]
 ) -> None:
     """SwiftUI opacity accepts CGFloat, but not CGFloat? from optional chaining."""
-    names = _cgfloat_names(paths)
-    if not names:
-        return
+    names: set[str] = set()
+    candidates: list[tuple[Path, str]] = []
     for path in paths:
         text = path.read_text(errors="replace")
+        if "CGFloat" in text:
+            for match in _CGFLOAT_BINDING.finditer(text):
+                names.add(next(group for group in match.groups() if group))
+        # A file without optional chaining cannot pass a CGFloat? into opacity.
+        if ".opacity(" in text and "?." in text:
+            candidates.append((path, text))
+    if not names:
+        return
+    for path, text in candidates:
         for argument_start, argument in _opacity_arguments(text):
             exposed = _without_double_casts(argument)
             if any(match.group(1) in names for match in _MEMBER.finditer(exposed)):

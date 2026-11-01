@@ -7,12 +7,25 @@ import io
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
+# The coverage tracer counts every Python line. Copying the Swift tree in
+# this process pushes the required suite past its 30s limit.
+_COPY_APP_SWIFT_TREE = """
+import shutil
+import sys
+from pathlib import Path
+root, dest = (Path(arg) for arg in sys.argv[1:])
+for source in (root / "apps/ios/LogYourBody").rglob("*.swift"):
+    target = dest / source.relative_to(root)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+"""
 SPEC = importlib.util.spec_from_file_location(
     "launch_ui_audit", ROOT / "scripts/ios/launch-ui-regression-audit.py"
 )
@@ -22,6 +35,18 @@ SPEC.loader.exec_module(AUDIT)
 
 
 class StatsCardCompositionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._swift_template = tempfile.TemporaryDirectory()
+        subprocess.run(
+            [sys.executable, "-c", _COPY_APP_SWIFT_TREE, str(ROOT), cls._swift_template.name],
+            check=True,
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._swift_template.cleanup()
+
     def test_behavior_runner_requires_complete_unskipped_execution(self):
         class IncompleteSuite(unittest.TestSuite):
             def countTestCases(self):
@@ -52,10 +77,10 @@ class StatsCardCompositionTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.app = self.root / "apps/ios/LogYourBody"
-        for source in (ROOT / "apps/ios/LogYourBody").rglob("*.swift"):
-            target = self.root / source.relative_to(ROOT)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, target)
+        subprocess.run(
+            ["cp", "-a", str(Path(self._swift_template.name) / "apps"), str(self.root)],
+            check=True,
+        )
 
     def replace(self, relative_path, before, after):
         path = self.app / relative_path
