@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,42 +40,74 @@ function pngDimensions(buffer) {
   };
 }
 
-async function capturedAtFor(source) {
-  try {
-    const value = execFileSync('git', ['log', '-1', '--format=%cI', '--', source], {
-      cwd: root,
-      encoding: 'utf8',
-    }).trim();
-    if (value) return value;
-  } catch {
-    // A source archive may not include git metadata; file mtime is the safe fallback.
+function capturedAtFor(source, sourceSha256, previous) {
+  // Unchanged image bytes retain their capture age, including in shallow CI clones.
+  if (previous?.source === source && previous.sourceSha256 === sourceSha256) {
+    if (!Number.isFinite(Date.parse(previous.capturedAt))) {
+      throw new Error(`Invalid capture provenance date: ${source}`);
+    }
+    return previous.capturedAt;
   }
 
-  return (await stat(path.join(root, source))).mtime.toISOString();
+  const git = (...args) =>
+    execFileSync('git', args, {
+      cwd: root,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 10_000,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+  try {
+    if (git('rev-parse', '--is-shallow-repository').toString().trim() !== 'false') {
+      throw new Error('Fetch complete history before syncing a changed capture');
+    }
+    const [commit, timestamp] = git('log', '-1', '--format=%H%n%cI', '--', source)
+      .toString()
+      .trim()
+      .split('\n');
+    if (
+      !Number.isFinite(Date.parse(timestamp)) ||
+      sha256(git('show', `${commit}:${source}`)) !== sourceSha256
+    ) {
+      throw new Error('The capture must match committed source bytes');
+    }
+    return timestamp;
+  } catch (error) {
+    throw new Error(`Missing capture provenance for ${source}: ${error.message}`);
+  }
 }
 
+const manifestPath = path.join(root, 'apps/web/src/generated/marketing-product-assets.json');
+const previous = await readFile(manifestPath, 'utf8')
+  .then(JSON.parse)
+  .catch((error) => {
+    if (error.code === 'ENOENT') return {};
+    throw error;
+  });
 const manifest = {};
 
 for (const [id, asset] of Object.entries(assets)) {
-  const sourcePath = path.join(root, asset.source);
-  const outputPath = path.join(root, asset.output);
-  const sourceBuffer = await readFile(sourcePath);
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await copyFile(sourcePath, outputPath);
-  const outputBuffer = await readFile(outputPath);
-  const { width, height } = pngDimensions(outputBuffer);
+  const sourceBuffer = await readFile(path.join(root, asset.source));
+  const sourceSha256 = sha256(sourceBuffer);
+  const { width, height } = pngDimensions(sourceBuffer);
 
   manifest[id] = {
     ...asset,
     width,
     height,
-    sourceSha256: sha256(sourceBuffer),
-    outputSha256: sha256(outputBuffer),
-    capturedAt: await capturedAtFor(asset.source),
+    sourceSha256,
+    outputSha256: sourceSha256,
+    capturedAt: capturedAtFor(asset.source, sourceSha256, previous[id]),
   };
 }
 
-const manifestPath = path.join(root, 'apps/web/src/generated/marketing-product-assets.json');
+// Validate every asset's provenance before updating any public output or receipt.
+for (const asset of Object.values(manifest)) {
+  const outputPath = path.join(root, asset.output);
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await copyFile(path.join(root, asset.source), outputPath);
+  asset.outputSha256 = sha256(await readFile(outputPath));
+}
+
 await mkdir(path.dirname(manifestPath), { recursive: true });
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
