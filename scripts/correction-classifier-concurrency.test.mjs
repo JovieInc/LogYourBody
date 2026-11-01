@@ -6,8 +6,11 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { classifyLedger, runClassifier } from './correction-classifier.mjs';
 
-for (const args of [['--resolve-merge'], ['--resolve-merge', '--stage'], ['--check-merge']]) {
-  test(`${args.join(' ')} refuses a changed index and safely retries`, (t) => {
+const commands = [['--resolve-merge'], ['--resolve-merge', '--stage'], ['--check-merge']];
+for (const [args, target] of commands.flatMap((args) =>
+  ['index', 'HEAD', 'MERGE_HEAD'].map((target) => [args, target]),
+)) {
+  test(`${args.join(' ')} refuses a changed ${target} and safely retries`, (t) => {
     const root = mkdtempSync(join(tmpdir(), 'lyb-classifier-concurrency-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
     const options = {
@@ -46,6 +49,8 @@ for (const args of [['--resolve-merge'], ['--resolve-merge', '--stage'], ['--che
       assert.equal(runClassifier(['--resolve-merge', root, '--stage'], quiet), 0);
     }
     const original = readFileSync(ledger, 'utf8');
+    const parent = target === 'index' ? null : git('rev-parse', target).trim();
+    const replacement = parent && git('rev-parse', `${parent}^`).trim();
     let changedIndex;
     let diagnostic = '';
     const command = [args[0], root, ...args.slice(1)];
@@ -60,24 +65,38 @@ for (const args of [['--resolve-merge'], ['--resolve-merge', '--stage'], ['--che
       (program, argv, options) => {
         const output = execFileSync(program, argv, options);
         if (argv.includes('ls-files') && changedIndex === undefined) {
-          writeFileSync(join(root, 'concurrent.txt'), 'another writer\n');
-          git('add', 'concurrent.txt');
+          if (target === 'index') {
+            writeFileSync(join(root, 'concurrent.txt'), 'another writer\n');
+            git('add', 'concurrent.txt');
+          } else {
+            // Parent refs can change without changing a single indexed byte.
+            git('update-ref', target, replacement);
+          }
           changedIndex = git('ls-files', '--stage', '-z');
         }
         return output;
       },
     );
-    assert.notEqual(changedIndex, undefined, 'the negative control must change the index');
-    assert.equal(status, 1, 'a changed index cannot receive a successful merge verdict');
-    assert.match(diagnostic, /merge index changed during validation/);
+    assert.notEqual(changedIndex, undefined, 'the negative control must run');
+    assert.equal(status, 1, 'changed merge evidence cannot receive a successful verdict');
+    assert.match(
+      diagnostic,
+      target === 'index'
+        ? /merge index changed during validation/
+        : /merge parents changed during validation/,
+    );
     assert.equal(readFileSync(ledger, 'utf8'), original, 'refusal preserves the ledger');
     assert.equal(
       git('ls-files', '--stage', '-z'),
       changedIndex,
       'refusal preserves the other writer',
     );
-    assert.equal(runClassifier(command, quiet), 0, 'retry validates the current index');
+    if (parent) {
+      assert.equal(git('rev-parse', target).trim(), replacement, 'refusal preserves the writer');
+      git('update-ref', target, parent);
+    }
+    assert.equal(runClassifier(command, quiet), 0, 'retry validates current merge evidence');
     assert.deepEqual(JSON.parse(readFileSync(ledger, 'utf8')), [rows[2], rows[0], rows[1]]);
-    assert.equal(git('show', ':0:concurrent.txt'), 'another writer\n');
+    if (target === 'index') assert.equal(git('show', ':0:concurrent.txt'), 'another writer\n');
   });
 }
