@@ -382,7 +382,7 @@ test('the repository matches its baseline and keeps deleted modes off launch rou
   assert.equal(baseline.inventoryDigest, digest);
   assert.deepEqual(findings, baseline.findings);
   const ids = new Set(findings.map((finding) => finding.id));
-  assert.equal(ids.has('web:/training/canvas'), true);
+  assert.equal(ids.has('web:/training/canvas'), false);
   assert.equal(ids.has('ios.screen.email'), true);
   assert.equal(ids.has('ios.sheet.trainingLiveSession'), true);
   assert.equal(ids.has('ios.mode.weightLoggerMVP'), false);
@@ -393,8 +393,8 @@ test('the repository matches its baseline and keeps deleted modes off launch rou
   assert.equal(ids.has('ios.screen.home'), false);
   const output = execFileSync(process.execPath, [script], { cwd: REPO_ROOT, encoding: 'utf8' });
   assert.match(output, /surface reconciliation: pass/);
-  assert.match(output, /web:\/training\/canvas/);
-  assert.match(output, /apps\/web\/src\/app\/training\/canvas\/page\.tsx/);
+  assert.doesNotMatch(output, /web:\/training\/canvas/);
+  assert.doesNotMatch(output, /apps\/web\/src\/app\/training\/canvas\/page\.tsx/);
   assert.match(output, /ios\.screen\.email/);
 });
 

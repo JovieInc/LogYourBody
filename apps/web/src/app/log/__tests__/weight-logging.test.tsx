@@ -1,8 +1,9 @@
+// Retained mock-only UI cases; the retired routes have no production module (LYB-100).
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import LogWeightPage from '../page';
-import MobileLogPage from '../mobile-page';
+const LogWeightPage = jest.requireMock('../page').default;
+const MobileLogPage = jest.requireMock('../mobile-page').default;
 import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
 import { useMediaQuery } from '@/hooks/use-media-query';
@@ -15,121 +16,139 @@ jest.mock('next/navigation', () => ({
 jest.mock('@/hooks/use-media-query');
 // Shared browser mocks are configured in jest.setup.js.
 
-jest.mock('../page', () => {
-  const React = require('react') as typeof import('react');
-  const { useMediaQuery } =
-    require('@/hooks/use-media-query') as typeof import('@/hooks/use-media-query');
+jest.mock(
+  '../page',
+  () => {
+    const React = require('react') as typeof import('react');
+    const { useMediaQuery } =
+      require('@/hooks/use-media-query') as typeof import('@/hooks/use-media-query');
 
-  const TestLogWeightPage: React.FC = () => {
-    const isMobile = useMediaQuery('(max-width: 768px)');
-    const [showModal, setShowModal] = React.useState(false);
-    const [hasWeight, setHasWeight] = React.useState(false);
+    const TestLogWeightPage: React.FC = () => {
+      const isMobile = useMediaQuery('(max-width: 768px)');
+      const [showModal, setShowModal] = React.useState(false);
+      const [hasWeight, setHasWeight] = React.useState(false);
 
-    const handleOpenModal = () => {
-      setShowModal(true);
+      const handleOpenModal = () => {
+        setShowModal(true);
+      };
+
+      const handleContinue = () => {
+        setShowModal(false);
+        setHasWeight(true);
+      };
+
+      if (isMobile) {
+        // Mobile layout is validated via useMediaQuery in tests; details are covered by MobileLogPage tests
+        return (
+          <div>
+            <p>Weight entry is required</p>
+          </div>
+        );
+      }
+
+      return (
+        <div>
+          <div>
+            <p>Weight entry is required</p>
+            <p>Please enter your current weight to continue with body composition tracking.</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleOpenModal}
+            className={hasWeight ? '' : 'animate-pulse'}
+          >
+            Set Your Weight
+          </button>
+
+          {showModal && (
+            <div>
+              <h2>Set Weight</h2>
+              <input
+                placeholder="Enter weight in lbs"
+                type="number"
+                step="0.1"
+                inputMode="decimal"
+              />
+              <button type="button" onClick={handleContinue}>
+                Continue
+              </button>
+            </div>
+          )}
+
+          <button type="button" className={hasWeight ? 'animate-glow-pulse' : ''}>
+            Next
+          </button>
+        </div>
+      );
     };
 
-    const handleContinue = () => {
-      setShowModal(false);
-      setHasWeight(true);
+    return {
+      __esModule: true,
+      default: TestLogWeightPage,
     };
+  },
+  { virtual: true },
+);
 
-    if (isMobile) {
-      // Mobile layout is validated via useMediaQuery in tests; details are covered by MobileLogPage tests
+jest.mock(
+  '../mobile-page',
+  () => {
+    const React = require('react') as typeof import('react');
+
+    const MobileLogPage: React.FC = () => {
+      const [showModal, setShowModal] = React.useState(false);
+      const [hasWeight, setHasWeight] = React.useState(false);
+
+      const handleOpenModal = () => {
+        setShowModal(true);
+      };
+
+      const handleContinue = () => {
+        setShowModal(false);
+        setHasWeight(true);
+      };
+
       return (
         <div>
           <p>Weight entry is required</p>
+          <p>Tap the box below to enter your weight</p>
+
+          <button type="button" onClick={handleOpenModal}>
+            <div className="animate-pulse">
+              <div>Tap to enter weight</div>
+            </div>
+          </button>
+
+          {showModal && (
+            <div>
+              <h2>Set Weight</h2>
+              <input
+                placeholder="Enter weight in lbs"
+                type="number"
+                step="0.1"
+                inputMode="decimal"
+              />
+              <button type="button" onClick={handleContinue}>
+                Continue
+              </button>
+            </div>
+          )}
+
+          <button type="button" className={hasWeight ? 'animate-glow-pulse' : ''}>
+            Next
+          </button>
         </div>
       );
-    }
-
-    return (
-      <div>
-        <div>
-          <p>Weight entry is required</p>
-          <p>Please enter your current weight to continue with body composition tracking.</p>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleOpenModal}
-          className={hasWeight ? '' : 'animate-pulse'}
-        >
-          Set Your Weight
-        </button>
-
-        {showModal && (
-          <div>
-            <h2>Set Weight</h2>
-            <input placeholder="Enter weight in lbs" type="number" step="0.1" inputMode="decimal" />
-            <button type="button" onClick={handleContinue}>
-              Continue
-            </button>
-          </div>
-        )}
-
-        <button type="button" className={hasWeight ? 'animate-glow-pulse' : ''}>
-          Next
-        </button>
-      </div>
-    );
-  };
-
-  return {
-    __esModule: true,
-    default: TestLogWeightPage,
-  };
-});
-
-jest.mock('../mobile-page', () => {
-  const React = require('react') as typeof import('react');
-
-  const MobileLogPage: React.FC = () => {
-    const [showModal, setShowModal] = React.useState(false);
-    const [hasWeight, setHasWeight] = React.useState(false);
-
-    const handleOpenModal = () => {
-      setShowModal(true);
     };
 
-    const handleContinue = () => {
-      setShowModal(false);
-      setHasWeight(true);
+    return {
+      __esModule: true,
+      default: MobileLogPage,
     };
-
-    return (
-      <div>
-        <p>Weight entry is required</p>
-        <p>Tap the box below to enter your weight</p>
-
-        <button type="button" onClick={handleOpenModal}>
-          <div className="animate-pulse">
-            <div>Tap to enter weight</div>
-          </div>
-        </button>
-
-        {showModal && (
-          <div>
-            <h2>Set Weight</h2>
-            <input placeholder="Enter weight in lbs" type="number" step="0.1" inputMode="decimal" />
-            <button type="button" onClick={handleContinue}>
-              Continue
-            </button>
-          </div>
-        )}
-
-        <button type="button" className={hasWeight ? 'animate-glow-pulse' : ''}>
-          Next
-        </button>
-      </div>
-    );
-  };
-
-  return {
-    __esModule: true,
-    default: MobileLogPage,
-  };
-});
+  },
+  { virtual: true },
+);
 
 const mockPush = jest.fn();
 const mockUser = { id: 'test-user-id' };

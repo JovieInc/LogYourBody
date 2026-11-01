@@ -8,36 +8,10 @@ import { ProductAuthProvider } from '@/contexts/ProductAuthContext';
 import { PWAProvider } from '@/components/PWAProvider';
 import { AuthRuntimeProvider } from '@/lib/ports/auth-ui';
 
-const authFreeMarketingPrefixes = [
-  '/',
-  '/about',
-  '/blog',
-  '/brand',
-  '/careers',
-  '/changelog',
-  '/delete-account',
-  '/download',
-  '/health-disclosure',
-  '/consumer-health-data',
-  '/mobile',
-  '/privacy',
-  '/security',
-  '/support',
-  '/terms',
-];
-
 export function needsProductAuthRuntime(pathname: string | null | undefined) {
-  if (!pathname) {
-    return true;
-  }
-
-  return !authFreeMarketingPrefixes.some((prefix) => {
-    if (prefix === '/') {
-      return pathname === '/';
-    }
-
-    return pathname === prefix || pathname.startsWith(`${prefix}/`);
-  });
+  // Only API-support sign-in pages need a browser session. Public pages and
+  // missing/retired routes must never load the product auth or sync runtime.
+  return pathname === '/signin' || pathname === '/signup';
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {

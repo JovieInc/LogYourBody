@@ -1,82 +1,97 @@
+// Retained mock-only UI cases; the retired routes have no production module (LYB-100).
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import DashboardPage from '../page';
+const DashboardPage = jest.requireMock('../page').default;
 
 // Mock dependencies
-jest.mock('@/components/MobileNavbar', () => ({
-  MobileNavbar: () => <div data-testid="mobile-navbar" />,
-}));
+jest.mock(
+  'retired-MobileNavbar',
+  () => ({
+    MobileNavbar: () => <div data-testid="mobile-navbar" />,
+  }),
+  { virtual: true },
+);
 
-jest.mock('../page', () => {
-  const React = require('react') as typeof import('react');
+jest.mock(
+  '../page',
+  () => {
+    const React = require('react') as typeof import('react');
 
-  const TestDashboardPage: React.FC = () => (
-    <div>
-      {/* Stats container with horizontal scroll */}
-      <div className="-mx-6 flex gap-3 overflow-x-auto px-6">
-        {/* Weight card */}
-        <div className="bg-linear-bg border-linear-border min-w-[140px] rounded-lg border p-4">
-          <div className="flex-col items-center text-center">
-            <div className="text-linear-text-secondary mb-2 text-xs uppercase tracking-wider">
-              WEIGHT
+    const TestDashboardPage: React.FC = () => (
+      <div>
+        {/* Stats container with horizontal scroll */}
+        <div className="-mx-6 flex gap-3 overflow-x-auto px-6">
+          {/* Weight card */}
+          <div className="bg-linear-bg border-linear-border min-w-[140px] rounded-lg border p-4">
+            <div className="flex-col items-center text-center">
+              <div className="text-linear-text-secondary mb-2 text-xs tracking-wider uppercase">
+                WEIGHT
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-linear-text text-4xl font-bold md:text-3xl">165.5</span>
+                <span className="text-linear-text-secondary text-lg font-medium md:text-sm">
+                  lbs
+                </span>
+              </div>
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-linear-text text-4xl font-bold md:text-3xl">165.5</span>
-              <span className="text-linear-text-secondary text-lg font-medium md:text-sm">lbs</span>
+          </div>
+
+          {/* Body Fat card */}
+          <div className="bg-linear-bg border-linear-border min-w-[140px] rounded-lg border p-4">
+            <div className="flex-col items-center text-center">
+              <div className="text-linear-text-secondary mb-2 text-xs tracking-wider uppercase">
+                BODY FAT
+              </div>
+              <div className="flex items-baseline gap-0.5">
+                <span className="text-linear-text text-4xl font-bold md:text-3xl">25.5</span>
+                <span className="text-linear-text-secondary text-2xl font-medium md:text-xl">
+                  %
+                </span>
+              </div>
+              <div className="text-linear-text-tertiary mt-1 text-xs">Obese</div>
+            </div>
+          </div>
+
+          {/* Lean Mass card */}
+          <div className="bg-linear-bg border-linear-border min-w-[140px] rounded-lg border p-4">
+            <div className="flex-col items-center text-center">
+              <div className="text-linear-text-secondary mb-2 text-xs tracking-wider uppercase">
+                LEAN MASS
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-linear-text text-4xl font-bold md:text-3xl">123.1</span>
+                <span className="text-linear-text-secondary text-lg font-medium md:text-sm">
+                  kg
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Body Fat card */}
-        <div className="bg-linear-bg border-linear-border min-w-[140px] rounded-lg border p-4">
-          <div className="flex-col items-center text-center">
-            <div className="text-linear-text-secondary mb-2 text-xs uppercase tracking-wider">
-              BODY FAT
-            </div>
-            <div className="flex items-baseline gap-0.5">
-              <span className="text-linear-text text-4xl font-bold md:text-3xl">25.5</span>
-              <span className="text-linear-text-secondary text-2xl font-medium md:text-xl">%</span>
-            </div>
-            <div className="text-linear-text-tertiary mt-1 text-xs">Obese</div>
-          </div>
+        {/* Body model empty state */}
+        <div className="mt-4">
+          <p className="text-white">No body model yet</p>
+          <p>Add your measurements to generate one</p>
+          <button className="text-linear-purple">Add Measurements</button>
         </div>
 
-        {/* Lean Mass card */}
-        <div className="bg-linear-bg border-linear-border min-w-[140px] rounded-lg border p-4">
-          <div className="flex-col items-center text-center">
-            <div className="text-linear-text-secondary mb-2 text-xs uppercase tracking-wider">
-              LEAN MASS
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-linear-text text-4xl font-bold md:text-3xl">123.1</span>
-              <span className="text-linear-text-secondary text-lg font-medium md:text-sm">kg</span>
-            </div>
-          </div>
+        {/* Trend indicator text */}
+        <div className="mt-4">
+          <span>-2.5 lbs</span>
         </div>
+
+        {/* Mobile navbar placeholder */}
+        <div data-testid="mobile-navbar" />
       </div>
+    );
 
-      {/* Body model empty state */}
-      <div className="mt-4">
-        <p className="text-white">No body model yet</p>
-        <p>Add your measurements to generate one</p>
-        <button className="text-linear-purple">Add Measurements</button>
-      </div>
-
-      {/* Trend indicator text */}
-      <div className="mt-4">
-        <span>-2.5 lbs</span>
-      </div>
-
-      {/* Mobile navbar placeholder */}
-      <div data-testid="mobile-navbar" />
-    </div>
-  );
-
-  return {
-    __esModule: true,
-    default: TestDashboardPage,
-  };
-});
+    return {
+      __esModule: true,
+      default: TestDashboardPage,
+    };
+  },
+  { virtual: true },
+);
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

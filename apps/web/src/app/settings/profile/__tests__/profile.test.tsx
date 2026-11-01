@@ -1,9 +1,10 @@
+// Retained mock-only UI cases; the retired routes have no production module (LYB-100).
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
-import ProfileSettingsPage from '../page';
+const ProfileSettingsPage = jest.requireMock('../page').default;
 import * as profileApi from '@/lib/profile';
 // import { format } from 'date-fns' // Not used
 
@@ -155,318 +156,320 @@ jest.mock('next/link', () => ({
 }));
 
 // Stub ProfileSettingsPage implementation for tests
-jest.mock('../page', () => {
-  const React = require('react') as typeof import('react');
+jest.mock(
+  '../page',
+  () => {
+    const React = require('react') as typeof import('react');
 
-  const { useAuth } =
-    require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
+    const { useAuth } =
+      require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
 
-  const { useRouter } = require('next/navigation') as typeof import('next/navigation');
+    const { useRouter } = require('next/navigation') as typeof import('next/navigation');
 
-  const profileApi = require('@/lib/profile') as typeof import('@/lib/profile');
+    const profileApi = require('@/lib/profile') as typeof import('@/lib/profile');
 
-  type ActivityLevel =
-    | 'sedentary'
-    | 'lightly_active'
-    | 'moderately_active'
-    | 'very_active'
-    | 'extremely_active';
+    type ActivityLevel =
+      'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active' | 'extremely_active';
 
-  interface TestProfile {
-    full_name: string;
-    username: string;
-    bio: string;
-    height: number;
-    height_unit: 'cm' | 'ft';
-    gender: 'male' | 'female';
-    date_of_birth: string;
-    activity_level: ActivityLevel;
-  }
-
-  const TODAY = new Date(2024, 5, 30);
-
-  const formatDate = (iso: string): string => {
-    const [yearStr, monthStr, dayStr] = iso.split('-');
-    const year = Number(yearStr);
-    const monthIndex = Number(monthStr) - 1;
-    const day = Number(dayStr);
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ] as const;
-    const month = months[monthIndex] ?? '';
-    return `${month} ${day}, ${year}`;
-  };
-
-  const calculateAgeFromIso = (iso: string | null | undefined): number | null => {
-    if (!iso) return null;
-    const [yearStr, monthStr, dayStr] = iso.split('-');
-    const year = Number(yearStr);
-    const month = Number(monthStr) - 1;
-    const day = Number(dayStr);
-    if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) return null;
-
-    const birthDate = new Date(year, month, day);
-    let age = TODAY.getFullYear() - birthDate.getFullYear();
-    const monthDiff = TODAY.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && TODAY.getDate() < birthDate.getDate())) {
-      age -= 1;
+    interface TestProfile {
+      full_name: string;
+      username: string;
+      bio: string;
+      height: number;
+      height_unit: 'cm' | 'ft';
+      gender: 'male' | 'female';
+      date_of_birth: string;
+      activity_level: ActivityLevel;
     }
-    return age;
-  };
 
-  const formatHeight = (profile: TestProfile | null): string => {
-    if (!profile) return 'Not set';
-    if (profile.height_unit === 'cm') {
-      return `${profile.height} cm`;
-    }
-    const feet = Math.floor(profile.height / 12);
-    const inches = profile.height % 12;
-    return `${feet}'${inches}"`;
-  };
+    const TODAY = new Date(2024, 5, 30);
 
-  const activityLabel = (level: ActivityLevel): string => {
-    switch (level) {
-      case 'sedentary':
-        return 'Sedentary';
-      case 'lightly_active':
-        return 'Lightly Active';
-      case 'moderately_active':
-        return 'Moderately Active';
-      case 'very_active':
-        return 'Very Active (6-7 days/week)';
-      case 'extremely_active':
-        return 'Extremely Active';
-      default:
-        return 'Moderately Active';
-    }
-  };
+    const formatDate = (iso: string): string => {
+      const [yearStr, monthStr, dayStr] = iso.split('-');
+      const year = Number(yearStr);
+      const monthIndex = Number(monthStr) - 1;
+      const day = Number(dayStr);
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ] as const;
+      const month = months[monthIndex] ?? '';
+      return `${month} ${day}, ${year}`;
+    };
 
-  const TestProfileSettingsPage: React.FC = () => {
-    const { user, loading } = useAuth() as { user: { id: string } | null; loading: boolean };
-    const router = useRouter() as { push: (path: string) => void };
-    const [profile, setProfile] = React.useState<TestProfile | null>(null);
-    const [isSaving, setIsSaving] = React.useState(false);
-    const [lastSaved, setLastSaved] = React.useState<Date | null>(null);
-    const [fullName, setFullName] = React.useState('');
-    const [bio, setBio] = React.useState('');
-    const [showDobModal, setShowDobModal] = React.useState(false);
-    const [showHeightModal, setShowHeightModal] = React.useState(false);
-    const [activityOpen, setActivityOpen] = React.useState(false);
+    const calculateAgeFromIso = (iso: string | null | undefined): number | null => {
+      if (!iso) return null;
+      const [yearStr, monthStr, dayStr] = iso.split('-');
+      const year = Number(yearStr);
+      const month = Number(monthStr) - 1;
+      const day = Number(dayStr);
+      if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) return null;
 
-    React.useEffect(() => {
-      if (!loading && !user) {
-        router.push('/signin');
+      const birthDate = new Date(year, month, day);
+      let age = TODAY.getFullYear() - birthDate.getFullYear();
+      const monthDiff = TODAY.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && TODAY.getDate() < birthDate.getDate())) {
+        age -= 1;
       }
-    }, [user, loading, router]);
+      return age;
+    };
 
-    React.useEffect(() => {
-      if (!user) return;
-      profileApi.getProfile(user.id).then((data: Partial<TestProfile> | null) => {
-        if (!data) return;
-        const initial: TestProfile = {
-          full_name: data.full_name || '',
-          username: data.username || '',
-          bio: data.bio || '',
-          height: data.height ?? 180,
-          height_unit: data.height_unit ?? 'cm',
-          gender: data.gender ?? 'male',
-          date_of_birth: data.date_of_birth || '1990-01-01',
-          activity_level: (data.activity_level as ActivityLevel) ?? 'moderately_active',
-        };
-        setProfile(initial);
-        setFullName(initial.full_name);
-        setBio(initial.bio);
-      });
-    }, [user]);
+    const formatHeight = (profile: TestProfile | null): string => {
+      if (!profile) return 'Not set';
+      if (profile.height_unit === 'cm') {
+        return `${profile.height} cm`;
+      }
+      const feet = Math.floor(profile.height / 12);
+      const inches = profile.height % 12;
+      return `${feet}'${inches}"`;
+    };
 
-    const saveProfile = async (updates: Partial<TestProfile>) => {
-      if (!user || !profile) return;
-      const merged: TestProfile = { ...profile, ...updates };
-      setProfile(merged);
-      setIsSaving(true);
-      try {
-        await profileApi.updateProfile(user.id, merged);
-        setLastSaved(new Date(TODAY));
-      } catch {
-        // Errors are handled by the real component; tests only assert calls
-      } finally {
-        setIsSaving(false);
+    const activityLabel = (level: ActivityLevel): string => {
+      switch (level) {
+        case 'sedentary':
+          return 'Sedentary';
+        case 'lightly_active':
+          return 'Lightly Active';
+        case 'moderately_active':
+          return 'Moderately Active';
+        case 'very_active':
+          return 'Very Active (6-7 days/week)';
+        case 'extremely_active':
+          return 'Extremely Active';
+        default:
+          return 'Moderately Active';
       }
     };
 
-    if (loading) {
-      return <div>Loading...</div>;
-    }
+    const TestProfileSettingsPage: React.FC = () => {
+      const { user, loading } = useAuth() as { user: { id: string } | null; loading: boolean };
+      const router = useRouter() as { push: (path: string) => void };
+      const [profile, setProfile] = React.useState<TestProfile | null>(null);
+      const [isSaving, setIsSaving] = React.useState(false);
+      const [lastSaved, setLastSaved] = React.useState<Date | null>(null);
+      const [fullName, setFullName] = React.useState('');
+      const [bio, setBio] = React.useState('');
+      const [showDobModal, setShowDobModal] = React.useState(false);
+      const [showHeightModal, setShowHeightModal] = React.useState(false);
+      const [activityOpen, setActivityOpen] = React.useState(false);
 
-    if (!user) {
-      return null;
-    }
+      React.useEffect(() => {
+        if (!loading && !user) {
+          router.push('/signin');
+        }
+      }, [user, loading, router]);
 
-    const age = calculateAgeFromIso(profile?.date_of_birth);
+      React.useEffect(() => {
+        if (!user) return;
+        profileApi.getProfile(user.id).then((data: Partial<TestProfile> | null) => {
+          if (!data) return;
+          const initial: TestProfile = {
+            full_name: data.full_name || '',
+            username: data.username || '',
+            bio: data.bio || '',
+            height: data.height ?? 180,
+            height_unit: data.height_unit ?? 'cm',
+            gender: data.gender ?? 'male',
+            date_of_birth: data.date_of_birth || '1990-01-01',
+            activity_level: (data.activity_level as ActivityLevel) ?? 'moderately_active',
+          };
+          setProfile(initial);
+          setFullName(initial.full_name);
+          setBio(initial.bio);
+        });
+      }, [user]);
 
-    return (
-      <div>
-        <header>{isSaving ? <span>Saving...</span> : lastSaved ? <span>Saved</span> : null}</header>
+      const saveProfile = async (updates: Partial<TestProfile>) => {
+        if (!user || !profile) return;
+        const merged: TestProfile = { ...profile, ...updates };
+        setProfile(merged);
+        setIsSaving(true);
+        try {
+          await profileApi.updateProfile(user.id, merged);
+          setLastSaved(new Date(TODAY));
+        } catch {
+          // Errors are handled by the real component; tests only assert calls
+        } finally {
+          setIsSaving(false);
+        }
+      };
 
-        <main>
-          {/* Full name field */}
-          <div>
-            <label htmlFor="fullName">Full Name</label>
-            <input
-              id="fullName"
-              value={fullName}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                const value = e.target.value;
-                setFullName(value);
-                void saveProfile({ full_name: value });
-              }}
-            />
-          </div>
+      if (loading) {
+        return <div>Loading...</div>;
+      }
 
-          {/* Username field */}
-          <div>
-            <input
-              aria-label="Username"
-              value={profile?.username ?? ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                void saveProfile({ username: e.target.value });
-              }}
-            />
-          </div>
+      if (!user) {
+        return null;
+      }
 
-          {/* Bio field */}
-          <div>
-            <textarea
-              aria-label="Bio"
-              value={bio}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
-                const value = e.target.value;
-                setBio(value);
-                void saveProfile({ bio: value });
-              }}
-            />
-          </div>
+      const age = calculateAgeFromIso(profile?.date_of_birth);
 
-          {/* Date of birth display */}
-          <div>
-            <span>{formatDate(profile?.date_of_birth ?? '1990-01-01')}</span>
-            {age !== null && <span>{`(${age} years old)`}</span>}
-            <button type="button" onClick={() => setShowDobModal(true)}>
-              Set
-            </button>
-          </div>
+      return (
+        <div>
+          <header>
+            {isSaving ? <span>Saving...</span> : lastSaved ? <span>Saved</span> : null}
+          </header>
 
-          {/* Height display */}
-          <div>
-            <span>{formatHeight(profile)}</span>
-            <button type="button" onClick={() => setShowHeightModal(true)}>
-              Set
-            </button>
-          </div>
+          <main>
+            {/* Full name field */}
+            <div>
+              <label htmlFor="fullName">Full Name</label>
+              <input
+                id="fullName"
+                value={fullName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const value = e.target.value;
+                  setFullName(value);
+                  void saveProfile({ full_name: value });
+                }}
+              />
+            </div>
 
-          {/* Gender selection */}
-          <div>
-            <button
-              type="button"
-              data-state={profile?.gender === 'male' ? 'on' : 'off'}
-              onClick={() => {
-                void saveProfile({ gender: 'male' });
-              }}
-            >
-              Male
-            </button>
-            <button
-              type="button"
-              data-state={profile?.gender === 'female' ? 'on' : 'off'}
-              onClick={() => {
-                void saveProfile({ gender: 'female' });
-              }}
-            >
-              Female
-            </button>
-          </div>
+            {/* Username field */}
+            <div>
+              <input
+                aria-label="Username"
+                value={profile?.username ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  void saveProfile({ username: e.target.value });
+                }}
+              />
+            </div>
 
-          {/* Activity level selection */}
-          <div>
-            <button
-              type="button"
-              role="combobox"
-              aria-controls="activity-level-options"
-              aria-expanded={activityOpen}
-              onClick={() => setActivityOpen((prev) => !prev)}
-            >
-              {activityLabel((profile?.activity_level as ActivityLevel) ?? 'moderately_active')}
-            </button>
-            {activityOpen && (
-              <div id="activity-level-options">
+            {/* Bio field */}
+            <div>
+              <textarea
+                aria-label="Bio"
+                value={bio}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                  const value = e.target.value;
+                  setBio(value);
+                  void saveProfile({ bio: value });
+                }}
+              />
+            </div>
+
+            {/* Date of birth display */}
+            <div>
+              <span>{formatDate(profile?.date_of_birth ?? '1990-01-01')}</span>
+              {age !== null && <span>{`(${age} years old)`}</span>}
+              <button type="button" onClick={() => setShowDobModal(true)}>
+                Set
+              </button>
+            </div>
+
+            {/* Height display */}
+            <div>
+              <span>{formatHeight(profile)}</span>
+              <button type="button" onClick={() => setShowHeightModal(true)}>
+                Set
+              </button>
+            </div>
+
+            {/* Gender selection */}
+            <div>
+              <button
+                type="button"
+                data-state={profile?.gender === 'male' ? 'on' : 'off'}
+                onClick={() => {
+                  void saveProfile({ gender: 'male' });
+                }}
+              >
+                Male
+              </button>
+              <button
+                type="button"
+                data-state={profile?.gender === 'female' ? 'on' : 'off'}
+                onClick={() => {
+                  void saveProfile({ gender: 'female' });
+                }}
+              >
+                Female
+              </button>
+            </div>
+
+            {/* Activity level selection */}
+            <div>
+              <button
+                type="button"
+                role="combobox"
+                aria-controls="activity-level-options"
+                aria-expanded={activityOpen}
+                onClick={() => setActivityOpen((prev) => !prev)}
+              >
+                {activityLabel((profile?.activity_level as ActivityLevel) ?? 'moderately_active')}
+              </button>
+              {activityOpen && (
+                <div id="activity-level-options">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivityOpen(false);
+                      void saveProfile({ activity_level: 'very_active' });
+                    }}
+                  >
+                    Very Active (6-7 days/week)
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* DOB modal */}
+            {showDobModal && (
+              <div>
+                <h2>Set Date of Birth</h2>
                 <button
                   type="button"
                   onClick={() => {
-                    setActivityOpen(false);
-                    void saveProfile({ activity_level: 'very_active' });
+                    const currentDob = profile?.date_of_birth ?? '1990-01-01';
+                    void saveProfile({ date_of_birth: currentDob });
+                    setShowDobModal(false);
                   }}
                 >
-                  Very Active (6-7 days/week)
+                  Save
                 </button>
               </div>
             )}
-          </div>
 
-          {/* DOB modal */}
-          {showDobModal && (
-            <div>
-              <h2>Set Date of Birth</h2>
-              <button
-                type="button"
-                onClick={() => {
-                  const currentDob = profile?.date_of_birth ?? '1990-01-01';
-                  void saveProfile({ date_of_birth: currentDob });
-                  setShowDobModal(false);
-                }}
-              >
-                Save
-              </button>
-            </div>
-          )}
+            {/* Height modal */}
+            {showHeightModal && (
+              <div>
+                <h2>Set Height</h2>
+                <button type="button">Metric (cm)</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const baseHeight = profile?.height ?? 180;
+                    const inches = Math.round(baseHeight / 2.54);
+                    void saveProfile({ height: inches, height_unit: 'ft' });
+                  }}
+                >
+                  Imperial (ft/in)
+                </button>
+              </div>
+            )}
+          </main>
+        </div>
+      );
+    };
 
-          {/* Height modal */}
-          {showHeightModal && (
-            <div>
-              <h2>Set Height</h2>
-              <button type="button">Metric (cm)</button>
-              <button
-                type="button"
-                onClick={() => {
-                  const baseHeight = profile?.height ?? 180;
-                  const inches = Math.round(baseHeight / 2.54);
-                  void saveProfile({ height: inches, height_unit: 'ft' });
-                }}
-              >
-                Imperial (ft/in)
-              </button>
-            </div>
-          )}
-        </main>
-      </div>
-    );
-  };
-
-  return {
-    __esModule: true,
-    default: TestProfileSettingsPage,
-  };
-});
+    return {
+      __esModule: true,
+      default: TestProfileSettingsPage,
+    };
+  },
+  { virtual: true },
+);
 
 const mockUser = {
   id: 'test-user-id',

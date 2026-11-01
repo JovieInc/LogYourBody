@@ -195,7 +195,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       }
 
       // Navigate to dashboard
-      router.push('/dashboard');
+      router.push('/download/ios');
     } catch (error) {
       console.error('Error completing onboarding:', error);
       // Show error to user

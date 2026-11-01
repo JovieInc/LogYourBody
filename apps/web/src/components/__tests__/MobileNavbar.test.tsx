@@ -1,6 +1,7 @@
+// Retained mock-only UI cases; the retired routes have no production module (LYB-100).
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { MobileNavbar } from '../MobileNavbar';
+const { MobileNavbar } = jest.requireMock('../MobileNavbar');
 import { useRouter, usePathname } from 'next/navigation';
 
 // Mock next/navigation
@@ -16,62 +17,67 @@ jest.mock('lucide-react', () => ({
   Settings: ({ className }: { className?: string }) => <svg className={className} />,
 }));
 
-jest.mock('../MobileNavbar', () => {
-  const React = require('react') as typeof import('react');
-  const { usePathname, useRouter } = require('next/navigation') as typeof import('next/navigation');
+jest.mock(
+  '../MobileNavbar',
+  () => {
+    const React = require('react') as typeof import('react');
+    const { usePathname, useRouter } =
+      require('next/navigation') as typeof import('next/navigation');
 
-  const MobileNavbar: React.FC = () => {
-    const pathname = usePathname();
-    const router = useRouter();
+    const MobileNavbar: React.FC = () => {
+      const pathname = usePathname();
+      const router = useRouter();
 
-    if (pathname === '/log' || pathname.startsWith('/settings')) {
-      return null;
-    }
+      if (pathname === '/log' || pathname.startsWith('/settings')) {
+        return null;
+      }
 
-    const navItems = [
-      { label: 'Dashboard', href: '/dashboard', isCenter: false },
-      { label: 'Add Data', href: '/log', isCenter: true },
-      { label: 'Settings', href: '/settings', isCenter: false },
-    ];
+      const navItems = [
+        { label: 'Dashboard', href: '/dashboard', isCenter: false },
+        { label: 'Add Data', href: '/log', isCenter: true },
+        { label: 'Settings', href: '/settings', isCenter: false },
+      ];
 
-    return (
-      <div className="bg-linear-bg border-linear-border fixed right-0 bottom-0 left-0 z-50 border-t md:hidden">
-        <div className="flex h-14 items-center justify-around px-4">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            const isCenter = item.isCenter;
+      return (
+        <div className="bg-linear-bg border-linear-border fixed right-0 bottom-0 left-0 z-50 border-t md:hidden">
+          <div className="flex h-14 items-center justify-around px-4">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+              const isCenter = item.isCenter;
 
-            return (
-              <button
-                key={item.href}
-                onClick={() => router.push(item.href)}
-                className="relative flex h-full flex-1 items-center justify-center"
-                aria-label={item.label}
-              >
-                {isCenter ? (
-                  <div className="bg-linear-purple flex h-12 w-12 items-center justify-center rounded-full shadow-lg">
-                    <svg className="h-5 w-5 text-white" />
-                  </div>
-                ) : (
-                  <svg
-                    className={`h-6 w-6 transition-colors ${
-                      isActive ? 'text-linear-purple' : 'text-linear-text-secondary'
-                    }`}
-                  />
-                )}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={item.href}
+                  onClick={() => router.push(item.href)}
+                  className="relative flex h-full flex-1 items-center justify-center"
+                  aria-label={item.label}
+                >
+                  {isCenter ? (
+                    <div className="bg-linear-purple flex h-12 w-12 items-center justify-center rounded-full shadow-lg">
+                      <svg className="h-5 w-5 text-white" />
+                    </div>
+                  ) : (
+                    <svg
+                      className={`h-6 w-6 transition-colors ${
+                        isActive ? 'text-linear-purple' : 'text-linear-text-secondary'
+                      }`}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
-    );
-  };
+      );
+    };
 
-  return {
-    __esModule: true,
-    MobileNavbar,
-  };
-});
+    return {
+      __esModule: true,
+      MobileNavbar,
+    };
+  },
+  { virtual: true },
+);
 
 describe('MobileNavbar', () => {
   const mockPush = jest.fn();

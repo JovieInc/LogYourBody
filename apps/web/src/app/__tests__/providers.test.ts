@@ -15,19 +15,20 @@ describe('needsProductAuthRuntime', () => {
     '/privacy',
     '/support',
     '/terms',
+    '/security',
+    '/mobile',
+    '/landing',
+    '/dashboard',
+    '/onboarding',
+    '/settings/profile',
+    '/unknown',
+    null,
+    undefined,
   ])('keeps %s free of the product auth runtime', (pathname) => {
     expect(needsProductAuthRuntime(pathname)).toBe(false);
   });
 
-  it.each([
-    '/signin',
-    '/signup',
-    '/dashboard',
-    '/landing',
-    '/onboarding',
-    '/settings/profile',
-    '/unknown',
-  ])('keeps product auth runtime enabled for %s', (pathname) => {
+  it.each(['/signin', '/signup'])('keeps product auth runtime enabled for %s', (pathname) => {
     expect(needsProductAuthRuntime(pathname)).toBe(true);
   });
 });

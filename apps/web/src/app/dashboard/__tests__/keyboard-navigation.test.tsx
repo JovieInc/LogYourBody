@@ -1,7 +1,8 @@
+// Retained mock-only UI cases; the retired routes have no production module (LYB-100).
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/ProductAuthContext';
-import DashboardPage from '../page';
+const DashboardPage = jest.requireMock('../page').default;
 
 // Mock dependencies
 jest.mock('next/navigation', () => ({
@@ -24,67 +25,71 @@ jest.mock('@/hooks/use-network-status', () => ({
 }));
 
 // Stub DashboardPage for keyboard navigation tests
-jest.mock('../page', () => {
-  const React = require('react') as typeof import('react');
+jest.mock(
+  '../page',
+  () => {
+    const React = require('react') as typeof import('react');
 
-  const isEditableTarget = (target: EventTarget | null): boolean => {
-    if (!target) return false;
-    const el = target as HTMLElement;
-    const tag = el.tagName;
-    if (!tag) return false;
-    const tagUpper = tag.toUpperCase();
-    if (tagUpper === 'INPUT' || tagUpper === 'TEXTAREA') return true;
-    if ((el as HTMLElement).isContentEditable) return true;
-    return false;
-  };
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!target) return false;
+      const el = target as HTMLElement;
+      const tag = el.tagName;
+      if (!tag) return false;
+      const tagUpper = tag.toUpperCase();
+      if (tagUpper === 'INPUT' || tagUpper === 'TEXTAREA') return true;
+      if ((el as HTMLElement).isContentEditable) return true;
+      return false;
+    };
 
-  const TestDashboardPage: React.FC = () => {
-    const [index, setIndex] = React.useState(2);
-    const [activeTab] = React.useState<'Avatar' | 'Photo'>('Avatar');
+    const TestDashboardPage: React.FC = () => {
+      const [index, setIndex] = React.useState(2);
+      const [activeTab] = React.useState<'Avatar' | 'Photo'>('Avatar');
 
-    React.useEffect(() => {
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (isEditableTarget(event.target)) return;
+      React.useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+          if (isEditableTarget(event.target)) return;
 
-        if (event.key === 'ArrowLeft') {
-          setIndex((prev) => (prev > 0 ? prev - 1 : 0));
-        } else if (event.key === 'ArrowRight') {
-          setIndex((prev) => (prev < 2 ? prev + 1 : 2));
-        }
-      };
+          if (event.key === 'ArrowLeft') {
+            setIndex((prev) => (prev > 0 ? prev - 1 : 0));
+          } else if (event.key === 'ArrowRight') {
+            setIndex((prev) => (prev < 2 ? prev + 1 : 2));
+          }
+        };
 
-      window.addEventListener('keydown', handleKeyDown);
-      return () => {
-        window.removeEventListener('keydown', handleKeyDown);
-      };
-    }, []);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+          window.removeEventListener('keydown', handleKeyDown);
+        };
+      }, []);
 
-    return (
-      <div>
-        <header>
-          <h1>LogYourBody</h1>
-        </header>
-        <main>
-          <input type="range" min={0} max={2} value={index} readOnly />
+      return (
+        <div>
+          <header>
+            <h1>LogYourBody</h1>
+          </header>
+          <main>
+            <input type="range" min={0} max={2} value={index} readOnly />
 
-          <div role="tablist">
-            <button role="tab" data-state={activeTab === 'Avatar' ? 'active' : 'inactive'}>
-              Avatar
-            </button>
-            <button role="tab" data-state={activeTab === 'Photo' ? 'active' : 'inactive'}>
-              Photo
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  };
+            <div role="tablist">
+              <button role="tab" data-state={activeTab === 'Avatar' ? 'active' : 'inactive'}>
+                Avatar
+              </button>
+              <button role="tab" data-state={activeTab === 'Photo' ? 'active' : 'inactive'}>
+                Photo
+              </button>
+            </div>
+          </main>
+        </div>
+      );
+    };
 
-  return {
-    __esModule: true,
-    default: TestDashboardPage,
-  };
-});
+    return {
+      __esModule: true,
+      default: TestDashboardPage,
+    };
+  },
+  { virtual: true },
+);
 
 describe('Dashboard Keyboard Navigation', () => {
   const mockPush = jest.fn();

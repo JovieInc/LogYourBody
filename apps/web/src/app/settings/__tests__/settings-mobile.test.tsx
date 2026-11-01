@@ -1,78 +1,87 @@
+// Retained mock-only UI cases; the retired routes have no production module (LYB-100).
 import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import SettingsPage from '../page';
+const SettingsPage = jest.requireMock('../page').default;
 import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
 
 // Mock dependencies
 jest.mock('@/contexts/ProductAuthContext');
 jest.mock('next/navigation');
-jest.mock('@/components/MobileNavbar', () => ({
-  MobileNavbar: () => <div data-testid="mobile-navbar" />,
-}));
+jest.mock(
+  'retired-MobileNavbar',
+  () => ({
+    MobileNavbar: () => <div data-testid="mobile-navbar" />,
+  }),
+  { virtual: true },
+);
 jest.mock('@/components/VersionDisplay', () => ({
   VersionDisplay: () => <span>v1.2.3</span>,
 }));
 
-jest.mock('../page', () => {
-  const React = require('react') as typeof import('react');
-  const { useAuth } =
-    require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
+jest.mock(
+  '../page',
+  () => {
+    const React = require('react') as typeof import('react');
+    const { useAuth } =
+      require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
 
-  const TestSettingsPage: React.FC = () => {
-    const { signOut } = useAuth();
+    const TestSettingsPage: React.FC = () => {
+      const { signOut } = useAuth();
 
-    return (
-      <div className="bg-linear-bg min-h-screen pb-16 md:pb-0">
-        <header role="banner" className="sticky top-0 z-10">
-          <a href="/dashboard">Back</a>
-          <div>Settings</div>
-          <div>test@example.com</div>
-        </header>
+      return (
+        <div className="bg-linear-bg min-h-screen pb-16 md:pb-0">
+          <header role="banner" className="sticky top-0 z-10">
+            <a href="/dashboard">Back</a>
+            <div>Settings</div>
+            <div>test@example.com</div>
+          </header>
 
-        <main role="main">
-          {/* Settings menu items */}
-          <div>
-            <a href="/settings/profile">Profile</a>
-            <a href="/settings/account">Account &amp; Security</a>
-            <a href="/settings/preferences">Preferences</a>
-            <a href="/settings/notifications">Notifications</a>
+          <main role="main">
+            {/* Settings menu items */}
             <div>
-              <a href="/settings/subscription">Subscription</a>
-              <span>Free</span>
+              <a href="/settings/profile">Profile</a>
+              <a href="/settings/account">Account &amp; Security</a>
+              <a href="/settings/preferences">Preferences</a>
+              <a href="/settings/notifications">Notifications</a>
+              <div>
+                <a href="/settings/subscription">Subscription</a>
+                <span>Free</span>
+              </div>
             </div>
-          </div>
 
-          {/* Version display row */}
-          <div>
-            <span>LogYourBody</span>
-            <span>v1.2.3</span>
-          </div>
+            {/* Version display row */}
+            <div>
+              <span>LogYourBody</span>
+              <span>v1.2.3</span>
+            </div>
 
-          {/* Sign out button */}
-          <button type="button" onClick={signOut}>
-            Sign Out
-          </button>
+            {/* Sign out button */}
+            <button type="button" onClick={signOut}>
+              Sign Out
+            </button>
 
-          {/* Footer links */}
-          <footer>
-            <a href="/terms">Terms</a>
-            <a href="/privacy">Privacy</a>
-            <a href="/about">About</a>
-          </footer>
-        </main>
+            {/* Footer links */}
+            <footer>
+              <a href="/terms">Terms</a>
+              <a href="/privacy">Privacy</a>
+              <a href="/about">About</a>
+            </footer>
+          </main>
 
-        {/* Mobile navbar placeholder */}
-        <div data-testid="mobile-navbar" />
-      </div>
-    );
-  };
+          {/* Mobile navbar placeholder */}
+          <div data-testid="mobile-navbar" />
+        </div>
+      );
+    };
 
-  return {
-    __esModule: true,
-    default: TestSettingsPage,
-  };
-});
+    return {
+      __esModule: true,
+      default: TestSettingsPage,
+    };
+  },
+  { virtual: true },
+);
 
 describe('Settings Page Mobile Experience', () => {
   const mockUser = {

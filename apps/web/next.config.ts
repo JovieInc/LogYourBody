@@ -79,6 +79,22 @@ const nextConfig: NextConfig = {
         destination: `${logYourBody.links.home}/:path*`,
         permanent: true,
       },
+      // Retired web-app URLs remain useful for bookmarks and OAuth returnTo cookies.
+      // Product data lives in the iOS app; /api paths do not match these aliases.
+      ...[
+        'dashboard',
+        'log',
+        'photos',
+        'settings',
+        'onboarding',
+        'steps',
+        'import',
+        'training',
+      ].map((route) => ({
+        source: `/${route}/:path*`,
+        destination: '/download/ios',
+        permanent: true,
+      })),
     ];
   },
 

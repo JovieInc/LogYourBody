@@ -1,6 +1,7 @@
+// Retained mock-only UI cases; the retired routes have no production module (LYB-100).
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import ImportPage from '../page';
+const ImportPage = jest.requireMock('../page').default;
 import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
 
@@ -19,89 +20,93 @@ jest.mock('exifr', () => ({
 }));
 
 // Stub ImportPage to avoid complex Next.js page in tests
-jest.mock('../page', () => {
-  const React = require('react') as typeof import('react');
-  const { useAuth } =
-    require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
-  const { useRouter } = require('next/navigation') as typeof import('next/navigation');
+jest.mock(
+  '../page',
+  () => {
+    const React = require('react') as typeof import('react');
+    const { useAuth } =
+      require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
+    const { useRouter } = require('next/navigation') as typeof import('next/navigation');
 
-  const TestImportPage: React.FC = () => {
-    const { user, loading } = useAuth() as { user: { id: string } | null; loading: boolean };
-    const router = useRouter() as { push: (path: string) => void };
-    const [files, setFiles] = React.useState<File[]>([]);
-    const [status, setStatus] = React.useState<string | null>(null);
+    const TestImportPage: React.FC = () => {
+      const { user, loading } = useAuth() as { user: { id: string } | null; loading: boolean };
+      const router = useRouter() as { push: (path: string) => void };
+      const [files, setFiles] = React.useState<File[]>([]);
+      const [status, setStatus] = React.useState<string | null>(null);
 
-    if (loading) {
-      return <div>Loading...</div>;
-    }
+      if (loading) {
+        return <div>Loading...</div>;
+      }
 
-    if (!user) {
-      router.push('/signin');
-      return null;
-    }
+      if (!user) {
+        router.push('/signin');
+        return null;
+      }
 
-    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const selected = Array.from(event.target.files || []);
-      setFiles(selected);
-      setStatus(null);
-    };
+      const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const selected = Array.from(event.target.files || []);
+        setFiles(selected);
+        setStatus(null);
+      };
 
-    const handleProcess = () => {
-      if (files.length === 0) return;
-      const first = files[0];
-      setStatus(`Extracting date from ${first.name}`);
-    };
+      const handleProcess = () => {
+        if (files.length === 0) return;
+        const first = files[0];
+        setStatus(`Extracting date from ${first.name}`);
+      };
 
-    return (
-      <div>
-        <header>
-          <h1>Smart Import</h1>
-        </header>
-        <main>
-          <section>
-            <h2>Upload Your Files</h2>
-
-            <div>
-              <label htmlFor="file-upload">Drop files here or click to browse</label>
-              <input id="file-upload" type="file" multiple onChange={handleChange} />
-            </div>
-
-            {files.length > 0 ? (
-              <div>
-                <p>
-                  {files.length} file{files.length > 1 ? 's' : ''} selected
-                </p>
-                <p>{files[0].name}</p>
-              </div>
-            ) : null}
-
-            {files.length > 0 && (
-              <button type="button" onClick={handleProcess}>
-                Process Files
-              </button>
-            )}
-
-            {status && <p>{status}</p>}
-
+      return (
+        <div>
+          <header>
+            <h1>Smart Import</h1>
+          </header>
+          <main>
             <section>
-              <h3>Supported File Types</h3>
-              <div>
-                <p>Photos (JPG, PNG, HEIC)</p>
-                <p>PDFs (DEXA, InBody, etc.)</p>
-                <p>Spreadsheets (CSV, Excel)</p>
-              </div>
-            </section>
-          </section>
-        </main>
-      </div>
-    );
-  };
+              <h2>Upload Your Files</h2>
 
-  return {
-    __esModule: true,
-    default: TestImportPage,
-  };
-});
+              <div>
+                <label htmlFor="file-upload">Drop files here or click to browse</label>
+                <input id="file-upload" type="file" multiple onChange={handleChange} />
+              </div>
+
+              {files.length > 0 ? (
+                <div>
+                  <p>
+                    {files.length} file{files.length > 1 ? 's' : ''} selected
+                  </p>
+                  <p>{files[0].name}</p>
+                </div>
+              ) : null}
+
+              {files.length > 0 && (
+                <button type="button" onClick={handleProcess}>
+                  Process Files
+                </button>
+              )}
+
+              {status && <p>{status}</p>}
+
+              <section>
+                <h3>Supported File Types</h3>
+                <div>
+                  <p>Photos (JPG, PNG, HEIC)</p>
+                  <p>PDFs (DEXA, InBody, etc.)</p>
+                  <p>Spreadsheets (CSV, Excel)</p>
+                </div>
+              </section>
+            </section>
+          </main>
+        </div>
+      );
+    };
+
+    return {
+      __esModule: true,
+      default: TestImportPage,
+    };
+  },
+  { virtual: true },
+);
 
 describe('ImportPage', () => {
   const mockPush = jest.fn();

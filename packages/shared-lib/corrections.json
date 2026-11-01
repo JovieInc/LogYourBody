@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "99329d619bcf",
+    "source": "https://linear.app/jovie/issue/LYB-100",
+    "correction": "Tim White / LYB-100: enforce lyb-web-landing-only-v1 after the 1.2.0 submission. Remove authenticated web application routes and navigation while retaining iOS API handlers and all marketing/legal pages.",
+    "mechanization": "Delete app page entrypoints, the settings layout and the mobile app navbar. Redirect legacy URLs to the iPhone download page without changing any API file. Retain existing mocked UI test cases as virtual test-only fixtures. Add the landing-only route, navigation and manifest contract to the existing required web Jest suite; it fails against the original routes/navbar/redirects and passes after removal. Shrink the existing surface-reconciliation baseline by only the ten resolved app findings. The release runbook records 1.2.0 WAITING_FOR_REVIEW on 2026-10-31, satisfying post-submit sequencing. Machine: built apps/web/src/app/__tests__/landing-only.node.test.ts. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Removing current app entrypoints prevents their execution but cannot by itself prevent a future Next.js page or navigation link from reintroducing a web product surface."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required web Jest suite can enumerate actual page entrypoints against the public route inventory, exercise legacy redirects through Next configuration and reject retired navigation and manifest shortcuts."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/__tests__/landing-only.node.test.ts",
+      "anchor": "lyb-web-landing-only-v1 (LYB-100)"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "dependency-update-lockfile-and-source-parity",
     "correction": "PR #1667 (fix-red-1423773703): The glob 14.0.2 dependency update left the source map stale, failing Detect Changes, parity and CI Summary. Repeated dependency repairs must remain retryable when Git staging fails after dependency verification.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1667",

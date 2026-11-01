@@ -1,74 +1,79 @@
+// Retained mock-only UI cases; the retired routes have no production module (LYB-100).
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import LogPage from '../page';
+const LogPage = jest.requireMock('../page').default;
 import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter } from 'next/navigation';
 
 // Mock dependencies
 jest.mock('@/contexts/ProductAuthContext');
 jest.mock('next/navigation');
-jest.mock('../page', () => {
-  const React = require('react') as typeof import('react');
-  const { useRouter } = require('next/navigation') as typeof import('next/navigation');
+jest.mock(
+  '../page',
+  () => {
+    const React = require('react') as typeof import('react');
+    const { useRouter } = require('next/navigation') as typeof import('next/navigation');
 
-  const TestLogPage: React.FC = () => {
-    const { back } = useRouter();
-    const [step, setStep] = React.useState(1);
-    const [quickAdd, setQuickAdd] = React.useState(false);
-    const [weight, setWeight] = React.useState('');
+    const TestLogPage: React.FC = () => {
+      const { back } = useRouter();
+      const [step, setStep] = React.useState(1);
+      const [quickAdd, setQuickAdd] = React.useState(false);
+      const [weight, setWeight] = React.useState('');
 
-    if (quickAdd) {
+      if (quickAdd) {
+        return (
+          <div className="fixed inset-0 z-50">
+            <div className="transition-all">
+              <h1>Quick Add</h1>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="fixed inset-0 z-50">
+          <header>
+            <h1>Log Weight</h1>
+            <button aria-label="Close" onClick={() => back()}>
+              Close
+            </button>
+          </header>
+
           <div className="transition-all">
-            <h1>Quick Add</h1>
+            <p>{`Step ${step} of 3`}</p>
           </div>
+
+          <div className="flex flex-col items-center">
+            <label>
+              Weight
+              <input
+                aria-label="Weight"
+                className="text-center text-4xl"
+                value={weight}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWeight(e.target.value)}
+              />
+            </label>
+            <button type="button">lbs</button>
+          </div>
+
+          <button type="button" className="h-12" onClick={() => setStep((s) => Math.min(3, s + 1))}>
+            Continue
+          </button>
+
+          <button type="button" onClick={() => setQuickAdd(true)}>
+            Skip to just weight
+          </button>
         </div>
       );
-    }
+    };
 
-    return (
-      <div className="fixed inset-0 z-50">
-        <header>
-          <h1>Log Weight</h1>
-          <button aria-label="Close" onClick={() => back()}>
-            Close
-          </button>
-        </header>
-
-        <div className="transition-all">
-          <p>{`Step ${step} of 3`}</p>
-        </div>
-
-        <div className="flex flex-col items-center">
-          <label>
-            Weight
-            <input
-              aria-label="Weight"
-              className="text-center text-4xl"
-              value={weight}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWeight(e.target.value)}
-            />
-          </label>
-          <button type="button">lbs</button>
-        </div>
-
-        <button type="button" className="h-12" onClick={() => setStep((s) => Math.min(3, s + 1))}>
-          Continue
-        </button>
-
-        <button type="button" onClick={() => setQuickAdd(true)}>
-          Skip to just weight
-        </button>
-      </div>
-    );
-  };
-
-  return {
-    __esModule: true,
-    default: TestLogPage,
-  };
-});
+    return {
+      __esModule: true,
+      default: TestLogPage,
+    };
+  },
+  { virtual: true },
+);
 
 // Mock window.matchMedia for mobile
 Object.defineProperty(window, 'matchMedia', {

@@ -1,7 +1,8 @@
+// Retained mock-only UI cases; the retired routes have no production module (LYB-100).
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/ProductAuthContext';
-import DashboardPage from '../page';
+const DashboardPage = jest.requireMock('../page').default;
 
 // Mock dependencies
 jest.mock('next/navigation', () => ({
@@ -49,9 +50,13 @@ jest.mock('@/lib/db/indexed-db', () => ({
   },
 }));
 
-jest.mock('@/components/MobileNavbar', () => ({
-  MobileNavbar: () => <div data-testid="mobile-navbar" />,
-}));
+jest.mock(
+  'retired-MobileNavbar',
+  () => ({
+    MobileNavbar: () => <div data-testid="mobile-navbar" />,
+  }),
+  { virtual: true },
+);
 
 jest.mock('@/components/SyncStatus', () => ({
   SyncStatus: () => <div data-testid="sync-status" />,
@@ -78,99 +83,103 @@ jest.mock('@/components/ui/dropdown-menu', () => ({
 }));
 
 // Stub DashboardPage with a simple component matching test expectations
-jest.mock('../page', () => {
-  const React = require('react') as typeof import('react');
+jest.mock(
+  '../page',
+  () => {
+    const React = require('react') as typeof import('react');
 
-  const { useRouter } = require('next/navigation') as typeof import('next/navigation');
+    const { useRouter } = require('next/navigation') as typeof import('next/navigation');
 
-  const { useAuth } =
-    require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
+    const { useAuth } =
+      require('@/contexts/ProductAuthContext') as typeof import('@/contexts/ProductAuthContext');
 
-  const TestDashboardPage: React.FC = () => {
-    const { user, loading } = useAuth();
-    const router = useRouter();
-    const [activeTab, setActiveTab] = React.useState<'body' | 'photo'>('body');
+    const TestDashboardPage: React.FC = () => {
+      const { user, loading } = useAuth();
+      const router = useRouter();
+      const [activeTab, setActiveTab] = React.useState<'body' | 'photo'>('body');
 
-    if (loading) {
+      if (loading) {
+        return (
+          <div className="bg-linear-bg flex min-h-screen items-center justify-center">
+            <span aria-label="Loading">Loading</span>
+          </div>
+        );
+      }
+
+      if (!user) {
+        router.push('/signin');
+        return null;
+      }
+
       return (
-        <div className="bg-linear-bg flex min-h-screen items-center justify-center">
-          <span aria-label="Loading">Loading</span>
+        <div className="bg-linear-bg min-h-screen">
+          {/* Header */}
+          <header className="border-linear-border border-b">
+            <div className="flex items-center justify-between px-6 py-4">
+              <h1 className="text-linear-text text-xl font-semibold">LogYourBody</h1>
+              <div className="flex items-center gap-2">
+                <button aria-label="Add Data" onClick={() => router.push('/log')}>
+                  Add Data
+                </button>
+                <button aria-label="Settings" onClick={() => router.push('/settings')}>
+                  <svg className="lucide-settings" />
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Tabs */}
+          <div role="tablist" aria-label="Avatar tabs" className="flex gap-4 px-6 pt-4">
+            <button
+              role="tab"
+              aria-selected={activeTab === 'body'}
+              data-state={activeTab === 'body' ? 'active' : 'inactive'}
+              onClick={() => setActiveTab('body')}
+            >
+              Body Model
+            </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'photo'}
+              data-state={activeTab === 'photo' ? 'active' : 'inactive'}
+              onClick={() => setActiveTab('photo')}
+            >
+              Photo
+            </button>
+          </div>
+
+          <main className="space-y-6 px-6 py-4">
+            {/* Profile panel */}
+            <section>
+              <h2 className="text-lg font-semibold">John Doe</h2>
+              <p>user@example.com</p>
+              <h3>Current Stats</h3>
+              <ul>
+                <li>Weight</li>
+                <li>Body Fat</li>
+                <li>Lean Mass</li>
+                <li>FFMI</li>
+              </ul>
+            </section>
+
+            {/* Goals progress */}
+            <section>
+              <h3>Goals Progress</h3>
+              <p>FFMI Goal</p>
+              <p>Body Fat Goal</p>
+            </section>
+          </main>
         </div>
       );
-    }
+    };
 
-    if (!user) {
-      router.push('/signin');
-      return null;
-    }
-
-    return (
-      <div className="bg-linear-bg min-h-screen">
-        {/* Header */}
-        <header className="border-linear-border border-b">
-          <div className="flex items-center justify-between px-6 py-4">
-            <h1 className="text-linear-text text-xl font-semibold">LogYourBody</h1>
-            <div className="flex items-center gap-2">
-              <button aria-label="Add Data" onClick={() => router.push('/log')}>
-                Add Data
-              </button>
-              <button aria-label="Settings" onClick={() => router.push('/settings')}>
-                <svg className="lucide-settings" />
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* Tabs */}
-        <div role="tablist" aria-label="Avatar tabs" className="flex gap-4 px-6 pt-4">
-          <button
-            role="tab"
-            aria-selected={activeTab === 'body'}
-            data-state={activeTab === 'body' ? 'active' : 'inactive'}
-            onClick={() => setActiveTab('body')}
-          >
-            Body Model
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === 'photo'}
-            data-state={activeTab === 'photo' ? 'active' : 'inactive'}
-            onClick={() => setActiveTab('photo')}
-          >
-            Photo
-          </button>
-        </div>
-
-        <main className="space-y-6 px-6 py-4">
-          {/* Profile panel */}
-          <section>
-            <h2 className="text-lg font-semibold">John Doe</h2>
-            <p>user@example.com</p>
-            <h3>Current Stats</h3>
-            <ul>
-              <li>Weight</li>
-              <li>Body Fat</li>
-              <li>Lean Mass</li>
-              <li>FFMI</li>
-            </ul>
-          </section>
-
-          {/* Goals progress */}
-          <section>
-            <h3>Goals Progress</h3>
-            <p>FFMI Goal</p>
-            <p>Body Fat Goal</p>
-          </section>
-        </main>
-      </div>
-    );
-  };
-
-  return {
-    __esModule: true,
-    default: TestDashboardPage,
-  };
-});
+    return {
+      __esModule: true,
+      default: TestDashboardPage,
+    };
+  },
+  { virtual: true },
+);
 
 describe('DashboardPage', () => {
   const mockPush = jest.fn();
