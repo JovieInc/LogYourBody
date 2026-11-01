@@ -165,6 +165,14 @@ def reviewed_project_pin(root, expected):
     return workflow, updated
 
 
+def projection_is_unmerged(root, output):
+    result = subprocess.run(
+        ["git", "ls-files", "--unmerged", "--", output],
+        cwd=root, check=True, capture_output=True, text=True,
+    )
+    return bool(result.stdout.strip())
+
+
 def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_project_sha256=None):
     root = Path(root).resolve()
     config = json.loads(repository_docs.local(root, "repository-docs.json").read_text())
@@ -176,6 +184,16 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
     unresolved = sorted(set(conflicts) - {"", output})
     if unresolved:
         raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
+    # A conflicted source map is rebuilt from the merged index.
+    # Unstaged worktree bytes and either parent's projection cannot change fingerprints.
+    if (
+        not refresh_lockfile
+        and not verify_lockfile
+        and reviewed_project_sha256 is None
+        and projection_is_unmerged(root, output)
+    ):
+        resolve_staged(root)
+        return
     pin_update = None
     if reviewed_project_sha256 is not None:
         pin_update = reviewed_project_pin(root, reviewed_project_sha256)
