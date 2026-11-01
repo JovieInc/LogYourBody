@@ -7,7 +7,11 @@ copy review is claimed.
 
 ## Approved wording
 
-> Stop this movement. If pain persists or gets worse, or you feel numbness or weakness, talk to a clinician.
+LYB-298 supersedes the original LYB-257 wording with its explicitly authorized
+default below. The shared runtime source is
+[`CONCERNING_PAIN_MESSAGE`](../../apps/web/src/lib/training/pain-policy.ts).
+
+> Stop this movement. If pain is persistent, worsening, or includes numbness, weakness, or other neurologic symptoms, seek evaluation from a qualified clinician.
 
 Show the entire message on **any pain report** during a movement. Do not wait
 for a severity score, a repeated report, another set or a duration threshold.
@@ -48,10 +52,10 @@ issue ID. Dependencies: this decision and the
 Extend the existing movement-response flow and deterministic review/action
 boundary; keep one implementation. The existing
 `TrainingSelectionView.swift` records pain and renders the server's message;
-`selection.ts` and `alternatives.ts` enforce symptom exclusions. Today the
-server message differs from this decision and the native flow offers no
-explicit pain-resolution confirmation. This decision does not change runtime
-behavior or certify those gaps as closed.
+`selection.ts` and `alternatives.ts` enforce symptom exclusions. LYB-298 shares
+the approved server copy and concerning-pain policy with selection and swap
+approval. The native flow still offers no explicit pain-resolution confirmation;
+that gap and the remaining UI/logic acceptance below stay with this follow-up.
 
 Implementation acceptance:
 

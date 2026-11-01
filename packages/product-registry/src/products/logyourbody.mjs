@@ -218,6 +218,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-173', reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.' },
       { value: 'https://linear.app/jovie/issue/LYB-174', reason: 'Source receipt for timestamped rolling training allocations and unfinished-work recovery; not a runtime endpoint.' },
       { value: 'https://linear.app/jovie/issue/LYB-176', reason: 'Source receipt for distinct exercise/setup selection, observed tolerability, approval and correction regression guards.' },
+      { value: 'https://linear.app/jovie/issue/LYB-298', reason: 'Source receipt for the concerning-pain movement pause policy and exact clinician-evaluation message; not a runtime endpoint.' },
       { value: 'https://linear.app/jovie/issue/LYB-189', reason: 'LYB-189 source evidence and Tim/legal review handoff for the Apple Health privacy disclosure.' },
       { value: 'https://linear.app/jovie/issue/LYB-194', reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.' },
       { value: 'https://linear.app/jovie/issue/LYB-47', reason: 'LYB-47 source evidence for dated metric observations and neutral trend semantics.' },
