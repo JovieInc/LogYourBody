@@ -175,6 +175,36 @@ test('conflicted source map refuses an unmerged fingerprint input', (t) => {
   assert.equal(f.git('ls-files', '--stage'), index);
 });
 
+test('conflicted source map refuses unstaged pinned drift without rewriting the projection', (t) => {
+  const f = sourceMapFixture(t);
+  writeFileSync(join(f.root, 'a.txt'), 'ours-a\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  writeFileSync(join(f.root, 'b.txt'), 'theirs-b\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  const merge = spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: f.root, env, encoding: 'utf8' });
+  assert.equal(merge.status, 1, merge.stderr);
+  const registry = JSON.parse(readFileSync(join(f.root, 'repository-docs.json'), 'utf8'));
+  registry.imports = [{
+    repository: 'example/policy',
+    revision: 'a'.repeat(40),
+    path: 'policy.md',
+    destination: 'policy.md',
+    sha256: '0'.repeat(64),
+  }];
+  writeFileSync(join(f.root, 'repository-docs.json'), JSON.stringify(registry));
+  const before = readFileSync(join(f.root, f.output));
+  const index = f.git('ls-files', '--stage');
+  const result = spawnSync('python3', [resolver, '--root', f.root], { env, encoding: 'utf8' });
+  assert.notEqual(result.status, 0, result.stdout);
+  assert.match(result.stderr, /pinned copy missing or changed: policy\.md/);
+  assert.deepEqual(readFileSync(join(f.root, f.output)), before);
+  assert.equal(f.git('ls-files', '--stage'), index);
+});
+
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
   for (const present of [true, false]) {
     test(`dependency repair ${mode} restores ${present ? 'existing' : 'missing'} outputs after staging fails`, (t) => {
