@@ -1,0 +1,36 @@
+{
+  "id": "LYB-303",
+  "parent": "LYB-173",
+  "status": "accepted",
+  "recorded_on": "2026-11-01",
+  "approval_basis": "ships-if-unanswered",
+  "question": "What safety bounds may a deload deferral or plan edit cross, and when may the product mention DEXA, without diagnosing?",
+  "decision": "A deload deferral or plan edit may stay inside the existing training-plan bounds, including a deferral that keeps the current plan when saved check-ins do not support a deload. Crossing those bounds requires a visible review checkpoint before the change applies. The product does not diagnose. It may mention a DEXA at most once every 30 days, only when a stated goal needs that measurement, and it does not insist.",
+  "deload_deferral": {
+    "limit": "in_bound_training_plan_adjustments_only",
+    "max_unreviewed_bound_crossings": 0,
+    "override_requires_visible_review_checkpoint": true,
+    "retains_current_plan_when_check_ins_do_not_support_deload": true,
+    "pain_pause_remains_authoritative": true,
+    "planned_deload_remains_authoritative": true
+  },
+  "plan_edit_limit": {
+    "limit": "in_bound_training_plan_adjustments_only",
+    "max_unreviewed_consequential_edits": 0,
+    "unsupported_edits_allowed": false,
+    "consequential_override_requires_visible_review_checkpoint": true
+  },
+  "minimum_days_between_dexa_suggestions": 30,
+  "dexa_suggestion": {
+    "insist": false,
+    "only_when_goal_needs_measurement": true
+  },
+  "diagnosis_allowed": false,
+  "silent_consequential_plan_change": false,
+  "boundaries": "Decision record only. This slice adds no workout UI, BodySpec client, runtime ranker, or training-engine change. Waiting longer than the DEXA minimum is allowed. A suggestion is not a measurement requirement.",
+  "standards": [
+    "docs/product/brand-ethos.md",
+    "docs/product/evidence-and-recommendation-standard.md",
+    "docs/product-development-roadmap.md"
+  ]
+}
