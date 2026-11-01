@@ -5,9 +5,6 @@
  * docs/product/wireframe-avatar-family.md. These shapes are original,
  * share one topology and one rig, and are not body-fat or FFMI values.
  */
-import { writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 export const MODEL_ID = 'lyb.wireframe.torso';
 export const MODEL_VERSION = '1.0.0';
@@ -478,18 +475,4 @@ export function assess(asset: WireframeAvatarAsset) {
   const refused = morph(resolved('male'), { ...resolved('female'), topologyId: 'smplx' }, 0.5);
   if (refused.ok) problems.push('cross-topology morph was accepted');
   return problems;
-}
-
-const assetPath = join(
-  dirname(fileURLToPath(import.meta.url)),
-  '../../../apps/ios/LogYourBody/Resources/WireframeAvatarFamily.json',
-);
-
-if (process.argv.includes('--write')) {
-  const asset = buildAsset();
-  const problems = assess(asset);
-  if (problems.length > 0) {
-    throw new Error(problems.join('\n'));
-  }
-  writeFileSync(assetPath, `${JSON.stringify(asset)}\n`);
 }

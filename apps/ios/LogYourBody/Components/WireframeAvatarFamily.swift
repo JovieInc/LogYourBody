@@ -289,13 +289,16 @@ enum WireframeAvatarLibrary {
     }
 
     static func fallbackWires() -> [[Int]] {
-        (0..<8).flatMap { segment in
-            [
-                [segment, (segment + 1) % 8],
-                [8 + segment, 8 + (segment + 1) % 8],
-                [segment, 8 + segment]
-            ]
+        // Nested array literals here blow the Swift type checker time budget.
+        var wires: [[Int]] = []
+        wires.reserveCapacity(24)
+        for segment in 0..<8 {
+            let next = (segment + 1) % 8
+            wires.append([segment, next])
+            wires.append([8 + segment, 8 + next])
+            wires.append([segment, 8 + segment])
         }
+        return wires
     }
 
     private static func cacheKey(presentation: String, adiposity: Double, muscularity: Double, frame: Double) -> String {

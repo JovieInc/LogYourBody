@@ -889,10 +889,7 @@ struct LaunchTimelineSurface: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-
-            // Behind the add-photo control. The stage height and that button stay as they are.
-            WireframeAvatarStage(topInset: 60)
-
+            WireframeAvatarStage(topInset: 60) // Behind the add-photo control.
             // The copy invites adding a photo, so the placeholder opens the attach sheet for this day.
             if let onAddPhoto {
                 Button(action: onAddPhoto) {
