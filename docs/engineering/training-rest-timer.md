@@ -54,6 +54,13 @@ are unchanged. Once the profile exists (`bundle exec fastlane setup_provisioning
 type:appstore readonly:false force:false`), revert the exclusion PR to restore the
 two-target release signing described above.
 
+Release archives stamp the pinned `CURRENT_PROJECT_VERSION` and `MARKETING_VERSION`
+onto every target with xcargs (LYB-336). The host `Info.plist` reads
+`$(CURRENT_PROJECT_VERSION)` and `$(MARKETING_VERSION)`. The extension generates
+its versions from those same settings. After export,
+`scripts/ios/check_embedded_bundle_versions.py` unzips the IPA and fails if any
+embedded `.appex` disagrees with the host.
+
 Validation entry points:
 
 - `TrainingSessionDraftTests`: exercise defaults, acknowledgement and retry, final
@@ -64,8 +71,11 @@ Validation entry points:
 - `python3 scripts/ios/test_training_rest_project.py`: actual build graph, shared
   attributes membership, extension embedding and plists.
 - `ruby scripts/ios/test_training_rest_release.rb`: actual release lane with
-  instrumented external actions, including default and explicit profile names.
-  Both scripts also run in the shared library's existing required test suite.
+  instrumented external actions, including default and explicit profile names
+  and the pinned version stamp.
+- `python3 scripts/ios/test_embedded_bundle_versions.py`: a mismatched extension
+  version fails the exported-IPA check.
+  These scripts also run in the shared library's existing required test suite.
 
 Linux lint and packaging tests do not replace native acceptance. Before rollout,
 run the native Unit selector and the UI case at the final commit, retain the required
