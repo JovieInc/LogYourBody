@@ -22,7 +22,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `86c9b97d1058a55f4e972f97dbeb88fe579a904b1f763df28b2a8af948e67022`)
 - `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `5a96cbfc2cbfad98715428422323ddf1dc82665fff746fda3331d93422b823d1`)
 - `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `6d4e837517b18d8d08933f7e3896a810fb932197f84e9e7dd281faba2ee76e4e`)
-- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3f1104f4c3a8d6c030f6e89f2795dcfd887998efea8a8fd9e5bcd7598cf93df0`)
+- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `345695942021d445210fd765248e6222c80078dfcc631ddc4558f85127995891`)
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf3cd24d39d6ff980d4bbc77b5ac72c1aa00aaeb7e92065e7bd467397ac1ac51`)
 - `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `ddc9efbe68915f529f7b828c7df5a88a00b14d20883e4e7ac9268b9278780110`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
@@ -391,7 +391,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
 - `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `accb93ae931ba6662990797662604d41922c5f815ffa48d90ade67e87abe1f3f`)
+- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `71a7c23032eb02adeda492aaf50d5c1b2465a23bb0fe329a639773f3fbcbebc0`)
 - `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `06c7ea820c1b1d4ed949201b839f4ba8b89e2b5bf51cd885b9bef36f9c3e4ca4`)
 
 ## Pinned shared sources
