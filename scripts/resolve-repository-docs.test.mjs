@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -91,6 +92,117 @@ test('documentation merge requires an active conflict and a regular documentatio
   assert.notEqual(f.resolve().status, 0, 'symlink stages are not documentation');
   f.git('merge', '--abort');
   assert.notEqual(f.resolve().status, 0, 'ordinary commits cannot generate a merge');
+});
+
+function sourceMapFixture(t) {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-source-map-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+  const output = 'SOURCES.md';
+  git('init', '-q', '-b', 'ours');
+  git('config', 'core.hooksPath', '/dev/null');
+  writeFileSync(join(root, 'README.md'), 'Local instructions\n');
+  writeFileSync(join(root, 'repository-docs.json'), JSON.stringify({
+    schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+    sources: [
+      { path: 'a.txt', purpose: 'First fingerprint' },
+      { path: 'b.txt', purpose: 'Second fingerprint' },
+    ],
+    imports: [], output,
+  }));
+  writeFileSync(join(root, 'a.txt'), 'base-a\n');
+  writeFileSync(join(root, 'b.txt'), 'base-b\n');
+  const generate = () => execFileSync('python3', [
+    fileURLToPath(new URL('./repository_docs.py', import.meta.url)), '--root', root, '--write',
+  ], { env });
+  const commit = () => {
+    git('add', '-A');
+    git('commit', '-qm', 'fixture');
+  };
+  generate();
+  commit();
+  git('branch', 'theirs');
+  return { root, git, output, generate, commit };
+}
+
+test('conflicted source map keeps both merged fingerprints and ignores unstaged source bytes', (t) => {
+  const f = sourceMapFixture(t);
+  writeFileSync(join(f.root, 'a.txt'), 'ours-a\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  writeFileSync(join(f.root, 'b.txt'), 'theirs-b\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  const merge = spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: f.root, env, encoding: 'utf8' });
+  assert.equal(merge.status, 1, merge.stderr);
+  assert.match(f.git('diff', '--name-only', '--diff-filter=U'), /^SOURCES\.md$/m);
+  const before = f.git('ls-files', '--stage');
+  writeFileSync(join(f.root, 'a.txt'), 'DIRTY\n');
+  const result = spawnSync('python3', [resolver, '--root', f.root], { env, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const staged = f.git('show', ':SOURCES.md');
+  const digest = (text) => createHash('sha256').update(text).digest('hex');
+  assert.equal(staged.includes('<<<<<<<'), false);
+  assert.match(staged, new RegExp(digest('ours-a\n')));
+  assert.match(staged, new RegExp(digest('theirs-b\n')));
+  assert.doesNotMatch(staged, new RegExp(digest('DIRTY\n')));
+  assert.equal(f.git('show', ':a.txt'), 'ours-a\n');
+  assert.equal(readFileSync(join(f.root, 'a.txt'), 'utf8'), 'DIRTY\n');
+  assert.equal(f.git('ls-files', '--unmerged'), '');
+  assert.notEqual(f.git('ls-files', '--stage'), before);
+});
+
+test('conflicted source map refuses an unmerged fingerprint input', (t) => {
+  const f = sourceMapFixture(t);
+  writeFileSync(join(f.root, 'a.txt'), 'ours-a\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  writeFileSync(join(f.root, 'a.txt'), 'theirs-a\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  const merge = spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: f.root, env, encoding: 'utf8' });
+  assert.equal(merge.status, 1, merge.stderr);
+  const before = readFileSync(join(f.root, f.output), 'utf8');
+  const index = f.git('ls-files', '--stage');
+  const result = spawnSync('python3', [resolver, '--root', f.root], { env, encoding: 'utf8' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /resolve source conflicts first: a\.txt/);
+  assert.equal(readFileSync(join(f.root, f.output), 'utf8'), before);
+  assert.equal(f.git('ls-files', '--stage'), index);
+});
+
+test('conflicted source map refuses unstaged pinned drift without rewriting the projection', (t) => {
+  const f = sourceMapFixture(t);
+  writeFileSync(join(f.root, 'a.txt'), 'ours-a\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  writeFileSync(join(f.root, 'b.txt'), 'theirs-b\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  const merge = spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: f.root, env, encoding: 'utf8' });
+  assert.equal(merge.status, 1, merge.stderr);
+  const registry = JSON.parse(readFileSync(join(f.root, 'repository-docs.json'), 'utf8'));
+  registry.imports = [{
+    repository: 'example/policy',
+    revision: 'a'.repeat(40),
+    path: 'policy.md',
+    destination: 'policy.md',
+    sha256: '0'.repeat(64),
+  }];
+  writeFileSync(join(f.root, 'repository-docs.json'), JSON.stringify(registry));
+  const before = readFileSync(join(f.root, f.output));
+  const index = f.git('ls-files', '--stage');
+  const result = spawnSync('python3', [resolver, '--root', f.root], { env, encoding: 'utf8' });
+  assert.notEqual(result.status, 0, result.stdout);
+  assert.match(result.stderr, /pinned copy missing or changed: policy\.md/);
+  assert.deepEqual(readFileSync(join(f.root, f.output)), before);
+  assert.equal(f.git('ls-files', '--stage'), index);
 });
 
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
