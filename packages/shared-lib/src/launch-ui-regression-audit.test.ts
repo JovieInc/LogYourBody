@@ -50,8 +50,7 @@ it('checks Stats composition, card styling and provenance dismissal through the 
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
   for (const input of [
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-audit.py',
-    '$TURBO_ROOT$/scripts/ios/launch_ui_home_interaction_audit.py',
-    '$TURBO_ROOT$/scripts/ios/launch_ui_timeline_calendar_audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_*.py',
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-report.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
     '$TURBO_ROOT$/apps/ios/LogYourBodyWidget/**/*.swift',
@@ -59,6 +58,22 @@ it('checks Stats composition, card styling and provenance dismissal through the 
   ]) {
     expect(turbo.tasks.test.inputs).toContain(input);
   }
+  const audit = readFileSync(
+    new URL('../../../scripts/ios/launch-ui-regression-audit.py', import.meta.url),
+    'utf8',
+  );
+  // launch audit loads every size-ratchet check sibling
+  expect(audit).toContain('Cannot load launch UI audit sibling');
+  expect(audit).toContain('launch_ui_*.py');
+  expect(audit).toContain('def load_check_siblings');
+  expect(audit).toContain('launch-ui-regression-report.py');
+  expect(audit).not.toMatch(/^def write_outputs\(/m);
+  expect(audit).not.toMatch(/^def check_timeline_calendar_day\(/m);
+  expect(audit).not.toMatch(/^def check_home_interaction\(/m);
+  readFileSync(
+    new URL('../../../scripts/ios/launch_ui_home_interaction_audit.py', import.meta.url),
+  );
+  readFileSync(new URL('../../../scripts/ios/launch_ui_timeline_day.py', import.meta.url));
   const coverage = mkdtempSync(`${tmpdir()}/lyb-ui-audit-coverage-`);
   try {
     const pythonLibrary = execFileSync('python3', ['-c', 'import sys; print(sys.prefix)'], {

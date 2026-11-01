@@ -99,6 +99,7 @@ jobs:
       ios_unit: ${{ steps.filter.outputs.ios_unit }}
       ios_quality: ${{ steps.filter.outputs.ios_quality }}
       ios_quality_deferred: ${{ steps.filter.outputs.ios_quality_deferred }}
+      signing: ${{ steps.filter.outputs.signing }}
     steps:
       - uses: actions/checkout@v4
 
@@ -138,7 +139,7 @@ jobs:
         run: node --test .github/scripts/verify-public-build-env-types.test.mjs
 
       - name: Test change detection and the CI Summary gate
-        run: node --test .github/scripts/detect-changes.test.mjs
+        run: node --test .github/scripts/detect-changes.test.mjs .github/scripts/detect-changes-signing.test.mjs
 
       - name: Test agent environment lifecycle with coverage
         run: >-
@@ -480,11 +481,42 @@ jobs:
           path: apps/ios/test_results/storekit/${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
 
+  release-signing:
+    name: Release signing provisioned
+    needs: detect-changes
+    if: needs.detect-changes.outputs.signing == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      conclusion: ${{ steps.check.outputs.conclusion }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Test release signing provisioning check
+        run: node --test .github/scripts/release-signing-provisioned.test.mjs
+
+      - name: Read App Store Connect
+        id: check
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          FORK: ${{ github.event.pull_request.head.repo.fork == true }}
+        run: node .github/scripts/release-signing-provisioned.mjs
+
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
     if: always()
-    needs: [detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_static, ios_storekit]
+    needs: [detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_static, ios_storekit, release-signing]
     steps:
       - name: Check results
         run: |
@@ -504,6 +536,34 @@ jobs:
             fi
           }
 
+          # Forks have no App Store Connect credentials. Neutral is the only
+          # result that counts: a green success there would be a silent pass.
+          assert_signing() {
+            local changed="$1"
+            local result="$2"
+            local conclusion="$3"
+            local fork="$4"
+            if [[ "$changed" == "true" ]]; then
+              if [[ "$fork" == "true" ]]; then
+                if [[ "$result" != "success" || "$conclusion" != "neutral" ]]; then
+                  echo "::error::Release signing provisioned was '$result'/'$conclusion'; a fork pull request must finish neutral and must not pass"
+                  return 1
+                fi
+                echo "Release signing provisioned: neutral. Fork pull request, no App Store Connect credentials. Not a pass. Runbook: docs/engineering/signing-expiry.md" >> "$GITHUB_STEP_SUMMARY"
+                return 0
+              fi
+              if [[ "$result" != "success" || "$conclusion" != "success" ]]; then
+                echo "::error::Release signing provisioned was '$result'/'$conclusion'; expected success"
+                return 1
+              fi
+              return 0
+            fi
+            if [[ "$result" != "skipped" ]]; then
+              echo "::error::Release signing provisioned was '$result'; expected skipped because signing inputs did not change"
+              return 1
+            fi
+          }
+
           storekit_expected=false
           if [[ "${{ github.event_name }}" == "push" ]] || \
              [[ "${{ github.event_name }}" == "merge_group" && "${{ needs.detect-changes.outputs.ios_changed }}" == "true" ]]; then
@@ -519,6 +579,8 @@ jobs:
             echo "- iOS Launch Quality runs here: ${{ needs.detect-changes.outputs.ios_quality }} (deferred for draft: ${{ needs.detect-changes.outputs.ios_quality_deferred }})"
             echo "- iOS quality gate: ${{ needs.ios_quality.result }}"
             echo "- iOS StoreKit purchase and restore: ${{ needs.ios_storekit.result }}"
+            echo "- Release signing changed: ${{ needs.detect-changes.outputs.signing }}"
+            echo "- Release signing provisioned: ${{ needs.release-signing.result }} (${{ needs.release-signing.outputs.conclusion }})"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -528,7 +590,8 @@ jobs:
              ! assert_expected_result "iOS" "${{ needs.detect-changes.outputs.ios_unit }}" "${{ needs.ios.result }}" || \
              ! assert_expected_result "iOS StoreKit" "$storekit_expected" "${{ needs.ios_storekit.result }}" || \
              ! assert_expected_result "iOS Static Audits" "${{ needs.detect-changes.outputs.ios_quality }}" "${{ needs.ios_static.result }}" || \
-             ! assert_expected_result "iOS Launch Quality Gate" "${{ needs.detect-changes.outputs.ios_quality }}" "${{ needs.ios_quality.result }}"; then
+             ! assert_expected_result "iOS Launch Quality Gate" "${{ needs.detect-changes.outputs.ios_quality }}" "${{ needs.ios_quality.result }}" || \
+             ! assert_signing "${{ needs.detect-changes.outputs.signing }}" "${{ needs.release-signing.result }}" "${{ needs.release-signing.outputs.conclusion }}" "${{ github.event.pull_request.head.repo.fork }}"; then
             echo "❌ One or more CI jobs failed" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi

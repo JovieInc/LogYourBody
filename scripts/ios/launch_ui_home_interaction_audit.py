@@ -5,6 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def function_body(text: str, name: str, next_name: str) -> str:
+    if f"func {name}" not in text or f"func {next_name}" not in text:
+        return ""
+    chunk = text.split(f"func {name}", 1)[1].split(f"func {next_name}", 1)[0]
+    return chunk.split("{", 1)[1] if "{" in chunk else ""
+
+
+def contribute(root: Path, app_dir: Path, violations: list, violation, _line_number) -> None:
+    check(root, app_dir, violations, function_body, violation)
+
+
 def check(root: Path, app_dir: Path, violations: list, function_body, violation) -> None:
     """The provenance chip stays above the weekly prompt, and typed characters refocus."""
     surface = app_dir / "Views/HomeV2/HomeV2Surface.swift"

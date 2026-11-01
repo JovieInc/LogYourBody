@@ -11,6 +11,41 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+def _load_sibling(module_name: str, filename: str, directory: Path | None = None):
+    """Load an extracted audit sibling. A missing module fails closed."""
+    path = (directory or Path(__file__).parent) / filename
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load launch UI audit sibling: {path}")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except FileNotFoundError as error:
+        raise RuntimeError(f"Cannot load launch UI audit sibling: {path}") from error
+    return module
+
+
+def load_check_siblings(directory: Path | None = None):
+    """Load every launch_ui check sibling. A missing contribute fails closed."""
+    directory = directory or Path(__file__).parent
+    paths = sorted(directory.glob("launch_ui_*.py"))
+    if not paths:
+        raise RuntimeError(f"Cannot load launch UI audit sibling: {directory / 'launch_ui_*.py'}")
+    modules = []
+    for path in paths:
+        module = _load_sibling(path.stem, path.name, directory)
+        if not callable(getattr(module, "contribute", None)):
+            raise RuntimeError(f"Cannot load launch UI audit sibling: {path}")
+        modules.append(module)
+    return modules
+
+
+_CHECK_SIBLINGS = load_check_siblings()
+write_outputs = _load_sibling(
+    "launch_ui_regression_report", "launch-ui-regression-report.py"
+).write_outputs
+
+
 @dataclass
 class AuditViolation:
     check: str
@@ -87,43 +122,6 @@ def require_one_of_tokens(
             detail=detail,
         )
     )
-
-
-def _load_report_writer():
-    path = Path(__file__).with_name("launch-ui-regression-report.py")
-    spec = importlib.util.spec_from_file_location("launch_ui_regression_report", path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Cannot load launch UI report writer: {path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.write_outputs
-
-
-write_outputs = _load_report_writer()
-
-
-def function_body(text: str, name: str, next_name: str) -> str:
-    if f"func {name}" not in text or f"func {next_name}" not in text:
-        return ""
-    chunk = text.split(f"func {name}", 1)[1].split(f"func {next_name}", 1)[0]
-    return chunk.split("{", 1)[1] if "{" in chunk else ""
-
-
-def check_timeline_calendar_day(root: Path, violations: list[AuditViolation]) -> None:
-    import importlib.util
-    path = Path(__file__).with_name("launch_ui_timeline_calendar_audit.py")
-    spec = importlib.util.spec_from_file_location("launch_ui_timeline_calendar_audit", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    module.check(root, violations, line_number, function_body, AuditViolation)
-
-
-def check_home_interaction(root: Path, app_dir: Path, violations: list[AuditViolation]) -> None:
-    path = Path(__file__).with_name("launch_ui_home_interaction_audit.py")
-    spec = importlib.util.spec_from_file_location("launch_ui_home_interaction_audit", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    module.check(root, app_dir, violations, function_body, AuditViolation)
 
 
 def main() -> int:
@@ -450,8 +448,8 @@ def main() -> int:
         ))
 
     # Timeline positions follow the injected calendar day, not elapsed 86400-second offsets.
-    check_timeline_calendar_day(root, violations)
-    check_home_interaction(root, app_dir, violations)
+    for module in _CHECK_SIBLINGS:
+        module.contribute(root, app_dir, violations, AuditViolation, line_number)
 
     write_outputs(args.artifact_dir, violations)
     if violations:

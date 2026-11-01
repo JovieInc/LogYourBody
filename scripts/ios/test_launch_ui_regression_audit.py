@@ -347,6 +347,41 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         self.assert_rejected("chat.synthetic_typing_refocuses")
 
 
+class CheckSiblingDiscoveryTests(unittest.TestCase):
+    def test_every_check_sibling_contributes_and_a_missing_hook_fails_closed(self):
+        # The coverage tracer reads these modules after the suite returns.
+        directory = Path(tempfile.mkdtemp(prefix="lyb-audit-siblings-"))
+        (directory / "launch_ui_beta.py").write_text(
+            "def contribute(bucket, *args):\n    bucket.append('beta')\n"
+        )
+        (directory / "launch_ui_alpha.py").write_text(
+            "def contribute(bucket, *args):\n    bucket.append('alpha')\n"
+        )
+        (directory / "notes.py").write_text("def contribute(bucket, *args):\n    bucket.append('nope')\n")
+        seen = []
+        for module in AUDIT.load_check_siblings(directory):
+            module.contribute(seen)
+        self.assertEqual(seen, ["alpha", "beta"])
+        (directory / "launch_ui_broken.py").write_text("def check():\n    return None\n")
+        with self.assertRaises(RuntimeError) as broken:
+            AUDIT.load_check_siblings(directory)
+        self.assertIn("Cannot load launch UI audit sibling", str(broken.exception))
+        empty = directory / "empty"
+        empty.mkdir()
+        with self.assertRaises(RuntimeError) as missing:
+            AUDIT.load_check_siblings(empty)
+        self.assertIn("Cannot load launch UI audit sibling", str(missing.exception))
+        with self.assertRaises(RuntimeError) as absent:
+            AUDIT._load_sibling("absent.py", "absent.py", empty)
+        self.assertIn("Cannot load launch UI audit sibling", str(absent.exception))
+
+    def test_shipped_check_siblings_include_home_and_timeline(self):
+        names = [module.__name__ for module in AUDIT._CHECK_SIBLINGS]
+        self.assertIn("launch_ui_home_interaction_audit", names)
+        self.assertIn("launch_ui_timeline_day", names)
+        self.assertNotIn("launch_ui_timeline_calendar_audit", names)
+
+
 def run_behavior_suite(suite):
     expected = suite.countTestCases()
     result = unittest.TextTestRunner().run(suite)
