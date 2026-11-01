@@ -121,6 +121,13 @@ non-documentation paths. It does not adjudicate contradictory prose.
 Repair a conflicted source projection first with
 `python3 scripts/resolve-repository-docs.py --staged`. If staging fails, it restores
 the original projection bytes (or absence), so the same command remains retryable.
+When the merged `project.pbxproj` is already stage zero and the diagnostic workflow
+conflicts only on its project pin, pass the reviewed digest of that staged project:
+`python3 scripts/resolve-repository-docs.py --reviewed-project-sha256 <digest>`.
+The command writes that pin, rebuilds a conflicted source projection from the index,
+and leaves the correction ledger untouched. It refuses any wider workflow conflict,
+a digest that does not match the staged project, a dirty project, and a hand-edited
+workflow. It never derives the digest. Resolve the ledger afterwards.
 The shared readiness check also rejects newly added conflict markers in the index,
 including diff3 base markers, markers shorter than seven characters, and files
 marked binary by Git attributes, before

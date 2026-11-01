@@ -1,36 +1,36 @@
 [
   {
-    "fingerprint": "weekly-photo-prompt-keeps-provenance-chip-tappable",
+    "fingerprint": "diagnostic-pin-conflict-uses-reviewed-merged-digest",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
-    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 4: Launch Quality run 41336887265 fails testProgressShareKeepsSelectedMetricAndVisibleValue because the weekly photo prompt sits between the photo pager and the provenance chip, pushing the chip under the dock on a 393 by 852 phone. The tap reaches the dock, so the provenance sheet never appears. Tently reports an AI-provider outage and stays unchanged.",
-    "mechanization": "Render the weekly photo prompt inside the photo number block immediately after the provenance chip, so the chip keeps its pre-prompt position above the dock and the prompt still shows without replacing the check-in dock. Extend the existing launch UI regression audit, through its home-interaction sibling, to reject a prompt that renders before the chip. That mutation fails on the old order and passes after the move. Origin/main is already merged as d28b97ba6. Native XCTest stays unverified on this Linux host. The harness owns push and PR-body edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "correction": "PR #1699 / LYB-312, fix-red-95726c4f82 occurrence 17: merge origin/main without rebasing. The diagnostic workflow conflicts only on the project.pbxproj pin after weekly photo membership and wireframe membership both land. Tently reports an AI-provider outage and no source finding; do not bypass that gate.",
+    "mechanization": "Extend the existing source-map resolver so --reviewed-project-sha256 replaces a pin-only workflow conflict with the explicit digest of the staged merged project, rebuilds a conflicted projection from the index, and leaves the correction ledger untouched. The real-Git regression fails on the previous resolver, which stops before the digest is applied, and passes after the extension. Wider workflow conflicts, a mismatched digest, a dirty project, a manual workflow edit, and any other unmerged path still fail with the files and index unchanged. The no-flag path still refuses to derive a digest. Use the extended resolver for this merge, then the existing ledger union. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
     "classification": {
       "codebase": {
         "feasible": true,
-        "rationale": "The home column renders the prompt after the provenance chip, so the chip stays above the dock instead of being pushed into the check-in control."
+        "rationale": "The resolver owns the diagnostic project pin during a merge. It writes only an explicit digest that matches the staged merged project, and only when the workflow conflict is that pin."
       }
     },
     "guard": {
-      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
-      "anchor": "Place the weekly photo prompt after the provenance chip so the chip stays above the dock."
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Replace a pin-only diagnostic workflow conflict with the explicit reviewed project digest."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
   },
   {
-    "fingerprint": "synthetic-chat-typing-refocuses-dropped-keyboard",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
-    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 4: Launch Quality run 41336887265 fails testHomeV2AskSyntheticCancelledTurnRecovers because submitSyntheticChatQuestion calls typeText after the keyboard drops. The composer holds only S and event synthesis aborts the test before the retry loop. Tently reports an AI-provider outage and stays unchanged.",
-    "mechanization": "Inside the synthetic character loop, refocus the composer and wait for the keyboard when it is absent, then enter the next character. Stop the loop without sending a partial question if the keyboard never returns. Extend the existing launch UI regression audit so a character loop that enters text before checking keyboard.exists is rejected. The mutation fails when that check is removed and passes with it. The harness owns push and PR-body edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "fingerprint": "conflicted-source-map-index-rebuild",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1702",
+    "correction": "PR #1702 / LYB-337, fix-red-95726c4f82 occurrence 16: merge origin/main without rebasing. The generated source map conflicts because each parent changed a different fingerprint. Tently reports an AI-provider outage and no source finding; do not bypass that gate. Rebuilding the map from a dirty worktree would publish unstaged bytes as the committed fingerprints.",
+    "mechanization": "Extend the existing source-map resolver so an unmerged projection is rebuilt from the merged index and staged, leaving unstaged source edits untouched and refusing any other unmerged path. The new real-Git regression fails while the resolver reads the worktree and passes after the index rebuild; the unmerged-input refusal stays in the same required suite. Use that command to stage this merge's map. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
     "classification": {
       "codebase": {
         "feasible": true,
-        "rationale": "The character loop refocuses and confirms the keyboard before each character, so a dropped keyboard no longer aborts event synthesis on the first unfocused character."
+        "rationale": "The resolver owns writing and staging the projection during a merge. Reading stage-zero sources prevents unstaged worktree bytes and either parent projection from becoming the committed fingerprints."
       }
     },
     "guard": {
-      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
-      "anchor": "Refocus the composer when the keyboard drops before each synthetic character."
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "A conflicted source map is rebuilt from the merged index."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -5621,5 +5621,41 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "weekly-photo-prompt-keeps-provenance-chip-tappable",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 4: Launch Quality run 41336887265 fails testProgressShareKeepsSelectedMetricAndVisibleValue because the weekly photo prompt sits between the photo pager and the provenance chip, pushing the chip under the dock on a 393 by 852 phone. The tap reaches the dock, so the provenance sheet never appears. Tently reports an AI-provider outage and stays unchanged.",
+    "mechanization": "Render the weekly photo prompt inside the photo number block immediately after the provenance chip, so the chip keeps its pre-prompt position above the dock and the prompt still shows without replacing the check-in dock. Extend the existing launch UI regression audit, through its home-interaction sibling, to reject a prompt that renders before the chip. That mutation fails on the old order and passes after the move. Origin/main is already merged as d28b97ba6. Native XCTest stays unverified on this Linux host. The harness owns push and PR-body edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The home column renders the prompt after the provenance chip, so the chip stays above the dock instead of being pushed into the check-in control."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "Place the weekly photo prompt after the provenance chip so the chip stays above the dock."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "synthetic-chat-typing-refocuses-dropped-keyboard",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 4: Launch Quality run 41336887265 fails testHomeV2AskSyntheticCancelledTurnRecovers because submitSyntheticChatQuestion calls typeText after the keyboard drops. The composer holds only S and event synthesis aborts the test before the retry loop. Tently reports an AI-provider outage and stays unchanged.",
+    "mechanization": "Inside the synthetic character loop, refocus the composer and wait for the keyboard when it is absent, then enter the next character. Stop the loop without sending a partial question if the keyboard never returns. Extend the existing launch UI regression audit so a character loop that enters text before checking keyboard.exists is rejected. The mutation fails when that check is removed and passes with it. The harness owns push and PR-body edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The character loop refocuses and confirms the keyboard before each character, so a dropped keyboard no longer aborts event synthesis on the first unfocused character."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "Refocus the composer when the keyboard drops before each synthetic character."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

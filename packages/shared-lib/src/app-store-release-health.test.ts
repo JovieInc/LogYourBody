@@ -203,6 +203,38 @@ describe('release and phased rollout fixture actions', () => {
     expect(result.requests.filter((r: { host: string }) => r.host === 'sentry.io')).toEqual([]);
   });
 
+  it('releases approved 1.2.0 when main is at 1.3.0 and APP_VERSION is unset', () => {
+    const result = run({ pending_behind_marketing: true, omit_app_version: true });
+    expect(result.exit_code).toBe(0);
+    expect(result.summary).toContain('HEALTHY');
+    expect(result.summary).toContain('requested release of 1.2.0 (pending-120)');
+    expect(mutations(result)).toMatchObject([
+      {
+        method: 'POST',
+        path: '/v1/appStoreVersionReleaseRequests',
+        body: {
+          data: {
+            type: 'appStoreVersionReleaseRequests',
+            relationships: {
+              appStoreVersion: { data: { type: 'appStoreVersions', id: 'pending-120' } },
+            },
+          },
+        },
+      },
+    ]);
+    const sessions = result.requests.filter((r: { host: string }) => r.host === 'sentry.io');
+    expect(sessions).toHaveLength(2);
+    expect(sessions[0].query).toContainEqual(['query', 'release:"ios-1.2.0 (120)"']);
+    expect(sessions[1].query).toContainEqual(['query', 'release:"ios-1.1.0 (110)"']);
+  });
+
+  it('keeps a manual app_version pinned to 1.3.0 from releasing approved 1.2.0', () => {
+    const result = run({ pending_behind_marketing: true, app_version: '1.3.0' });
+    expect(result.exit_code).toBe(0);
+    expect(mutations(result)).toEqual([]);
+    expect(result.summary).not.toContain('requested release of 1.2.0');
+  });
+
   it('retains a mandatory pre-release health gate in the submission and monitor workflows', () => {
     const submit = readFileSync(`${root}/.github/workflows/ios-release-loop.yml`, 'utf8');
     expect(submit).toContain('automatic_release:false');
@@ -213,7 +245,16 @@ describe('release and phased rollout fixture actions', () => {
       'utf8',
     );
     expect(monitor).toContain("cron: '*/30 * * * *'");
+    expect(monitor).toContain('about 3-7 hours apart');
+    expect(monitor).toContain('LYB-139');
+    expect(monitor).toContain('github.event.inputs.app_version');
+    expect(monitor).not.toContain('MARKETING_VERSION');
+    expect(monitor).not.toContain('project.pbxproj');
     expect(monitor).toContain('issues: write');
+    const runbook = readFileSync(`${root}/docs/RELEASE_APP_STORE.md`, 'utf8');
+    expect(runbook).toContain('about 3-7 hours apart');
+    expect(runbook).toContain('PENDING_DEVELOPER_RELEASE');
+    expect(runbook).not.toContain('runs every 30 minutes');
     expect(monitor).toContain('SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}');
     expect(monitor).toContain('GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}');
     const ci = readFileSync(`${root}/.github/workflows/ci.yml`, 'utf8');

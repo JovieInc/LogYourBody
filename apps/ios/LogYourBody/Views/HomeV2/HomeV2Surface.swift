@@ -382,6 +382,19 @@ struct HomeV2DataHero: View {
     }
 
     var body: some View {
+        ZStack {
+            HomeV2Tokens.Colors.card
+            WireframeAvatarStage(topInset: 8)
+            savedGraphic
+                .allowsHitTesting(false)
+                .accessibilityElement(children: .contain)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Measurements stay readable and identifiable. Hits pass through to the wireframe.
+    private var savedGraphic: some View {
         VStack(spacing: 0) {
             if let bodyFat {
                 bodyFatGraphic(bodyFat)
@@ -396,9 +409,6 @@ struct HomeV2DataHero: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(HomeV2Tokens.Colors.card)
-        .accessibilityElement(children: .contain)
     }
 
     private func bodyFatGraphic(_ reading: HomeV2EditorialPolicy.BodyFatReading) -> some View {
