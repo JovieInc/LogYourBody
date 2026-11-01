@@ -16,7 +16,7 @@ Derivatives live in memory for the session. Durable mask files stay with the exi
 
 ## Tests
 
-`BodyPhotoPresentationTests` (registered on the LogYourBodyTests target, journey 9; alignment cases are an extension in `BodyPhotoPresentationTests+Alignment.swift`):
+`BodyPhotoPresentationTests` and `BodyPhotoAlignmentTests` (both on the LogYourBodyTests target, journey 9; alignment cases are their own suite in `BodyPhotoPresentationTests+Alignment.swift`):
 
 - Subject color is unchanged across four skin tones and three sizes.
 - Background dim and the frame stroke do not rewrite the source or the subject.

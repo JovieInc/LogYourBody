@@ -18,7 +18,7 @@ final class BodyPhotoPresentationTests: XCTestCase {
         var preserved: [(UInt8, UInt8, UInt8)] = []
         for tone in tones {
             for size in sizes {
-                let source = try pixels(width: size.width, height: size.height, red: 20, green: 90, blue: 200)
+                var source = try pixels(width: size.width, height: size.height, red: 20, green: 90, blue: 200)
                 fill(&source.pixels, width: size.width, rect: subjectRect(width: size.width, height: size.height), color: tone)
                 var mask = PersonMaskGrid(
                     width: size.width,

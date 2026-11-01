@@ -6,7 +6,7 @@ import UIKit
 import XCTest
 @testable import LogYourBody
 
-extension BodyPhotoPresentationTests {
+final class BodyPhotoAlignmentTests: XCTestCase {
     func testAlignmentUsesTorsoLengthAndKeepsShoulderWidth() throws {
         let narrow = frame(shoulderSpan: 20, torso: 80, wrist: CGPoint(x: 10, y: 70))
         let wide = frame(shoulderSpan: 50, torso: 80, wrist: CGPoint(x: 90, y: 20))
