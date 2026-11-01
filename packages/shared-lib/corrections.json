@@ -5563,5 +5563,27 @@
       "path": "packages/shared-lib/src/program-revision-rationale-wording.test.ts",
       "anchor": "program revision rationale wording policy (LYB-277)"
     }
+  },
+  {
+    "fingerprint": "timeline-calendar-day-position",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41299089691",
+    "correction": "PR #1687 / LYB-286, fix-red-95726c4f82 occurrence 11: merge-group iOS failed testSingleRecentMetricMapsToDailyImportanceNearNewestPosition because a 72-hour offset is two Pacific calendar days during the DST fallback hour (position 0.9533333333333334 versus 0.93 +/- 0.02). Tently reports an AI-provider outage without code findings.",
+    "mechanization": "Extend TimelineCalculator to take the caller clock and calendar, and build timeline fixtures with calendar day offsets from that same clock. Extend the existing launch UI regression audit to reject a fresh clock inside the position functions and elapsed day offsets in the timeline tests, and require the Pacific fallback-hour regression. The new audit cases fail on the recorded helper and a restored live clock, then pass on the repaired sources. The harness owns push and PR-body updates and must add exactly one machine line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Injecting the clock makes one calculation reproducible, but the calculator cannot stop a test from building its metric with elapsed seconds and expecting a three-calendar-day position."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required launch UI audit can reject a recaptured clock and elapsed day-offset fixtures, and can require the fallback-hour regression that failed in the merge group."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "Timeline positions follow the injected calendar day, not elapsed 86400-second offsets."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

@@ -36,7 +36,11 @@ class TimelineCalculator {
     /// Calculate weighted timeline positions for body metrics
     /// - Parameter metrics: Array of BodyMetrics sorted by date (newest first)
     /// - Returns: Array of TimelineDataPoint with weighted positions
-    static func calculateTimelinePoints(from metrics: [BodyMetrics]) -> [TimelineDataPoint] {
+    static func calculateTimelinePoints(
+        from metrics: [BodyMetrics],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [TimelineDataPoint] {
         guard !metrics.isEmpty else { return [] }
 
         // Sort metrics oldest to newest for easier calculation
@@ -51,9 +55,7 @@ class TimelineCalculator {
             return []
         }
 
-        let now = Date()
         var timelinePoints: [TimelineDataPoint] = []
-        let calendar = Calendar.current
 
         // Calculate time intervals from now
         let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: now) ?? now
@@ -89,7 +91,12 @@ class TimelineCalculator {
         }
 
         // Calculate weighted positions
-        timelinePoints = calculateWeightedPositions(points: timelinePoints, newestDate: newestDate)
+        timelinePoints = calculateWeightedPositions(
+            points: timelinePoints,
+            newestDate: newestDate,
+            now: now,
+            calendar: calendar
+        )
 
         if let key = cacheKey {
             timelineCache.setValue(timelinePoints, for: key)
@@ -100,10 +107,12 @@ class TimelineCalculator {
 
     /// Calculate weighted positions where recent dates get more timeline space
     /// 70% of timeline = last 30 days, 20% = last year, 10% = everything older
-    private static func calculateWeightedPositions(points: [TimelineDataPoint], newestDate: Date) -> [TimelineDataPoint] {
-        let calendar = Calendar.current
-        let now = Date()
-
+    private static func calculateWeightedPositions(
+        points: [TimelineDataPoint],
+        newestDate: Date,
+        now: Date,
+        calendar: Calendar
+    ) -> [TimelineDataPoint] {
         let thirtyDaysAgo = calendar.date(byAdding: .day, value: -30, to: now) ?? now
         let oneYearAgo = calendar.date(byAdding: .year, value: -1, to: now) ?? now
 

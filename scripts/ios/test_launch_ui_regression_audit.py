@@ -293,6 +293,31 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 self.assert_rejected("dashboard.checkin_card_hit_region")
                 path.write_text(source)
 
+    def test_timeline_position_uses_the_injected_calendar_day(self):
+        calculator = self.app / "Helpers/TimelineCalculator.swift"
+        original = calculator.read_text()
+        self.assertIn("now: Date = Date()", original)
+        self.assertIn("if point.date >= thirtyDaysAgo {", original)
+        tests = self.root / "apps/ios/LogYourBodyTests/TimelineCalculatorTests.swift"
+        tests.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / "apps/ios/LogYourBodyTests/TimelineCalculatorTests.swift", tests)
+        self.assertEqual(self.run_audit()[0], 0)
+
+        tests.write_text("let date = now.addingTimeInterval(-daysAgo * 24 * 60 * 60)\n")
+        self.assert_rejected("timeline.elapsed_day_offset")
+        self.assert_rejected("timeline.fallback_hour_regression")
+
+        tests.unlink()
+        calculator.write_text(original.replace(
+            "if point.date >= thirtyDaysAgo {",
+            "if point.date >= thirtyDaysAgo {\n            let now = Date()",
+            1,
+        ))
+        self.assert_rejected("timeline.injected_calendar_day")
+
+        calculator.write_text(original.replace("now: Date = Date(),\n        ", "", 1))
+        self.assert_rejected("timeline.injected_calendar_day")
+
 
 def run_behavior_suite(suite):
     expected = suite.countTestCases()
