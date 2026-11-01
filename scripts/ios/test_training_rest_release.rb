@@ -41,6 +41,8 @@ ENV['APP_IDENTIFIER'] = 'com.logyourbody.app'
 ENV['APPLE_TEAM_ID'] = 'fixture-team'
 ENV['MATCH_GIT_URL'] = 'fixture-repository'
 ENV['MATCH_PASSWORD'] = 'fixture-password'
+ENV['RELEASE_BUILD_NUMBER'] = '20261101140020'
+ENV['RELEASE_MARKETING_VERSION'] = '1.2.0'
 
 2.times do |index|
   SIGNING.clear
@@ -63,6 +65,8 @@ ENV['MATCH_PASSWORD'] = 'fixture-password'
   raise 'Missing app export profile' unless build[:export_options][:provisioningProfiles] == expected
   raise 'Release export still requests the unprovisioned rest-timer extension' if build[:export_options][:provisioningProfiles].key?('com.logyourbody.app.rest-timer')
   raise 'Archive applies a profile override to every executable' if build[:xcargs].include?('PROVISIONING_PROFILE')
+  raise 'Release archive did not stamp the pinned build number' unless build[:xcargs].include?('CURRENT_PROJECT_VERSION=20261101140020')
+  raise 'Release archive did not stamp the pinned marketing version' unless build[:xcargs].include?('MARKETING_VERSION=1.2.0')
   raise 'Provisioning must remain readonly' unless PROVISIONING == [{ type: 'appstore', readonly: true }]
   raise 'Release archive did not exclude the rest-timer extension' unless REST_TIMER_EXCLUSIONS == [true]
   raise 'Expected one target-specific signing update' unless SIGNING.size == 1
@@ -74,4 +78,17 @@ ENV['MATCH_PASSWORD'] = 'fixture-password'
     raise 'Signing policy was weakened' unless signing[:use_automatic_signing] == false
   end
 end
-puts JSON.generate(cases: 2, result: 'Release archive signs only the app while the rest-timer extension lacks an App Store profile')
+ENV['RELEASE_BUILD_NUMBER'] = 'stale-plist'
+rejected = nil
+begin
+  LANES.fetch(:build_release).call
+rescue RuntimeError => error
+  rejected = error.message
+end
+raise 'Malformed release build number was accepted' unless rejected&.include?('RELEASE_BUILD_NUMBER')
+
+puts JSON.generate(
+  cases: 2,
+  rejected: 1,
+  result: 'Release archive stamps one version on every target and signs only the app while the rest-timer extension lacks an App Store profile'
+)
