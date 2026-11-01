@@ -92,6 +92,13 @@ support a one-visit prescription. One disrupted week, no logged visits or known
 unlogged work cannot silently change capacity. Continuations count once; separate
 AM/PM visits count separately. No program is changed by this choice.
 
+The accepted [LYB-259 decision](../product/training-frequency-consolidation.md)
+sets the five-to-four offer to three consecutive complete weeks at four of five
+and records its exact copy and **Keep 5** / **Use 4** actions. It also creates
+the prompt implementation slice. The current selector still permits a two-week
+offer; that threshold, prompt presentation, remembered responses and committed
+switch/back behavior remain implementation gaps, not shipped behavior.
+
 ## Persistence and remaining acceptance
 
 The existing optimizer acceptance certifies and returns the complete allocation
