@@ -185,12 +185,18 @@ struct WireframeAvatarStage: View {
         let vertices: [SIMD3<Double>]
         let wires: [[Int]]
         if let asset {
+            let shape = PersonalBodyEngine.appliedIllustration(
+                storedAdiposity: adiposity,
+                storedMuscularity: muscularity,
+                storedFrame: frame,
+                photoByteCount: 0
+            )
             vertices = WireframeAvatarLibrary.vertices(
                 asset: asset,
                 presentation: presentation,
-                adiposity: adiposity,
-                muscularity: muscularity,
-                frame: frame
+                adiposity: shape.adiposity,
+                muscularity: shape.muscularity,
+                frame: shape.frame
             )
             wires = asset.wires
         } else {
