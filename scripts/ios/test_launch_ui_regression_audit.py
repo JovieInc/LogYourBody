@@ -293,6 +293,29 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 self.assert_rejected("dashboard.checkin_card_hit_region")
                 path.write_text(source)
 
+    def test_optional_cgfloat_opacity_must_be_explicit_double(self):
+        policy = self.app / "Services/PersonMaskPolicy.swift"
+        compare = self.app / "Views/HomeV2/HomeV2CompareView.swift"
+        original_policy = policy.read_text()
+        original_compare = compare.read_text()
+        self.assertIn("var earlierOpacity: Double", original_policy)
+        self.assertEqual(self.run_audit()[0], 0)
+
+        policy.write_text(original_policy.replace(
+            "var earlierOpacity: Double", "var earlierOpacity: CGFloat", 1
+        ))
+        self.assert_rejected("swift.optional_cgfloat_opacity")
+
+        # A CGFloat member is allowed only after an explicit Double conversion.
+        compare.write_text(original_compare.replace(
+            ".opacity(blend?.earlierOpacity ?? 1)",
+            ".opacity(Double(blend?.earlierOpacity ?? 1))",
+            1,
+        ))
+        self.assertEqual(self.run_audit()[0], 0)
+        policy.write_text(original_policy)
+        compare.write_text(original_compare)
+
     def test_timeline_position_uses_the_injected_calendar_day(self):
         calculator = self.app / "Helpers/TimelineCalculator.swift"
         original = calculator.read_text()

@@ -315,8 +315,8 @@ struct BodyPhotoTransition: Equatable {
     var laterSourceID: String
     var progress: CGFloat
 
-    var earlierOpacity: CGFloat { 1 - min(max(progress, 0), 1) }
-    var laterOpacity: CGFloat { min(max(progress, 0), 1) }
+    var earlierOpacity: Double { Double(1 - min(max(progress, 0), 1)) }
+    var laterOpacity: Double { Double(min(max(progress, 0), 1)) }
     var isPersistedCapture: Bool { false }
 
     static func crossDissolve(

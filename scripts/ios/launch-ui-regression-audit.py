@@ -13,6 +13,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
+from launch_ui_opacity_audit import check_optional_cgfloat_opacity
 from launch_ui_timeline_audit import (
     AuditViolation,
     check_timeline_calendar_day,
@@ -108,13 +109,21 @@ def main() -> int:
     root = args.root.resolve()
     app_dir = root / "apps/ios/LogYourBody"
     app_swift_files = sorted(app_dir.rglob("*.swift"))
+    native_swift_files = sorted(
+        path
+        for directory in (
+            "LogYourBody",
+            "LogYourBodyTests",
+            "LogYourBodyUITests",
+            "LogYourBodyWidget",
+        )
+        for path in (root / "apps/ios" / directory).rglob("*.swift")
+    )
     violations: list[AuditViolation] = []
 
     add_pattern_violations(
         root=root,
-        paths=sorted(path for directory in (
-            "LogYourBody", "LogYourBodyTests", "LogYourBodyUITests", "LogYourBodyWidget"
-        ) for path in (root / "apps/ios" / directory).rglob("*.swift")),
+        paths=native_swift_files,
         pattern=re.compile(
             r"\b(?:CGPoint|CGSize|CGRect|CGVector|CGAffineTransform)\s*\("
             r"[^()]*?\b\w+\s*:\s*[+-]?\s*\.(?:infinity|nan)\b"
@@ -123,6 +132,7 @@ def main() -> int:
         detail="Qualify non-finite geometry arguments with CGFloat or Double to avoid ambiguous overloads.",
         violations=violations,
     )
+    check_optional_cgfloat_opacity(root, native_swift_files, violations)
 
     add_pattern_violations(
         root=root,

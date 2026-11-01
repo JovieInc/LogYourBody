@@ -5585,5 +5585,27 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "swift-optional-cgfloat-opacity",
+    "correction": "PR #1700 (fix-red-cc900b961c, occurrence 3): Launch Quality run 41337583400 failed to compile HomeV2CompareView.swift because blend?.earlierOpacity is CGFloat? and SwiftUI opacity expects Double?. Tently failed because its AI provider was unreachable; that outage is not a source defect.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41337583400/job/124940773836",
+    "mechanization": "Change BodyPhotoTransition earlierOpacity and laterOpacity to Double so the compare dissolve type-checks without reshaping the blend. Extend the existing launch UI regression audit to reject an optional-chained CGFloat member inside .opacity unless it is wrapped in Double. The new behavior case fails when earlierOpacity is restored to CGFloat and passes after the Double property and after an explicit Double cast. Non-optional CGFloat opacity expressions stay allowed because Swift still converts those. The existing required shared-lib suite executes the audit. Tently reports an AI-provider outage, so no gate is bypassed. Native XCTest execution remains required on macOS CI. The harness owns push and PR-body updates and must add exactly one machine line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Exposing these two opacities as Double fixes this call site, but a product type cannot stop a later view from optional-chaining another CGFloat into SwiftUI opacity. An opacity(CGFloat) overload would make numeric literals ambiguous."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required launch UI audit can reject optional-chained CGFloat members passed to opacity while allowing Double properties, explicit Double casts, and non-optional CGFloat expressions."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "check_optional_cgfloat_opacity("
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   }
 ]
