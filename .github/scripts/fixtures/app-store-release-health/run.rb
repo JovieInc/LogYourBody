@@ -15,6 +15,15 @@ previous = { "id" => "old", "attributes" => { "versionString" => "1.2.0", "appVe
 versions = [current, previous]
 versions.reverse! if settings["reverse_versions"]
 versions.delete(previous) if settings["no_previous"]
+# main's marketing version is 1.3.0 while 1.2.0 is the approved version waiting
+# for developer release. 1.1.0 is the prior live build the health gate compares.
+if settings["pending_behind_marketing"]
+  versions = [
+    { "id" => "marketing-130", "attributes" => { "versionString" => "1.3.0", "appVersionState" => "PREPARE_FOR_SUBMISSION" } },
+    { "id" => "pending-120", "attributes" => { "versionString" => "1.2.0", "appVersionState" => "PENDING_DEVELOPER_RELEASE" } },
+    { "id" => "old", "attributes" => { "versionString" => "1.1.0", "appVersionState" => "READY_FOR_SALE" } }
+  ]
+end
 phase = { "id" => "phase-new", "attributes" => { "phasedReleaseState" => settings.fetch("phase", "INACTIVE") } }
 fixture_dir = __dir__
 http = Object.new
@@ -32,7 +41,9 @@ http.define_singleton_method(:request) do |req|
          when ["api.appstoreconnect.apple.com", "GET", "/v1/appStoreVersions/old/appStoreVersionPhasedRelease"] then { data: nil }
          when ["api.appstoreconnect.apple.com", "GET", "/v1/appStoreVersions/new/build"] then status = 404 if settings["missing_build"]
            { data: { attributes: { version: "130" } } }
-         when ["api.appstoreconnect.apple.com", "GET", "/v1/appStoreVersions/old/build"] then { data: { attributes: { version: "120" } } }
+         when ["api.appstoreconnect.apple.com", "GET", "/v1/appStoreVersions/old/build"] then { data: { attributes: { version: settings["pending_behind_marketing"] ? "110" : "120" } } }
+         when ["api.appstoreconnect.apple.com", "GET", "/v1/appStoreVersions/pending-120/appStoreVersionPhasedRelease"] then { data: phase }
+         when ["api.appstoreconnect.apple.com", "GET", "/v1/appStoreVersions/pending-120/build"] then { data: { attributes: { version: "120" } } }
          when ["api.appstoreconnect.apple.com", "PATCH", "/v1/appStoreVersionPhasedReleases/phase-new"]
            status = settings.fetch("pause_status", 200)
            { data: phase.merge("attributes" => { "phasedReleaseState" => settings.fetch("pause_response", "PAUSED") }) }
@@ -71,6 +82,7 @@ Dir.mktmpdir("lyb-health-") do |directory|
   key = OpenSSL::PKey::EC.generate("prime256v1").to_pem
   File.write("#{directory}/key.json", JSON.generate(key: key, issuer_id: "fixture", key_id: "fixture"))
   ENV.update("APP_STORE_CONNECT_API_KEY_PATH" => "#{directory}/key.json", "GITHUB_STEP_SUMMARY" => "#{directory}/summary.md", "APP_STORE_APP_ID" => "123", "APP_VERSION" => settings.fetch("app_version", "1.3.0"), "SENTRY_AUTH_TOKEN" => "fixture-secret", "SENTRY_ORG" => "jovie", "SENTRY_PROJECT" => "log-your-body-ios", "RELEASE_HEALTH_MIN_CRASH_FREE_PERCENT" => "99.5", "RELEASE_HEALTH_MIN_SESSIONS" => "100", "RELEASE_HEALTH_MIN_USERS" => "20", "GH_TOKEN" => "fixture-gh-secret", "GITHUB_REPOSITORY" => "fixture/repo", "GITHUB_RUN_ID" => "1")
+  ENV.delete("APP_VERSION") if settings["omit_app_version"]
   ENV.delete("SENTRY_AUTH_TOKEN") if settings["missing_token"]
   ENV["RELEASE_HEALTH_MAX_REGRESSION_PP"] = settings.fetch("regression_pp", "0.5").to_s
   exit_code = 0
