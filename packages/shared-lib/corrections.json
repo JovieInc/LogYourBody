@@ -5465,5 +5465,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-72cbcd2e3b",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1678",
+    "correction": "PR #1678 / LYB-191: Repair the JavaScript CI concurrency fixtures on modern Git without weakening merge-parent validation or the 100% classifier coverage gates. MERGE_HEAD is a pseudoref and cannot be mutated with update-ref.",
+    "mechanization": "Extend the existing concurrency fixture with one parent mutation/restoration helper. Write MERGE_HEAD through its Git-resolved pseudoref path, retain update-ref for HEAD, and require readback of every mutation before asserting rejection or safe retry. Preserve all nine index/HEAD/MERGE_HEAD cases across resolver, staged resolver and verifier modes in the existing required shared-lib suite. Include the classifier diagnostic if fixture setup fails. The claims-policy cadence stays intact; the harness owns push and PR updates. Machine: built scripts/correction-classifier-concurrency.test.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing Git fixture owns parent mutation and restoration. A shared helper selecting the supported pseudoref write path prevents unsupported update-ref calls by construction, with readback proving the concurrent change actually occurs."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier-concurrency.test.mjs",
+      "anchor": "the parent mutation must take effect"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

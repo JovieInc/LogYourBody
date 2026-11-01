@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { classifyLedger, runClassifier } from './correction-classifier.mjs';
 
@@ -51,6 +51,15 @@ for (const [args, target] of commands.flatMap((args) =>
     const original = readFileSync(ledger, 'utf8');
     const parent = target === 'index' ? null : git('rev-parse', target).trim();
     const replacement = parent && git('rev-parse', `${parent}^`).trim();
+    const setParent = (value) => {
+      if (target === 'MERGE_HEAD') {
+        // MERGE_HEAD is a pseudoref; recent Git refuses update-ref writes to it.
+        writeFileSync(resolve(root, git('rev-parse', '--git-path', target).trim()), `${value}\n`);
+      } else {
+        git('update-ref', target, value);
+      }
+      assert.equal(git('rev-parse', target).trim(), value, 'the parent mutation must take effect');
+    };
     let changedIndex;
     let diagnostic = '';
     const command = [args[0], root, ...args.slice(1)];
@@ -70,14 +79,14 @@ for (const [args, target] of commands.flatMap((args) =>
             git('add', 'concurrent.txt');
           } else {
             // Parent refs can change without changing a single indexed byte.
-            git('update-ref', target, replacement);
+            setParent(replacement);
           }
           changedIndex = git('ls-files', '--stage', '-z');
         }
         return output;
       },
     );
-    assert.notEqual(changedIndex, undefined, 'the negative control must run');
+    assert.notEqual(changedIndex, undefined, `the negative control must run: ${diagnostic}`);
     assert.equal(status, 1, 'changed merge evidence cannot receive a successful verdict');
     assert.match(
       diagnostic,
@@ -93,7 +102,7 @@ for (const [args, target] of commands.flatMap((args) =>
     );
     if (parent) {
       assert.equal(git('rev-parse', target).trim(), replacement, 'refusal preserves the writer');
-      git('update-ref', target, parent);
+      setParent(parent);
     }
     assert.equal(runClassifier(command, quiet), 0, 'retry validates current merge evidence');
     assert.deepEqual(JSON.parse(readFileSync(ledger, 'utf8')), [rows[2], rows[0], rows[1]]);
