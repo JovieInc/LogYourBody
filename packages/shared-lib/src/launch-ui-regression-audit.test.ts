@@ -50,6 +50,7 @@ it('checks Stats composition, card styling and provenance dismissal through the 
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
   for (const input of [
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_opacity_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-report.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_timeline_day.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
@@ -62,12 +63,15 @@ it('checks Stats composition, card styling and provenance dismissal through the 
     new URL('../../../scripts/ios/launch-ui-regression-audit.py', import.meta.url),
     'utf8',
   );
-  // launch audit keeps both size-ratchet siblings
+  // launch audit keeps every size-ratchet sibling
   expect(audit).toContain('Cannot load launch UI audit sibling');
+  expect(audit).toContain('_AUDIT_SIBLINGS');
   expect(audit).toContain('launch_ui_timeline_day.py');
+  expect(audit).toContain('launch_ui_opacity_audit.py');
   expect(audit).toContain('launch-ui-regression-report.py');
   expect(audit).not.toMatch(/^def write_outputs\(/m);
   expect(audit).not.toMatch(/^def check_timeline_calendar_day\(/m);
+  expect(audit).not.toMatch(/^def check_optional_cgfloat_opacity\(/m);
   const coverage = mkdtempSync(`${tmpdir()}/lyb-ui-audit-coverage-`);
   try {
     const pythonLibrary = execFileSync('python3', ['-c', 'import sys; print(sys.prefix)'], {

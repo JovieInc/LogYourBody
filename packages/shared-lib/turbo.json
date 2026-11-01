@@ -33,6 +33,7 @@
         "$TURBO_ROOT$/scripts/ios/test_training_rest_release.rb",
         "$TURBO_ROOT$/scripts/ios/launch-ui-regression-audit.py",
         "$TURBO_ROOT$/scripts/ios/launch_ui_timeline_day.py",
+        "$TURBO_ROOT$/scripts/ios/launch_ui_opacity_audit.py",
         "$TURBO_ROOT$/scripts/ios/launch-ui-regression-report.py",
         "$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py",
         "$TURBO_ROOT$/apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift",

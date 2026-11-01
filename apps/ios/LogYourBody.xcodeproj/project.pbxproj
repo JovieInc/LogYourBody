@@ -137,6 +137,11 @@
 		81A33EF8A149BD31F7933863 /* DashboardViewLiquid+HomeV2Photos.swift in Sources */ = {isa = PBXBuildFile; fileRef = D856C71302D4F5358A9C217A /* DashboardViewLiquid+HomeV2Photos.swift */; };
 		841527E772D0CA94BE0D3F96 /* HealthKitManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B8B5B2EBD6BD4427633C2F5 /* HealthKitManager+Part01.swift */; };
 		87977666693C1FD6C5DDAA8B /* SubjectPlateRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E56886A697AD88A24468E56 /* SubjectPlateRenderer.swift */; };
+		B313F11E0000000000000A02 /* BodyPhotoPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B313F11E0000000000000A01 /* BodyPhotoPresentation.swift */; };
+		B313F11E0000000000000A12 /* PersonMaskPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B313F11E0000000000000A11 /* PersonMaskPolicy.swift */; };
+		B313F11E0000000000000A22 /* AspectFillCropper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B313F11E0000000000000A21 /* AspectFillCropper.swift */; };
+		B313F11E0000000000000A42 /* TorsoFocusService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B313F11E0000000000000A41 /* TorsoFocusService.swift */; };
+		B313F11E0000000000000A32 /* SubjectPlateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B313F11E0000000000000A31 /* SubjectPlateView.swift */; };
 		8A4E2FE2E07BE7A995941A6E /* HomeV2SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E484B3BBE5650558AF9F18D2 /* HomeV2SidebarView.swift */; };
 		8A693BCF3584DF89630F50C5 /* OnboardingFlowViewModel+Part02.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5586EC0657B1F9E652068FBA /* OnboardingFlowViewModel+Part02.swift */; };
 		8C7414EAC6711493183196F3 /* HomeV2Policy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E442F03731E41EA713BCAE3E /* HomeV2Policy.swift */; };
@@ -163,6 +168,8 @@
 		9F1405CB5B2F4A0563C3C4A1 /* HomeV2PhotoViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA50D84A24CA405046D5EAFA /* HomeV2PhotoViewer.swift */; };
 		A14230332A86E9780FEAB7F6 /* SyntheticImageFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E5BB7F340376DECDD7ABC3A /* SyntheticImageFixtures.swift */; };
 		A3B2D419E2AED6266506624B /* SubjectPlateRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB73CC33EB688034C7B8512F /* SubjectPlateRendererTests.swift */; };
+		B313F11E0000000000000B02 /* BodyPhotoPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B313F11E0000000000000B01 /* BodyPhotoPresentationTests.swift */; };
+		B313F11E0000000000000B12 /* BodyPhotoPresentationTests+Alignment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B313F11E0000000000000B11 /* BodyPhotoPresentationTests+Alignment.swift */; };
 		A3CFAB8A53F95BD9F8FA0B82 /* PhotoLibraryScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2715F4BF0E82E86A99821E3 /* PhotoLibraryScannerTests.swift */; };
 		A40A693BDA9D2826E3DE900D /* OnboardingStepEntryPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E16AB6CFAC7A59EBD3B2792 /* OnboardingStepEntryPolicyTests.swift */; };
 		A4856A2B9E1FC174F9F1739F /* RevenueCatFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FE602CA4F092CAB186EE952 /* RevenueCatFlowTests.swift */; };
@@ -706,6 +713,10 @@
 		59C400E664F1B03F8C2556C9 /* AccountDeletionConfirmationPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccountDeletionConfirmationPolicyTests.swift; sourceTree = "<group>"; };
 		5D15E6A333FABD14CA6405A4 /* LaunchAndBodyCompositionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchAndBodyCompositionTests.swift; sourceTree = "<group>"; };
 		5E56886A697AD88A24468E56 /* SubjectPlateRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SubjectPlateRenderer.swift; sourceTree = "<group>"; };
+		B313F11E0000000000000A01 /* BodyPhotoPresentation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyPhotoPresentation.swift; sourceTree = "<group>"; };
+		B313F11E0000000000000A11 /* PersonMaskPolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PersonMaskPolicy.swift; sourceTree = "<group>"; };
+		B313F11E0000000000000A21 /* AspectFillCropper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AspectFillCropper.swift; sourceTree = "<group>"; };
+		B313F11E0000000000000A41 /* TorsoFocusService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TorsoFocusService.swift; sourceTree = "<group>"; };
 		5F1996527170EC15B242FF4B /* RevenueCatSubscriptionAnalyticsTransitionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RevenueCatSubscriptionAnalyticsTransitionTests.swift; sourceTree = "<group>"; };
 		6199FE2F37FD5DB5339ABD58 /* HomeV2OnboardingViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2OnboardingViews.swift; sourceTree = "<group>"; };
 		620823F9E8905856BB1B666D /* GlobalTimelineServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GlobalTimelineServiceTests.swift; sourceTree = "<group>"; };
@@ -774,6 +785,9 @@
 		A88D7AC2C7FF4E14A3BB8168 /* CoreDataManager+Part03.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "CoreDataManager+Part03.swift"; path = "CoreDataManager+Part03.swift"; sourceTree = "<group>"; };
 		AB22C3A99D0B42B73AAAD00E /* HomeV2Tokens.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2Tokens.swift; sourceTree = "<group>"; };
 		AB73CC33EB688034C7B8512F /* SubjectPlateRendererTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SubjectPlateRendererTests.swift; sourceTree = "<group>"; };
+		B313F11E0000000000000B01 /* BodyPhotoPresentationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyPhotoPresentationTests.swift; sourceTree = "<group>"; };
+		B313F11E0000000000000B11 /* BodyPhotoPresentationTests+Alignment.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "BodyPhotoPresentationTests+Alignment.swift"; path = "BodyPhotoPresentationTests+Alignment.swift"; sourceTree = "<group>"; };
+		B313F11E0000000000000A31 /* SubjectPlateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SubjectPlateView.swift; sourceTree = "<group>"; };
 		AB992727D1333B365F93F30E /* AccountDeletionCleanupServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AccountDeletionCleanupServiceTests.swift; sourceTree = "<group>"; };
 		AC2D65CF8B18CD2463021D99 /* PasswordStrengthIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PasswordStrengthIndicator.swift; path = DesignSystem/Molecules/PasswordStrengthIndicator.swift; sourceTree = "<group>"; };
 		ACBA870282ED5F613A82213D /* HomeV2PrimaryButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2PrimaryButton.swift; sourceTree = "<group>"; };
@@ -1392,6 +1406,7 @@
 				E442F03731E41EA713BCAE3E /* HomeV2Policy.swift */,
 				AB22C3A99D0B42B73AAAD00E /* HomeV2Tokens.swift */,
 				FC9C445A5BBDAD9BB34C8E55 /* HomeV2Surface.swift */,
+				B313F11E0000000000000A31 /* SubjectPlateView.swift */,
 				F0165C8B0000000000000002 /* HomeV2PhotoScrubber.swift */,
 				FF6016AA00000000000000F1 /* HomeV2TimelineHero.swift */,
 				CA50D84A24CA405046D5EAFA /* HomeV2PhotoViewer.swift */,
@@ -1608,6 +1623,8 @@
 				4877512DEE0F7236151A15AA /* HomeV2PolicyTests.swift */,
 				FF6016BB00000000000000F1 /* HomeV2TimelinePolicyTests.swift */,
 				AB73CC33EB688034C7B8512F /* SubjectPlateRendererTests.swift */,
+				B313F11E0000000000000B01 /* BodyPhotoPresentationTests.swift */,
+				B313F11E0000000000000B11 /* BodyPhotoPresentationTests+Alignment.swift */,
 				577B839EE95E4F09A47A27E0 /* DailyStepValidationTests.swift */,
 				A42DAD978808FA956C842F52 /* HealthKitStepCountPolicyTests.swift */,
 				3FDA4E2154B359271C66879D /* HomeV2TrendPolicyTests.swift */,
@@ -1774,6 +1791,10 @@
 				D416CADF171F4B0BB27A26A1 /* RevenueCatManager+Lifecycle.swift */,
 				EC645B4F52DDE739FAFF042E /* ProductAPIClient+Part01.swift */,
 				5E56886A697AD88A24468E56 /* SubjectPlateRenderer.swift */,
+				B313F11E0000000000000A21 /* AspectFillCropper.swift */,
+				B313F11E0000000000000A41 /* TorsoFocusService.swift */,
+				B313F11E0000000000000A01 /* BodyPhotoPresentation.swift */,
+				B313F11E0000000000000A11 /* PersonMaskPolicy.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -2617,6 +2638,8 @@
 				CB2DAC6AFD2CCDD76F568339 /* HomeV2PolicyTests.swift in Sources */,
 				FF6016BB00000000000000B1 /* HomeV2TimelinePolicyTests.swift in Sources */,
 				A3B2D419E2AED6266506624B /* SubjectPlateRendererTests.swift in Sources */,
+				B313F11E0000000000000B02 /* BodyPhotoPresentationTests.swift in Sources */,
+				B313F11E0000000000000B12 /* BodyPhotoPresentationTests+Alignment.swift in Sources */,
 				9A041FE1B8AF416FB7931540 /* DailyStepValidationTests.swift in Sources */,
 				69FE1F8757E6B0643B73F39E /* HealthKitStepCountPolicyTests.swift in Sources */,
 				3D1AFA818E06FB9D3FFDA1C6 /* HomeV2TrendPolicyTests.swift in Sources */,
@@ -2964,6 +2987,11 @@
 				FF6016AA00000000000000B1 /* HomeV2TimelineHero.swift in Sources */,
 				F38F981DE886318E350B7CF8 /* DashboardViewLiquid+HomeV2.swift in Sources */,
 				87977666693C1FD6C5DDAA8B /* SubjectPlateRenderer.swift in Sources */,
+				B313F11E0000000000000A22 /* AspectFillCropper.swift in Sources */,
+				B313F11E0000000000000A42 /* TorsoFocusService.swift in Sources */,
+				B313F11E0000000000000A02 /* BodyPhotoPresentation.swift in Sources */,
+				B313F11E0000000000000A12 /* PersonMaskPolicy.swift in Sources */,
+				B313F11E0000000000000A32 /* SubjectPlateView.swift in Sources */,
 				9F1405CB5B2F4A0563C3C4A1 /* HomeV2PhotoViewer.swift in Sources */,
 				C7B9E48E55256B991FBCDEF0 /* HomeV2TrendChart.swift in Sources */,
 				7F81E0D294C9EBD959FA20B8 /* HomeV2PrimaryButton.swift in Sources */,
