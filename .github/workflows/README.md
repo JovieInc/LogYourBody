@@ -100,11 +100,17 @@ release setting is unchanged.
 
 ### `ios-app-store-approved-release.yml`
 
-Every 30 minutes, checks exact-build Sentry production crash-free users/sessions
-before requesting release and during every active or paused phased rollout.
-BREACHED and UNVERIFIED outcomes block release, pause an active rollout through
-ASC, and create or reopen a GitHub remediation issue. Decisions and action results
-appear in the step summary. Pauses never automatically resume. See
+Scheduled backstop for an approved App Store version. The cron expression is
+`*/30 * * * *`, and GitHub delivered those runs about 3-7 hours apart from
+2026-10-28 15:17Z through 2026-11-01 17:12Z. LYB-139's health gate uses that
+gap as the latency for a release request and for pausing a rollout. Scheduled
+runs release whichever version is `PENDING_DEVELOPER_RELEASE`; a manual
+`app_version` input overrides that. The job checks exact-build Sentry
+production crash-free users/sessions before requesting release and during every
+active or paused phased rollout. BREACHED and UNVERIFIED outcomes block
+release, pause an active rollout through ASC, and create or reopen a GitHub
+remediation issue. Decisions and action results appear in the step summary.
+Pauses never automatically resume. See
 [the release-health policy and first-release handling](../../docs/RELEASE_APP_STORE.md#release-health-and-phased-rollout-lyb-139).
 
 ### `app-store-metadata-sync.yml`

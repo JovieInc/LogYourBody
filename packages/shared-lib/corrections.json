@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "conflicted-source-map-index-rebuild",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1702",
+    "correction": "PR #1702 / LYB-337, fix-red-95726c4f82 occurrence 16: merge origin/main without rebasing. The generated source map conflicts because each parent changed a different fingerprint. Tently reports an AI-provider outage and no source finding; do not bypass that gate. Rebuilding the map from a dirty worktree would publish unstaged bytes as the committed fingerprints.",
+    "mechanization": "Extend the existing source-map resolver so an unmerged projection is rebuilt from the merged index and staged, leaving unstaged source edits untouched and refusing any other unmerged path. The new real-Git regression fails while the resolver reads the worktree and passes after the index rebuild; the unmerged-input refusal stays in the same required suite. Use that command to stage this merge's map. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The resolver owns writing and staging the projection during a merge. Reading stage-zero sources prevents unstaged worktree bytes and either parent projection from becoming the committed fingerprints."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "A conflicted source map is rebuilt from the merged index."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "marketing-assets-reject-future-capture-provenance",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1685",
     "correction": "PR #1685 / LYB-277, fix-red-95726c4f82 occurrence 10: merge origin/main without rebasing and preserve verbatim program-revision rationale. Merge-group run 41290991865 fails marketing screenshot freshness because synthetic Git history emits a future capture date; Tently separately reports an AI-provider outage.",
