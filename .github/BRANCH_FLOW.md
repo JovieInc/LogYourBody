@@ -31,6 +31,7 @@ Admission to the native merge queue is exact-head. `.github/workflows/native-mer
 
 - Web/package changes: `pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm test:ci`.
 - iOS changes: the iOS Fastlane CI lane.
+- Signing changes (`apps/ios/fastlane/`, `project.pbxproj`, entitlements): **Release signing provisioned** must succeed. Fork pulls without App Store Connect credentials finish neutral and are not a pass.
 - The summary job itself if required upstream validation fails.
 
 External or AI review comments are advisory unless they point to a deterministic release-breaker such as a failing command, leaked secret, unsafe workflow permission change, crash-on-launch risk, data loss, or broken auth/billing/release path.
