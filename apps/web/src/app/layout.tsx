@@ -3,8 +3,6 @@ import localFont from 'next/font/local';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Providers } from './providers';
-import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
-import { ServiceWorkerUpdater } from '@/components/ServiceWorkerUpdater';
 import './globals.css';
 import { logYourBody } from '@jovieinc/product-registry';
 
@@ -139,11 +137,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${satoshi.variable}`}>
-        <Providers>
-          {children}
-          <PWAInstallPrompt />
-          <ServiceWorkerUpdater />
-        </Providers>
+        <Providers>{children}</Providers>
         <Analytics />
         <SpeedInsights />
       </body>

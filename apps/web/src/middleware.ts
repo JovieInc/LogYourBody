@@ -10,17 +10,10 @@ import {
 } from '@/lib/marketing/public-markdown';
 
 const protectedRoutePrefixes = [
-  '/dashboard',
-  '/log',
   '/api/weights',
   '/api/auth/delete-account',
   '/api/parse-pdf',
   '/api/parse-pdf-v2',
-  '/onboarding',
-  '/settings',
-  '/photos',
-  '/steps',
-  '/import',
 ];
 
 const productionDebugRoutePatterns = [
@@ -96,10 +89,13 @@ export default async function middleware(req: NextRequest) {
     const hasSession =
       Boolean(req.cookies.get(authCookies.accessToken)?.value) ||
       Boolean(req.cookies.get(authCookies.refreshToken)?.value);
-    if (!hasSession) {
-      const signIn = new URL('/signin', req.url);
-      signIn.searchParams.set('returnTo', `${req.nextUrl.pathname}${req.nextUrl.search}`);
-      return NextResponse.redirect(signIn);
+    // API handlers validate credentials; native callers use bearer tokens, not web cookies.
+    const hasBearer = /^Bearer\s+[^\s]+$/i.test(req.headers.get('authorization') ?? '');
+    if (!hasSession && !hasBearer) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: { 'Cache-Control': 'no-store' } },
+      );
     }
   }
 

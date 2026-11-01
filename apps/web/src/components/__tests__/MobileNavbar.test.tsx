@@ -1,105 +1,47 @@
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { MobileNavbar } from '../MobileNavbar';
-import { useRouter, usePathname } from 'next/navigation';
+/** @jest-environment node */
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-jest.mock('next/navigation', () => ({
-  useRouter: jest.fn(),
-  usePathname: jest.fn(),
-}));
-
-jest.mock('lucide-react', () => {
-  const React = require('react');
-  function Icon(props: { className?: string }) {
-    return React.createElement('svg', props);
-  }
-  return { __esModule: true, default: Icon, Home: Icon, Settings: Icon };
-});
-
-describe('MobileNavbar', () => {
-  const mockPush = jest.fn();
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (useRouter as jest.Mock).mockReturnValue({
-      push: mockPush,
-    });
+describe('retired app navigation (LYB-100)', () => {
+  it('removes the dashboard, log and settings navbar', () => {
+    expect(existsSync(join(process.cwd(), 'src/components/MobileNavbar.tsx'))).toBe(false);
   });
 
-  it('should render the launch home and settings actions', () => {
-    (usePathname as jest.Mock).mockReturnValue('/');
-
-    render(<MobileNavbar />);
-
-    expect(screen.getByLabelText('Home')).toBeInTheDocument();
-    expect(screen.getByLabelText('Settings')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Add Data')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Dashboard')).not.toBeInTheDocument();
+  it('removes app navigation shortcuts from the public web manifest', () => {
+    const manifest = JSON.parse(
+      readFileSync(join(process.cwd(), 'public/site.webmanifest'), 'utf8'),
+    );
+    expect(manifest.start_url).toBe('/');
+    expect(manifest).not.toHaveProperty('shortcuts');
   });
 
-  it('should not render on log page', () => {
-    (usePathname as jest.Mock).mockReturnValue('/log');
-
-    const { container } = render(<MobileNavbar />);
-
-    expect(container.firstChild).toBeNull();
+  it('keeps retained UI links and navigation free of retired app destinations', () => {
+    function uiFiles(directory: string): string[] {
+      return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        const file = join(directory, entry.name);
+        if (['api', '__tests__', 'generated'].includes(entry.name)) return [];
+        if (entry.isDirectory()) return uiFiles(file);
+        return /\.[jt]sx?$/.test(entry.name) && !/\.(test|spec)\./.test(entry.name) ? [file] : [];
+      });
+    }
+    const retired = '(?:dashboard|log|photos|settings|onboarding|steps|import|training)';
+    const destination = new RegExp(
+      `(?:href\\s*(?:=\\s*\\{?|:)|(?:push|replace|redirect|assign)\\s*\\()\\s*['"\x60]/${retired}(?:[/#?'"\x60]|$)`,
+    );
+    for (const file of uiFiles(join(process.cwd(), 'src'))) {
+      expect({ file, deadLink: destination.test(readFileSync(file, 'utf8')) }).toEqual({
+        file,
+        deadLink: false,
+      });
+    }
   });
 
-  it('should not render on settings pages', () => {
-    (usePathname as jest.Mock).mockReturnValue('/settings/profile');
-
-    const { container } = render(<MobileNavbar />);
-
-    expect(container.firstChild).toBeNull();
-  });
-
-  it('should highlight active route', () => {
-    (usePathname as jest.Mock).mockReturnValue('/');
-
-    render(<MobileNavbar />);
-
-    const homeButton = screen.getByLabelText('Home');
-    const settingsButton = screen.getByLabelText('Settings');
-
-    const homeIcon = homeButton.querySelector('svg');
-    expect(homeIcon).toHaveClass('text-linear-purple');
-
-    const settingsIcon = settingsButton.querySelector('svg');
-    expect(settingsIcon).toHaveClass('text-linear-text-secondary');
-  });
-
-  it('should navigate when buttons are clicked', () => {
-    (usePathname as jest.Mock).mockReturnValue('/');
-
-    render(<MobileNavbar />);
-
-    fireEvent.click(screen.getByLabelText('Settings'));
-    expect(mockPush).toHaveBeenCalledWith('/settings');
-
-    fireEvent.click(screen.getByLabelText('Home'));
-    expect(mockPush).toHaveBeenCalledWith('/');
-  });
-
-  it('should be hidden on desktop', () => {
-    (usePathname as jest.Mock).mockReturnValue('/');
-
-    const { container } = render(<MobileNavbar />);
-
-    const navbar = container.querySelector('.fixed.bottom-0');
-    expect(navbar).toHaveClass('md:hidden');
-  });
-
-  it('should have correct height and positioning', () => {
-    (usePathname as jest.Mock).mockReturnValue('/');
-
-    const { container } = render(<MobileNavbar />);
-
-    const navbar = container.querySelector('.fixed.bottom-0');
-    expect(navbar).toHaveClass('fixed', 'bottom-0', 'left-0', 'right-0');
-
-    // Height is on the inner container
-    const innerContainer = navbar?.querySelector('.h-14');
-    expect(innerContainer).toBeInTheDocument();
-    expect(innerContainer).toHaveClass('h-14');
+  it('does not mount auth or PWA app chrome around public pages or 404s', () => {
+    for (const file of ['layout.tsx', 'providers.tsx']) {
+      const source = readFileSync(join(process.cwd(), 'src/app', file), 'utf8');
+      expect(source).not.toMatch(
+        /ProductAuthProvider|AuthRuntimeProvider|PWAProvider|PWAInstallPrompt|ServiceWorkerUpdater/,
+      );
+    }
   });
 });

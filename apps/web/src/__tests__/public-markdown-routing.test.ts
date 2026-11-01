@@ -159,50 +159,60 @@ it('bounds a hung gate request and keeps HTML fallback available', async () => {
   jest.useRealTimers();
 });
 
-it('routes only a negotiated unmatched path through the real Next fallback matcher, retaining status404', async () => {
-  const req = request('/no-such-public-page/nested?private=never-echo');
-  const middlewareResponse = await middleware(req);
-  const forwarded = forwardedHeaders(middlewareResponse, req);
-  expect(forwarded.get(PUBLIC_MARKDOWN_HEADER)).toBe('1');
-  const configResponse = await unstable_getResponseFromNextConfig({
-    url: req.url,
-    nextConfig,
-    headers: Object.fromEntries(forwarded),
-  });
-  expect(new URL(getRewrittenUrl(configResponse)!).pathname).toBe(
-    '/api/marketing/markdown-not-found',
-  );
-  const response = GET(new Request(getRewrittenUrl(configResponse)!, { headers: forwarded }));
-  expect(response.status).toBe(404);
-  expect(response.headers.get('Content-Type')).toBe('text/markdown; charset=utf-8');
-  expect(response.headers.get('Vary')).toBe('Accept');
-  expect(response.headers.get('Cache-Control')).toBe('private, no-store');
-  const body = await response.text();
-  expect(body).toContain('Page not found');
-  expect(body).toContain(logYourBody.links.home);
-  expect(body).not.toContain('never-echo');
-  // The framework utility matches config only; route precedence is asserted
-  // by fallback placement and still needs a real preview HTTP receipt.
-  const rewrites = await nextConfig.rewrites!();
-  expect(Array.isArray(rewrites)).toBe(false);
-  if (Array.isArray(rewrites)) throw new Error('Expected phased rewrites');
-  expect(rewrites.afterFiles).toEqual([
-    {
-      source: '/.well-known/oauth-protected-resource/api/mcp',
-      destination: '/api/mcp/oauth-protected-resource',
-    },
-    {
-      source: '/.well-known/oauth-protected-resource',
-      destination: '/api/mcp/oauth-protected-resource',
-    },
-  ]);
-  expect(rewrites.fallback).toHaveLength(1);
-});
+it.each(['/no-such-public-page/nested', '/dashboard', '/settings/profile', '/training/canvas'])(
+  'keeps negotiated recovery for %s consistent with the launch scope',
+  async (path) => {
+    const req = request(`${path}?private=never-echo`);
+    const middlewareResponse = await middleware(req);
+    if (path !== '/no-such-public-page/nested') {
+      expect(middlewareResponse.status).toBe(307);
+      expect(middlewareResponse.headers.get('location')).toBe('https://www.logyourbody.com/');
+      expect(middlewareResponse.headers.has(PUBLIC_MARKDOWN_HEADER)).toBe(false);
+      expect(fetchMock).not.toHaveBeenCalled();
+      return;
+    }
+    const forwarded = forwardedHeaders(middlewareResponse, req);
+    expect(forwarded.get(PUBLIC_MARKDOWN_HEADER)).toBe('1');
+    const configResponse = await unstable_getResponseFromNextConfig({
+      url: req.url,
+      nextConfig,
+      headers: Object.fromEntries(forwarded),
+    });
+    expect(new URL(getRewrittenUrl(configResponse)!).pathname).toBe(
+      '/api/marketing/markdown-not-found',
+    );
+    const response = GET(new Request(getRewrittenUrl(configResponse)!, { headers: forwarded }));
+    expect(response.status).toBe(404);
+    expect(response.headers.get('Content-Type')).toBe('text/markdown; charset=utf-8');
+    expect(response.headers.get('Vary')).toBe('Accept');
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    const body = await response.text();
+    expect(body).toContain('Page not found');
+    expect(body).toContain(logYourBody.links.home);
+    expect(body).not.toContain('never-echo');
+    // The framework utility matches config only; route precedence is asserted
+    // by fallback placement and still needs a real preview HTTP receipt.
+    const rewrites = await nextConfig.rewrites!();
+    expect(Array.isArray(rewrites)).toBe(false);
+    if (Array.isArray(rewrites)) throw new Error('Expected phased rewrites');
+    expect(rewrites.afterFiles).toEqual([
+      {
+        source: '/.well-known/oauth-protected-resource/api/mcp',
+        destination: '/api/mcp/oauth-protected-resource',
+      },
+      {
+        source: '/.well-known/oauth-protected-resource',
+        destination: '/api/mcp/oauth-protected-resource',
+      },
+    ]);
+    expect(rewrites.fallback).toHaveLength(1);
+  },
+);
 
 it.each([
   '/api/mcp',
   '/api/auth/session',
-  '/dashboard',
+  '/api/weights',
   '/signin',
   '/.well-known/oauth-protected-resource',
 ])('does not attach Markdown routing to reserved/auth/API path %s', async (path) => {

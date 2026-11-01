@@ -10,9 +10,14 @@ import {
 } from 'next/experimental/testing/server';
 import nextConfig from '../../../next.config';
 import { accumulateMetadata, type MetadataItems } from 'next/dist/lib/metadata/resolve-metadata';
+import { getURLFromRedirectError } from 'next/dist/client/components/redirect';
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 
 jest.mock('server-only', () => ({}));
-jest.mock('next/navigation', () => ({ notFound: jest.requireActual('next/navigation').notFound }));
+jest.mock('next/navigation', () => ({
+  notFound: jest.requireActual('next/navigation').notFound,
+  redirect: jest.requireActual('next/navigation').redirect,
+}));
 jest.mock('next/font/local', () => () => ({ variable: 'font' }));
 jest.mock('@vercel/analytics/next', () => ({ Analytics: () => null }));
 jest.mock('@vercel/speed-insights/next', () => ({ SpeedInsights: () => null }));
@@ -23,32 +28,35 @@ jest.mock('@/components/MarketingPage', () => ({ MarketingPage: () => null }));
 jest.mock('@/components/MarkdownRenderer', () => ({ MarkdownRenderer: () => null }));
 jest.mock('@/app/LaunchLanding', () => ({ LaunchLanding: () => null }));
 jest.mock('@/lib/flags/publicLanding.server', () => ({ readEditorialHomepageRollout: jest.fn() }));
-jest.mock('@/lib/ports/auth-ui', () => ({ AuthSignUp: () => null }));
+jest.mock('@/lib/blog', () => ({ getAllTags: jest.fn(), getPostBySlug: jest.fn() }));
 
 const appRoot = path.join(process.cwd(), 'src/app');
-// LYB-100 owns product routes. Redirect-only acquisition routes emit no indexable document.
-const productPrefixes = [
-  'dashboard',
-  'log',
-  'onboarding',
-  'settings',
-  'photos',
-  'steps',
-  'import',
-  'training',
-];
+// Redirect-only acquisition routes emit no indexable document.
 const aliases: Record<string, string> = { '/download/ios': '/' };
+const redirectPages: Record<string, string> = {
+  'download/page.tsx': '/download/ios',
+  'landing/page.tsx': '/',
+  'mobile/page.tsx': '/download/ios',
+  'about/page.tsx': '/',
+  'blog/page.tsx': '/',
+  'blog/[slug]/page.tsx': '/',
+  'blog/tag/[tag]/page.tsx': '/',
+  'brand/page.tsx': '/',
+  'careers/page.tsx': '/',
+  'changelog/page.tsx': '/',
+  'download/android/page.tsx': '/download/ios',
+};
 
 function publicPages(directory = appRoot): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const file = path.join(directory, entry.name);
     const relative = path.relative(appRoot, file);
     if (entry.isDirectory()) {
-      if (['api', '__tests__', ...productPrefixes].includes(relative.split(path.sep)[0])) return [];
+      if (entry.name === '__tests__' || relative.split(path.sep)[0] === 'api') return [];
       return publicPages(file);
     }
-    if (entry.name !== 'page.tsx') return [];
-    if (/\bredirect\(/.test(readFileSync(file, 'utf8'))) return [];
+    if (!/^page\.[jt]sx?$/.test(entry.name)) return [];
+    if (redirectPages[relative] && /\bredirect\(/.test(readFileSync(file, 'utf8'))) return [];
     return [relative];
   });
 }
@@ -64,7 +72,7 @@ async function assertMetadata(metadata: Metadata, route: string) {
     const layout = path.join(appRoot, ...segments.slice(0, depth), 'layout.tsx');
     items.push([existsSync(layout) ? (require(layout).metadata ?? null) : null, null]);
   }
-  items.push([route === '/signin' ? null : metadata, null]);
+  items.push([metadata, null]);
   // Use Next's resolver so nested layout templates and metadata inheritance are exercised.
   const resolved = await accumulateMetadata(route, items, Promise.resolve(route), {
     trailingSlash: false,
@@ -105,11 +113,10 @@ describe('public route metadata contract (LYB-223)', () => {
     expect(rootMetadata.alternates?.canonical).toBeUndefined();
   });
 
-  it('keeps the shared marketing inventory complete without legacy auth routes', () => {
+  it('enforces the landing-only route inventory (LYB-100)', () => {
     const routes = publicPages()
       .filter((file) => !file.includes('['))
-      .map((file) => '/' + path.dirname(file).replace(/^\.$/, '').split(path.sep).join('/'))
-      .filter((route) => !['/signin', '/signup'].includes(route));
+      .map((file) => '/' + path.dirname(file).replace(/^\.$/, '').split(path.sep).join('/'));
     expect([...PUBLIC_MARKETING_ROUTES].sort()).toEqual(routes.sort());
   });
 
@@ -117,11 +124,25 @@ describe('public route metadata contract (LYB-223)', () => {
     '%s has its own canonical and title',
     async (file) => {
       const route = '/' + path.dirname(file).replace(/^\.$/, '').split(path.sep).join('/');
-      // Sign-in is a client page; its server layout supplies metadata.
-      const metadataFile = route === '/signin' ? 'signin/layout.tsx' : file;
-      const { metadata } = require(path.join(appRoot, metadataFile)) as { metadata: Metadata };
+      const { metadata } = require(path.join(appRoot, file)) as { metadata: Metadata };
       expect(metadata).toBeDefined();
       await assertMetadata(metadata, route);
+    },
+  );
+
+  it.each(Object.entries(redirectPages))(
+    '%s recovers to %s without an indexable document',
+    (file, destination) => {
+      const { default: Page } = require(path.join(appRoot, file));
+      let result: unknown;
+      try {
+        Page();
+      } catch (error) {
+        result = error;
+      }
+      expect(isRedirectError(result)).toBe(true);
+      if (!isRedirectError(result)) throw new Error('Expected a real Next redirect');
+      expect(getURLFromRedirectError(result)).toBe(destination);
     },
   );
 

@@ -6,7 +6,7 @@ import { GET } from '../route';
 describe('GET /api/auth/login', () => {
   it('starts a direct Jovie authorization-code flow with PKCE and state', async () => {
     const response = await GET(
-      new NextRequest('http://localhost:3000/api/auth/login?returnTo=%2Fdashboard'),
+      new NextRequest('http://localhost:3000/api/auth/login?returnTo=%2Fsupport'),
     );
     const location = new URL(response.headers.get('location') || '');
 
@@ -21,7 +21,7 @@ describe('GET /api/auth/login', () => {
     expect(location.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(response.cookies.get('lyb_oauth_state')?.value).toBe(location.searchParams.get('state'));
     expect(response.cookies.get('lyb_oauth_verifier')?.value).toBeTruthy();
-    expect(response.cookies.get('lyb_oauth_return_to')?.value).toBe('/');
+    expect(response.cookies.get('lyb_oauth_return_to')?.value).toBe('/support');
   });
 
   it('does not accept an external return URL', async () => {
@@ -31,4 +31,16 @@ describe('GET /api/auth/login', () => {
 
     expect(response.cookies.get('lyb_oauth_return_to')?.value).toBe('/');
   });
+
+  it.each(['/dashboard', '/settings/profile', '/onboarding', '/training/canvas', '/missing'])(
+    'returns to the landing page instead of retired or unknown destination %s',
+    async (returnTo) => {
+      const response = await GET(
+        new NextRequest(
+          `http://localhost:3000/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+        ),
+      );
+      expect(response.cookies.get('lyb_oauth_return_to')?.value).toBe('/');
+    },
+  );
 });

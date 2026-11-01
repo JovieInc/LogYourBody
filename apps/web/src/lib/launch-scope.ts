@@ -13,9 +13,9 @@ const EXACT_REDIRECTS: Record<string, string> = {
   '/photos': '/',
   '/preferences': '/',
   '/profile': '/',
-  '/settings/notifications': '/settings',
-  '/settings/preferences': '/settings',
-  '/settings/profile': '/settings',
+  '/settings/notifications': '/',
+  '/settings/preferences': '/',
+  '/settings/profile': '/',
   '/steps': '/',
   '/training/canvas': '/',
 };

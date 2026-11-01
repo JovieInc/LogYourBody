@@ -45,7 +45,7 @@ export function ProductAuthProvider({ children }: { children: React.ReactNode })
   const [exitReason, setExitReason] = useState<AuthExitReason>('none');
   const previousUserIdRef = useRef<string | null>(null);
 
-  // Load any stored exit reason on mount (e.g. after a redirect to /signin)
+  // Load any stored exit reason on mount.
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -105,7 +105,7 @@ export function ProductAuthProvider({ children }: { children: React.ReactNode })
 
   const signIn = useCallback(async () => {
     try {
-      router.push('/signin');
+      router.push('/download/ios');
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -114,7 +114,7 @@ export function ProductAuthProvider({ children }: { children: React.ReactNode })
 
   const signUp = useCallback(async () => {
     try {
-      router.push('/signup');
+      router.push('/download/ios');
       return { error: null };
     } catch (error) {
       return { error: error as Error };

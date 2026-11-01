@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "lyb-web-landing-only-v1",
+    "source": "https://github.com/JovieInc/LogYourBody/tree/codex/lyb-100-20261101t042159#lyb-100-task",
+    "correction": "Tim's lyb-web-landing-only-v1 lock: after 1.2.0 submission, remove authenticated web app UI and navigation while retaining the landing, marketing/legal pages and first-party iOS APIs.",
+    "mechanization": "Remove app page entrypoints and their navigation and providers. Extend the existing required web metadata inventory test to include every UI page without product-prefix exceptions, rejecting reintroduced and unlisted pages. Retain former page test files as retirement regressions, add dead navigation and middleware bearer/401 checks, and replace obsolete auth-form browser coverage with real 404 and legacy redirect cases. The inventory regression fails against the original 16 non-marketing UI routes and passes after removal. Shrink the existing surface-reconciliation and public-claims baselines for resolved findings; preserve its immutable inventory digest and all remaining findings. The lanes harness owns push and PR operations. Machine: built apps/web/src/app/__tests__/public-metadata.node.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Deleting existing app pages removes their current entrypoints, but retaining the Next.js API and public pages cannot prevent future authenticated UI routes by construction."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required web Jest suite can compare all routable UI pages against the canonical marketing inventory without app-route exceptions and reject dead navigation to retired routes."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/__tests__/public-metadata.node.test.ts",
+      "anchor": "enforces the landing-only route inventory (LYB-100)"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "dependency-update-lockfile-and-source-parity",
     "correction": "PR #1667 (fix-red-1423773703): The glob 14.0.2 dependency update left the source map stale, failing Detect Changes, parity and CI Summary. Repeated dependency repairs must remain retryable when Git staging fails after dependency verification.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1667",
@@ -5390,7 +5412,7 @@
     "fingerprint": "fix-red-540db44e1a",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41271258089",
     "correction": "PR #1672 / LYB-183: SwiftLint rejects three blank lines before closing braces. The ungated launch directive reaches 665 points at accessibility XXXL, leaving no chat transcript viewport and obscuring home controls; the root also owns a competing outcome-editor sheet. Preserve the dated journey and scope enforcement without weakening launch-quality checks.",
-    "mechanization": "Bound the directive with a scrolling fallback, isolate its sheet on the directive, and expose the journey only through the default-off deadline_launch_journey analytics port gate. Extend the existing required launch UI audit with mutation regressions for all three boundaries. Running that audit against the original-head Swift files fails on all three new contracts, while the repaired source and all 30 audit behavior tests pass. Add native gate-policy tests and an opt-in XXXL outcome-editor UI regression; native execution and coverage remain unverified on this Linux host. Remove only the three reported whitespace violations. Tently reports a provider outage, so no app or gate change attempts to bypass it. Machine: built scripts/ios/launch-ui-regression-audit.py. The harness retains push and PR-body ownership.",
+    "mechanization": "Bound the directive with a scrolling fallback, isolate its sheet on the directive, and expose the journey only through the default-off deadline_launch_journey analytics port gate. Extend the existing required launch UI audit with mutation regressions for all three boundaries. Running that audit against the original-head Swift files fails on all three new contracts, while the repaired source and all 30 audit behavior tests pass. Add native gate-policy tests and an opt-in XXXL outcome-editor UI regression; native execution and coverage remain unverified on this Linux host. Remove only the three reported whitespace violations. Merge main's reviewed retirement of the web app and its public OAuth return-URL allowlist, retaining launch tombstones and sending hidden Settings routes to the live landing page; preserve both immutable parents' receipts and the zero-drift surface baseline. Tently reports a provider outage, so no app or gate change attempts to bypass it. Machine: built scripts/ios/launch-ui-regression-audit.py. The harness retains push and PR-body ownership.",
     "classification": {
       "codebase": {
         "feasible": true,
