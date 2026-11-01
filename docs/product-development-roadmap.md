@@ -1,6 +1,6 @@
 # LogYourBody Product Roadmap And Build Guardrails
 
-Last reconciled: 2026-11-01 (LYB-173 October 28 home contract; preserves LYB-161 and LYB-179)
+Last reconciled: 2026-11-01 (LYB-173 October 28 home contract; LYB-274 parity-slice decision; preserves LYB-161 and LYB-179)
 
 ## October 16 supersession: current product behavior
 
@@ -101,12 +101,32 @@ food logger, general workout tracker, or mandatory custom CLI is implied.
 
 **Release exception and planning boundary:** the October 13 TestFlight beta and
 held release PR are grandfathered. LYB-161 and its children do not gate that
-release or the separate, higher-priority latest-main TestFlight delivery. This
-plan authorizes no implementation, deployment, account connection, dependency
+release or the separate, higher-priority latest-main TestFlight delivery. Except
+for the single post-shipment inventory check recorded in LYB-274, this plan
+authorizes no implementation, deployment, account connection, dependency
 installation, marketplace publication, Apple capability/signing change, release
 metadata/checklist/workflow change, or release-PR mutation. Keep linked planning
 items in Backlog without dispatch, admission labels, locks or release-blocking
 relations; retain existing owners and branches.
+
+### LYB-274 next slice only
+
+Recommended default adopted under LYB-274's ships-if-unanswered instruction.
+LYB-274 authorizes only a CI parity-inventory check after the current TestFlight
+release ships. Feature slices stay unauthorized. The check maps every iOS
+capability to a product API or MCP action or a declared device, system, or user
+handoff. It is not feature work. It adds no tool, route, account connection,
+deployment, or release gate, and it leaves the grandfathered October 13 beta
+and the in-flight TestFlight delivery ungated.
+
+Recorded child slices: inventory check, goals/preferences, trends,
+photos/imports, GLP-1, export/deletion, and integration status. Only the
+inventory check is implementation-authorized, and only on the terms above. The
+other six stay unauthorized. LYB-162 remains the in-progress weight slice.
+Repository slice keys are not Linear issue IDs, admission labels, or dispatch.
+Real-device TestFlight evidence stays with LYB-161. The
+[slice record](../packages/shared-lib/decisions/agent-parity-slices.md) is the
+specification.
 
 ## September 26 roadmap — preserved v1 history
 

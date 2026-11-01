@@ -1,0 +1,131 @@
+{
+  "id": "LYB-274",
+  "parent": "LYB-161",
+  "depends_on": "LYB-162",
+  "status": "accepted",
+  "recorded_on": "2026-11-01",
+  "approval_basis": "Recommended default adopted under LYB-274's ships-if-unanswered instruction. This records the authorized default, not a separate human approval.",
+  "question": "May agents start implementing agent-parity slices after LYB-162, or does the planning-only restriction stand?",
+  "decision": "Authorize the next slice only: a CI parity-inventory check (every iOS capability maps to an API/MCP action or a declared handoff), no feature work, after the current TestFlight release ships. The planning-only restriction stands for goals/preferences, trends, photos/imports, GLP-1, export/deletion and integration status.",
+  "specification": "packages/shared-lib/decisions/agent-parity-slices.md",
+  "roadmap": "docs/product-development-roadmap.md",
+  "inventory": "docs/integrations/chatgpt-app/README.md",
+  "journeys": "docs/USER_JOURNEYS.md",
+  "authorizes_feature_work": false,
+  "creates_linear_issues": false,
+  "current_section": {
+    "start": "### LYB-274 next slice only",
+    "end": "## September 26 roadmap — preserved v1 history"
+  },
+  "planning_boundary_start": "**Release exception and planning boundary:**",
+  "required_current_phrases": [
+    "ships-if-unanswered",
+    "LYB-274 authorizes only a CI parity-inventory check after the current TestFlight release ships",
+    "Feature slices stay unauthorized",
+    "not feature work",
+    "goals/preferences, trends, photos/imports, GLP-1, export/deletion, and integration status",
+    "Only the inventory check is implementation-authorized",
+    "LYB-162 remains the in-progress weight slice",
+    "not Linear issue IDs",
+    "Real-device TestFlight evidence stays with LYB-161"
+  ],
+  "preserved_boundary_phrases": [
+    "October 13 TestFlight beta",
+    "held release PR are grandfathered",
+    "do not gate that",
+    "Except for the single post-shipment inventory check recorded in LYB-274",
+    "authorizes no implementation",
+    "without dispatch, admission labels"
+  ],
+  "required_cross_document_phrases": [
+    "LYB-274 authorizes only a CI parity-inventory check after the current TestFlight release ships. Feature slices stay unauthorized."
+  ],
+  "slices": [
+    {
+      "key": "inventory_check",
+      "title": "Inventory check",
+      "specification": "packages/shared-lib/decisions/agent-parity-slices.md#slice-inventory-check",
+      "implementation": "authorized_after_current_testflight_ships",
+      "kind": "ci_check",
+      "feature_work": false,
+      "implemented": false,
+      "covers": "every_canonical_inventory_row",
+      "linear_issue": null,
+      "inventory_anchors": ["Canonical iOS capability inventory"]
+    },
+    {
+      "key": "goals_preferences",
+      "title": "Goals/preferences",
+      "specification": "packages/shared-lib/decisions/agent-parity-slices.md#slice-goals-and-preferences",
+      "implementation": "not_authorized",
+      "kind": "feature_gap",
+      "feature_work": false,
+      "implemented": false,
+      "linear_issue": null,
+      "inventory_anchors": ["Profile, units, goals, dated outcomes and preferences"]
+    },
+    {
+      "key": "trends",
+      "title": "Trends",
+      "specification": "packages/shared-lib/decisions/agent-parity-slices.md#slice-trends",
+      "implementation": "not_authorized",
+      "kind": "feature_gap",
+      "feature_work": false,
+      "implemented": false,
+      "linear_issue": null,
+      "inventory_anchors": [
+        "Latest metrics, history, deterministic trends, interpolation, body score"
+      ]
+    },
+    {
+      "key": "photos_imports",
+      "title": "Photos/imports",
+      "specification": "packages/shared-lib/decisions/agent-parity-slices.md#slice-photos-and-imports",
+      "implementation": "not_authorized",
+      "kind": "feature_gap",
+      "feature_work": false,
+      "implemented": false,
+      "linear_issue": null,
+      "inventory_anchors": [
+        "Progress photos: capture/select",
+        "DEXA/InBody/PDF and BodySpec imports"
+      ]
+    },
+    {
+      "key": "glp1",
+      "title": "GLP-1",
+      "specification": "packages/shared-lib/decisions/agent-parity-slices.md#slice-glp-1",
+      "implementation": "not_authorized",
+      "kind": "feature_gap",
+      "feature_work": false,
+      "implemented": false,
+      "linear_issue": null,
+      "inventory_anchors": ["GLP-1 dose/check-in history"]
+    },
+    {
+      "key": "export_deletion",
+      "title": "Export/deletion",
+      "specification": "packages/shared-lib/decisions/agent-parity-slices.md#slice-export-and-deletion",
+      "implementation": "not_authorized",
+      "kind": "feature_gap",
+      "feature_work": false,
+      "implemented": false,
+      "linear_issue": null,
+      "inventory_anchors": ["Export, metric/photo sharing, account deletion"]
+    },
+    {
+      "key": "integration_status",
+      "title": "Integration status",
+      "specification": "packages/shared-lib/decisions/agent-parity-slices.md#slice-integration-status",
+      "implementation": "not_authorized",
+      "kind": "feature_gap",
+      "feature_work": false,
+      "implemented": false,
+      "linear_issue": null,
+      "inventory_anchors": [
+        "Integration availability, connection, permissions, sync status, support"
+      ]
+    }
+  ],
+  "boundaries": "Decision and seven repository-local slices only. Real-device TestFlight evidence stays with LYB-161. Repository slice keys are not Linear issue IDs, admission labels, dispatch, or release blockers. LYB-162 stays the in-progress weight slice. This record adds no tool, route, account connection, deployment, or CI inventory parser."
+}

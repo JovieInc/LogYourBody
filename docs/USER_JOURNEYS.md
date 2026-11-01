@@ -110,3 +110,6 @@ writes or cross-user disclosure, and truthful handoff outcomes. Report supported
 passed, failed and pending cases per client/action; an empty or partial evidence
 set is not full parity. This planning contract does not gate the grandfathered
 TestFlight beta or authorize client registration, account connection or release.
+LYB-274 authorizes only a CI parity-inventory check after the current TestFlight
+release ships. Feature slices stay unauthorized. The recorded slices live in
+[agent-parity-slices.md](../packages/shared-lib/decisions/agent-parity-slices.md).

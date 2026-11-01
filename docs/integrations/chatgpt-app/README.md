@@ -347,7 +347,12 @@ from this planning lane. Mira Thud remains an unverified research candidate with
 no available public API or verified weights dependency; no model/runtime is selected.
 
 Split the remaining gaps into focused contracts as the existing features are
-extended. These are backlog candidates, not newly dispatched issues or blockers:
+extended. These are backlog candidates, not newly dispatched issues or blockers.
+LYB-274 authorizes only a CI parity-inventory check after the current TestFlight
+release ships. Feature slices stay unauthorized. The
+[recorded slices](../../../packages/shared-lib/decisions/agent-parity-slices.md)
+are repository-local keys for the inventory check, goals/preferences, trends,
+photos/imports, GLP-1, export/deletion and integration status.
 
 | Contract / existing lane                             | Trigger and KPI                                                                                           | Required acceptance before implementation is called complete                                                                                                                |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
