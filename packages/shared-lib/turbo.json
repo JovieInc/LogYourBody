@@ -57,6 +57,7 @@
         "$TURBO_ROOT$/.github/workflows/signing-expiry.yml",
         "$TURBO_ROOT$/.github/workflows/regenerate-certificates.yml",
         "$TURBO_ROOT$/docs/engineering/signing-expiry.md",
+        "$TURBO_ROOT$/docs/architecture/metric-source-adapters.md",
         "$TURBO_ROOT$/.github/scripts/lib/linear-correction-coverage.mjs",
         "$TURBO_ROOT$/.github/workflows/ci.yml",
         "$TURBO_ROOT$/.github/scripts/codeowners-check.mjs",
