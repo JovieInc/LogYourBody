@@ -529,7 +529,6 @@ struct LogYourBodyWhatsNewView: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("What’s New")
         .onAppear(perform: onSeen)
-
     }
 
     @ViewBuilder

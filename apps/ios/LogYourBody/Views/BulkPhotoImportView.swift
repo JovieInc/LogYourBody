@@ -122,7 +122,6 @@ struct BulkPhotoImportView: View {
                 hasStartedScan = true
             }
         }
-
     }
 
     @ViewBuilder

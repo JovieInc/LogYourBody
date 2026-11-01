@@ -782,7 +782,6 @@ struct BodyScoreShareSheet: View {
         ZStack {
             sheetSurface
         }
-
     }
 
     private var sheetSurface: some View {

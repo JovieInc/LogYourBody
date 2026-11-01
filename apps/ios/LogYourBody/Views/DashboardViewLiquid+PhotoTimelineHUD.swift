@@ -52,7 +52,9 @@ extension DashboardViewLiquid {
 
     var photoTimelineRoot: some View {
         VStack(spacing: 0) {
-            launchJourneyDirective
+            if isLaunchJourneyEnabled {
+                launchJourneyDirective
+            }
 
             photoTimelineRootNavigation
                 .padding(.horizontal, JovieTokens.screenInset)
@@ -91,9 +93,6 @@ extension DashboardViewLiquid {
         )
         .onChange(of: selectedPhotoTimelineRootPage) { _, _ in
             isHomeChatExpanded = false
-        }
-        .sheet(isPresented: $showsLaunchOutcomeEditor) {
-            launchJourneyOutcomeEditor
         }
         .overlay(alignment: .leading) {
             Color.clear

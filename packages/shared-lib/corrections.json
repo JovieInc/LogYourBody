@@ -5385,5 +5385,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-540db44e1a",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41271258089",
+    "correction": "PR #1672 / LYB-183: SwiftLint rejects three blank lines before closing braces. The ungated launch directive reaches 665 points at accessibility XXXL, leaving no chat transcript viewport and obscuring home controls; the root also owns a competing outcome-editor sheet. Preserve the dated journey and scope enforcement without weakening launch-quality checks.",
+    "mechanization": "Bound the directive with a scrolling fallback, isolate its sheet on the directive, and expose the journey only through the default-off deadline_launch_journey analytics port gate. Extend the existing required launch UI audit with mutation regressions for all three boundaries. Running that audit against the original-head Swift files fails on all three new contracts, while the repaired source and all 30 audit behavior tests pass. Add native gate-policy tests and an opt-in XXXL outcome-editor UI regression; native execution and coverage remain unverified on this Linux host. Remove only the three reported whitespace violations. Tently reports a provider outage, so no app or gate change attempts to bypass it. Machine: built scripts/ios/launch-ui-regression-audit.py. The harness retains push and PR-body ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The directive owns its height and scrolling, its editor owns a local presenter, and the analytics port owns opt-in exposure. These runtime boundaries prevent unbounded header growth and root editor interception by construction; the existing required audit rejects their removal without introducing another workflow."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "# A launch directive must not consume the home or become its sheet presenter."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

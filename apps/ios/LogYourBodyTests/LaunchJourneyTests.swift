@@ -2,6 +2,25 @@ import XCTest
 @testable import LogYourBody
 
 final class LaunchJourneyTests: XCTestCase {
+    @MainActor
+    func testDeadlineJourneyRequiresItsOwnEnableGate() {
+        var queriedKeys: [String] = []
+        XCTAssertFalse(LaunchJourney.isEnabled(arguments: []) { key in
+            queriedKeys.append(key)
+            return false
+        })
+        XCTAssertEqual(queriedKeys, ["deadline_launch_journey"])
+        XCTAssertTrue(LaunchJourney.isEnabled(arguments: []) { $0 == LaunchJourney.gateKey })
+    }
+
+    @MainActor
+    func testDeadlineJourneyFixtureEnablesWithoutRemoteConfiguration() {
+        XCTAssertTrue(LaunchJourney.isEnabled(arguments: [LaunchJourney.fixtureArgument]) { _ in
+            XCTFail("The debug fixture must not depend on remote configuration")
+            return false
+        })
+    }
+
     private let now = DatedOutcome.calendarDate("2026-11-01")!
     private let week: TimeInterval = 7 * 24 * 60 * 60
     private let bounds = OutcomeFeasibility.Thresholds(

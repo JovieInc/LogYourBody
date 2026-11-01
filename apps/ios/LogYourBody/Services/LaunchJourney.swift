@@ -4,6 +4,21 @@ import Foundation
 /// DEXA inputs never change the plan or add medication commentary. Missing
 /// safety policy fails closed. A date is never extended.
 enum LaunchJourney {
+    static let gateKey = "deadline_launch_journey"
+    static let fixtureArgument = "-lybUITestLaunchJourneyFixture"
+
+    @MainActor
+    static func isEnabled(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        isGateEnabled: ((String) -> Bool)? = nil
+    ) -> Bool {
+        #if DEBUG
+        if arguments.contains(fixtureArgument) { return true }
+        #endif
+        let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return checkGate(gateKey)
+    }
+
     static let promiseHeadline = "Your body-composition goal, planned around your next date."
     static let promiseExplanation =
         "Set an outcome and a date. LogYourBody follows your photos and measurements, spots drift, and gives you one next action."

@@ -6,6 +6,20 @@ struct LaunchDirectiveCard: View {
     var onAction: () -> Void
 
     var body: some View {
+        ViewThatFits(in: .vertical) {
+            content
+            ScrollView {
+                content
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .accessibilityIdentifier("launch_directive_scroll")
+        }
+        .frame(maxHeight: 160)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("launch_directive_\(presentation.surface.rawValue)")
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(presentation.title)
                 .font(.headline)
@@ -20,8 +34,6 @@ struct LaunchDirectiveCard: View {
                 .accessibilityIdentifier("launch_next_action")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("launch_directive_\(presentation.surface.rawValue)")
     }
 }
 
@@ -118,6 +130,11 @@ private func existingValue(_ outcome: DatedOutcome) -> Double {
 }
 
 extension DashboardViewLiquid {
+    var isLaunchJourneyEnabled: Bool {
+        _ = featureGateRefreshToken
+        return LaunchJourney.isEnabled()
+    }
+
     var homeChatDraftBinding: Binding<String> {
         let ownership = authManager.captureAccountSession()
         return AccountSessionChatDraft.binding(storage: $homeChatDraft, owner: ownership) {
@@ -134,6 +151,9 @@ extension DashboardViewLiquid {
         )
         .padding(.horizontal, JovieTokens.screenInset)
         .padding(.top, 8)
+        .sheet(isPresented: $showsLaunchOutcomeEditor) {
+            launchJourneyOutcomeEditor
+        }
     }
 
     var launchJourneyOutcomeEditor: some View {
