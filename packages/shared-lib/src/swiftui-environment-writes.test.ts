@@ -76,18 +76,21 @@ it('allows reading Reduce Motion and setting writable preview preferences', () =
   ).toBe(false);
 });
 
-it('keeps native views and previews free of read-only Reduce Motion writes (LYB-153)', () => {
-  const root = fileURLToPath(new URL('../../../apps/ios/LogYourBody/', import.meta.url));
-  const violations = readdirSync(root, { recursive: true })
-    .map(String)
-    .filter((path) => path.endsWith('.swift'))
-    .filter((path) => writesReduceMotion(readFileSync(join(root, path), 'utf8')));
+it.each(['LogYourBody', 'LogYourBodyTests', 'LogYourBodyUITests'])(
+  'keeps native views and previews free of read-only Reduce Motion writes (LYB-153): %s',
+  (target) => {
+    const root = fileURLToPath(new URL(`../../../apps/ios/${target}/`, import.meta.url));
+    const violations = readdirSync(root, { recursive: true })
+      .map(String)
+      .filter((path) => path.endsWith('.swift'))
+      .filter((path) => writesReduceMotion(readFileSync(join(root, path), 'utf8')));
 
-  expect(
-    violations,
-    'Use the system Reduce Motion preference; its environment value is read-only',
-  ).toEqual([]);
-});
+    expect(
+      violations,
+      'Use the system Reduce Motion preference; its environment value is read-only',
+    ).toEqual([]);
+  },
+);
 
 it('keeps merged native views free of duplicate environment bindings', () => {
   const root = fileURLToPath(new URL('../../../apps/ios/LogYourBody/', import.meta.url));

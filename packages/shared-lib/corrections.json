@@ -5581,5 +5581,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "swiftui-reduce-motion-environment-is-read-only",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41285773987/job/124786814816",
+    "correction": "PR #1679 / LYB-245 (fix-red-cc900b961c occurrence 2): Launch Quality cannot compile HealthSyncPresentationTests because its render snapshot writes the read-only accessibilityReduceMotion environment. CI Summary reflects that native build failure. Tently check 124786645463 reports an unreachable AI provider without a code finding.",
+    "mechanization": "Disable snapshot animation through a SwiftUI transaction instead of assigning a get-only environment value. Extend the existing required shared-lib Reduce Motion guard from app sources to the unit-test and UI-test targets. The expanded guard fails specifically on HealthSyncPresentationTests.swift before the fix while the other 336 tests pass, then all 337 pass after the fix. Preserve every native test, copy, snapshot combination, feature gate and production motion behavior. The harness owns pushing and PR edits and should use the single declaration: Machine: built packages/shared-lib/src/swiftui-environment-writes.test.ts. The existing native compiler remains an independent gate; this Linux host cannot establish native build, execution or coverage success.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Runtime app logic cannot prevent future source edits from invoking an unsupported SwiftUI modifier, including within debug-only preview code."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic source regression in the existing required shared-lib test task detects the unsupported environment write on Linux before the native compiler independently rejects it on macOS."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/swiftui-environment-writes.test.ts",
+      "anchor": "keeps native views and previews free of read-only Reduce Motion writes (LYB-153)"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

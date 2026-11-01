@@ -56,7 +56,7 @@ final class HealthSyncPresentationTests: XCTestCase {
                     .environment(\.dynamicTypeSize, size)
                     .environment(\.locale, locale)
                     .environment(\.timeZone, timeZone)
-                    .environment(\.accessibilityReduceMotion, true)
+                    .transaction { $0.disablesAnimations = true }
                     let renderer = ImageRenderer(content: view)
                     renderer.scale = 1
                     let image = try XCTUnwrap(renderer.uiImage)
