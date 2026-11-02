@@ -93,6 +93,49 @@ fi
 # invocation. A stock simulator left for xcodebuild to boot made every hosted
 # test invocation spend 5-9 min launching the runner (run 38320479871); the
 # created-and-booted fallback simulator launched it in 24-60s (#1379 probe).
+
+# Every wait here is bounded: a wedged CoreSimulator previously kept
+# `simctl bootstatus` running for the entire workflow step (runs 41400440890
+# and 41406257126 burned the full 52-minute launch-quality budget before the
+# first test). The bounds fail into the restart-once repair and the existing
+# exit 70 "simulator unavailable" path, never into an unbounded hang.
+SIM_BOOT_TIMEOUT_SECONDS="${SIM_BOOT_TIMEOUT_SECONDS:-300}"
+SIM_SHUTDOWN_TIMEOUT_SECONDS="${SIM_SHUTDOWN_TIMEOUT_SECONDS:-120}"
+
+run_with_timeout() {
+  local timeout_seconds="$1"
+  shift
+  python3 - "$timeout_seconds" "$@" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+
+timeout_seconds = float(sys.argv[1])
+command = sys.argv[2:]
+
+process = subprocess.Popen(command, start_new_session=True)
+try:
+    sys.exit(process.wait(timeout=timeout_seconds))
+except subprocess.TimeoutExpired:
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+        process.wait(timeout=30)
+    except ProcessLookupError:
+        pass
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+    sys.exit(124)
+PY
+}
+
+restart_simulator_once() {
+  run_with_timeout "$SIM_SHUTDOWN_TIMEOUT_SECONDS" xcrun simctl shutdown "$SIMULATOR_ID" >&2 || true
+  xcrun simctl boot "$SIMULATOR_ID" >&2 || true
+  run_with_timeout "$SIM_BOOT_TIMEOUT_SECONDS" xcrun simctl bootstatus "$SIMULATOR_ID" -b >&2
+}
+
 testmanager_socket_ready() {
   local socket_path
   socket_path="$(xcrun simctl getenv "$SIMULATOR_ID" TESTMANAGERD_SIM_SOCK)" || return 1
@@ -103,14 +146,17 @@ if [[ -n "$SIMULATOR_ID" ]]; then
   boot_started="$(date +%s)"
   # boot can report "already booted"; bootstatus must still succeed.
   xcrun simctl boot "$SIMULATOR_ID" >/dev/null 2>&1 || true
-  xcrun simctl bootstatus "$SIMULATOR_ID" -b >&2
+  # A device that never finishes booting gets the one restart below; a still
+  # stuck device exits 70 so the audit fails fast with a precise cause.
+  if ! run_with_timeout "$SIM_BOOT_TIMEOUT_SECONDS" xcrun simctl bootstatus "$SIMULATOR_ID" -b >&2; then
+    echo "::warning::Simulator $SIMULATOR_ID did not finish booting within ${SIM_BOOT_TIMEOUT_SECONDS}s; restarting it once before tests." >&2
+    restart_simulator_once || true
+  fi
   # A persistent Mac can retain a booted device whose launchd socket vanished
   # (run 40597923369). Repair only this device, once, before admitting tests.
   if ! testmanager_socket_ready; then
     echo "::warning::Simulator $SIMULATOR_ID has no testmanagerd socket; restarting it once before tests." >&2
-    xcrun simctl shutdown "$SIMULATOR_ID" >&2
-    xcrun simctl boot "$SIMULATOR_ID" >&2
-    xcrun simctl bootstatus "$SIMULATOR_ID" -b >&2
+    restart_simulator_once || true
     if ! testmanager_socket_ready; then
       echo "::error::Simulator $SIMULATOR_ID still has no testmanagerd socket after restart." >&2
       exit 70

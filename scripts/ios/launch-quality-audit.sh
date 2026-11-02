@@ -33,6 +33,13 @@ XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
 # missed every Swift package cache and was still compiling test targets at 600s.
 # Allow 15m for compilation; keep test timeouts, retries and the outer step cap.
 BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"
+# Every bounded command below also honors this audit-level deadline. The
+# workflow step kills the whole audit at 52 minutes with zero diagnostics (Mac
+# runs upload no artifacts and job logs are admin-gated), so the audit must
+# always reach its own timeouts first and emit phase evidence as it goes.
+# 2760s (46m) stays above the slowest passing hosted run (38m) and inside the
+# 52-minute step cap. This caps waste, it never extends a bound.
+AUDIT_DEADLINE_SECONDS="${AUDIT_DEADLINE_SECONDS:-2760}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
@@ -58,12 +65,54 @@ if [[ -d "$ARTIFACT_DIR" && -n "$(ls -A "$ARTIFACT_DIR")" ]]; then
 fi
 mkdir -p "$ARTIFACT_DIR"
 AUDIT_STARTED_AT="$(date +%s)"
+
+# Phase and budget helpers must exist before the first phase_start call below.
+remaining_budget_seconds() {
+  local remaining=$(( AUDIT_DEADLINE_SECONDS - $(date +%s) + AUDIT_STARTED_AT ))
+  (( remaining < 60 )) && remaining=60
+  printf '%s\n' "$remaining"
+}
+
+# Cap each phase at min(its own bound, what is left of the audit deadline) so a
+# slow host fails the audit through its own timeout and evidence instead of a
+# silent runner-side step kill.
+bounded_seconds() {
+  local bound="$1" remaining
+  remaining="$(remaining_budget_seconds)"
+  (( bound < remaining )) && printf '%s\n' "$bound" || printf '%s\n' "$remaining"
+}
+
+PHASE_NAME=""
+PHASE_STARTED_AT=0
+emit_phase() {
+  local line="launch-quality audit: $1 (elapsed $(( $(date +%s) - AUDIT_STARTED_AT ))s)"
+  echo "$line"
+  printf '%s\n' "$line" >> "$ARTIFACT_DIR/phase-timeline.log"
+  # The step summary renders even when the runner later kills the step, which
+  # is the only public evidence channel on self-hosted Mac runs.
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    printf '%s\n' "$line" >> "$GITHUB_STEP_SUMMARY"
+  fi
+}
+
+phase_start() {
+  PHASE_NAME="$1"
+  PHASE_STARTED_AT="$(date +%s)"
+  emit_phase "started $PHASE_NAME"
+}
+
+phase_end() {
+  emit_phase "finished $PHASE_NAME in $(( $(date +%s) - PHASE_STARTED_AT ))s"
+  PHASE_NAME=""
+}
+
 # Record source identity without implying an authenticated production build.
 git -C "$ROOT_DIR" rev-parse HEAD > "$ARTIFACT_DIR/source-revision.txt"
 git -C "$ROOT_DIR" diff HEAD --binary > "$ARTIFACT_DIR/source-working-tree.patch"
 
 if [[ "$AUDIT_MODE" == full ]]; then
   # Finish validator shell fixtures before simulator boot competes for host resources.
+  phase_start preflight
   python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
   bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
 fi
@@ -74,6 +123,10 @@ fi
 
 if [[ "$DESTINATION" == "auto" ]]; then
   DESTINATION="$(IOS_DIR="$IOS_DIR" PROJECT="$PROJECT" SCHEME="$SCHEME" bash "$ROOT_DIR/scripts/ios/resolve-simulator-destination.sh")"
+fi
+
+if [[ "$AUDIT_MODE" == full ]]; then
+  phase_end preflight
 fi
 
 run_with_timeout() {
@@ -189,6 +242,11 @@ stop_launch_probe() {
   [[ "$LQ_LAUNCH_PROBE" == "true" ]] || return 0
   local pid
   for pid in ${LAUNCH_PROBE_PIDS[@]+"${LAUNCH_PROBE_PIDS[@]}"}; do
+    # The recorded pid may have exec'd into a tool (xcrun -> simctl) whose
+    # child (e.g. `simctl spawn ... log stream`) survives its parent and
+    # streams forever on a persistent Mac. Kill the children first, or every
+    # attempt leaks one unbounded simulator log stream.
+    pkill -P "$pid" >/dev/null 2>&1 || true
     kill "$pid" >/dev/null 2>&1 || true
     wait "$pid" >/dev/null 2>&1 || true
   done
@@ -208,6 +266,7 @@ run_xcodebuild_test() {
   local log_file="$3"
   local attempt
   local status
+  local effective_timeout
   local -a xcodebuild_command
   shift 3
 
@@ -231,15 +290,16 @@ run_xcodebuild_test() {
     )
 
     set +e
+    effective_timeout="$(bounded_seconds "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS")"
     run_with_timeout \
-      "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS" \
+      "$effective_timeout" \
       "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
     status="${PIPESTATUS[0]}"
     set -e
     stop_launch_probe "$label"
 
     if [[ "$status" -eq 124 ]]; then
-      echo "xcodebuild command timed out after ${XCODEBUILD_COMMAND_TIMEOUT_SECONDS}s" | tee -a "$log_file"
+      echo "xcodebuild command timed out after ${effective_timeout}s" | tee -a "$log_file"
       return "$status"
     fi
 
@@ -273,6 +333,7 @@ assert_xcresult_evidence() {
 build_for_testing_once() {
   local log_file="$ARTIFACT_DIR/launch-quality-build-for-testing.log"
   local status
+  local effective_timeout
   local -a xcodebuild_command
 
   : > "$log_file"
@@ -287,14 +348,15 @@ build_for_testing_once() {
   )
 
   set +e
+  effective_timeout="$(bounded_seconds "$BUILD_FOR_TESTING_TIMEOUT_SECONDS")"
   run_with_timeout \
-    "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" \
+    "$effective_timeout" \
     "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
   status="${PIPESTATUS[0]}"
   set -e
 
   if [[ "$status" -eq 124 ]]; then
-    echo "build-for-testing timed out after ${BUILD_FOR_TESTING_TIMEOUT_SECONDS}s" | tee -a "$log_file"
+    echo "build-for-testing timed out after ${effective_timeout}s" | tee -a "$log_file"
   fi
 
   return "$status"
@@ -513,6 +575,7 @@ if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
   exit 0
 fi
 
+phase_start static
 if [[ "$RUN_SWIFTLINT" == "true" ]]; then
   swiftlint lint --strict | tee "$ARTIFACT_DIR/swiftlint.log"
 fi
@@ -537,7 +600,11 @@ else
   echo "Skipping optical grid audit" | tee "$ARTIFACT_DIR/optical-grid-audit.log"
 fi
 
+phase_end static
+
+phase_start build-for-testing
 build_for_testing_once
+phase_end build-for-testing
 
 CHAT_QUALIFICATION_UNIT_TESTS=(
   "ChatServiceTests/testSyntheticChatCompletionRestoresThroughExistingHistoryPort"
@@ -560,6 +627,7 @@ done
 # Launch Quality runs on 2026-10-25 with the LYB-231 signature (empty StoreKit state at restore).
 # Launch Quality gates the general unit target. The StoreKit lifecycle suite
 # remains required in the dedicated merge-group and main job.
+phase_start unit-tests
 run_xcodebuild_test \
   "launch-quality-unit-tests" \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" \
@@ -577,6 +645,7 @@ python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --base-revision "${BASE_SHA:-}" --source-root "$ROOT_DIR" \
   --scheme "$SCHEME" --only-testing LogYourBodyTests \
   > "$ARTIFACT_DIR/launch-quality-unit-tests.ratchet.json"
+phase_end unit-tests
 
 # Every UI check runs in ONE xcodebuild invocation. On hosted macOS each
 # test-without-building invocation pays 3-6 min launching the UI test runner
@@ -632,6 +701,7 @@ UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")
 # replaces three separately bounded invocations, so its own bound is the
 # per-invocation limit plus the work the other two used to carry.
 UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1500}"
+phase_start ui-tests
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_xcodebuild_test \
   "launch-quality-ui" \
   "$UI_RESULT_BUNDLE" \
@@ -639,7 +709,9 @@ XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_
   "${UI_SELECTORS[@]}"
 assert_xcresult_evidence "$UI_RESULT_BUNDLE" "${UI_EVIDENCE_ARGS[@]}" \
   --critical-captures --require-settings-row-coverage --require-chaos-accounting-coverage --require-canvas-coverage
+phase_end ui-tests
 
+phase_start runtime-warnings
 if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
   FAIL_ON_RUNTIME_WARNINGS="$FAIL_ON_RUNTIME_WARNINGS" \
     bash "$ROOT_DIR/scripts/ios/xcresult-runtime-audit.sh" \
@@ -649,6 +721,7 @@ if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
 else
   echo "Skipping XCTest runtime-warning audit" | tee "$ARTIFACT_DIR/runtime-warnings.log"
 fi
+phase_end runtime-warnings
 
 {
   printf '# iOS Launch Quality Audit\n\n'
@@ -663,7 +736,8 @@ fi
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
   printf -- '- Build strategy: one `build-for-testing`, the general unit target (StoreKit lifecycle tests run in the required dedicated job), then one UI invocation covering inherited surface cases, two canvas cases, and twelve bounded chaos regressions with simulator parallelism disabled\n'
   printf -- '- Required native coverage: biometric policy, SettingsRow, chaos action accounting, and executed MesocycleCanvas app/view lines. Canvas captures cover reduced motion, replay/readback, and undo.\n'
-  printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
+  printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation; audit deadline: `%ss`\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS" "$AUDIT_DEADLINE_SECONDS"
+  printf -- '- Phase timing: `phase-timeline.log` (also emitted to the step summary as each phase starts and ends)\n'
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"
 
