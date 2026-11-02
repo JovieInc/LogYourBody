@@ -100,7 +100,12 @@
       "id": "launch.baseline",
       "tier": "simulator_interaction",
       "requiredCaptures": ["baseline-manual"],
-      "testIds": ["LaunchJourneyTests/testBaselineDenialAndNoDataRecoverToOneAction()"]
+      "testIds": [
+        "LaunchJourneyTests/testBaselineDenialAndNoDataRecoverToOneAction()",
+        "DatedTimelineTests/testDeniedAndInterruptedOptionalInputsAllowManualBaselineWithoutPolicy()",
+        "DatedTimelineTests/testManualBodyFatAndFFMIBaselinesUseExistingInputs()",
+        "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()"
+      ]
     },
     {
       "id": "launch.deadline",
@@ -136,7 +141,14 @@
       "id": "launch.navigation",
       "tier": "simulator_interaction",
       "requiredCaptures": ["launch-navigation"],
-      "testIds": ["LaunchJourneyTests/testHiddenSurfaceRecoveryHasAnExit()"]
+      "testIds": [
+        "LaunchJourneyTests/testHiddenSurfaceRecoveryHasAnExit()",
+        "DatedOutcomeStoreTests/testStalePresentationCannotSaveIntoAnotherAccount()",
+        "DatedOutcomeStoreTests/testPresentationReadAfterSessionChangeIsDiscarded()",
+        "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()",
+        "DatedTimelineTests/testSwitchingAccountsCannotExposePreviousHistoryOrRequireItsAction()",
+        "DatedTimelineTests/testDelayedSheetActionsRejectReplacementAccountAndSessionGeneration()"
+      ]
     },
     {
       "id": "launch.promise",
@@ -148,19 +160,34 @@
       "id": "launch.recovery",
       "tier": "simulator_interaction",
       "requiredCaptures": ["launch-recovery"],
-      "testIds": ["LaunchJourneyTests/testOfflineStaleAndConflictRecover()"]
+      "testIds": [
+        "LaunchJourneyTests/testOfflineStaleAndConflictRecover()",
+        "DatedTimelineTests/testEveryTimelineStatePreservesOutcomeAndHasOneRecoveryDestination()",
+        "DatedTimelineTests/testDeniedAndInterruptedOptionalInputsAllowManualBaselineWithoutPolicy()",
+        "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()",
+        "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()"
+      ]
     },
     {
       "id": "launch.return",
       "tier": "simulator_interaction",
       "requiredCaptures": ["return-next-action"],
-      "testIds": ["LaunchJourneyTests/testExpiredAndMaintenanceDoNotExtendTheDate()"]
+      "testIds": [
+        "LaunchJourneyTests/testExpiredAndMaintenanceDoNotExtendTheDate()",
+        "DatedTimelineTests/testExpiredDateWinsOverOfflineDenialAndMissingPolicy()",
+        "DatedOutcomeStoreTests/testPresentationSaveAndRelaunchRestoreOwnerScopedContext()",
+        "LogYourBodyUITests/testDatedTimelineExpiredOutcomeOpensEditorWithoutExtendingDate()"
+      ]
     },
     {
       "id": "launch.safety",
       "tier": "service_integration",
       "requiredCaptures": [],
-      "testIds": ["LaunchJourneyTests/testUnavailableSafetyAndUnsafeDatesFailClosed()"]
+      "testIds": [
+        "LaunchJourneyTests/testUnavailableSafetyAndUnsafeDatesFailClosed()",
+        "DatedTimelineTests/testManualBaselineNeverAdmitsMissingOrIncompletePolicy()",
+        "DatedTimelineTests/testSafetyAndMaintenanceWithMissingPolicyRecoverWithoutAdmittingPlan()"
+      ]
     },
     {
       "id": "launch.stats",
@@ -172,7 +199,13 @@
       "id": "launch.timeline",
       "tier": "simulator_interaction",
       "requiredCaptures": ["launch-timeline"],
-      "testIds": ["LaunchJourneyTests/testTimelineSurfaceProjectsEveryState()"]
+      "testIds": [
+        "LaunchJourneyTests/testTimelineSurfaceProjectsEveryState()",
+        "DatedTimelineTests/testEveryTimelineStatePreservesOutcomeAndHasOneRecoveryDestination()",
+        "DatedTimelineTests/testDatedProvenanceDoesNotUseImportTimeAsMeasurementTime()",
+        "DatedTimelineTests/testForeignExcludedFutureAndPhotoEstimatesCannotEstablishBaseline()",
+        "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()"
+      ]
     }
   ],
   "routes": [

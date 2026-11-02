@@ -1,0 +1,48 @@
+{
+  "launch.baseline": [
+    "LaunchJourneyTests/testBaselineDenialAndNoDataRecoverToOneAction()",
+    "DatedTimelineTests/testDeniedAndInterruptedOptionalInputsAllowManualBaselineWithoutPolicy()",
+    "DatedTimelineTests/testManualBodyFatAndFFMIBaselinesUseExistingInputs()",
+    "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()"
+  ],
+  "launch.deadline": ["LaunchJourneyTests/testDatedOutcomeSurvivesAndEditRecomputes()"],
+  "launch.deadline-replan": ["LaunchJourneyTests/testDateEditRecomputesWithoutExtendingExpired()"],
+  "launch.directive": ["LaunchJourneyTests/testOneNextActionForReadyPlan()"],
+  "launch.drift": ["LaunchJourneyTests/testDriftChangesTheSingleAction()"],
+  "launch.memory-isolation": ["LaunchJourneyTests/testHealthMemoryIsolationFailClosed()"],
+  "launch.navigation": [
+    "LaunchJourneyTests/testHiddenSurfaceRecoveryHasAnExit()",
+    "DatedOutcomeStoreTests/testStalePresentationCannotSaveIntoAnotherAccount()",
+    "DatedOutcomeStoreTests/testPresentationReadAfterSessionChangeIsDiscarded()",
+    "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()",
+    "DatedTimelineTests/testSwitchingAccountsCannotExposePreviousHistoryOrRequireItsAction()",
+    "DatedTimelineTests/testDelayedSheetActionsRejectReplacementAccountAndSessionGeneration()"
+  ],
+  "launch.promise": ["LaunchJourneyTests/testPromiseCopyStatesTheDate()"],
+  "launch.recovery": [
+    "LaunchJourneyTests/testOfflineStaleAndConflictRecover()",
+    "DatedTimelineTests/testEveryTimelineStatePreservesOutcomeAndHasOneRecoveryDestination()",
+    "DatedTimelineTests/testDeniedAndInterruptedOptionalInputsAllowManualBaselineWithoutPolicy()",
+    "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()",
+    "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()"
+  ],
+  "launch.return": [
+    "LaunchJourneyTests/testExpiredAndMaintenanceDoNotExtendTheDate()",
+    "DatedTimelineTests/testExpiredDateWinsOverOfflineDenialAndMissingPolicy()",
+    "DatedOutcomeStoreTests/testPresentationSaveAndRelaunchRestoreOwnerScopedContext()",
+    "LogYourBodyUITests/testDatedTimelineExpiredOutcomeOpensEditorWithoutExtendingDate()"
+  ],
+  "launch.safety": [
+    "LaunchJourneyTests/testUnavailableSafetyAndUnsafeDatesFailClosed()",
+    "DatedTimelineTests/testManualBaselineNeverAdmitsMissingOrIncompletePolicy()",
+    "DatedTimelineTests/testSafetyAndMaintenanceWithMissingPolicyRecoverWithoutAdmittingPlan()"
+  ],
+  "launch.stats": ["LaunchJourneyTests/testStatsSurfaceProjectsEveryState()"],
+  "launch.timeline": [
+    "LaunchJourneyTests/testTimelineSurfaceProjectsEveryState()",
+    "DatedTimelineTests/testEveryTimelineStatePreservesOutcomeAndHasOneRecoveryDestination()",
+    "DatedTimelineTests/testDatedProvenanceDoesNotUseImportTimeAsMeasurementTime()",
+    "DatedTimelineTests/testForeignExcludedFutureAndPhotoEstimatesCannotEstablishBaseline()",
+    "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()"
+  ]
+}

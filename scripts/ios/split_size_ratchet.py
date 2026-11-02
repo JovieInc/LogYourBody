@@ -107,6 +107,58 @@ def _type_name(chunk):
     raise ValueError("split chunk has no top-level type name")
 
 
+def extract_declarations(text, names, owner=None):
+    """Move whole types or computed members; never widen access implicitly."""
+    if not names or len(set(names)) != len(names):
+        raise ValueError("declaration names must be unique")
+    if owner is None:
+        header, chunks = declaration_chunks(text)
+        moved = [chunk for chunk in chunks if _type_name(chunk) in names]
+        if len(moved) != len(names):
+            raise ValueError("missing or ambiguous type declaration")
+        return (header + "".join(c for c in chunks if c not in moved)).rstrip() + "\n", (_import_header(header) + "".join(moved)).rstrip() + "\n"
+    pattern = r"(?m)^(?:(?:public|internal|final) +)*(?:struct|class|enum|actor|extension) +" + re.escape(owner) + r"\b[^\n{]*\{"
+    owners = list(re.finditer(pattern, text))
+    if not owners:
+        raise ValueError("missing owner")
+    declaration = owners[0]
+    end = next(b for a, b in top_level_braces(text) if a == declaration.end() - 1)
+    chunk = text[declaration.start():end + 1]
+    opening, closing = top_level_braces(chunk)[0]
+    body = chunk[opening + 1:closing]
+    spans = top_level_braces(body)
+    ranges = []
+    for name in names:
+        pattern = r"(?m)^    (?:(?:public|internal|private|fileprivate|static|mutating) +)*(?:func|var) +" + re.escape(name) + r"\b"
+        matches = list(re.finditer(pattern, body))
+        if len(matches) != 1:
+            raise ValueError("missing or ambiguous member: " + name)
+        match = matches[0]
+        if re.search(r"\b(private|fileprivate)\b", match[0]):
+            raise ValueError("review member access before extraction: " + name)
+        start = match.start()
+        while start > 0:
+            previous = body.rfind("\n", 0, start - 1) + 1
+            if not body[previous:start].strip().startswith(("//", "@")):
+                break
+            start = previous
+        block = next(((a, b) for a, b in spans if a >= match.end()), None)
+        if block is None or not re.fullmatch(r"[^{}]*", body[match.end():block[0]]):
+            raise ValueError("member has no complete body: " + name)
+        signature = body[match.end():block[0]]
+        if ("var " in match[0] and "=" in signature) or re.search(r"(?m)^    (?:func|var|let)\b", signature):
+            raise ValueError("member is not computed: " + name)
+        ranges.append((start, block[1] + 1))
+    ranges.sort()
+    if any(end > next_start for (_, end), (next_start, _) in zip(ranges, ranges[1:])):
+        raise ValueError("overlapping members")
+    moved = "\n\n".join(body[a:b] for a, b in ranges)
+    for a, b in reversed(ranges):
+        body = body[:a].rstrip("\n") + "\n\n" + body[b:].lstrip("\n")
+    kept = text.replace(chunk, chunk[:opening + 1] + body + chunk[closing:], 1)
+    return kept, _import_header(text) + "extension " + owner + " {\n" + moved + "\n}\n"
+
+
 def _import_header(header):
     imports = [line for line in header.splitlines(keepends=True) if line.startswith("import ")]
     if not imports:
@@ -392,8 +444,21 @@ def main():
     parser.add_argument("--root", type=Path, default=Path("."))
     parser.add_argument("--relocate-prefix", help="move the prefix before this exact line into --sibling")
     parser.add_argument("--sibling", type=Path)
+    parser.add_argument("--extract", nargs="+", help="move named types or --owner computed members to --sibling")
+    parser.add_argument("--owner", help="type whose computed members are extracted")
     args = parser.parse_args()
     try:
+        if args.extract:
+            if args.source is None or args.sibling is None or args.sibling.exists():
+                raise ValueError("extract needs a source and a new --sibling")
+            kept, moved = extract_declarations(args.source.read_text(), args.extract, args.owner)
+            if source_lines(moved) > args.limit:
+                raise ValueError("extracted sibling exceeds limit")
+            if not args.dry_run:
+                args.sibling.write_text(moved)
+                args.source.write_text(kept)
+            print(str(args.sibling) + ": " + str(source_lines(moved)) + " lines")
+            return
         if args.check:
             fails = check_repo(args.root)
             for fail in fails:
