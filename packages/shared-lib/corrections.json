@@ -5910,5 +5910,23 @@
     },
     "level": "static",
     "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "correction-ratchet-reports-complete-finding",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41396587009",
+    "correction": "PR #1699 / LYB-312, fix-red-95726c4f82 occurrence 22: merge origin/main first and repair the rejected merge group. Both runs 41396422059 and 41396587009 fail the correction ratchet because the catalog on main grew from its 854-line company baseline to 944 lines. The runner discards the scanner detail, so CI reports only the path. Tently separately reports an AI-provider outage; retain that gate.",
+    "mechanization": "Extend the existing correction-ratchet runner to include the scanner finding key in rejection diagnostics, retaining actual and allowed values for every registered rule. A behavioral regression executes the real company-size scanner: 944 lines against an 854-line baseline must fail with both counts, a source split must pass, and an unbaselined sibling at 501 lines must fail with its limit. Failed checks preserve baselines. The diagnostic regression fails before the runner change and passes after it. Use the strengthened runner to diagnose this instance, then move the unchanged catalog schemas into catalog-schema.ts and re-export them through catalog.ts. Keep the company and correction baselines unchanged. The harness owns pushing and PR-body updates and must add exactly one line: Machine: built packages/shared-lib/scripts/correction-ratchet.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared ratchet runner owns rejection formatting. Including the complete finding key there prevents loss of each scanner's actual and allowed values for all current and future rules."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-ratchet.mjs",
+      "anchor": "${finding.path}: ${finding.key}"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

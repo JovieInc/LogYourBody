@@ -114,6 +114,28 @@ test('new files and moving a violation cannot spend an old finding allowance', a
   await assert.rejects(f.run(), /new correction violation.*app\/new.txt/);
 });
 
+test('size failures report the growth and verify both sides of a source split', async (t) => {
+  const f = fixture(t, { findings: [] });
+  f.put('guard.mjs', readFileSync(new URL('./company-size-ratchet.mjs', import.meta.url), 'utf8'));
+  const sizeReceipt = receipt();
+  sizeReceipt.guard.anchor = 'Baselined files may not grow.';
+  f.json(LEDGER_PATH, [sizeReceipt]);
+  const catalog = 'apps/web/src/lib/training/catalog.ts';
+  const sibling = 'apps/web/src/lib/training/catalog-schema.ts';
+  f.json('.company-guards/size-baseline.json', { [catalog]: 854 });
+  f.put(catalog, 'line\n'.repeat(944));
+  const baseline = readFileSync(join(f.root, 'baseline.json'), 'utf8');
+  await assert.rejects(f.run(), /new correction violation: preserve-invariant: .*grew 854 -> 944/);
+  assert.equal(readFileSync(join(f.root, 'baseline.json'), 'utf8'), baseline);
+
+  f.put(catalog, 'line\n'.repeat(800));
+  f.put(sibling, 'line\n'.repeat(144));
+  assert.equal((await f.run())[0].findings, 0);
+  f.put(sibling, 'line\n'.repeat(501));
+  await assert.rejects(f.run(), /catalog-schema\.ts: 501 lines, over 500 and not baselined/);
+  assert.equal(readFileSync(join(f.root, 'baseline.json'), 'utf8'), baseline);
+});
+
 test('first guard seeds only violations that exist at the immutable base revision', async (t) => {
   const f = fixture(t, { registered: false });
   f.json(LEDGER_PATH, [receipt()]);
