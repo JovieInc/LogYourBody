@@ -88,6 +88,9 @@ lock and unrelated edits remain untouched.
 It then stages the lockfile and source map, refusing unresolved source conflicts,
 unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift. It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.
+Both dependency modes check pnpm hooks (`.pnpmfile.cjs`), workspace `.npmrc`
+files and `patches/` as dependency inputs. Stage reviewed changes to these files
+before repair; local edits remain untouched when the preflight refuses them.
 
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
