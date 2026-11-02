@@ -146,7 +146,8 @@
         "DatedOutcomeStoreTests/testStalePresentationCannotSaveIntoAnotherAccount()",
         "DatedOutcomeStoreTests/testPresentationReadAfterSessionChangeIsDiscarded()",
         "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()",
-        "DatedTimelineTests/testSwitchingAccountsCannotExposePreviousHistoryOrRequireItsAction()"
+        "DatedTimelineTests/testSwitchingAccountsCannotExposePreviousHistoryOrRequireItsAction()",
+        "DatedTimelineTests/testDelayedSheetActionsRejectReplacementAccountAndSessionGeneration()"
       ]
     },
     {

@@ -108,6 +108,12 @@ struct PhotoUploadBatchPolicy {
 }
 
 enum NativeSheetPresentationPolicy {
+    static func allowsAction(
+        owner: AuthManager.ProfileSessionOwnership?, current: AuthManager.ProfileSessionOwnership?
+    ) -> Bool {
+        owner == nil || owner == current
+    }
+
     enum Surface: String, CaseIterable {
         case addEntry
         case addMedication
@@ -221,6 +227,7 @@ struct AddEntrySheet: View {
     @State var selectedTab: Int
     let includesGlp1Entry: Bool
     let isHomeV2LogEntry: Bool
+    @State var presentationOwner: AuthManager.ProfileSessionOwnership?
     @State var selectedDate = Date()
     let onWeightSaved: ((PhotoMetricsUpdateResult) -> Void)?
     let onBodyFatSaved: ((BodyMetrics) -> Void)?
@@ -236,7 +243,8 @@ struct AddEntrySheet: View {
         initialBodyFatMethod: String? = nil,
         isHomeV2LogEntry: Bool = false,
         onWeightSaved: ((PhotoMetricsUpdateResult) -> Void)? = nil,
-        onBodyFatSaved: ((BodyMetrics) -> Void)? = nil
+        onBodyFatSaved: ((BodyMetrics) -> Void)? = nil,
+        presentationOwner: AuthManager.ProfileSessionOwnership? = nil
     ) {
         let resolvedInitialTab = initialTab == 3 && !includesGlp1Entry ? 0 : initialTab
         self._isPresented = isPresented
@@ -251,6 +259,11 @@ struct AddEntrySheet: View {
         ))
         self.onWeightSaved = onWeightSaved
         self.onBodyFatSaved = onBodyFatSaved
+        self._presentationOwner = State(initialValue: presentationOwner)
+    }
+
+    var isPresentationCurrent: Bool {
+        NativeSheetPresentationPolicy.allowsAction(owner: presentationOwner, current: authManager.captureAccountSession())
     }
 
 

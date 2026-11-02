@@ -29,6 +29,19 @@ final class DatedTimelineTests: XCTestCase {
               createdAt: now.addingTimeInterval(100), updatedAt: now)
     }
 
+    @MainActor
+    func testDelayedSheetActionsRejectReplacementAccountAndSessionGeneration() {
+        let owner = AuthManager.ProfileSessionOwnership(subject: "a", generation: 1)
+        XCTAssertTrue(NativeSheetPresentationPolicy.allowsAction(owner: owner, current: owner))
+        XCTAssertFalse(NativeSheetPresentationPolicy.allowsAction(owner: owner, current: nil))
+        XCTAssertFalse(NativeSheetPresentationPolicy.allowsAction(
+            owner: owner, current: .init(subject: "b", generation: 1)))
+        XCTAssertFalse(NativeSheetPresentationPolicy.allowsAction(
+            owner: owner, current: .init(subject: "a", generation: 2)))
+        XCTAssertTrue(NativeSheetPresentationPolicy.allowsAction(owner: nil, current: nil),
+                      "Unbound existing presentations retain their gate-off behavior")
+    }
+
     func testEveryTimelineStatePreservesOutcomeAndHasOneRecoveryDestination() async {
         var denied = input()
         denied.permissionDenied = true

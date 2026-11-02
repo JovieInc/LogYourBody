@@ -15,7 +15,8 @@
     "DatedOutcomeStoreTests/testStalePresentationCannotSaveIntoAnotherAccount()",
     "DatedOutcomeStoreTests/testPresentationReadAfterSessionChangeIsDiscarded()",
     "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()",
-    "DatedTimelineTests/testSwitchingAccountsCannotExposePreviousHistoryOrRequireItsAction()"
+    "DatedTimelineTests/testSwitchingAccountsCannotExposePreviousHistoryOrRequireItsAction()",
+    "DatedTimelineTests/testDelayedSheetActionsRejectReplacementAccountAndSessionGeneration()"
   ],
   "launch.promise": ["LaunchJourneyTests/testPromiseCopyStatesTheDate()"],
   "launch.recovery": [

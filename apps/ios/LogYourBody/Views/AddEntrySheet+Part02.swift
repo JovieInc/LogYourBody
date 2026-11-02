@@ -133,6 +133,7 @@ var saveButtonText: String {
 
 // MARK: - Actions
     func saveEntry() {
+        guard isPresentationCurrent else { return }
         guard let userId = authManager.currentUser?.id else { return }
         guard !isSavingEntry, !isProcessingPhotos else { return }
 
@@ -184,6 +185,7 @@ func saveWeight(userId: String) {
                         weight: weightInKg,
                         userId: userId
                     )
+                    guard isPresentationCurrent else { return }
                     RealtimeSyncManager.shared.syncIfNeeded()
 
                     BodyScoreCache.shared.invalidate(for: userId)
@@ -201,6 +203,7 @@ func saveWeight(userId: String) {
 
                     dismiss()
                 } catch {
+                    guard isPresentationCurrent else { return }
                     handleValidationError(
                         .invalidWeight("Your weight could not be saved. Try again."),
                         for: .weight
@@ -230,6 +233,7 @@ func saveBodyFat(userId: String) {
                         bodyFatMethod: bodyFatMethod,
                         userId: userId
                     )
+                    guard isPresentationCurrent else { return }
                     RealtimeSyncManager.shared.syncIfNeeded()
 
                     BodyScoreCache.shared.invalidate(for: userId)
@@ -240,6 +244,7 @@ func saveBodyFat(userId: String) {
                     onBodyFatSaved?(savedMetric)
                     dismiss()
                 } catch {
+                    guard isPresentationCurrent else { return }
                     handleValidationError(
                         .invalidBodyFat("Your body fat could not be saved. Try again."),
                         for: .bodyFat

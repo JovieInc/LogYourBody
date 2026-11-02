@@ -358,19 +358,22 @@ struct DashboardViewLiquid: View {
 
         let withSheetsAndNavigation = withSyncAndState
             .sheet(isPresented: $showAddEntrySheet) {
-                AddEntrySheet(
-                    isPresented: $showAddEntrySheet,
-                    initialTab: addEntryInitialTab,
-                    includesGlp1Entry: addEntryIncludesGlp1Entry,
-                    initialDate: addEntryInitialDate,
-                    initialWeight: addEntryInitialWeight,
-                    initialBodyFat: addEntryInitialBodyFat,
-                    initialBodyFatMethod: addEntryInitialBodyFatMethod,
-                    isHomeV2LogEntry: isHomeV2LoggingWeight,
-                    onWeightSaved: handleHomeV2WeightEntrySaved,
-                    onBodyFatSaved: handleHomeV2BodyFatEntrySaved
-                )
-                    .environmentObject(authManager)
+                if !isDatedTimelineEnabled || datedTimelineIsOwned {
+                    AddEntrySheet(
+                        isPresented: $showAddEntrySheet,
+                        initialTab: addEntryInitialTab,
+                        includesGlp1Entry: addEntryIncludesGlp1Entry,
+                        initialDate: addEntryInitialDate,
+                        initialWeight: addEntryInitialWeight,
+                        initialBodyFat: addEntryInitialBodyFat,
+                        initialBodyFatMethod: addEntryInitialBodyFatMethod,
+                        isHomeV2LogEntry: isHomeV2LoggingWeight,
+                        onWeightSaved: handleHomeV2WeightEntrySaved,
+                        onBodyFatSaved: handleHomeV2BodyFatEntrySaved,
+                        presentationOwner: isDatedTimelineEnabled ? datedTimelineOwner : nil
+                    )
+                        .environmentObject(authManager)
+                }
             }
             .sheet(isPresented: $showSyncDetails) {
                 DashboardSyncDetailsSheet(
@@ -379,14 +382,17 @@ struct DashboardViewLiquid: View {
                 )
             }
             .sheet(isPresented: $isProgressPhotoAttachPresented) {
-                ProgressPhotoAttachSheet(
-                    targetMetric: progressPhotoAttachTarget,
-                    fallbackDate: progressPhotoAttachFallbackDate,
-                    onComplete: {
-                        await handleProgressPhotoAttachComplete()
-                    }
-                )
-                .environmentObject(authManager)
+                if !isDatedTimelineEnabled || datedTimelineIsOwned {
+                    ProgressPhotoAttachSheet(
+                        targetMetric: progressPhotoAttachTarget,
+                        fallbackDate: progressPhotoAttachFallbackDate,
+                        onComplete: {
+                            await handleProgressPhotoAttachComplete()
+                        },
+                        presentationOwner: isDatedTimelineEnabled ? datedTimelineOwner : nil
+                    )
+                    .environmentObject(authManager)
+                }
             }
             .navigationDestination(isPresented: $isMetricDetailActive) {
                 fullMetricChartView

@@ -89,6 +89,7 @@ struct ProgressPhotoAttachSheet: View {
     let fallbackDate: Date
     let onComplete: () async -> Void
 
+    @State var presentationOwner: AuthManager.ProfileSessionOwnership?
     @State var selectedImage: UIImage?
     @State private var selectedImageDate: Date?
     @State var attachStatus: ProgressPhotoAttachStatus = .empty
@@ -115,6 +116,10 @@ struct ProgressPhotoAttachSheet: View {
 
     private var canAttach: Bool {
         selectedImage != nil && !isBusy && !isSuccess
+    }
+
+    private var isPresentationCurrent: Bool {
+        NativeSheetPresentationPolicy.allowsAction(owner: presentationOwner, current: authManager.captureAccountSession())
     }
 
     #if DEBUG
@@ -464,6 +469,7 @@ struct ProgressPhotoAttachSheet: View {
     }
 
     private func loadSelectedPhoto(_ asset: AppPhotoAsset?) {
+        guard isPresentationCurrent else { return }
         let loadID = UUID()
         photoSelectionLoadID = loadID
 
@@ -482,6 +488,7 @@ struct ProgressPhotoAttachSheet: View {
     }
 
     private func startCameraCapture() {
+        guard isPresentationCurrent else { return }
         #if DEBUG
         if usesProgressPhotoAttachFixture {
             isCameraPresented = true
@@ -520,6 +527,7 @@ struct ProgressPhotoAttachSheet: View {
     }
 
     private func attachSelectedPhoto() {
+        guard isPresentationCurrent else { return }
         if isSuccess {
             dismiss()
             return

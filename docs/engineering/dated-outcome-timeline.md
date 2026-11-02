@@ -35,6 +35,12 @@ presentations; a late result cannot publish the prior account's goal or action.
 History remains hidden until its owner and selected entry match the active
 session. Existing hidden-surface/deep-link recovery is unchanged.
 
+The reused logging and photo sheets freeze the opening account session in
+presentation state. The shared `NativeSheetPresentationPolicy` rejects delayed
+actions after account replacement or a new generation of the same account;
+late logger callbacks cannot publish into the replacement session. Existing
+callers keep their behavior through the optional, default-unbound parameter.
+
 ## Policy reconciliation remains required before rollout
 
 The repository's pinned upstream v1 policy supplies no numerical feasibility
