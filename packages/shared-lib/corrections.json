@@ -5831,5 +5831,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-reviews-hooks-config-and-patches",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1732",
+    "correction": "PR #1732, fix-red-1423773703 occurrence 34: merge origin/main and repair the ElevenLabs 3.0.76 dependency artifacts. Detect Changes and parity reject the stale source map, causing CI Summary to fail. The existing repair helper must also refuse unreviewed pnpm hooks, workspace npmrc files and patches before verifying or refreshing dependencies.",
+    "mechanization": "Extend the existing dependency resolver preflight to include .pnpmfile.cjs, workspace .npmrc files and patches/. Twelve real-Git refusal cases fail before the extension and pass afterward; six staged-input controls pass in both versions. The existing required pre-commit suite imports these tests. Use the extended --verify-lockfile helper on the preserved lockfile update, then retain frozen installation and source parity checks. Vercel deployment logs require unavailable credentials, so its hosted result remains unverified. The harness owns push and PR-body edits and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dependency repair helper owns artifact generation and can reject unstaged or untracked resolution inputs before invoking pnpm, preventing local hook, config or patch bytes from contaminating reviewed dependency artifacts."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Pnpm hooks, workspace npmrc files and patches also affect dependency resolution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
