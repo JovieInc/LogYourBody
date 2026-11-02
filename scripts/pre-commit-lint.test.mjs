@@ -7,6 +7,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { lintArguments } from './pre-commit-lint.mjs';
 import './resolve-repository-docs.test.mjs';
+import './resolve-repository-docs-pin.test.mjs';
+import './resolve-repository-docs-manifest.test.mjs';
 
 const env = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),

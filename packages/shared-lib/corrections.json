@@ -1,5 +1,41 @@
 [
   {
+    "fingerprint": "merged-project-keeps-parent-file-membership",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1705",
+    "correction": "PR #1705 / LYB-317, fix-red-95726c4f82 occurrence 21: merge origin/main without rebasing. Both parents added different Xcode file membership and changed the diagnostic project pin, so Git conflicted the pin while the project auto-merged. Tently reports an AI-provider outage (reference 318a46a0-8b5d-48a5-817f-f3e4a8fcbbbc) and no source finding; do not bypass that gate. A reviewed pin must not accept a merged project that dropped the other parent's file.",
+    "mechanization": "Extend the conflicted diagnostic pin resolver so the staged merged project keeps every PBXBuildFile and PBXFileReference added by either parent before the reviewed digest replaces the pin. The new real-Git regression fails while the resolver accepts a digest of a project that dropped the incoming file and passes after the refusal; the pin-only success path still ignores unstaged source bytes. Use that command with the reviewed digest of this merge's project. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The conflicted pin resolver already runs before a merge commit is accepted. Refusing a merged project that lost a parent file membership prevents that dropped file from becoming the committed diagnostic digest."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "A merged diagnostic project must keep every parent file membership."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "auto-merged-manifest-parent-inputs",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1705",
+    "correction": "PR #1705 / LYB-317, fix-red-95726c4f82 occurrence 19: merge origin/main without rebasing. Both parents added different shared-lib test inputs, so Git auto-merged the manifest while the generated source map conflicted. Tently reports an AI-provider outage and no source finding; do not bypass that gate. A resolved manifest that drops the other parent's input must not be fingerprinted.",
+    "mechanization": "Extend the staged source-map resolver so an auto-merged shared-lib manifest keeps every parent test input before the projection is rebuilt. The new real-Git regression fails while the resolver accepts a staged manifest that dropped the incoming turbo input and passes after the refusal; the clean auto-merge still fingerprints index bytes and ignores dirty worktree text. Use that command to stage this merge's map. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The staged resolver already runs before a merge commit is accepted. Refusing a resolved manifest that lost a parent test input prevents that dropped input from becoming the committed source fingerprint."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "An auto-merged manifest must keep every parent test input."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "conflicted-source-map-index-rebuild",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1702",
     "correction": "PR #1702 / LYB-337, fix-red-95726c4f82 occurrence 16: merge origin/main without rebasing. The generated source map conflicts because each parent changed a different fingerprint. Tently reports an AI-provider outage and no source finding; do not bypass that gate. Rebuilding the map from a dirty worktree would publish unstaged bytes as the committed fingerprints.",

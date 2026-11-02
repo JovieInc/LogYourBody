@@ -202,6 +202,7 @@ struct AccountDeletionCleanupService {
         var clearUserDefaults: () -> [String]
         var logoutAuthSession: () async -> Void
         var deleteTrainingDrafts: () async throws -> Void = {}
+        var deletePersonalBodyEstimates: () async -> Void = {}
     }
 
     static let accountUserDefaultsKeys: [String] = [
@@ -290,6 +291,10 @@ struct AccountDeletionCleanupService {
                         UserDefaultsCanvasStore.clear(subject: ownership.subject)
                         try TrainingDraftStore.shared.purge(ownerId: ownership.subject)
                     }
+                },
+                deletePersonalBodyEstimates: {
+                    guard let subject = ownership?.subject else { return }
+                    await PersonalBodyEstimateStore.shared.forgetAccount(subject)
                 }
             )
         )
@@ -318,6 +323,7 @@ struct AccountDeletionCleanupService {
         } catch {
             localCleanupError = error
         }
+        await dependencies.deletePersonalBodyEstimates()
         do {
             try await dependencies.deleteCoreData()
         } catch {

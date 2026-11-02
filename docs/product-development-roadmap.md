@@ -27,10 +27,13 @@ timeline and provider metadata stay inspectable and do not dominate Home. Chat
 remains a control plane, not the whole UI.
 
 Optional rotatable personal 3D is in scope only inside LYB-311. That bounded
-program replaces a blanket deferral of all 3D work. Generic avatars stay
-illustrative until calibrated. Personalized reconstruction and body-change
-claims wait for their recorded validation gates. An AI weekly average or other
-synthetic transformation is never shown as captured evidence.
+program replaces a blanket deferral of all 3D work. LYB-317 adds the optional
+on-device outline from a front or side capture. It does not claim body fat or
+weekly change, and an unvalidated capture stays on the photo or the generic
+wireframe. Generic avatars stay illustrative until calibrated. Personalized
+reconstruction and body-change claims wait for their recorded validation gates.
+An AI weekly average or other synthetic transformation is never shown as
+captured evidence.
 
 Paid R1 is the body timeline, Stats, and imports, and it can ship on its own.
 R2 chat and R3 programming stay separate releases. Paid R1 has no mandatory

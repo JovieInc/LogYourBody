@@ -89,15 +89,16 @@ struct ProgressPhotoAttachSheet: View {
     let fallbackDate: Date
     let onComplete: () async -> Void
 
-    @State private var selectedImage: UIImage?
+    @State var selectedImage: UIImage?
     @State private var selectedImageDate: Date?
-    @State private var attachStatus: ProgressPhotoAttachStatus = .empty
+    @State var attachStatus: ProgressPhotoAttachStatus = .empty
     @State private var isCameraPresented = false
     @State private var photoSelectionLoadID = UUID()
     @State private var sheetDetent = NativeSheetPresentationPolicy.initialDetent(for: .progressPhotoAttach)
+    @State var outlineAttachment = PersonalBodyOutlineAttachment()
     @AccessibilityFocusState private var isStatusFocused: Bool
 
-    private var targetDate: Date {
+    var targetDate: Date {
         targetMetric?.date ?? selectedImageDate ?? fallbackDate
     }
 
@@ -105,7 +106,7 @@ struct ProgressPhotoAttachSheet: View {
         ProgressPhotoAttachPolicy.isBusy(status: attachStatus)
     }
 
-    private var isSuccess: Bool {
+    var isSuccess: Bool {
         if case .success = attachStatus {
             return true
         }
@@ -130,6 +131,7 @@ struct ProgressPhotoAttachSheet: View {
                         header
                         previewPane(height: previewHeight(for: geometry.size.height))
                         statusPane
+                        personalBodyOffer
                         actionPane
                     }
                     .padding(.horizontal, JovieTokens.screenInset)
@@ -564,8 +566,7 @@ struct ProgressPhotoAttachSheet: View {
                     try writeAdmission()
                     await MainActor.run {
                         guard authManager.ownsAccountSession(ownership) else { return }
-                        attachStatus = .success
-                        HapticManager.shared.successAction()
+                        markAttached(metricsId: metrics.id, accountId: userId)
                     }
                     return
                 }
@@ -581,8 +582,7 @@ struct ProgressPhotoAttachSheet: View {
                 try writeAdmission()
                 await MainActor.run {
                     guard authManager.ownsAccountSession(ownership) else { return }
-                    attachStatus = .success
-                    HapticManager.shared.successAction()
+                    markAttached(metricsId: metrics.id, accountId: userId)
                 }
             } catch {
                 // Preserve any already-admitted original-owner upload; stale callers

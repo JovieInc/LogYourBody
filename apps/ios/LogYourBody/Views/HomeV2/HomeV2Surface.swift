@@ -37,6 +37,8 @@ struct HomeV2Surface: View {
 
     @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
     @State private var showsProvenance = false
+    @State private var personalBodyDisplays: [String: PersonalBodyDisplay] = [:]
+    @State private var personalBodyEnabled = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var isLogged: Bool { loggedSentence != nil }
@@ -51,7 +53,9 @@ struct HomeV2Surface: View {
                         snapshot: timeline, selectedID: userSelection,
                         size: CGSize(width: geometry.size.width, height: geometry.size.width / HomeV2Tokens.photoAspectRatio),
                         unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto,
-                        isNavigating: isPhotoScrubNavigating || showsProvenance
+                        isNavigating: isPhotoScrubNavigating || showsProvenance,
+                        bodyDisplays: personalBodyDisplays,
+                        bodyEstimateEnabled: personalBodyEnabled
                     )
                     photoNumberBlock
                     if hasAnyPhotoInHistory {
@@ -88,6 +92,30 @@ struct HomeV2Surface: View {
         .onChange(of: metric.id) { _, _ in showsProvenance = false }
         .onChange(of: showsProvenance) { _, presented in onProvenancePresentationChange(presented) }
         .onDisappear { onProvenancePresentationChange(false) }
+        .task(id: personalBodyToken) { await reloadPersonalBody() }
+    }
+
+    private var personalBodyDates: [String] {
+        // key(_:calendar:) is not (Date) -> String when passed unapplied.
+        timeline.chronologicalDates.map { PersonalBodyDay.key($0) }
+    }
+
+    private var personalBodyToken: String {
+        metric.userId + "|" + personalBodyDates.joined(separator: ",")
+    }
+
+    /// The date list, not the scrub position, owns this load. A date change only
+    /// looks up the display that was already built.
+    private func reloadPersonalBody() async {
+        personalBodyDisplays = [:]
+        personalBodyEnabled = false
+        let accountId = metric.userId
+        let dates = personalBodyDates
+        guard PersonalBodyPolicy.isEnabled() else { return }
+        let index = await PersonalBodyEstimateStore.shared.index(accountId: accountId, dates: dates)
+        guard !Task.isCancelled else { return }
+        personalBodyEnabled = true
+        personalBodyDisplays = index.displays
     }
 
     @ViewBuilder
