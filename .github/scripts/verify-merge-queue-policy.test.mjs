@@ -96,6 +96,8 @@ test('Company Guards must block detection and the required CI Summary', () => {
       '      - name: Check results\n        continue-on-error: true\n',
     ),
     ci.replaceAll('needs: [detect-changes,', 'needs: ['),
+    ci.replace('\n            exit 1\n', '\n            exit 0\n'),
+    ci.replace('\n            exit 1\n', '\n'),
     ci.replace(
       'needs.detect-changes.result }}" != "success"',
       'needs.detect-changes.result }}" == "success"',

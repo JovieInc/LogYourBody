@@ -50,6 +50,7 @@ export function verifyCompanyGuards(ciWorkflow, companyGuardsWorkflow) {
   const caller = job(ciWorkflow, 'company-guards');
   const detection = job(ciWorkflow, 'detect-changes').split('\n    steps:')[0];
   const summary = job(ciWorkflow, 'ci-summary');
+  const summaryFailure = summary.slice(summary.indexOf('\n          if [[ "${{ needs.detect-changes.result }}"'));
   const shared = job(companyGuardsWorkflow, 'company-guards');
   const sharedPin = shared.match(/uses: JovieInc\/ci\/\.github\/workflows\/company-guards.yml@([a-f0-9]{40})\n/)?.[1];
   assert(
@@ -75,6 +76,7 @@ export function verifyCompanyGuards(ciWorkflow, companyGuardsWorkflow) {
     /\n    if: always\(\)\n/.test(summary) &&
       /\n    needs: \[detect-changes,/.test(summary) &&
       !/\n(?: {4}continue-on-error:| {8}(?:if|continue-on-error):)/.test(summary) &&
+      /\n            exit 1\n          fi\n/.test(summaryFailure) &&
       summary.includes('needs.detect-changes.result }}" != "success"'),
     'Company Guards failures must reach the required CI Summary',
   );
