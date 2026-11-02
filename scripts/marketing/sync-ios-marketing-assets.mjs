@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -47,27 +47,42 @@ function pngDimensions(buffer) {
   };
 }
 
-async function capturedAtFor(source, sourceSha256, previousAsset) {
-  // Unchanged bytes retain their capture receipt. Shallow Git history and archive
-  // mtimes describe the checkout, not when the product image was captured.
+function capturedAtFor(id, source, sourceBuffer) {
+  // Capture provenance follows the image bytes, never checkout or synthetic merge time.
+  const latestCaptureTime = Date.now();
+  const previous = previousManifest[id];
   if (
-    previousAsset?.source === source &&
-    previousAsset.sourceSha256 === sourceSha256 &&
-    Number.isFinite(Date.parse(previousAsset.capturedAt))
+    previous?.source === source &&
+    previous.sourceSha256 === sha256(sourceBuffer) &&
+    Number.isFinite(Date.parse(previous.capturedAt)) &&
+    Date.parse(previous.capturedAt) <= latestCaptureTime
   ) {
-    return previousAsset.capturedAt;
-  }
-  try {
-    const value = execFileSync('git', ['log', '-1', '--format=%cI', '--', source], {
-      cwd: root,
-      encoding: 'utf8',
-    }).trim();
-    if (value) return value;
-  } catch {
-    // A source archive may not include git metadata; file mtime is the safe fallback.
+    return previous.capturedAt;
   }
 
-  return (await stat(path.join(root, source))).mtime.toISOString();
+  try {
+    const options = { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] };
+    if (
+      execFileSync('git', ['rev-parse', '--is-shallow-repository'], options).toString().trim() !==
+      'false'
+    ) {
+      throw new Error('Shallow history cannot establish capture provenance');
+    }
+    const committed = execFileSync('git', ['show', `HEAD:${source}`], options);
+    if (sha256(committed) !== sha256(sourceBuffer)) {
+      throw new Error('Uncommitted asset has no capture provenance');
+    }
+    const value = execFileSync('git', ['log', '-1', '--format=%cI', '--', source], {
+      ...options,
+      encoding: 'utf8',
+    }).trim();
+    if (Number.isFinite(Date.parse(value)) && Date.parse(value) <= latestCaptureTime) return value;
+  } catch {
+    // Extraction time and shallow merge commits are not evidence of a new capture.
+  }
+  throw new Error(
+    `Cannot establish capture timestamp for ${source}; restore a hash-matching manifest or regenerate from complete, committed asset history.`,
+  );
 }
 
 const manifest = {};
@@ -76,19 +91,19 @@ for (const [id, asset] of Object.entries(assets)) {
   const sourcePath = path.join(root, asset.source);
   const outputPath = path.join(root, asset.output);
   const sourceBuffer = await readFile(sourcePath);
+  const capturedAt = capturedAtFor(id, asset.source, sourceBuffer);
   await mkdir(path.dirname(outputPath), { recursive: true });
   await copyFile(sourcePath, outputPath);
   const outputBuffer = await readFile(outputPath);
   const { width, height } = pngDimensions(outputBuffer);
-  const sourceSha256 = sha256(sourceBuffer);
 
   manifest[id] = {
     ...asset,
     width,
     height,
-    sourceSha256,
+    sourceSha256: sha256(sourceBuffer),
     outputSha256: sha256(outputBuffer),
-    capturedAt: await capturedAtFor(asset.source, sourceSha256, previousManifest[id]),
+    capturedAt,
   };
 }
 
