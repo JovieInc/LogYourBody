@@ -669,13 +669,9 @@ test('a production smoke failure files web-deploy in Linear and later smoke reco
     fetchImpl: async (url) => {
       const path = new URL(url).pathname;
       if (path === '/api/waitlist') return Response.json({ success: true }, { status: 202 });
-      // Emulate redirect: 'follow' for the retired landing-only routes.
-      const destination = REDIRECT_ROUTES[path] ?? path;
-      const canonical = new URL(destination === '/download/ios' ? '/' : destination, logYourBody.links.home).href;
-      const html = `<title>Public page | ${logYourBody.identity.name}</title><link rel="canonical" href="${canonical}">`;
-      const response = new Response(html, { status: path === '/support' ? 500 : 200 });
-      Object.defineProperty(response, 'url', { value: new URL(destination, logYourBody.links.home).href });
-      return response;
+      const destination = REDIRECT_ROUTES[path] ?? path; // emulate redirect: 'follow'
+      const html = `<title>Public page | ${logYourBody.identity.name}</title><link rel="canonical" href="${new URL(destination === '/download/ios' ? '/' : destination, logYourBody.links.home).href}">`;
+      return Object.defineProperty(new Response(html, { status: path === '/support' ? 500 : 200 }), 'url', { value: new URL(destination, logYourBody.links.home).href });
     },
   });
   assert.equal(results.filter((result) => !result.ok).length, 2);
