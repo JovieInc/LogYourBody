@@ -78,6 +78,7 @@ extension DashboardViewLiquid {
                 .accessibilityIdentifier("launch_timeline_add_photo")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("launch_timeline_surface")
     }
 
