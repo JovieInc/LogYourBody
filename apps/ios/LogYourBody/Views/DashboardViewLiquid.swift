@@ -92,6 +92,13 @@ struct DashboardViewLiquid: View {
     @State var showsLaunchOutcomeEditor = false
     @State var launchOutcomeError: String?
     @State var launchHoldNote: String?
+    @State var datedTimelineProjector = DatedTimelineProjector()
+    @State var datedTimelineSnapshot: DatedTimelineProjector.Snapshot?
+    @State var datedTimelineOwner: AuthManager.ProfileSessionOwnership?
+    @State var datedTimelineRefreshTask: Task<Void, Never>?
+    @State var datedTimelineRefreshID = UUID()
+    @State var datedTimelineLoadFailed = false
+    @State var showsDatedTimelineEditor = false
     @State var homeChatDraft = AccountSessionChatDraft()
     @State var isShowingPhotoTimelineMenu = false
     @State var isPhotoTimelineSettingsPresented = false
@@ -246,6 +253,7 @@ struct DashboardViewLiquid: View {
             .onAppear {
                 LaunchMetrics.markFirstDashboardFrame()
                 openReleaseReviewDestinationIfNeeded()
+                scheduleDatedTimelineRefresh()
                 Task { @MainActor in
                     await Task.yield()
                     handleOnAppear()
@@ -261,12 +269,26 @@ struct DashboardViewLiquid: View {
                 syncBannerDismissTask?.cancel()
                 metricCacheRefreshTask?.cancel()
                 metricCacheBuildID = UUID()
+                datedTimelineRefreshTask?.cancel()
             }
 
         let withSyncAndState = withLifecycle
             .onChange(of: realtimeSyncManager.syncStatus) { oldStatus, newStatus in
                 previousSyncStatus = oldStatus
                 handleSyncStatusChange(from: oldStatus, to: newStatus)
+                scheduleDatedTimelineRefresh()
+            }
+            .onChange(of: realtimeSyncManager.isOnline) { _, _ in
+                scheduleDatedTimelineRefresh()
+            }
+            .onChange(of: authManager.currentUser?.profile?.height) { _, _ in
+                scheduleDatedTimelineRefresh()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                scheduleDatedTimelineRefresh()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { scheduleDatedTimelineRefresh() }
             }
             .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)) { notification in
                 handleCoreDataContextChange(notification)
@@ -276,11 +298,14 @@ struct DashboardViewLiquid: View {
                 scheduleMetricCacheRefresh()
             }
             .onReceive(viewModel.$bodyMetrics) { metrics in
+                scheduleDatedTimelineRefresh(metrics: metrics)
                 reconcileHomeV2Timeline(with: metrics)
                 scheduleDashboardDerivedStateRefresh()
                 scheduleMetricCacheRefresh()
             }
             .onChange(of: authManager.captureAccountSession()) { _, owner in
+                clearDatedTimelineContext()
+                scheduleDatedTimelineRefresh()
                 invalidateDashboardShareContext(currentOwner: owner)
                 homeV2EditingSession = nil
                 homeV2TimelineSelection = nil
@@ -325,6 +350,8 @@ struct DashboardViewLiquid: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
                 featureGateRefreshToken = UUID()
+                clearDatedTimelineContext()
+                scheduleDatedTimelineRefresh()
                 reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
                 loadGlp1WeeklyCheckInDataIfNeeded()
             }
