@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-staged-source-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1726",
+    "correction": "PR #1726, fix-red-1423773703 occurrence 37: the ElevenLabs 3.0.76 bump left the generated repository source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must not fingerprint unrelated unstaged sources when repairing the reviewed dependency artifacts.",
+    "mechanization": "Extend both existing dependency repair modes to reuse the staged source-map generator, staging the refreshed lockfile and projection in one Git operation. Two real-Git regressions fail against the previous worktree rendering and pass after the change, proving staged fingerprints, preserved unstaged source bytes and valid bot resolutions, and idempotence. The existing required Detect Changes pre-commit suite runs them along with the existing failure rollback cases. Use --verify-lockfile for this update. The harness retains push and PR-body ownership and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dependency repair helper owns source-map construction and staging. Reusing its existing index renderer prevents unrelated worktree bytes from becoming the committed source fingerprints, while preserving frozen verification and rollback."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Dependency repairs fingerprint only staged sources, preserving unrelated edits."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "pr1712-dated-timeline-red-checks",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1712",
     "correction": "LYB-342 / fix-red-b87016832d occurrence 3: repair the dated-outcome timeline checks after merging origin/main. Company guards reject oversized Swift growth; static audits pin a baselined sheet to exact size; Mac routing rejects the stale reviewed-project digest; launch quality loses the Add photo identifier and checks keyboard presence instead of field focus. Tently reports an AI-provider outage.",
