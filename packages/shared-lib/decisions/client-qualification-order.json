@@ -1,0 +1,166 @@
+{
+  "id": "LYB-275",
+  "parent": "LYB-163",
+  "depends_on": "LYB-161",
+  "status": "accepted",
+  "recorded_on": "2026-11-01",
+  "approval_basis": "Recommended default adopted under LYB-275's ships-if-unanswered instruction. This records the authorized default, not a separate human approval.",
+  "question": "Who provides the consented test accounts and client registrations, and in what order do the three clients get qualified?",
+  "decision": "Qualify Claude Code first on a synthetic fixture account only (no real user data), then ChatGPT, then Jovie. Real consented accounts and client registrations are not provided. The account owner supplies them only after that client's synthetic run passes. This record does not connect an account, register a client, store a credential, or add an admission label.",
+  "specification": "packages/shared-lib/decisions/client-qualification-order.md",
+  "roadmap": "docs/product-development-roadmap.md",
+  "runbook": "docs/integrations/chatgpt-app/client-qualification.md",
+  "inventory": "docs/integrations/chatgpt-app/README.md",
+  "journeys": "docs/USER_JOURNEYS.md",
+  "authorizes_feature_work": false,
+  "authorizes_account_connection": false,
+  "authorizes_client_registration": false,
+  "authorizes_real_user_data": false,
+  "creates_linear_issues": false,
+  "creates_admission_labels": false,
+  "providers": {
+    "synthetic_fixtures": "LYB-275",
+    "consented_test_accounts": "account_owner",
+    "client_registrations": "account_owner",
+    "redirect_uris": "account_owner",
+    "account_owner": "Tim",
+    "account_owner_source": "AGENTS.md names Tim as the person who supplies secret values out of band.",
+    "agent_may_supply_real_accounts": false
+  },
+  "accounts_provided": [
+    {
+      "id": "fixture-a",
+      "kind": "synthetic_fixture",
+      "role": "subject_a",
+      "provided_by": "LYB-275",
+      "real_user_data": false,
+      "credentials": "none",
+      "client_id": null,
+      "redirect_uri": null
+    },
+    {
+      "id": "fixture-b",
+      "kind": "synthetic_fixture",
+      "role": "subject_b",
+      "provided_by": "LYB-275",
+      "real_user_data": false,
+      "credentials": "none",
+      "client_id": null,
+      "redirect_uri": null
+    }
+  ],
+  "consented_test_accounts_provided": [],
+  "client_registrations_provided": [],
+  "provider_steps": [
+    {
+      "step": "synthetic_qualification",
+      "actor": "later_qualification_slice",
+      "status": "not_run",
+      "uses": ["fixture-a", "fixture-b"]
+    },
+    {
+      "step": "provide_consented_account_registration_and_redirect",
+      "actor": "account_owner",
+      "status": "not_provided",
+      "starts_when": "that_client_synthetic_run_passes"
+    },
+    {
+      "step": "hosted_policy_review_and_real_account_qualification",
+      "actor": "account_owner",
+      "status": "not_accepted",
+      "starts_when": "consented_account_and_registration_provided"
+    }
+  ],
+  "current_section": {
+    "start": "### LYB-275 client qualification order",
+    "end": "## September 26 roadmap — preserved v1 history"
+  },
+  "planning_boundary_start": "**Release exception and planning boundary:**",
+  "required_current_phrases": [
+    "ships-if-unanswered",
+    "LYB-275 qualifies Claude Code first on a synthetic fixture account only, then ChatGPT, then Jovie.",
+    "Real consented accounts and client registrations are not provided.",
+    "fixture-a",
+    "fixture-b",
+    "account owner",
+    "Only Claude Code may start",
+    "ChatGPT starts after the Claude Code synthetic run passes",
+    "Jovie starts after the ChatGPT synthetic run passes",
+    "not Linear issue IDs",
+    "connects no account",
+    "Real-device TestFlight evidence stays with LYB-161"
+  ],
+  "required_boundary_phrases": [
+    "LYB-275 is a further exception limited to synthetic-fixture qualification of Claude Code, then ChatGPT, then Jovie.",
+    "That exception still authorizes no account connection"
+  ],
+  "required_cross_document_phrases": [
+    "LYB-275 qualifies Claude Code first on a synthetic fixture account only, then ChatGPT, then Jovie. Real consented accounts and client registrations are not provided."
+  ],
+  "slices": [
+    {
+      "key": "claude_code",
+      "title": "Claude Code",
+      "order": 1,
+      "specification": "packages/shared-lib/decisions/client-qualification-order.md#slice-claude-code",
+      "implementation": "authorized_synthetic_fixture_only",
+      "starts_when": "recorded",
+      "account": "synthetic_fixture_only",
+      "accounts": ["fixture-a", "fixture-b"],
+      "registration": "not_provided",
+      "client_id": null,
+      "redirect_uri": null,
+      "real_consented_account": "not_provided",
+      "real_account_provider": "account_owner",
+      "real_account_when": "after_this_client_synthetic_run_passes",
+      "feature_work": false,
+      "account_connection": false,
+      "qualifies_other_clients": false,
+      "implemented": false,
+      "linear_issue": null
+    },
+    {
+      "key": "chatgpt",
+      "title": "ChatGPT",
+      "order": 2,
+      "specification": "packages/shared-lib/decisions/client-qualification-order.md#slice-chatgpt",
+      "implementation": "authorized_after_claude_code_synthetic_passes",
+      "starts_when": "claude_code_synthetic_passes",
+      "account": "synthetic_fixture_only",
+      "accounts": ["fixture-a", "fixture-b"],
+      "registration": "not_provided",
+      "client_id": null,
+      "redirect_uri": null,
+      "real_consented_account": "not_provided",
+      "real_account_provider": "account_owner",
+      "real_account_when": "after_this_client_synthetic_run_passes",
+      "feature_work": false,
+      "account_connection": false,
+      "qualifies_other_clients": false,
+      "implemented": false,
+      "linear_issue": null
+    },
+    {
+      "key": "jovie",
+      "title": "Jovie",
+      "order": 3,
+      "specification": "packages/shared-lib/decisions/client-qualification-order.md#slice-jovie",
+      "implementation": "authorized_after_chatgpt_synthetic_passes",
+      "starts_when": "chatgpt_synthetic_passes",
+      "account": "synthetic_fixture_only",
+      "accounts": ["fixture-a", "fixture-b"],
+      "registration": "not_provided",
+      "client_id": null,
+      "redirect_uri": null,
+      "real_consented_account": "not_provided",
+      "real_account_provider": "account_owner",
+      "real_account_when": "after_this_client_synthetic_run_passes",
+      "feature_work": false,
+      "account_connection": false,
+      "qualifies_other_clients": false,
+      "implemented": false,
+      "linear_issue": null
+    }
+  ],
+  "boundaries": "Decision, synthetic fixture list, and three repository-local qualification slices only. Real consented accounts and client registrations are not provided. Real-device TestFlight evidence stays with LYB-161. Repository slice keys are not Linear issue IDs, admission labels, dispatch, or release blockers. This record adds no tool, route, account connection, client registration, credential, deployment, or qualification receipt."
+}

@@ -18,7 +18,7 @@ extension BodySpecAPI: BodySpecDexaAPIClient {}
 actor BodySpecDexaImporter: MetricSourceAdapter {
     @MainActor static let shared = BodySpecDexaImporter(api: BodySpecAPI.shared, authManager: .shared)
 
-    // Provider events are unverified. Never infer push delivery from a connected account.
+    // LYB-246: user OAuth is polling-only. Partner webhooks are documented, not enabled here.
     nonisolated let capabilities = MetricSourceCapabilities(incrementalPull: true, scheduledPoll: true)
     private let api: BodySpecDexaAPIClient
     private let authManager: AuthManager

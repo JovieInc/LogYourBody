@@ -1,0 +1,64 @@
+diff --git a/dist/commonjs/index.js b/dist/commonjs/index.js
+index eb1c915f43b2debf5faa7ac3a73c262a161c7a4f..f7725de668d1d0df61b8fc4d0d8096982fb12086 100644
+--- a/dist/commonjs/index.js
++++ b/dist/commonjs/index.js
+@@ -1547,4 +1547,40 @@ Object.defineProperty(exports, "unescape", { enumerable: true, get: function ()
+ exports.minimatch.Minimatch = Minimatch;
+ exports.minimatch.escape = escape_js_1.escape;
+ exports.minimatch.unescape = unescape_js_1.unescape;
++// ESLint 3.x parents call this module as a function, read the Babel
++// __esModule default, and build regular expressions with makeRe(). minimatch
++// 11 exports a named-only object, so restore that surface on top of the
++// patched matcher. makeRe delegates to the same matcher; it does not
++// reintroduce the vulnerable preprocessor.
++function minimatchCompat(p, pattern, options) {
++    return exports.minimatch(p, pattern, options);
++}
++function makeRe(pattern, options) {
++    return {
++        test(input) {
++            return minimatchCompat(String(input), pattern, options);
++        },
++    };
++}
++Object.assign(minimatchCompat, exports, {
++    __esModule: true,
++    default: minimatchCompat,
++    minimatch: minimatchCompat,
++    Minimatch: exports.Minimatch,
++    makeRe,
++});
++module.exports = minimatchCompat;
++module.exports.__esModule = true;
++module.exports.default = minimatchCompat;
++module.exports.minimatch = minimatchCompat;
++module.exports.Minimatch = exports.Minimatch;
++module.exports.makeRe = makeRe;
++module.exports.GLOBSTAR = exports.GLOBSTAR;
++module.exports.sep = exports.sep;
++module.exports.filter = exports.filter;
++module.exports.defaults = exports.defaults;
++module.exports.braceExpand = exports.braceExpand;
++module.exports.match = exports.match;
++module.exports.escape = exports.escape;
++module.exports.unescape = exports.unescape;
+ //# sourceMappingURL=index.js.map
+\ No newline at end of file
+diff --git a/dist/esm/index.js b/dist/esm/index.js
+index 1dc27e67064fcbf1f3dce34aa3ea1a134b7be168..3af19897ff266d4d75a1cb566766c571ed20f2d5 100644
+--- a/dist/esm/index.js
++++ b/dist/esm/index.js
+@@ -1536,4 +1536,13 @@ export { unescape } from './unescape.js';
+ minimatch.Minimatch = Minimatch;
+ minimatch.escape = escape;
+ minimatch.unescape = unescape;
++// Same callable surface as the CommonJS build, for the ESM eslintrc path
++// (`import minimatch from 'minimatch'` then `minimatch.Minimatch` / `makeRe`).
++minimatch.makeRe = (pattern, options) => ({
++    test(input) {
++        return minimatch(String(input), pattern, options);
++    },
++});
++minimatch.default = minimatch;
++export default minimatch;
+ //# sourceMappingURL=index.js.map

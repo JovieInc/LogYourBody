@@ -5,7 +5,6 @@
   ".github/scripts/lib/linear-issue-intake.mjs": 913,
   ".github/scripts/merge-queue-enrollment.test.mjs": 952,
   ".github/scripts/remediation-signal.test.mjs": 937,
-  ".github/scripts/signing-expiry.mjs": 563,
   "apps/ios/LogYourBody/Components/BodyScoreShareCard.swift": 1120,
   "apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift": 718,
   "apps/ios/LogYourBody/Components/FullMetricChartView+Part02.swift": 753,

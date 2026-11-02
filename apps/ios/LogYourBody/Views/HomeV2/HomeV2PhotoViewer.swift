@@ -114,7 +114,7 @@ struct HomeV2PhotoViewer: View {
         ) { isScrubbing in
             Group {
                 if isScrubbing, let current {
-                    SubjectPlateView(urlString: current.photoUrl ?? "", size: photoSize)
+                    SubjectPlateView(urlString: current.photoUrl ?? "", size: photoSize, preparedOnly: true)
                         .frame(width: size.width, height: size.height)
                 } else {
                     TabView(selection: $selectedIndex) {
@@ -128,11 +128,31 @@ struct HomeV2PhotoViewer: View {
                     .frame(width: size.width, height: size.height)
                 }
             }
+            .task(id: isScrubbing ? "scrub" : "ready-\(selectedIndex)") {
+                guard !isScrubbing else { return }
+                await precomputeViewerWindow(photoSize)
+            }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(current.map { "Progress photo, \(formatters.dateText($0))" } ?? "Progress photo")
             .accessibilityIdentifier("home_v2_viewer_stage")
         }
         .frame(width: size.width, height: size.height)
+    }
+
+    private func precomputeViewerWindow(_ target: CGSize) async {
+        guard let position = chronological.firstIndex(of: selectedIndex) else { return }
+        let urls = BodyPhotoPreparationPlan.neighborURLs(
+            around: position,
+            urls: chronological.map { bodyMetrics[$0].photoUrl }
+        )
+        for url in urls {
+            guard !Task.isCancelled else { return }
+            if SubjectPlateStore.shared.scrubImage(for: url, target: target) != nil { continue }
+            guard let image = await ImageCacheService.shared.loadImage(from: url), !Task.isCancelled else { continue }
+            _ = await SubjectPlateStore.shared.prepare(
+                urlString: url, image: image, target: target, retaining: urls
+            )
+        }
     }
 
     private var topBar: some View {
