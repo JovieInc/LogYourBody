@@ -1276,6 +1276,24 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "dependabot-transitive-security-floors",
+    "correction": "LYB-354: Dependabot cannot raise transitive minimatch 3.1.5 to the GHSA-g3hv-75wg-m249 floor 11.0.1 because the eslint, glob 10, and glob 13 parents still request older majors. Force every copy to minimatch >=11.0.1 without an ignore or an age-gate exception.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41216930482",
+    "mechanization": "Both pnpm override declarations require minimatch ^11.0.1 and glob ^14.0.2, because glob 10 and 13 walk minimatch sets as regular expressions and cannot use minimatch 11. A minimatch patch restores the callable module export, Babel default, Minimatch class, and makeRe for the ESLint 3.x parents. The required shared-lib dependency-security tests reject vulnerable lockfile copies, inconsistent overrides, and a minimatch export those parents cannot call.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Package-manager overrides enforce the patched minimum for every transitive parent during resolution, without a parent major upgrade or an age-gate exception."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/dependency-security.test.ts",
+      "anchor": "%s has no vulnerable locked copies below %s"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1521: The Zod 4.6.6 manifest update left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary, and shadow parity. Regenerate the source projection with the existing tool.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40019693238/job/120640721225",
