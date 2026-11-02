@@ -169,6 +169,7 @@ func scheduleBackgroundSync() {
 
         let success = await coreDataManager.markBodyMetricDeleted(id: id, userId: userId)
         guard success else { return false }
+        await PersonalBodyEstimateStore.shared.forget(accountId: userId, photoId: id)
 
         queueOperation(
             SyncOperation(

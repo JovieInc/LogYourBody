@@ -93,8 +93,17 @@ def union_manifests(root):
     apply_manifest_union(root)
 
 
+def union_project(root):
+    """Stage insertion-only Xcode membership. Never derive the diagnostic digest."""
+    from pbx_union import apply_project_union
+    apply_project_union(root)
+
+
 def resolve_staged(root):
     root = Path(root).resolve()
+    # An auto-merged manifest must keep every parent test input.
+    from manifest_union import assert_auto_merged_parent_inputs
+    assert_auto_merged_parent_inputs(root)
     registry = staged_bytes(root, "repository-docs.json")
     config = json.loads(registry)
     output = repository_docs.local(root, config["output"])
@@ -186,6 +195,43 @@ def conflicted_diagnostic_template(root):
     return texts[1][0]
 
 
+PBX_MEMBER = re.compile(
+    r"(?m)^\t\t([A-Za-z0-9]+) /\* .*? \*/ = \{isa = PBX(?:BuildFile|FileReference);"
+)
+
+
+def assert_merged_project_keeps_parent_files(root, project):
+    """A merged diagnostic project must keep every parent file membership."""
+    if subprocess.run(
+        ["git", "rev-parse", "--verify", "MERGE_HEAD"], cwd=root, capture_output=True,
+    ).returncode:
+        raise ValueError("diagnostic pin repair requires an active merge")
+    base_rev = subprocess.run(
+        ["git", "merge-base", "HEAD", "MERGE_HEAD"],
+        cwd=root, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+    def blob(spec):
+        try:
+            return git_bytes(root, "show", spec).decode()
+        except subprocess.CalledProcessError as error:
+            raise ValueError("diagnostic pin repair cannot read " + spec) from error
+        except UnicodeDecodeError as error:
+            raise ValueError("diagnostic project is not text: " + spec) from error
+
+    base_ids = set(PBX_MEMBER.findall(blob(f"{base_rev}:{DIAGNOSTIC_PROJECT}")))
+    added = set()
+    for parent in ("HEAD", "MERGE_HEAD"):
+        added.update(set(PBX_MEMBER.findall(blob(f"{parent}:{DIAGNOSTIC_PROJECT}"))) - base_ids)
+    try:
+        merged_ids = set(PBX_MEMBER.findall(project.decode()))
+    except UnicodeDecodeError as error:
+        raise ValueError("diagnostic project is not text") from error
+    missing = sorted(added - merged_ids)
+    if missing:
+        raise ValueError("merged project dropped a parent file: " + ", ".join(missing))
+
+
 def reviewed_conflicted_pin(root, expected):
     if not re.fullmatch(r"[0-9a-f]{64}", expected):
         raise ValueError("reviewed project SHA-256 must be 64 lowercase hex characters")
@@ -199,6 +245,7 @@ def reviewed_conflicted_pin(root, expected):
         raise ValueError("resolve source conflicts first: " + DIAGNOSTIC_PROJECT) from error
     if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", project):
         raise ValueError("resolve staged conflict markers first: " + DIAGNOSTIC_PROJECT)
+    assert_merged_project_keeps_parent_files(root, project)
     if repository_docs.digest(project) != expected:
         raise ValueError("reviewed project SHA-256 does not match merged source")
     template = conflicted_diagnostic_template(root)
@@ -373,10 +420,13 @@ def main():
     mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
+    mode.add_argument("--union-project", action="store_true", help="union additive Xcode file membership from both parents and stage the project")
     args = parser.parse_args()
     try:
         if args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
+        elif args.union_project:
+            union_project(args.root)
         elif args.union_manifests:
             union_manifests(args.root)
             resolve(args.root)
