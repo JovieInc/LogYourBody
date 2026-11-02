@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependabot-workspace-release-age-resolution",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41420896425",
+    "correction": "LYB-357: the weekly multi-directory Dependabot job reports 38 update_not_possible errors. Run 41420896425 shows all 38 are ERR_PNPM_NO_MATURE_MATCHING_VERSION for the implicitly resolved Rollup peer, not duplicate-PR errors. The workspace member also triggers npm probes without the root package-manager pin.",
+    "mechanization": "Schedule npm updates once at the pnpm workspace root and declare Rollup as a root tool dependency with a compatible caret range. The required shared-lib suite uses the pinned pnpm against a local registry to reproduce the locked immature peer failure, then proves a web dependency updates with mature Rollup. Configuration assertions retain weekly updates, cooldowns and existing exclusions; Turbo hashes every external input. Both regressions fail before the change. The harness owns push and PR operations. Machine: built packages/shared-lib/src/dependabot-workspace.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A single root update entry gives the workspace and shared lockfile one owner. An explicit Rollup range replaces pnpm's implicit locked peer pin, allowing normal release-age filtering to select a mature version without relaxing cooldowns, ignoring dependencies or exempting Rollup."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/dependabot-workspace.test.ts",
+      "anchor": "updates a web dependency while keeping an immature Rollup peer out of the lockfile"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-staged-source-projection",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1726",
     "correction": "PR #1726, fix-red-1423773703 occurrence 37: the ElevenLabs 3.0.76 bump left the generated repository source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must not fingerprint unrelated unstaged sources when repairing the reviewed dependency artifacts.",

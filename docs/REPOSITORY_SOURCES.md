@@ -190,7 +190,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `3efca9ed74adc77a926ca576ae39d4ee037ba8bd43a360ae74a58de2b6f985ab`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f61df4f6a15b6f3bcf4dd0cafec6a025d5eae0696bade1f96537bc7a73424f3e`)
 
 ### `package.json`: packageManager
 
@@ -282,6 +282,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "lint-staged": "^15.5.2",
   "prettier": "^3.9.9",
   "prettier-plugin-tailwindcss": "^0.8.1",
+  "rollup": "^4.65.0",
   "turbo": "^2.11.9",
   "typescript": "^5.9.3",
   "vitest": "^5.0.5"
@@ -391,7 +392,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
 - `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `6979b4a3fde402a55fbad4e018158aaf822ca395c385e6d64b9b07728ca2f1dc`)
+- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `e5b975760bd93e60a14969e8df1a9fc8e97e9bbdce96923c3646b8d44ecc9a71`)
 - `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `87941ea0acf0ad3f0bf3e729c0c3ca6b33f66b191c838d84bfe18954291587c4`)
 
 ## Pinned shared sources
