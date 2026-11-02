@@ -74,6 +74,8 @@ existing lockfile with pinned Corepack pnpm (frozen, offline, lockfile-only,
 lifecycle scripts disabled) before regenerating and staging only the source map.
 It retains the refusal of unstaged dependency/output edits and pinned-source drift
 without re-resolving unrelated dependencies.
+Both dependency repair modes reject a successful frozen check that changes or
+removes the lockfile, restoring the original lockfile and projection for a retry.
 
 For dependency PRs, stage the reviewed manifests and run
 `python3 scripts/resolve-repository-docs.py --refresh-lockfile`. This explicit

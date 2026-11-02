@@ -28,6 +28,21 @@ def restore_dependency_artifacts_on_failure(root, output):
         raise
 
 
+def install_lockfile(root, mode):
+    lockfile = repository_docs.local(root, "pnpm-lock.yaml")
+    before = lockfile.read_bytes() if lockfile.exists() else None
+    result = subprocess.run(
+        ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
+        cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+    )
+    print(result.stdout, end="", flush=True)
+    if result.returncode == 0 and "--frozen-lockfile" in mode:
+        after = lockfile.read_bytes() if lockfile.exists() else None
+        if after != before:
+            raise ValueError("frozen verification changed pnpm-lock.yaml")
+    return result
+
+
 def staged_bytes(root, name):
     return subprocess.run(
         ["git", "show", ":" + name], cwd=root, check=True, capture_output=True,
@@ -375,11 +390,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             modes = [["--frozen-lockfile", "--offline"]]
             # Explicit repair only: normal commit hooks and CI retain frozen installs.
             if refresh_lockfile:
-                probe = subprocess.run(
-                    ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *modes[0]],
-                    cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                )
-                print(probe.stdout, end="", flush=True)
+                probe = install_lockfile(root, modes[0])
                 # Refresh only a confirmed manifest mismatch; other failures remain blockers.
                 if probe.returncode:
                     if "ERR_PNPM_OUTDATED_LOCKFILE" not in probe.stdout:
@@ -388,10 +399,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                 else:
                     modes = []
             for mode in modes:
-                subprocess.run(
-                    ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
-                    cwd=root, check=True,
-                )
+                install_lockfile(root, mode).check_returncode()
         if pin_update:
             repository_docs.local(root, pin_update[0]).write_text(pin_update[1])
         errors = repository_docs.run(root, write=True)
