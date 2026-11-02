@@ -358,12 +358,13 @@ final class BodyScoreShareCardTests: XCTestCase {
         }
     }
 
-    func testSharePayloadUsesSameNearestAvatarBucketAsHomeHero() {
+    func testSharePayloadKeepsUncalibratedAvatarIllustrative() {
         let payload = makePayload(bodyFatPercentage: 16.4, gender: "male")
 
-        XCTAssertEqual(payload.avatarMatch.assetName, "avatar_male_15")
-        XCTAssertEqual(payload.avatarMatch.badgeText, "Male 15% body fat")
-        XCTAssertEqual(payload.visualBadgeText(includeVisual: true), "Male 15% body fat")
+        XCTAssertEqual(payload.avatarMatch.assetName, "avatar_male_18")
+        XCTAssertEqual(payload.avatarMatch.badgeText, "Illustrative, not body fat")
+        XCTAssertEqual(payload.visualBadgeText(includeVisual: true), "Illustrative, not body fat")
+        XCTAssertFalse(payload.visualBadgeText(includeVisual: true).contains("%"))
         XCTAssertEqual(payload.visualBadgeText(includeVisual: false), "")
         XCTAssertFalse(payload.visualBadgeText(includeVisual: false).localizedCaseInsensitiveContains("private"))
         XCTAssertNil(payload.photoImage)
