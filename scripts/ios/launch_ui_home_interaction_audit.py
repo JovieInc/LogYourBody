@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 
 def function_body(text: str, name: str, next_name: str) -> str:
@@ -14,6 +15,25 @@ def function_body(text: str, name: str, next_name: str) -> str:
 
 def contribute(root: Path, app_dir: Path, violations: list, violation, _line_number) -> None:
     check(root, app_dir, violations, function_body, violation)
+    check_person_mask_executor(root, app_dir, violations, violation)
+
+
+def check_person_mask_executor(root: Path, app_dir: Path, violations: list, violation) -> None:
+    """Blocking Vision segmentation must leave the Swift cooperative pool available."""
+    path = app_dir / "Services/BackgroundRemovalService.swift"
+    text = path.read_text()
+    body = text.split("func personMask(", 1)[-1].split("func personMaskGrid(", 1)[0]
+    queue = re.search(
+        r"segmentationQueue\s*:\s*DispatchQueue\s*=\s*DispatchQueue\(([^)]*)\)", text
+    )
+    if ("Task.detached" in body or "withCheckedThrowingContinuation" not in body
+            or "segmentationQueue.async {" not in body or queue is None
+            or ".concurrent" in queue.group(1)):
+        violations.append(violation(
+            check="photo.segmentation_dispatch_executor",
+            file=str(path.relative_to(root)), line=1,
+            detail="Run blocking person segmentation asynchronously on a serial Dispatch queue, outside Swift's cooperative pool.",
+        ))
 
 
 def check(root: Path, app_dir: Path, violations: list, function_body, violation) -> None:

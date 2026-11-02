@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "vision-segmentation-cooperative-pool-starvation",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41406114043/job/125148772785",
+    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 6: repair the native launch-quality hang without weakening selectors or gates. The retained simulator log confirms callback.assigned and sheet.appear; the 07:49:41 stackshot shows all three Swift workers blocked in BackgroundRemovalService.personMask / VNControlledCapacityTasksQueue.dispatchGroupWait while the main thread is idle. Tently separately reports its AI-provider outage (de67d1f1-56fd-40c4-b9c7-806ba1a5635a), with no code findings.",
+    "mechanization": "Move the existing synchronous segmentation operation from Task.detached onto a serial Dispatch queue bridged by one checked throwing continuation. This prevents Vision waits from occupying the cooperative pool and propagates the original operation error exactly once. Extend the existing required launch UI audit with executor mutations rejecting detached tasks, synchronous dispatch, and concurrent queues; the production regression fails against the prior service and passes after the repair. Add native queue-execution, failure/recovery, and cancellation tests, retaining the original Vision integration case and every UI assertion. Current native execution remains unverified on this Linux host. origin/main is already an ancestor, so the required merge reports already up to date. The harness owns pushes and PR updates and must add exactly one line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing segmentation service owns the blocking Vision call. Dispatching that work on its own serial queue prevents cooperative-pool starvation by construction rather than lengthening native timeouts or retrying a hung presentation."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/BackgroundRemovalService.swift",
+      "anchor": "segmentationQueue.async {"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "merged-project-keeps-parent-placement",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
     "correction": "PR #1699 / LYB-312, fix-red-95726c4f82 occurrence 22: merge origin/main without rebasing. Both parents added a different ProgressPhotoAttachSheet sibling, so the Xcode group conflict can drop one child while both file references remain. The diagnostic project pin conflicts on the merged digest. Tently reports an AI-provider outage and no source finding; do not bypass that gate.",

@@ -434,6 +434,21 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         destination.write_text(source.replace("if !keyboard.exists {\n", "if false {\n", 1))
         self.assert_rejected("chat.synthetic_typing_refocuses")
 
+    def test_person_segmentation_cannot_block_the_swift_cooperative_pool(self):
+        path = self.app / "Services/BackgroundRemovalService.swift"
+        original = path.read_text()
+        self.assertEqual(self.run_audit()[0], 0)
+        for before, after in [
+            ("segmentationQueue.async {", "Task.detached(priority: .userInitiated) {"),
+            ("segmentationQueue.async {", "segmentationQueue.sync {"),
+            ("qos: .userInitiated)", "qos: .userInitiated, attributes: .concurrent)"),
+        ]:
+            with self.subTest(before=before, after=after):
+                self.assertIn(before, original)
+                path.write_text(original.replace(before, after, 1))
+                self.assert_rejected("photo.segmentation_dispatch_executor")
+        path.write_text(original)
+
 
 class CheckSiblingDiscoveryTests(unittest.TestCase):
     def test_every_check_sibling_contributes_and_a_missing_hook_fails_closed(self):
