@@ -309,6 +309,48 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                     self.assert_rejected("timeline.header_swipe_excludes_buttons")
                     path.write_text(source)
 
+    def test_edge_swipe_cannot_share_the_menu_button(self):
+        self.assertEqual(self.run_audit()[0], 0)
+        path = self.app / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
+        source = path.read_text()
+        start = source.index("                .overlay(alignment: .leading)")
+        end = source.index("                .opacity(isHomeChatExpanded", start)
+        overlay = source[start:end]
+        detached = source[:start] + source[end:]
+        parent = "        .fullScreenCover(isPresented: $isHomeV2ViewerPresented)"
+        path.write_text(detached.replace(parent, overlay + parent, 1))
+        self.assert_rejected("timeline.edge_swipe_excludes_header")
+        path.write_text(source.replace(".frame(maxHeight: .infinity)\n                        .contentShape",
+                                       ".padding(.top, 56)\n                        .contentShape", 1))
+        self.assert_rejected("timeline.edge_swipe_excludes_header")
+
+    def test_logout_actions_and_selection_reject_the_recorded_failure(self):
+        ui_path = self.root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
+        ui_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / ui_path.relative_to(self.root), ui_path)
+        self.assertEqual(self.run_audit()[0], 0)
+        settings = self.app / "Views/PreferencesView+Header.swift"
+        source = settings.read_text()
+        for identifier in ("settings_logout_confirm", "settings_logout_cancel"):
+            token = '.accessibilityElement(children: .combine)'
+            at = source.index(f'.accessibilityIdentifier("{identifier}")')
+            start = source.rfind(token, 0, at)
+            self.assertGreaterEqual(start, 0)
+            settings.write_text(source[:start] + source[start:].replace(token, "", 1))
+            self.assert_rejected("settings.logout_alert_one_element")
+            settings.write_text(source)
+        helper = ui_path.read_text()
+        for token, replacement in (
+            ('children(matching: .button).count == 0', 'descendants(matching: .button).firstMatch.exists'),
+            ('seen.insert(key).inserted', 'true'),
+            ('leaves.count == 1 ? leaves.first : nil', 'leaves.first'),
+            ('$0.label == label', 'true'),
+        ):
+            self.assertIn(token, helper)
+            ui_path.write_text(helper.replace(token, replacement, 1))
+            self.assert_rejected("settings.logout_alert_action_selection")
+            ui_path.write_text(helper)
+
     def test_header_title_cannot_lose_navigation_or_its_hit_region(self):
         for token in (".gesture(photoTimelineSwipe)", ".contentShape(Rectangle())",
                       ", minHeight: JovieTokens.minimumHitTarget"):
@@ -342,6 +384,7 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
             [
                 "launch_ui_timeline_day",
                 "launch_ui_opacity_audit",
+                "launch_ui_home_interaction_audit",
                 "launch_ui_regression_report",
             ],
         )

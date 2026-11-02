@@ -74,6 +74,14 @@ extension DashboardViewLiquid {
 
             photoTimelineHomeContent
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? 0 : .infinity)
+                .overlay(alignment: .leading) {
+                    Color.clear
+                        .frame(width: 20)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(photoTimelineSwipe)
+                        .accessibilityHidden(true)
+                }
                 .opacity(isHomeChatExpanded ? 0 : 1)
                 .allowsHitTesting(!isHomeChatExpanded)
                 .accessibilityHidden(isHomeChatExpanded)
@@ -104,14 +112,6 @@ extension DashboardViewLiquid {
         )
         .onChange(of: selectedPhotoTimelineRootPage) { _, _ in
             isHomeChatExpanded = false
-        }
-        .overlay(alignment: .leading) {
-            Color.clear
-                .frame(width: 20)
-                .padding(.top, 56)
-                .contentShape(Rectangle())
-                .highPriorityGesture(photoTimelineSwipe)
-                .accessibilityHidden(true)
         }
         .fullScreenCover(isPresented: $isHomeV2ViewerPresented) {
             homeV2PhotoViewer

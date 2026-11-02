@@ -5086,7 +5086,7 @@
     "fingerprint": "native-alert-action-query-excludes-wrapper-buttons",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40882928976/job/123479399281",
     "correction": "At exact53b1, the required logout test failed because its uniqueness predicate counted two hittable nodes. The printed native hierarchy proves each expected action is a Button containing a child Button with identical identifier, label and frame. The alert and user action exist; raw descendant-count uniqueness incorrectly treats wrapper and leaf as separate actions.",
-    "mechanization": "Keep the exact alert, action identifier, expected label, enabled/hittable predicate and one-action requirement. Exclude a matching node only when it contains another Button with the same identifier, selecting the concrete leaf action. Distinct leaf actions still fail closed. Preserve cancel/session and actual sign-out assertions, the five-second readiness bound, required native selectors and overall deadlines. Hosted red-before53b1 is retained; candidate acceptance requires actual native execution.",
+    "mechanization": "Keep the exact alert, action identifier, expected label, enabled/hittable predicate and one physical action requirement. Use a finite child-button count to exclude wrappers without a missing-descendant exists query that blocks the waiter. Collapse identical-frame aliases of the same identified leaf; distinct frames still fail closed. Combine settings alert action accessibility children. Preserve cancel/session and actual sign-out assertions, alert readiness bounds, required native selectors and overall deadlines. The extended required launch audit rejects the recorded blocking query and loss of label filtering, alias deduplication or uniqueness. Hosted red-before53b1 and PR #1698 run 41339803046 are retained; candidate acceptance requires actual native execution.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -5095,7 +5095,7 @@
     },
     "guard": {
       "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
-      "anchor": "&& !$0.descendants(matching: .button).matching(identifier: identifier).firstMatch.exists"
+      "anchor": "children(matching: .button).count == 0"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -5885,5 +5885,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "signing-renewal-pr-launch-quality-repair",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41339803046",
+    "correction": "PR #1698 / LYB-338, fix-red-cc900b961c occurrence 7: merge origin/main without rebasing and repair CI Summary and Launch Quality. The failed native run loses composer focus, intercepts Open Menu taps with the root edge overlay, and times out probing duplicate logout descendants. Tently reports an AI-provider outage (reference 2510f0ec-3c38-4211-98c2-86e31c7f5d6b), without a source finding.",
+    "mechanization": "Preserve both resolver commands and all tests while extracting the additive JSON helper and tests to stay within the size gate. Main supplies the composer-focus repair. Extend the existing launch UI audit through its sibling loader to reject root edge gestures that overlap the header and native logout actions or selectors that reproduce the recorded failure. Mutated real-source cases cover a parent overlay, padding before the hit shape, uncombined actions, blocking descendant probes, lost alias deduplication, ambiguous physical buttons and lost label filtering. Run the extended audit before and after the corresponding minimal Swift repairs, retaining the native assertions. Use the existing source-map resolver on the merged index. No CI gate is relaxed. macOS execution remains required. The harness owns push and PR edits and must replace the existing machine line with exactly one line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Moving the overlay and combining alert actions repair these sites, but SwiftUI and XCTest allow later source edits to restore overlapping hit regions or blocking accessibility probes. A product type cannot prevent the entire recurring repair class."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required launch audit can reject the observed SwiftUI modifier placement and native alert selection failure patterns; real-source mutations prove each refusal without requiring credentials or weakening the native behavior gate."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "def check_home_interactions("
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
