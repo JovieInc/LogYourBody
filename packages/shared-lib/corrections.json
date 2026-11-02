@@ -1,5 +1,45 @@
 [
   {
+    "fingerprint": "launch-audit-parent-size-ratchet",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1703",
+    "correction": "PR #1703 / LYB-315, fix-red-95726c4f82 occurrence 20: merge origin/main without rebasing. Both parents changed project.pbxproj, so the diagnostic pin and generated source map conflict on different fingerprints. Keeping both parents' launch-audit edits also grows the parent past the company 500-line ratchet. Tently reports an AI-provider outage without code findings; do not bypass that gate.",
+    "mechanization": "Resolve the pin-only workflow conflict with the existing reviewed-project digest resolver, which rebuilds the source map from the merged index and ignores unstaged bytes. Move header and edge swipe checks into a launch-audit sibling so the parent stays within 500 lines. Extend the existing required shared-lib audit test to reject a parent over that limit and a dropped gesture sibling. The oversized inlined parent fails that assertion; the extracted audit passes. Do not bypass Tently. The harness owns push and PR-body updates and must replace any earlier machine declaration with exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Loading the gesture checks from a sibling removes them from this parent, but the loader cannot stop a later edit from inlining those checks and growing the parent past 500 lines."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib launch audit test reads the parent source, so a merge that leaves it over 500 lines or drops the gesture sibling fails before the audit runs."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-ui-regression-audit.test.ts",
+      "anchor": "The parent audit stays within the company 500-line ratchet."
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "timeline-edge-swipe-excludes-menu",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41354175812",
+    "correction": "PR #1703 / LYB-315, fix-red-cc900b961c occurrence 5: Launch Quality run 41354175812 fails testPhotoScrubResetsWhenNavigatingToTheMenuAndBack because a single Open Menu tap leaves home_v2_sidebar_scrim absent. The root edge high-priority drag included header padding and shared the menu button's leading edge, so the button action never presented the sidebar. Tently reports an AI-provider outage and stays unchanged.",
+    "mechanization": "Move the existing edge high-priority drag from the root overlay onto the home content below the header, with its hit shape before any padding. Extend the existing launch UI regression audit with timeline.edge_swipe_excludes_header. The behavior regression rejects the old parent overlay and padding before the gesture, and passes on the content-only overlay. The existing required shared-lib suite runs that audit. Launch Quality keeps the three-tap and title-swipe assertions. Native execution remains unverified on this Linux host. Do not bypass Tently. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Attaching the edge swipe only to the content below the header excludes the menu button hit region by construction. The hit shape is applied before any padding, so the drag cannot cover the header while the title swipe and sidebar assertions stay in place."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "timeline.edge_swipe_excludes_header"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "conflicted-source-map-index-rebuild",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1702",
     "correction": "PR #1702 / LYB-337, fix-red-95726c4f82 occurrence 16: merge origin/main without rebasing. The generated source map conflicts because each parent changed a different fingerprint. Tently reports an AI-provider outage and no source finding; do not bypass that gate. Rebuilding the map from a dirty worktree would publish unstaged bytes as the committed fingerprints.",

@@ -37,11 +37,15 @@ def _load_sibling(module_name: str, filename: str, export: str):
 _AUDIT_SIBLINGS = (
     ("launch_ui_timeline_day", "launch_ui_timeline_day.py", "check_timeline_calendar_day"),
     ("launch_ui_opacity_audit", "launch_ui_opacity_audit.py", "check_optional_cgfloat_opacity"),
+    ("launch_ui_timeline_gesture_audit", "launch_ui_timeline_gesture_audit.py", "check_timeline_gestures"),
     ("launch_ui_regression_report", "launch-ui-regression-report.py", "write_outputs"),
 )
-check_timeline_calendar_day, check_optional_cgfloat_opacity, write_outputs = [
-    _load_sibling(*sibling) for sibling in _AUDIT_SIBLINGS
-]
+(
+    check_timeline_calendar_day,
+    check_optional_cgfloat_opacity,
+    check_timeline_gestures,
+    write_outputs,
+) = [_load_sibling(*sibling) for sibling in _AUDIT_SIBLINGS]
 
 
 def read_sources(paths: list[Path]) -> dict[Path, str]:
@@ -442,23 +446,10 @@ def main() -> int:
         violations=violations,
     )
 
-    # Header navigation drags must not own either button's touch region.
     hud_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
-    hud = texts[hud_path]
-    header_call = hud.split("photoTimelineRootNavigation\n", 1)[-1].split("photoTimelineHomeContent\n", 1)[0]
-    header = hud.split("private var photoTimelineRootNavigation: some View {", 1)[-1].split(
-        "private var photoTimelineSwipe:", 1
-    )[0]
-    title = header.split("VStack(spacing: 2) {", 1)[-1].split("if isHomeV2CheckIn {", 1)[0]
-    gesture = re.compile(r"\.(?:gesture|simultaneousGesture|highPriorityGesture)\s*\(")
-    if (gesture.search(header_call) or gesture.search(header.replace(title, ""))
-            or ".gesture(photoTimelineSwipe)" not in title
-            or ".contentShape(Rectangle())" not in title
-            or "minHeight: JovieTokens.minimumHitTarget" not in title):
-        violations.append(AuditViolation(
-            check="timeline.header_swipe_excludes_buttons", file=str(hud_path.relative_to(root)), line=1,
-            detail="Attach the header swipe only to the full-height title hit region, outside the menu and detail buttons.",
-        ))
+    # Header navigation drags must not own either button's touch region.
+    # timeline.edge_swipe_excludes_header stays on the content below the header.
+    check_timeline_gestures(root, hud_path, texts[hud_path], violations, AuditViolation)
 
     checkin_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
     checkin_card = texts[checkin_path].split("var hudGlp1WeeklyCheckIn:", 1)[-1].split(

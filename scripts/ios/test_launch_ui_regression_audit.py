@@ -295,6 +295,54 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                     self.assert_rejected("timeline.header_swipe_excludes_buttons")
                     path.write_text(source)
 
+    def test_edge_swipe_cannot_share_the_menu_button(self):
+        self.assertEqual(self.run_audit()[0], 0)
+        path = self.app / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
+        source = path.read_text()
+        content_overlay = """                .overlay(alignment: .leading) {
+                    Color.clear
+                        .frame(width: 20)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(photoTimelineSwipe)
+                        .accessibilityHidden(true)
+                }
+"""
+        self.assertIn(content_overlay, source)
+        detached = source.replace(content_overlay, "", 1)
+        header_end = """        .onChange(of: selectedPhotoTimelineRootPage) { _, _ in
+            isHomeChatExpanded = false
+        }
+"""
+        parent_overlay = header_end + """        .overlay(alignment: .leading) {
+            Color.clear
+                .frame(width: 20)
+                .padding(.top, 56)
+                .contentShape(Rectangle())
+                .highPriorityGesture(photoTimelineSwipe)
+                .accessibilityHidden(true)
+        }
+"""
+        self.assertIn(header_end, detached)
+        path.write_text(detached.replace(header_end, parent_overlay, 1))
+        self.assert_rejected("timeline.edge_swipe_excludes_header")
+
+        padded = source.replace(
+            """.frame(width: 20)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(photoTimelineSwipe)""",
+            """.frame(width: 20)
+                        .padding(.top, 56)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(photoTimelineSwipe)""",
+            1,
+        )
+        self.assertNotEqual(padded, source)
+        path.write_text(padded)
+        self.assert_rejected("timeline.edge_swipe_excludes_header")
+        path.write_text(source)
+
     def test_header_title_cannot_lose_navigation_or_its_hit_region(self):
         for token in (".gesture(photoTimelineSwipe)", ".contentShape(Rectangle())",
                       ", minHeight: JovieTokens.minimumHitTarget"):
@@ -318,6 +366,14 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 self.assert_rejected("dashboard.checkin_card_hit_region")
                 path.write_text(source)
 
+    def test_parent_audit_stays_within_the_company_size_ratchet(self):
+        # The parent audit stays within the company 500-line ratchet.
+        count = len(Path(AUDIT.__file__).read_text().splitlines())
+        self.assertLessEqual(
+            count, 500, "extract a sibling before the company size guard",
+        )
+        self.assertNotIn("def check_timeline_gestures", Path(AUDIT.__file__).read_text())
+
     def test_every_size_ratchet_sibling_loads_or_the_audit_fails_closed(self):
         loaded = [
             AUDIT._load_sibling(module_name, filename, export)
@@ -328,6 +384,7 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
             [
                 "launch_ui_timeline_day",
                 "launch_ui_opacity_audit",
+                "launch_ui_timeline_gesture_audit",
                 "launch_ui_regression_report",
             ],
         )

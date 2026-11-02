@@ -20,6 +20,11 @@
 		A26100000000000000000005 /* QuickPillRankerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26100000000000000000006 /* QuickPillRankerTests.swift */; };
 		B26920261025000000000002 /* BackwardPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26920261025000000000001 /* BackwardPlanner.swift */; };
 		B26920261025000000000004 /* BackwardPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26920261025000000000003 /* BackwardPlannerTests.swift */; };
+		B31520261101000000000002 /* BodyVisualizationSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31520261101000000000001 /* BodyVisualizationSnapshot.swift */; };
+		B31520261101000000000004 /* BodyVisualizationLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31520261101000000000003 /* BodyVisualizationLedger.swift */; };
+		B31520261101000000000006 /* BodyVisualizationSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31520261101000000000005 /* BodyVisualizationSnapshotTests.swift */; };
+		B31520261101000000000008 /* BodyVisualizationComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31520261101000000000007 /* BodyVisualizationComposer.swift */; };
+		B3152026110100000000000A /* BodyVisualizationSnapshotFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31520261101000000000009 /* BodyVisualizationSnapshotFixtures.swift */; };
 		B18320261101000000000002 /* LaunchJourney.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18320261101000000000001 /* LaunchJourney.swift */; };
 		B18320261101000000000004 /* LaunchJourneyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18320261101000000000003 /* LaunchJourneyTests.swift */; };
 		B18320261101000000000006 /* LaunchJourneyUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18320261101000000000005 /* LaunchJourneyUI.swift */; };
@@ -622,6 +627,11 @@
 		A26100000000000000000006 /* QuickPillRankerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickPillRankerTests.swift; sourceTree = "<group>"; };
 		B26920261025000000000001 /* BackwardPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackwardPlanner.swift; sourceTree = "<group>"; };
 		B26920261025000000000003 /* BackwardPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackwardPlannerTests.swift; sourceTree = "<group>"; };
+		B31520261101000000000001 /* BodyVisualizationSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyVisualizationSnapshot.swift; sourceTree = "<group>"; };
+		B31520261101000000000003 /* BodyVisualizationLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyVisualizationLedger.swift; sourceTree = "<group>"; };
+		B31520261101000000000005 /* BodyVisualizationSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyVisualizationSnapshotTests.swift; sourceTree = "<group>"; };
+		B31520261101000000000007 /* BodyVisualizationComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyVisualizationComposer.swift; sourceTree = "<group>"; };
+		B31520261101000000000009 /* BodyVisualizationSnapshotFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyVisualizationSnapshotFixtures.swift; sourceTree = "<group>"; };
 		B18320261101000000000001 /* LaunchJourney.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchJourney.swift; sourceTree = "<group>"; };
 		B18320261101000000000003 /* LaunchJourneyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchJourneyTests.swift; sourceTree = "<group>"; };
 		B18320261101000000000005 /* LaunchJourneyUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchJourneyUI.swift; sourceTree = "<group>"; };
@@ -1493,6 +1503,8 @@
 				AD2600042F00000100ABCDEF /* HomeFocusSelectorTests.swift */,
 				E24920261025000400000001 /* WorkoutReconciliationPromptTests.swift */,
 				B26920261025000000000003 /* BackwardPlannerTests.swift */,
+				B31520261101000000000005 /* BodyVisualizationSnapshotTests.swift */,
+				B31520261101000000000009 /* BodyVisualizationSnapshotFixtures.swift */,
 				B18320261101000000000003 /* LaunchJourneyTests.swift */,
 				B27020261029000000000003 /* OutcomeFeasibilityTests.swift */,
 				B26920261025000000000005 /* lyb-launch-contract.json */,
@@ -1739,6 +1751,9 @@
 				AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */,
 				AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */,
 				4885B7AB7A8A7A8978CFFF5D /* MetricCorrectionService.swift */,
+				B31520261101000000000001 /* BodyVisualizationSnapshot.swift */,
+				B31520261101000000000007 /* BodyVisualizationComposer.swift */,
+				B31520261101000000000003 /* BodyVisualizationLedger.swift */,
 				2E6CF428B39B066C378F12CD /* BodyRecordReviewConsumer.swift */,
 				AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */,
 				AD3134002F01313400D134A1 /* NotificationManager.swift */,
@@ -2475,6 +2490,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				B26920261025000000000004 /* BackwardPlannerTests.swift in Sources */,
+				B31520261101000000000006 /* BodyVisualizationSnapshotTests.swift in Sources */,
+				B3152026110100000000000A /* BodyVisualizationSnapshotFixtures.swift in Sources */,
 				B18320261101000000000004 /* LaunchJourneyTests.swift in Sources */,
 				B27020261029000000000004 /* OutcomeFeasibilityTests.swift in Sources */,
 				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
@@ -2701,6 +2718,9 @@
 				AD1036332F00000100ABCDEF /* BodyMetricAppIntents.swift in Sources */,
 				AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */,
 				C3A33981B636CF792D2C0688 /* MetricCorrectionService.swift in Sources */,
+				B31520261101000000000002 /* BodyVisualizationSnapshot.swift in Sources */,
+				B31520261101000000000008 /* BodyVisualizationComposer.swift in Sources */,
+				B31520261101000000000004 /* BodyVisualizationLedger.swift in Sources */,
 				80341C4DDED4231D4589ED47 /* BodyRecordReviewConsumer.swift in Sources */,
 				AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */,
 				AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */,

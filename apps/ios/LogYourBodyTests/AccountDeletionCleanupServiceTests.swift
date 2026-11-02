@@ -199,6 +199,27 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
         XCTAssertEqual(events, ["revenuecat", "healthkit", "product"])
     }
 
+    func testPerformDeletionClearsVisualizationAssetsWithTheAuthorizedLocalCleanup() async {
+        var events: [String] = []
+        let service = AccountDeletionCleanupService(dependencies: .init(
+            logoutSubscriptionProvider: { events.append("provider") },
+            resetHealthKitAnchors: { events.append("health") },
+            deleteProductAccount: { events.append("product") },
+            deleteCoreData: { events.append("coredata") },
+            clearKeychain: { events.append("keychain") },
+            deleteSpotlightMetrics: { events.append("spotlight") },
+            clearUserDefaults: { events.append("defaults"); return [] },
+            logoutAuthSession: { events.append("auth") },
+            deleteTrainingDrafts: { events.append("drafts") },
+            deleteVisualizationAssets: { events.append("visualization") }
+        ))
+        try? await service.performDeletion()
+        XCTAssertEqual(
+            events,
+            ["provider", "health", "product", "drafts", "visualization", "coredata", "keychain", "defaults", "spotlight", "auth"]
+        )
+    }
+
     func testClearAccountUserDefaultsRemovesAuthHealthKitBillingAndLaunchState() {
         let suiteName = "AccountDeletionCleanupServiceTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

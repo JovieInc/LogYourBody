@@ -20,6 +20,7 @@ python3 "$ROOT_DIR/scripts/ios/launch-ui-regression-audit.py" --root "$ROOT_DIR"
 python3 "$ROOT_DIR/scripts/ios/optical-grid-audit.py" --root "$ROOT_DIR" --artifact-dir "$ARTIFACT_DIR" |
   tee "$ARTIFACT_DIR/optical-grid-audit.log"
 python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
+python3 "$ROOT_DIR/scripts/ios/test_split_size_ratchet.py"
 
 # Smell audit and budget summary, with the xcodebuild phases off (same flags the macOS step used).
 RUN_SWIFTLINT=false RUN_LAUNCH_PERFORMANCE=false RUN_PERFORMANCE_UNIT_TESTS=false RUN_TIMELINE_TRACE_WORKFLOW=false \
