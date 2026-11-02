@@ -99,3 +99,13 @@ def check_optional_cgfloat_opacity(
                         detail=_DETAIL,
                     )
                 )
+
+
+def contribute(root, _app_dir, violations, _violation, _line_number) -> None:
+    """Run the opacity check from the discovered sibling list."""
+    paths = sorted(
+        path
+        for directory in ("LogYourBody", "LogYourBodyTests", "LogYourBodyUITests", "LogYourBodyWidget")
+        for path in (root / "apps" / "ios" / directory).rglob("*.swift")
+    )
+    check_optional_cgfloat_opacity(root, paths, violations)

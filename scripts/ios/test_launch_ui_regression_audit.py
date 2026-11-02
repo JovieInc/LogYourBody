@@ -238,6 +238,22 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                      'LineMark(x: .value("Observation date", date)')
         self.assert_rejected("dashboard.observation_plot")
 
+    def test_observation_chart_cannot_take_the_card_tap(self):
+        self.replace(
+            "DesignSystem/Organisms/MetricSummaryCard.swift",
+            ".accessibilityHidden(true)\n        .allowsHitTesting(false)",
+            ".accessibilityHidden(true)",
+        )
+        self.assert_rejected("dashboard.observation_chart_ignores_hits")
+
+    def test_card_tap_still_opens_detail_when_the_list_drag_takes_the_touch(self):
+        self.replace(
+            "DesignSystem/Organisms/MetricSummaryCard.swift",
+            "button.highPriorityGesture(TapGesture().onEnded { action.handler() })",
+            "button",
+        )
+        self.assert_rejected("dashboard.card_tap_opens_detail")
+
     def test_single_timestamp_cannot_establish_no_change(self):
         self.replace("Helpers/DashboardMetricFormatting.swift",
                      "if requiresComparison && first.date == last.date { return nil }", "")
@@ -389,6 +405,71 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
 
         calculator.write_text(original.replace("now: Date = Date(),\n        ", "", 1))
         self.assert_rejected("timeline.injected_calendar_day")
+
+    def test_weekly_prompt_cannot_precede_the_provenance_chip(self):
+        path = self.app / "Views/HomeV2/HomeV2Surface.swift"
+        source = path.read_text()
+        prompt = (
+            "            if let weeklyPhotoPrompt {\n"
+            "                WeeklyPhotoCheckInPrompt(prompt: weeklyPhotoPrompt, onAdd: onAddWeeklyPhoto)\n"
+            "            }\n"
+        )
+        self.assertEqual(source.count(prompt), 1)
+        self.assertEqual(self.run_audit()[0], 0)
+        moved = source.replace(prompt, "", 1).replace(
+            "                    photoNumberBlock\n",
+            prompt + "                    photoNumberBlock\n",
+            1,
+        )
+        path.write_text(moved)
+        self.assert_rejected("home.provenance_chip_precedes_weekly_prompt")
+
+    def test_synthetic_character_entry_refocuses_a_dropped_keyboard(self):
+        destination = self.root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / destination.relative_to(self.root), destination)
+        self.assertEqual(self.run_audit()[0], 0)
+        source = destination.read_text()
+        self.assertIn("if !keyboard.exists {", source)
+        destination.write_text(source.replace("if !keyboard.exists {\n", "if false {\n", 1))
+        self.assert_rejected("chat.synthetic_typing_refocuses")
+
+
+class CheckSiblingDiscoveryTests(unittest.TestCase):
+    def test_every_check_sibling_contributes_and_a_missing_hook_fails_closed(self):
+        # The coverage tracer reads these modules after the suite returns.
+        directory = Path(tempfile.mkdtemp(prefix="lyb-audit-siblings-"))
+        (directory / "launch_ui_beta.py").write_text(
+            "def contribute(bucket, *args):\n    bucket.append('beta')\n"
+        )
+        (directory / "launch_ui_alpha.py").write_text(
+            "def contribute(bucket, *args):\n    bucket.append('alpha')\n"
+        )
+        (directory / "notes.py").write_text("def contribute(bucket, *args):\n    bucket.append('nope')\n")
+        seen = []
+        for module in AUDIT.load_check_siblings(directory):
+            module.contribute(seen)
+        self.assertEqual(seen, ["alpha", "beta"])
+        (directory / "launch_ui_broken.py").write_text("def check():\n    return None\n")
+        with self.assertRaises(RuntimeError) as broken:
+            AUDIT.load_check_siblings(directory)
+        self.assertIn("Cannot load launch UI audit sibling", str(broken.exception))
+        empty = directory / "empty"
+        empty.mkdir()
+        with self.assertRaises(RuntimeError) as missing:
+            AUDIT.load_check_siblings(empty)
+        self.assertIn("Cannot load launch UI audit sibling", str(missing.exception))
+        with self.assertRaises(RuntimeError) as absent:
+            AUDIT._load_sibling("absent.py", "absent.py", empty)
+        self.assertIn("Cannot load launch UI audit sibling", str(absent.exception))
+
+    def test_shipped_check_siblings_include_home_and_timeline(self):
+        names = [module.__name__ for module in AUDIT._CHECK_SIBLINGS]
+        self.assertIn("launch_ui_home_interaction_audit", names)
+        self.assertIn("launch_ui_timeline_day", names)
+        self.assertIn("launch_ui_opacity_audit", names)
+        self.assertNotIn("launch_ui_timeline_audit", names)
+        self.assertNotIn("launch_ui_timeline_calendar_audit", names)
 
 
 def run_behavior_suite(suite):

@@ -152,6 +152,9 @@ extension DashboardViewLiquid {
         } message: {
             Text("Your entry is still saved. Try Undo again.")
         }
+        .task(id: authManager.currentUser?.id) {
+            await refreshWeeklyPhotoProvenanceIfNeeded()
+        }
     }
 
     private var isComposerLoggingPrototypeEnabled: Bool {
@@ -411,10 +414,6 @@ extension DashboardViewLiquid {
         return globalTimelineStore.weeklyBuckets.last
     }
 
-    var progressPhotoAttachFallbackDate: Date {
-        currentMetric?.date ?? globalTimelineStore.cursor?.date ?? activeTimelineBucket?.endDate ?? Date()
-    }
-
     var progressPhotoAttachMetric: BodyMetrics? {
         if let currentMetric {
             return currentMetric
@@ -427,6 +426,7 @@ extension DashboardViewLiquid {
     }
 
     func presentProgressPhotoAttach(for metric: BodyMetrics?) {
+        progressPhotoAttachFallbackOverride = nil
         progressPhotoAttachTarget = metric
         HapticManager.shared.selection()
         isProgressPhotoAttachPresented = true

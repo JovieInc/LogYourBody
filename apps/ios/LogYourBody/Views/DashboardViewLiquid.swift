@@ -117,6 +117,9 @@ struct DashboardViewLiquid: View {
     @State var isStatsDestinationActive = false
     @State var isProgressPhotoAttachPresented = false
     @State var progressPhotoAttachTarget: BodyMetrics?
+    @State var progressPhotoAttachFallbackOverride: Date?
+    @State var pendingWeeklyPhotoMoment: Date?
+    @State var pendingWeeklyCompare = false
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
     @State var bodyScoreShareCapture = AccountBoundShareCapture()
@@ -329,38 +332,30 @@ struct DashboardViewLiquid: View {
                 loadGlp1WeeklyCheckInDataIfNeeded()
             }
 
-        let withSheetsAndNavigation = withSyncAndState
-            .sheet(isPresented: $showAddEntrySheet) {
-                AddEntrySheet(
-                    isPresented: $showAddEntrySheet,
-                    initialTab: addEntryInitialTab,
-                    includesGlp1Entry: addEntryIncludesGlp1Entry,
-                    initialDate: addEntryInitialDate,
-                    initialWeight: addEntryInitialWeight,
-                    initialBodyFat: addEntryInitialBodyFat,
-                    initialBodyFatMethod: addEntryInitialBodyFatMethod,
-                    isHomeV2LogEntry: isHomeV2LoggingWeight,
-                    onWeightSaved: handleHomeV2WeightEntrySaved,
-                    onBodyFatSaved: handleHomeV2BodyFatEntrySaved
-                )
-                    .environmentObject(authManager)
-            }
-            .sheet(isPresented: $showSyncDetails) {
-                DashboardSyncDetailsSheet(
-                    isPresented: $showSyncDetails,
-                    syncManager: realtimeSyncManager
-                )
-            }
-            .sheet(isPresented: $isProgressPhotoAttachPresented) {
-                ProgressPhotoAttachSheet(
-                    targetMetric: progressPhotoAttachTarget,
-                    fallbackDate: progressPhotoAttachFallbackDate,
-                    onComplete: {
-                        await handleProgressPhotoAttachComplete()
-                    }
-                )
-                .environmentObject(authManager)
-            }
+        let withSheetsAndNavigation = weeklyPhotoAttachSheet(
+            on: withSyncAndState
+                .sheet(isPresented: $showAddEntrySheet) {
+                    AddEntrySheet(
+                        isPresented: $showAddEntrySheet,
+                        initialTab: addEntryInitialTab,
+                        includesGlp1Entry: addEntryIncludesGlp1Entry,
+                        initialDate: addEntryInitialDate,
+                        initialWeight: addEntryInitialWeight,
+                        initialBodyFat: addEntryInitialBodyFat,
+                        initialBodyFatMethod: addEntryInitialBodyFatMethod,
+                        isHomeV2LogEntry: isHomeV2LoggingWeight,
+                        onWeightSaved: handleHomeV2WeightEntrySaved,
+                        onBodyFatSaved: handleHomeV2BodyFatEntrySaved
+                    )
+                        .environmentObject(authManager)
+                }
+                .sheet(isPresented: $showSyncDetails) {
+                    DashboardSyncDetailsSheet(
+                        isPresented: $showSyncDetails,
+                        syncManager: realtimeSyncManager
+                    )
+                }
+        )
             .navigationDestination(isPresented: $isMetricDetailActive) {
                 fullMetricChartView
             }

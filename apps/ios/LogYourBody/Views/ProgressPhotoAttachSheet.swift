@@ -77,35 +77,47 @@ struct ProgressPhotoAttachPolicy {
 }
 
 struct ProgressPhotoAttachSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var authManager: AuthManager
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var authManager: AuthManager
     @Environment(\.theme) private var theme
     @Environment(\.openURL) private var openURL
     @ObservedObject private var uploadManager = PhotoUploadManager.shared
-    private let photoLibrary: PhotoLibraryManaging = LivePhotoLibraryAdapter.shared
-    private let cameraAuthorizer: CameraAuthorizing = LiveCameraAuthorizationAdapter.shared
+    let photoLibrary: PhotoLibraryManaging = LivePhotoLibraryAdapter.shared
+    let cameraAuthorizer: CameraAuthorizing = LiveCameraAuthorizationAdapter.shared
 
     let targetMetric: BodyMetrics?
     let fallbackDate: Date
+    var photoHistory: [WeeklyPhotoProvenance] = []
+    var previousPhotoURL: String?
     let onComplete: () async -> Void
+    var onCheckInSaved: (WeeklyPhotoSaveOutcome) -> Void = { _ in }
 
-    @State private var selectedImage: UIImage?
-    @State private var selectedImageDate: Date?
-    @State private var attachStatus: ProgressPhotoAttachStatus = .empty
-    @State private var isCameraPresented = false
-    @State private var photoSelectionLoadID = UUID()
+    @State var selectedImage: UIImage?
+    @State var selectedOriginalData: Data?
+    @State var selectedImageDate: Date?
+    @State var chosenPhotoDate: Date?
+    @State var captureViewpoint = "unspecified"
+    @State var captureMirror = "unknown"
+    @State var captureSource = "library"
+    @State var submissionId = UUID().uuidString
+    @State var captureStartedAt: Date?
+    @State var didFinishAttempt = false
+    @State var attachStatus: ProgressPhotoAttachStatus = .empty
+    @State var isCameraPresented = false
+    @State var cameraSessionStarted = false
+    @State var photoSelectionLoadID = UUID()
     @State private var sheetDetent = NativeSheetPresentationPolicy.initialDetent(for: .progressPhotoAttach)
-    @AccessibilityFocusState private var isStatusFocused: Bool
+    @AccessibilityFocusState var isStatusFocused: Bool
 
-    private var targetDate: Date {
-        targetMetric?.date ?? selectedImageDate ?? fallbackDate
+    var targetDate: Date {
+        chosenPhotoDate ?? selectedImageDate ?? targetMetric?.date ?? fallbackDate
     }
 
     private var isBusy: Bool {
         ProgressPhotoAttachPolicy.isBusy(status: attachStatus)
     }
 
-    private var isSuccess: Bool {
+    var isSuccess: Bool {
         if case .success = attachStatus {
             return true
         }
@@ -117,7 +129,7 @@ struct ProgressPhotoAttachSheet: View {
     }
 
     #if DEBUG
-    private var usesProgressPhotoAttachFixture: Bool {
+    var usesProgressPhotoAttachFixture: Bool {
         ProcessInfo.processInfo.arguments.contains("-lybUITestProgressPhotoAttachFixture")
     }
     #endif
@@ -163,13 +175,34 @@ struct ProgressPhotoAttachSheet: View {
                     photoSourceMenu
                 }
             }
-            .fullScreenCover(isPresented: $isCameraPresented) {
-                CameraView { image in
-                    Task { @MainActor in
-                        handleCameraImage(image)
-                        await Task.yield()
-                        attachSelectedPhoto()
+            .fullScreenCover(isPresented: $isCameraPresented, onDismiss: {
+                if cameraSessionStarted, selectedImage == nil {
+                    finishAbandoned(outcome: "interrupted", source: "camera")
+                }
+                cameraSessionStarted = false
+            }, content: {
+                CameraView(
+                    hasPreviousPhoto: previousPhotoURL != nil,
+                    previousPhotoURL: previousPhotoURL,
+                    onCaptureStarted: { source in
+                        noteCaptureStarted(source)
+                    },
+                    onCaptureContext: { viewpoint, mirror in
+                        captureViewpoint = viewpoint
+                        captureMirror = mirror
+                    },
+                    onImageCaptured: { image in
+                        Task { @MainActor in
+                            handleCameraImage(image)
+                            await Task.yield()
+                            attachSelectedPhoto()
+                        }
                     }
+                )
+            })
+            .onDisappear {
+                if !didFinishAttempt, attachStatus != .success, attachStatus != .processing {
+                    finishAbandoned(outcome: "cancelled", source: captureSource)
                 }
             }
             .interactiveDismissDisabled(!ProgressPhotoAttachPolicy.canDismiss(status: attachStatus))
@@ -304,6 +337,19 @@ struct ProgressPhotoAttachSheet: View {
                     .foregroundColor(theme.colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if selectedImage != nil, !isBusy, !isSuccess {
+                    DatePicker(
+                        "Photo date",
+                        selection: Binding(
+                            get: { chosenPhotoDate ?? selectedImageDate ?? targetDate },
+                            set: { chosenPhotoDate = $0 }
+                        ),
+                        displayedComponents: .date
+                    )
+                    .font(theme.typography.bodySmall)
+                    .accessibilityIdentifier("weekly_photo_date")
+                }
+
                 if case .permissionDenied = attachStatus {
                     Button("Open Settings") {
                         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
@@ -368,7 +414,12 @@ struct ProgressPhotoAttachSheet: View {
         VStack(spacing: 12) {
             AppPhotosPicker(maxSelectionCount: 1) { assets in
                 await MainActor.run {
-                    loadSelectedPhoto(assets.first)
+                    guard let asset = assets.first else {
+                        finishAbandoned(outcome: "cancelled", source: "library")
+                        return
+                    }
+                    noteCaptureStarted("library")
+                    loadSelectedPhoto(asset)
                 }
             } label: {
                 Label("Choose from Library", systemImage: "photo.fill")
@@ -442,245 +493,5 @@ struct ProgressPhotoAttachSheet: View {
         .accessibilityLabel(isSuccess ? "Close progress photo" : "Attach progress photo")
         .accessibilityHint(canAttach ? "Attaches the selected photo to this timeline point" : "Choose a photo before attaching")
         .accessibilityIdentifier("progress_photo_attach_submit_button")
-    }
-
-    private func previewHeight(for availableHeight: CGFloat) -> CGFloat {
-        min(260, max(184, availableHeight * 0.30))
-    }
-
-    private func announceStatusChange(_ status: ProgressPhotoAttachStatus) {
-        let message = "\(ProgressPhotoAttachPolicy.statusTitle(for: status)). \(ProgressPhotoAttachPolicy.statusMessage(for: status))"
-        UIAccessibility.post(notification: .announcement, argument: message)
-        isStatusFocused = true
-    }
-
-    private func updateInitialPermissionState() {
-        let status = photoLibrary.authorizationStatus()
-        if status == .denied || status == .restricted {
-            attachStatus = .permissionDenied
-        }
-    }
-
-    private func loadSelectedPhoto(_ asset: AppPhotoAsset?) {
-        let loadID = UUID()
-        photoSelectionLoadID = loadID
-
-        guard let asset else {
-            selectedImage = nil
-            selectedImageDate = nil
-            attachStatus = .empty
-            return
-        }
-
-        attachStatus = .processing
-        guard photoSelectionLoadID == loadID else { return }
-        selectedImage = asset.image
-        selectedImageDate = PhotoMetadataService.shared.extractDate(from: asset.data)
-        attachStatus = .ready
-    }
-
-    private func startCameraCapture() {
-        #if DEBUG
-        if usesProgressPhotoAttachFixture {
-            isCameraPresented = true
-            return
-        }
-        #endif
-        guard cameraAuthorizer.isCameraAvailable else {
-            attachStatus = .failed("Camera is not available in Simulator. Choose from Library instead.")
-            return
-        }
-
-        switch cameraAuthorizer.authorizationStatus() {
-        case .authorized:
-            isCameraPresented = true
-        case .notDetermined:
-            attachStatus = .processing
-            Task {
-                let granted = await cameraAuthorizer.requestAccess()
-                await MainActor.run {
-                    attachStatus = granted ? .empty : .permissionDenied
-                    isCameraPresented = granted
-                }
-            }
-        case .denied, .restricted:
-            attachStatus = .permissionDenied
-        case .unknown:
-            attachStatus = .permissionDenied
-        }
-    }
-
-    private func handleCameraImage(_ image: UIImage) {
-        photoSelectionLoadID = UUID()
-        selectedImage = image
-        selectedImageDate = nil
-        attachStatus = .ready
-    }
-
-    private func attachSelectedPhoto() {
-        if isSuccess {
-            dismiss()
-            return
-        }
-
-        guard let selectedImage else {
-            attachStatus = .empty
-            return
-        }
-
-        guard let ownership = authManager.captureAccountSession(),
-              authManager.ownsAccountSession(ownership) else {
-            attachStatus = .failed("Sign in again to upload photos.")
-            return
-        }
-        let userId = ownership.subject
-        let writeAdmission: CoreDataManager.WriteAdmission = {
-            guard authManager.ownsAccountSession(ownership) else {
-                throw PhotoUploadManager.PhotoError.notAuthenticated
-            }
-        }
-
-        attachStatus = .processing
-
-        Task {
-            var placeholderMetricId: String?
-
-            do {
-                try writeAdmission()
-                let metricsResult = try await targetMetrics(userId: userId, writeAdmission: writeAdmission)
-                try writeAdmission()
-                let metrics = metricsResult.metrics
-                placeholderMetricId = metrics.id
-
-                #if DEBUG
-                if usesProgressPhotoAttachFixture {
-                    try await attachFixturePhoto(
-                        image: selectedImage,
-                        to: metrics,
-                        userId: userId
-                    )
-                    try writeAdmission()
-                    await onComplete()
-                    try writeAdmission()
-                    await MainActor.run {
-                        guard authManager.ownsAccountSession(ownership) else { return }
-                        attachStatus = .success
-                        HapticManager.shared.successAction()
-                    }
-                    return
-                }
-                #endif
-
-                _ = try await PhotoUploadManager.shared.uploadProgressPhoto(
-                    for: metrics,
-                    image: selectedImage
-                )
-
-                try writeAdmission()
-                await onComplete()
-                try writeAdmission()
-                await MainActor.run {
-                    guard authManager.ownsAccountSession(ownership) else { return }
-                    attachStatus = .success
-                    HapticManager.shared.successAction()
-                }
-            } catch {
-                // Preserve any already-admitted original-owner upload; stale callers
-                // cannot clean up its row or update replacement-session presentation.
-                guard authManager.ownsAccountSession(ownership) else { return }
-                await MainActor.run {
-                    guard authManager.ownsAccountSession(ownership) else { return }
-                    attachStatus = .failed(error.localizedDescription)
-                }
-                if let placeholderMetricId {
-                    _ = await CoreDataManager.shared.deleteEmptyPhotoPlaceholder(
-                        id: placeholderMetricId,
-                        userId: userId,
-                        writeAdmission: writeAdmission
-                    )
-                }
-            }
-        }
-    }
-
-    #if DEBUG
-    private func selectFixturePhoto() {
-        photoSelectionLoadID = UUID()
-        selectedImage = makeFixtureProgressPhoto()
-        selectedImageDate = targetDate
-        attachStatus = .ready
-    }
-
-    private func makeFixtureProgressPhoto() -> UIImage {
-        let size = CGSize(width: 900, height: 1_200)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { context in
-            context.cgContext.setFillColor(CGColor(red: 0.04, green: 0.04, blue: 0.05, alpha: 1))
-            context.cgContext.fill(CGRect(origin: .zero, size: size))
-
-            context.cgContext.setFillColor(CGColor(red: 0.18, green: 0.19, blue: 0.21, alpha: 1))
-            context.cgContext.fillEllipse(in: CGRect(x: 330, y: 170, width: 240, height: 240))
-
-            context.cgContext.setFillColor(CGColor(red: 0.26, green: 0.27, blue: 0.30, alpha: 1))
-            let bodyPath = UIBezierPath(
-                roundedRect: CGRect(x: 250, y: 430, width: 400, height: 570),
-                cornerRadius: 172
-            )
-            context.cgContext.addPath(bodyPath.cgPath)
-            context.cgContext.fillPath()
-
-            context.cgContext.setStrokeColor(CGColor(red: 0.96, green: 0.96, blue: 0.92, alpha: 0.18))
-            context.cgContext.setLineWidth(10)
-            context.cgContext.move(to: CGPoint(x: 230, y: 1_050))
-            context.cgContext.addLine(to: CGPoint(x: 670, y: 1_050))
-            context.cgContext.strokePath()
-        }
-    }
-
-    private func attachFixturePhoto(
-        image: UIImage,
-        to metrics: BodyMetrics,
-        userId: String
-    ) async throws {
-        guard let photoUrl = try writeFixturePhoto(image) else {
-            throw PhotoUploadManager.PhotoError.imageConversionFailed
-        }
-
-        _ = try await PhotoMetadataService.shared.createOrUpdateMetrics(
-            for: metrics.date,
-            photoUrl: photoUrl,
-            userId: userId
-        )
-    }
-
-    private func writeFixturePhoto(_ image: UIImage) throws -> String? {
-        guard let data = image.jpegData(compressionQuality: 0.86) else {
-            return nil
-        }
-
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("lyb-progress-photo-fixture.jpg")
-        try data.write(to: url, options: [.atomic])
-        return url.absoluteString
-    }
-    #endif
-
-    private func targetMetrics(
-        userId: String,
-        writeAdmission: @escaping CoreDataManager.WriteAdmission
-    ) async throws -> PhotoMetricsUpdateResult {
-        if let targetMetric {
-            return try await PhotoMetadataService.shared.prepareExistingMetricsForPhotoUpload(
-                id: targetMetric.id,
-                userId: userId,
-                writeAdmission: writeAdmission
-            )
-        }
-
-        return try await PhotoMetadataService.shared.createOrUpdateMetricsForPhotoUpload(
-            for: selectedImageDate ?? fallbackDate,
-            userId: userId,
-            writeAdmission: writeAdmission
-        )
     }
 }

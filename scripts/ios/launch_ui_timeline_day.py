@@ -54,3 +54,7 @@ def check_timeline_calendar_day(root: Path, violations: list, violation_cls, lin
             line=1,
             detail="Keep the Pacific DST fallback regression for the merge-group timeline position failure.",
         ))
+
+
+def contribute(root, _app_dir, violations, violation_cls, line_number) -> None:
+    check_timeline_calendar_day(root, violations, violation_cls, line_number)

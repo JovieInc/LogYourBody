@@ -33,6 +33,8 @@ struct HomeV2Surface: View {
     let onDone: () -> Void
     let onUndo: () -> Void
     var onProvenancePresentationChange: (Bool) -> Void = { _ in }
+    var weeklyPhotoPrompt: WeeklyPhotoCheckInPolicy.Prompt?
+    var onAddWeeklyPhoto: () -> Void = {}
     var isPhotoScrubNavigating = false
 
     @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
@@ -150,6 +152,9 @@ struct HomeV2Surface: View {
 
             if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
                 HomeV2ProvenanceChip(detail: provenance) { showsProvenance = true }
+            }
+            if let weeklyPhotoPrompt {
+                WeeklyPhotoCheckInPrompt(prompt: weeklyPhotoPrompt, onAdd: onAddWeeklyPhoto)
             }
 
             if HomeV2EditorialPolicy.bodyFat(in: metric) == nil {

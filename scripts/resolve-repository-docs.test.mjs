@@ -205,136 +205,6 @@ test('conflicted source map refuses unstaged pinned drift without rewriting the 
   assert.equal(f.git('ls-files', '--stage'), index);
 });
 
-const DIAGNOSTIC_PROJECT = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj';
-const DIAGNOSTIC_WORKFLOW = '.github/workflows/ios-ui-diagnostics.yml';
-
-function pinWorkflow(digest, note = 'kept') {
-  return `jobs:\n  pins:\n    run: echo ok\n    env:\n      # ${note}\n            '${DIAGNOSTIC_PROJECT}': '${digest}',\n`;
-}
-
-function pinFixture(t) {
-  const root = mkdtempSync(join(tmpdir(), 'lyb-diagnostic-pin-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
-  const output = 'SOURCES.md';
-  git('init', '-q', '-b', 'ours');
-  git('config', 'core.hooksPath', '/dev/null');
-  mkdirSync(join(root, 'apps/ios/LogYourBody.xcodeproj'), { recursive: true });
-  mkdirSync(join(root, '.github/workflows'), { recursive: true });
-  writeFileSync(join(root, 'README.md'), 'Local instructions\n');
-  writeFileSync(join(root, 'repository-docs.json'), JSON.stringify({
-    schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
-    sources: [
-      { path: DIAGNOSTIC_PROJECT, purpose: 'Merged Xcode project' },
-      { path: DIAGNOSTIC_WORKFLOW, purpose: 'Diagnostic project pin' },
-      { path: 'a.txt', purpose: 'Branch fingerprint' },
-    ],
-    imports: [], output,
-  }));
-  const generate = () => execFileSync('python3', [
-    fileURLToPath(new URL('./repository_docs.py', import.meta.url)), '--root', root, '--write',
-  ], { env });
-  const commit = () => {
-    git('add', '-A');
-    git('commit', '-qm', 'fixture');
-  };
-  const writeProject = (body, note = 'kept') => {
-    writeFileSync(join(root, DIAGNOSTIC_PROJECT), body);
-    writeFileSync(join(root, DIAGNOSTIC_WORKFLOW), pinWorkflow(createHash('sha256').update(body).digest('hex'), note));
-  };
-  writeProject('base-project\n');
-  writeFileSync(join(root, 'a.txt'), 'base-a\n');
-  generate();
-  commit();
-  git('branch', 'theirs');
-  return { root, git, output, generate, commit, writeProject };
-}
-
-function mergePinFixture(f) {
-  const merge = spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: f.root, env, encoding: 'utf8' });
-  assert.equal(merge.status, 1, merge.stderr);
-}
-
-test('reviewed digest replaces a pin-only workflow conflict and rebuilds the source map from the index', (t) => {
-  const f = pinFixture(t);
-  f.writeProject('ours-project\n');
-  writeFileSync(join(f.root, 'a.txt'), 'ours-a\n');
-  f.generate();
-  f.commit();
-  f.git('switch', '-q', 'theirs');
-  f.writeProject('theirs-project\n');
-  f.generate();
-  f.commit();
-  f.git('switch', '-q', 'ours');
-  mergePinFixture(f);
-  const blocked = spawnSync('python3', [
-    resolver, '--root', f.root, '--reviewed-project-sha256', 'ab'.repeat(32),
-  ], { env, encoding: 'utf8' });
-  assert.notEqual(blocked.status, 0);
-  assert.match(blocked.stderr, /resolve source conflicts first: apps\/ios\/LogYourBody\.xcodeproj\/project\.pbxproj/);
-  const merged = 'ours-project\ntheirs-project\n';
-  writeFileSync(join(f.root, DIAGNOSTIC_PROJECT), merged);
-  f.git('add', '--', DIAGNOSTIC_PROJECT);
-  const digest = createHash('sha256').update(merged).digest('hex');
-  const beforeWorkflow = readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW));
-  const beforeMap = readFileSync(join(f.root, f.output));
-  const index = f.git('ls-files', '--stage');
-  const derived = spawnSync('python3', [resolver, '--root', f.root], { env, encoding: 'utf8' });
-  assert.notEqual(derived.status, 0);
-  assert.match(derived.stderr, /resolve source conflicts first: \.github\/workflows\/ios-ui-diagnostics\.yml/);
-  const wrong = spawnSync('python3', [
-    resolver, '--root', f.root, '--reviewed-project-sha256', '0'.repeat(64),
-  ], { env, encoding: 'utf8' });
-  assert.notEqual(wrong.status, 0);
-  assert.match(wrong.stderr, /does not match merged source/);
-  assert.deepEqual(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW)), beforeWorkflow);
-  assert.deepEqual(readFileSync(join(f.root, f.output)), beforeMap);
-  assert.equal(f.git('ls-files', '--stage'), index);
-  writeFileSync(join(f.root, 'a.txt'), 'DIRTY\n');
-  const result = spawnSync('python3', [
-    resolver, '--root', f.root, '--reviewed-project-sha256', digest,
-  ], { env, encoding: 'utf8' });
-  assert.equal(result.status, 0, result.stderr);
-  const workflow = f.git('show', `:${DIAGNOSTIC_WORKFLOW}`);
-  const staged = f.git('show', `:${f.output}`);
-  assert.match(workflow, new RegExp(digest));
-  assert.doesNotMatch(workflow, new RegExp(createHash('sha256').update('ours-project\n').digest('hex')));
-  assert.doesNotMatch(workflow, new RegExp(createHash('sha256').update('theirs-project\n').digest('hex')));
-  assert.match(staged, new RegExp(digest));
-  assert.match(staged, new RegExp(createHash('sha256').update(workflow).digest('hex')));
-  assert.match(staged, new RegExp(createHash('sha256').update('ours-a\n').digest('hex')));
-  assert.doesNotMatch(staged, new RegExp(createHash('sha256').update('DIRTY\n').digest('hex')));
-  assert.equal(readFileSync(join(f.root, 'a.txt'), 'utf8'), 'DIRTY\n');
-  assert.equal(f.git('diff', '--name-only', '--diff-filter=U'), '');
-});
-
-test('reviewed digest refuses a workflow conflict that changes more than the project pin', (t) => {
-  const f = pinFixture(t);
-  f.writeProject('ours-project\n');
-  f.generate();
-  f.commit();
-  f.git('switch', '-q', 'theirs');
-  f.writeProject('theirs-project\n', 'moved');
-  f.generate();
-  f.commit();
-  f.git('switch', '-q', 'ours');
-  mergePinFixture(f);
-  const merged = 'ours-project\ntheirs-project\n';
-  writeFileSync(join(f.root, DIAGNOSTIC_PROJECT), merged);
-  f.git('add', '--', DIAGNOSTIC_PROJECT);
-  const beforeWorkflow = readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW));
-  const beforeMap = readFileSync(join(f.root, f.output));
-  const index = f.git('ls-files', '--stage');
-  const result = spawnSync('python3', [
-    resolver, '--root', f.root, '--reviewed-project-sha256', createHash('sha256').update(merged).digest('hex'),
-  ], { env, encoding: 'utf8' });
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /not limited to the project pin/);
-  assert.deepEqual(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW)), beforeWorkflow);
-  assert.deepEqual(readFileSync(join(f.root, f.output)), beforeMap);
-  assert.equal(f.git('ls-files', '--stage'), index);
-});
-
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
   for (const present of [true, false]) {
     test(`dependency repair ${mode} restores ${present ? 'existing' : 'missing'} outputs after staging fails`, (t) => {
@@ -402,217 +272,182 @@ elif lock.read_text() != 'resolved lock\\n':
   }
 }
 
-function manifestRepo(t) {
-  const root = mkdtempSync(join(tmpdir(), 'lyb-manifest-union-'));
+function diagnosticPinFixture(t, { workflowExtra = '', extraPath = null } = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-diagnostic-pin-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
-  const pkg = 'packages/shared-lib/package.json';
-  const turbo = 'packages/shared-lib/turbo.json';
-  const output = 'docs/REPOSITORY_SOURCES.md';
-  const writeManifests = (testScript, inputs) => {
-    mkdirSync(dirname(join(root, pkg)), { recursive: true });
-    writeFileSync(join(root, pkg), `${JSON.stringify({
-      name: 'shared',
-      scripts: { test: testScript },
-    }, null, 2)}\n`);
-    writeFileSync(join(root, turbo), `{
-  "extends": ["//"],
-  "tasks": {
-    "test": {
-      "outputs": ["$TURBO_EXTENDS$"],
-      "inputs": [
-${inputs.map((item) => `        ${JSON.stringify(item)}`).join(',\n')}
-      ]
-    },
-    "test:mutation": {
-      "cache": false
-    }
-  }
-}
-`);
-  };
-  const project = () => execFileSync('python3', [
+  const output = 'SOURCES.md';
+  const project = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj';
+  const workflow = '.github/workflows/ios-ui-diagnostics.yml';
+  const ledger = 'packages/shared-lib/corrections.json';
+  const digest = (text) => createHash('sha256').update(text).digest('hex');
+  const pinFile = (pin, extra = '') =>
+    `name: diagnostics\nDEPENDENCIES = {\n  '${project}': '${pin}',\n}\n${extra}`;
+  const generate = () => execFileSync('python3', [
     fileURLToPath(new URL('./repository_docs.py', import.meta.url)), '--root', root, '--write',
   ], { env });
-  const commit = (testScript, inputs, message) => {
-    writeManifests(testScript, inputs);
-    project();
-    git('add', '.');
-    git('commit', '-qm', message);
+  const commit = () => {
+    git('add', '-A');
+    git('commit', '-qm', 'fixture');
   };
-  git('init', '-q', '-b', 'feature');
+  git('init', '-q', '-b', 'ours');
   git('config', 'core.hooksPath', '/dev/null');
-  mkdirSync(join(root, 'docs'), { recursive: true });
+  for (const path of [project, workflow, ledger]) mkdirSync(dirname(join(root, path)), { recursive: true });
+  const baseProject = 'alpha\nkeep\nomega\n';
   writeFileSync(join(root, 'README.md'), 'Local instructions\n');
-  writeFileSync(join(root, 'NOTES.md'), 'Shared note\n');
   writeFileSync(join(root, 'repository-docs.json'), JSON.stringify({
-    schemaVersion: 1,
-    repository: 'example/app',
-    entrypoints: ['README.md'],
+    schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
     sources: [
-      { path: pkg, purpose: 'Test wiring' },
-      { path: turbo, purpose: 'Cache inputs' },
+      { path: 'a.txt', purpose: 'First fingerprint' },
+      { path: 'b.txt', purpose: 'Second fingerprint' },
     ],
-    imports: [],
-    output,
+    imports: [], output,
   }));
-  commit('node --test shared.test.mjs', ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml'], 'base');
-  return { root, git, pkg, turbo, output, commit };
+  writeFileSync(join(root, 'a.txt'), 'base-a\n');
+  writeFileSync(join(root, 'b.txt'), 'base-b\n');
+  writeFileSync(join(root, project), baseProject);
+  writeFileSync(join(root, workflow), pinFile(digest(baseProject)));
+  writeFileSync(join(root, ledger), 'base ledger\n');
+  generate();
+  commit();
+  git('branch', 'theirs');
+  const oursProject = 'ALPHA\nkeep\nomega\n';
+  writeFileSync(join(root, 'a.txt'), 'ours-a\n');
+  writeFileSync(join(root, project), oursProject);
+  writeFileSync(join(root, workflow), pinFile(digest(oursProject)));
+  writeFileSync(join(root, ledger), 'ours ledger\n');
+  if (extraPath) writeFileSync(join(root, extraPath), 'ours extra\n');
+  generate();
+  commit();
+  git('switch', '-q', 'theirs');
+  const theirsProject = 'alpha\nkeep\nOMEGA\n';
+  writeFileSync(join(root, 'b.txt'), 'theirs-b\n');
+  writeFileSync(join(root, project), theirsProject);
+  writeFileSync(join(root, workflow), pinFile(digest(theirsProject), workflowExtra));
+  writeFileSync(join(root, ledger), 'theirs ledger\n');
+  if (extraPath) writeFileSync(join(root, extraPath), 'theirs extra\n');
+  generate();
+  commit();
+  git('switch', '-q', 'ours');
+  const merge = spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: root, env, encoding: 'utf8' });
+  assert.equal(merge.status, 1, merge.stderr);
+  const mergedProject = 'ALPHA\nkeep\nOMEGA\n';
+  assert.equal(git('show', `:${project}`), mergedProject);
+  const expected = digest(mergedProject);
+  const resolve = (args = []) => spawnSync('python3', [resolver, '--root', root, ...args], {
+    env, encoding: 'utf8',
+  });
+  return { root, git, output, project, workflow, ledger, digest, expected, resolve, pinFile };
 }
 
-function conflictingManifests(t, theirsTest, theirsInputs, oursTest = 'node --test shared.test.mjs ours.test.mjs', oursInputs = ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs']) {
-  const fixture = manifestRepo(t);
-  fixture.git('switch', '-qc', 'incoming');
-  fixture.commit(theirsTest, theirsInputs, 'incoming');
-  fixture.git('switch', '-q', 'feature');
-  fixture.commit(oursTest, oursInputs, 'ours');
-  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: fixture.root, env });
-  assert.equal(merge.status, 1, 'fixture must contain a real merge conflict');
-  const run = (flag) => spawnSync('python3', [resolver, '--root', fixture.root, flag], { env, encoding: 'utf8' });
-  return { ...fixture, run };
-}
-
-test('manifest union keeps both parents test inputs and inline turbo arrays', (t) => {
-  const fixture = conflictingManifests(
-    t,
-    'node --test shared.test.mjs theirs.test.mjs',
-    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
-  );
-  writeFileSync(join(fixture.root, 'NOTES.md'), 'Unstaged note\n');
-  assert.notEqual(fixture.run('--staged').status, 0);
-  const refused = spawnSync('python3', [resolver, '--root', fixture.root], { env, encoding: 'utf8' });
+test('reviewed digest resolves a pin-only workflow conflict and keeps the ledger', (t) => {
+  const f = diagnosticPinFixture(t);
+  writeFileSync(join(f.root, 'a.txt'), 'DIRTY\n');
+  const ledger = readFileSync(join(f.root, f.ledger));
+  const ledgerStages = f.git('ls-files', '--stage', '--', f.ledger);
+  const index = f.git('ls-files', '--stage');
+  const refused = f.resolve();
   assert.notEqual(refused.status, 0);
-  assert.match(refused.stderr, /resolve source conflicts first/);
-  const result = fixture.run('--union-manifests');
+  assert.match(refused.stderr, /resolve source conflicts first:.*ios-ui-diagnostics\.yml/);
+  assert.equal(f.git('ls-files', '--stage'), index);
+  assert.match(readFileSync(join(f.root, f.workflow), 'utf8'), /^<<<<<<< /m);
+  const wrong = f.resolve(['--reviewed-project-sha256', 'a'.repeat(64)]);
+  assert.notEqual(wrong.status, 0);
+  assert.match(wrong.stderr, /does not match merged source/);
+  assert.equal(f.git('ls-files', '--stage'), index);
+  const result = f.resolve(['--reviewed-project-sha256', f.expected]);
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(
-    JSON.parse(readFileSync(join(fixture.root, fixture.pkg), 'utf8')).scripts.test,
-    'node --test shared.test.mjs theirs.test.mjs ours.test.mjs',
-  );
-  const turbo = readFileSync(join(fixture.root, fixture.turbo), 'utf8');
-  assert.match(turbo, /"extends": \["\/\/"\]/);
-  assert.match(turbo, /"outputs": \["\$TURBO_EXTENDS\$"\]/);
-  assert.deepEqual(JSON.parse(turbo).tasks.test.inputs, [
-    '$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs',
-  ]);
-  assert.equal(fixture.git('ls-files', '-u'), '');
-  const projection = fixture.git('show', `:${fixture.output}`);
-  assert.match(projection, /theirs\.test\.mjs/);
-  assert.match(projection, /ours\.test\.mjs/);
-  assert.equal(readFileSync(join(fixture.root, 'NOTES.md'), 'utf8'), 'Unstaged note\n');
-  const index = fixture.git('ls-files', '--stage');
-  assert.equal(fixture.run('--union-manifests').status, 0, 'resolved manifests stay idempotent');
-  assert.equal(fixture.git('ls-files', '--stage'), index);
+  const stagedWorkflow = f.git('show', `:${f.workflow}`);
+  assert.equal(stagedWorkflow, f.pinFile(f.expected));
+  assert.equal(stagedWorkflow.includes(f.expected), true);
+  assert.equal(f.git('ls-files', '--unmerged', '--', f.workflow), '');
+  const staged = f.git('show', `:${f.output}`);
+  assert.equal(staged.includes('<<<<<<<'), false);
+  assert.match(staged, new RegExp(f.digest('ours-a\n')));
+  assert.match(staged, new RegExp(f.digest('theirs-b\n')));
+  assert.doesNotMatch(staged, new RegExp(f.digest('DIRTY\n')));
+  assert.equal(readFileSync(join(f.root, 'a.txt'), 'utf8'), 'DIRTY\n');
+  assert.deepEqual(readFileSync(join(f.root, f.ledger)), ledger);
+  assert.equal(f.git('ls-files', '--stage', '--', f.ledger), ledgerStages);
+  assert.match(ledgerStages, /corrections\.json/);
+  writeFileSync(join(f.root, 'a.txt'), 'ours-a\n');
+  const again = f.resolve(['--reviewed-project-sha256', f.expected]);
+  assert.equal(again.status, 0, again.stderr);
+  assert.equal(f.git('show', `:${f.workflow}`), stagedWorkflow);
+  assert.match(f.git('show', `:${f.output}`), new RegExp(f.digest('ours-a\n')));
+  assert.equal(f.git('ls-files', '--stage', '--', f.ledger), ledgerStages);
 });
 
-for (const [name, testScript, inputs] of [
-  ['deleted test', 'node --test', ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml']],
-  ['reordered input', 'node --test shared.test.mjs extra.test.mjs', ['shared.mjs', '$TURBO_DEFAULT$', 'workflow.yml', 'workflow.yml', 'theirs.mjs']],
-  ['replaced script', 'node --test other.test.mjs', ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'extra.mjs']],
-  ['dropped repeated input', 'node --test shared.test.mjs extra.test.mjs', ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml']],
-]) {
-  test(`manifest union refuses ${name} without staging`, (t) => {
-    const fixture = conflictingManifests(t, testScript, inputs);
-    const before = readFileSync(join(fixture.root, fixture.pkg), 'utf8');
-    const index = fixture.git('ls-files', '--stage');
-    const result = fixture.run('--union-manifests');
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /additive manifest union keeps every parent test input/);
-    assert.equal(readFileSync(join(fixture.root, fixture.pkg), 'utf8'), before);
-    assert.equal(fixture.git('ls-files', '--stage'), index);
-  });
-}
-
-test('manifest union leaves a conflicted correction ledger for its resolver', (t) => {
-  const fixture = manifestRepo(t);
-  const ledger = 'packages/shared-lib/corrections.json';
-  const writeLedger = (body) => {
-    mkdirSync(dirname(join(fixture.root, ledger)), { recursive: true });
-    writeFileSync(join(fixture.root, ledger), body);
-  };
-  writeLedger('[]\n');
-  fixture.git('add', ledger);
-  fixture.git('commit', '-qm', 'ledger base');
-  fixture.git('switch', '-qc', 'incoming');
-  writeLedger('[{"fingerprint":"theirs"}]\n');
-  fixture.commit(
-    'node --test shared.test.mjs theirs.test.mjs',
-    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
-    'incoming',
-  );
-  fixture.git('switch', '-q', 'feature');
-  writeLedger('[{"fingerprint":"ours"}]\n');
-  fixture.commit(
-    'node --test shared.test.mjs ours.test.mjs',
-    ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs'],
-    'ours',
-  );
-  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: fixture.root, env });
-  assert.equal(merge.status, 1, merge.stderr?.toString());
-  const beforeLedger = readFileSync(join(fixture.root, ledger), 'utf8');
-  const result = spawnSync('python3', [resolver, '--root', fixture.root, '--union-manifests'], {
-    env, encoding: 'utf8',
-  });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(fixture.git('diff', '--name-only', '--diff-filter=U').trim(), ledger);
-  assert.equal(readFileSync(join(fixture.root, ledger), 'utf8'), beforeLedger);
-  assert.match(beforeLedger, /^<<<<<<< /m);
-  const testScript = JSON.parse(readFileSync(join(fixture.root, fixture.pkg), 'utf8')).scripts.test;
-  assert.match(testScript, /ours\.test\.mjs/);
-  assert.match(testScript, /theirs\.test\.mjs/);
-  assert.equal(fixture.git('ls-files', '-u', '--', fixture.output).trim(), '');
-});
-
-test('manifest union refuses an unrelated conflict without staging', (t) => {
-  const fixture = manifestRepo(t);
-  fixture.git('switch', '-qc', 'incoming');
-  writeFileSync(join(fixture.root, 'NOTES.md'), 'Incoming note\n');
-  fixture.commit(
-    'node --test shared.test.mjs theirs.test.mjs',
-    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
-    'incoming',
-  );
-  fixture.git('switch', '-q', 'feature');
-  writeFileSync(join(fixture.root, 'NOTES.md'), 'Branch note\n');
-  fixture.commit(
-    'node --test shared.test.mjs ours.test.mjs',
-    ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs'],
-    'ours',
-  );
-  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: fixture.root, env });
-  assert.equal(merge.status, 1);
-  const before = readFileSync(join(fixture.root, fixture.pkg), 'utf8');
-  const index = fixture.git('ls-files', '--stage');
-  const result = spawnSync('python3', [resolver, '--root', fixture.root, '--union-manifests'], {
-    env, encoding: 'utf8',
-  });
+test('reviewed digest refuses a wider workflow conflict without writing', (t) => {
+  const f = diagnosticPinFixture(t, { workflowExtra: 'other: true\n' });
+  const index = f.git('ls-files', '--stage');
+  const workflow = readFileSync(join(f.root, f.workflow));
+  const result = f.resolve(['--reviewed-project-sha256', f.expected]);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /unrelated conflicts/);
-  assert.equal(readFileSync(join(fixture.root, fixture.pkg), 'utf8'), before);
-  assert.equal(fixture.git('ls-files', '--stage'), index);
+  assert.match(result.stderr, /not limited to the reviewed project pin/);
+  assert.equal(f.git('ls-files', '--stage'), index);
+  assert.deepEqual(readFileSync(join(f.root, f.workflow)), workflow);
 });
 
-test('manifest union refuses a symlink stage and a commit that is not a merge', (t) => {
-  const fixture = conflictingManifests(
-    t,
-    'node --test shared.test.mjs theirs.test.mjs',
-    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
-  );
-  const blob = fixture.git('rev-parse', `:3:${fixture.pkg}`).trim();
-  const before = readFileSync(join(fixture.root, fixture.pkg), 'utf8');
-  execFileSync('git', ['update-index', '--index-info'], {
-    cwd: fixture.root,
-    env,
-    input: `120000 ${blob} 3\t${fixture.pkg}\n`,
-  });
-  const index = fixture.git('ls-files', '--stage');
-  const symlink = fixture.run('--union-manifests');
-  assert.notEqual(symlink.status, 0);
-  assert.match(symlink.stderr, /regular files/);
-  assert.equal(readFileSync(join(fixture.root, fixture.pkg), 'utf8'), before);
-  assert.equal(fixture.git('ls-files', '--stage'), index);
-  fixture.git('merge', '--abort');
-  const absent = fixture.run('--union-manifests');
-  assert.notEqual(absent.status, 0);
-  assert.match(absent.stderr, /repository-docs:/);
+test('reviewed digest refuses unrelated conflicts, a dirty project, and a manual workflow edit', (t) => {
+  const blocked = diagnosticPinFixture(t, { extraPath: 'notes.txt' });
+  const blockedIndex = blocked.git('ls-files', '--stage');
+  const blockedResult = blocked.resolve(['--reviewed-project-sha256', blocked.expected]);
+  assert.notEqual(blockedResult.status, 0);
+  assert.match(blockedResult.stderr, /resolve source conflicts first: notes\.txt/);
+  assert.equal(blocked.git('ls-files', '--stage'), blockedIndex);
+
+  const dirty = diagnosticPinFixture(t);
+  const dirtyIndex = dirty.git('ls-files', '--stage');
+  writeFileSync(join(dirty.root, dirty.project), 'ALPHA\nkeep\nOMEGA\nDIRTY\n');
+  const dirtyResult = dirty.resolve(['--reviewed-project-sha256', dirty.expected]);
+  assert.notEqual(dirtyResult.status, 0);
+  assert.match(dirtyResult.stderr, /stage reviewed project and workflow edits first/);
+  assert.equal(dirty.git('ls-files', '--stage'), dirtyIndex);
+
+  const manual = diagnosticPinFixture(t);
+  const manualIndex = manual.git('ls-files', '--stage');
+  writeFileSync(join(manual.root, manual.workflow), 'manual resolution\n');
+  const manualResult = manual.resolve(['--reviewed-project-sha256', manual.expected]);
+  assert.notEqual(manualResult.status, 0);
+  assert.match(manualResult.stderr, /manually edited workflow/);
+  assert.equal(manual.git('ls-files', '--stage'), manualIndex);
+  assert.equal(readFileSync(join(manual.root, manual.workflow), 'utf8'), 'manual resolution\n');
+});
+
+test('reviewed digest still updates one clean diagnostic pin', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-clean-pin-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+  const project = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj';
+  const workflow = '.github/workflows/ios-ui-diagnostics.yml';
+  const output = 'SOURCES.md';
+  const digest = (text) => createHash('sha256').update(text).digest('hex');
+  const pinFile = (pin) => `name: diagnostics\nDEPENDENCIES = {\n  '${project}': '${pin}',\n}\n`;
+  git('init', '-q', '-b', 'main');
+  git('config', 'core.hooksPath', '/dev/null');
+  mkdirSync(dirname(join(root, project)), { recursive: true });
+  mkdirSync(dirname(join(root, workflow)), { recursive: true });
+  writeFileSync(join(root, 'README.md'), 'Local instructions\n');
+  writeFileSync(join(root, 'a.txt'), 'alpha\n');
+  writeFileSync(join(root, 'repository-docs.json'), JSON.stringify({
+    schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+    sources: [{ path: 'a.txt', purpose: 'Fingerprint' }], imports: [], output,
+  }));
+  writeFileSync(join(root, project), 'alpha\n');
+  writeFileSync(join(root, workflow), pinFile(digest('alpha\n')));
+  execFileSync('python3', [
+    fileURLToPath(new URL('./repository_docs.py', import.meta.url)), '--root', root, '--write',
+  ], { env });
+  git('add', '-A');
+  git('commit', '-qm', 'fixture');
+  writeFileSync(join(root, project), 'beta\n');
+  git('add', '--', project);
+  const expected = digest('beta\n');
+  const result = spawnSync('python3', [
+    resolver, '--root', root, '--reviewed-project-sha256', expected,
+  ], { env, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(git('show', `:${workflow}`), pinFile(expected));
+  assert.equal(readFileSync(join(root, workflow), 'utf8'), pinFile(expected));
 });
