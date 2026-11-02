@@ -95,6 +95,9 @@ def union_manifests(root):
 
 def resolve_staged(root):
     root = Path(root).resolve()
+    # An auto-merged manifest must keep every parent test input.
+    from manifest_union import assert_auto_merged_parent_inputs
+    assert_auto_merged_parent_inputs(root)
     registry = staged_bytes(root, "repository-docs.json")
     config = json.loads(registry)
     output = repository_docs.local(root, config["output"])
@@ -145,102 +148,175 @@ def resolve_staged(root):
     print("repository-docs: regenerated and staged " + config["output"] + " from index")
 
 
-PROJECT_PATH = "apps/ios/LogYourBody.xcodeproj/project.pbxproj"
-WORKFLOW_PATH = ".github/workflows/ios-ui-diagnostics.yml"
-LEDGER_PATH = "packages/shared-lib/corrections.json"
-# Git supports short markers; raw snapshots can also retain CRLF endings.
-CONFLICT_MARKER = re.compile(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)")
+DIAGNOSTIC_PROJECT = "apps/ios/LogYourBody.xcodeproj/project.pbxproj"
+DIAGNOSTIC_WORKFLOW = ".github/workflows/ios-ui-diagnostics.yml"
+DIAGNOSTIC_PIN = re.compile(
+    r"(?m)^( +'" + re.escape(DIAGNOSTIC_PROJECT) + r"': ')[0-9a-f]{64}(',)$"
+)
 
 
-def conflict_names(root):
-    raw = subprocess.run(
-        ["git", "diff", "--name-only", "--diff-filter=U", "--relative", "-z"],
-        cwd=root, check=True, capture_output=True,
-    ).stdout.decode().split("\0")
-    return sorted({name for name in raw if name})
-
-
-def unmerged_stages(root, name):
-    raw = subprocess.run(
-        ["git", "ls-files", "--unmerged", "-z", "--", name],
-        cwd=root, check=True, capture_output=True,
-    ).stdout.decode().strip("\0")
-    if not raw:
-        return []
-    return [entry.split("\t", 1)[0].split() for entry in raw.split("\0") if entry]
-
-
-def refuse_reviewed_symlink(root, name):
-    path = root / name
-    if any(parent.is_symlink() for parent in (path, *path.parents) if parent != root.parent):
-        raise ValueError("reviewed project repair refuses symlinks: " + name)
-
-
-def pin_expression():
-    return re.compile(r"(?m)^( +'" + re.escape(PROJECT_PATH) + r"': ')[0-9a-f]{64}(',)$")
-
-
-def replace_pin(source, expected):
-    matches = list(pin_expression().finditer(source))
-    if len(matches) != 1:
-        raise ValueError("expected exactly one diagnostic project pin")
-    match = matches[0]
-    return source[:match.start()] + match.group(1) + expected + match.group(2) + source[match.end():]
-
-
-def show_stage(root, stage, name):
+def git_bytes(root, *args):
     return subprocess.run(
-        ["git", "show", f":{stage}:{name}"], cwd=root, check=True, capture_output=True,
+        ["git", *args], cwd=root, check=True, capture_output=True,
     ).stdout
 
 
-def reviewed_project_pin(root, expected):
+def conflicted_diagnostic_template(root):
+    """Return one parent workflow when every stage differs only by the project pin."""
+    entries = [
+        entry for entry in git_bytes(
+            root, "ls-files", "--unmerged", "-z", "--", DIAGNOSTIC_WORKFLOW,
+        ).decode().split("\0") if entry
+    ]
+    stages = [entry.split("\t", 1)[0].split() for entry in entries]
+    if len(stages) != 3 or {row[2] for row in stages if len(row) == 3} != {"1", "2", "3"}:
+        raise ValueError("diagnostic pin repair requires all three workflow stages")
+    if any(row[0] not in {"100644", "100755"} for row in stages):
+        raise ValueError("diagnostic pin repair requires a regular workflow file")
+    texts = []
+    for stage in ("1", "2", "3"):
+        text = git_bytes(root, "show", f":{stage}:{DIAGNOSTIC_WORKFLOW}").decode()
+        if re.search(r"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", text):
+            raise ValueError("diagnostic pin repair refuses conflict markers in a parent")
+        masked, count = DIAGNOSTIC_PIN.subn(
+            lambda match: match.group(1) + ("0" * 64) + match.group(2), text, count=1,
+        )
+        if count != 1:
+            raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+        texts.append((text, masked))
+    if len({masked for _text, masked in texts}) != 1:
+        raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+    return texts[1][0]
+
+
+PBX_MEMBER = re.compile(
+    r"(?m)^\t\t([A-Za-z0-9]+) /\* .*? \*/ = \{isa = PBX(?:BuildFile|FileReference);"
+)
+# Group children and build-phase rows use the same id as the object definition.
+# Keeping the definition does not keep the row.
+PBX_PLACEMENT = re.compile(r"(?m)^\t\t\t\t([A-Za-z0-9]+) /\* .*? \*/,")
+
+
+def _project_membership(text):
+    return set(PBX_MEMBER.findall(text)), set(PBX_PLACEMENT.findall(text))
+
+
+def assert_merged_project_keeps_parent_files(root, project):
+    """A merged diagnostic project must keep every parent file membership."""
+    # A parent group or build-phase entry must remain even when its definition survived.
+    if subprocess.run(
+        ["git", "rev-parse", "--verify", "MERGE_HEAD"], cwd=root, capture_output=True,
+    ).returncode:
+        raise ValueError("diagnostic pin repair requires an active merge")
+    base_rev = subprocess.run(
+        ["git", "merge-base", "HEAD", "MERGE_HEAD"],
+        cwd=root, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+    def blob(spec):
+        try:
+            return git_bytes(root, "show", spec).decode()
+        except subprocess.CalledProcessError as error:
+            raise ValueError("diagnostic pin repair cannot read " + spec) from error
+        except UnicodeDecodeError as error:
+            raise ValueError("diagnostic project is not text: " + spec) from error
+
+    base_defs, base_rows = _project_membership(blob(f"{base_rev}:{DIAGNOSTIC_PROJECT}"))
+    added_defs, added_rows = set(), set()
+    for parent in ("HEAD", "MERGE_HEAD"):
+        defs, rows = _project_membership(blob(f"{parent}:{DIAGNOSTIC_PROJECT}"))
+        added_defs.update(defs - base_defs)
+        added_rows.update(rows - base_rows)
+    try:
+        merged_defs, merged_rows = _project_membership(project.decode())
+    except UnicodeDecodeError as error:
+        raise ValueError("diagnostic project is not text") from error
+    missing = sorted((added_defs - merged_defs) | (added_rows - merged_rows))
+    if missing:
+        raise ValueError("merged project dropped a parent file: " + ", ".join(missing))
+
+
+def reviewed_conflicted_pin(root, expected):
     """Replace a pin-only diagnostic workflow conflict with the explicit reviewed project digest."""
-    # A conflicted diagnostic pin is replaced only by the reviewed project digest.
     if not re.fullmatch(r"[0-9a-f]{64}", expected):
         raise ValueError("reviewed project SHA-256 must be 64 lowercase hex characters")
-    for name in (PROJECT_PATH, WORKFLOW_PATH):
-        refuse_reviewed_symlink(root, name)
-    if unmerged_stages(root, PROJECT_PATH):
-        raise ValueError("resolve the merged project before refreshing its diagnostic pin")
-    project = staged_bytes(root, PROJECT_PATH)
-    if repository_docs.local(root, PROJECT_PATH).read_bytes() != project:
-        raise ValueError("stage reviewed project and workflow edits first: " + PROJECT_PATH)
-    if CONFLICT_MARKER.search(project):
-        raise ValueError("resolve staged conflict markers first: " + PROJECT_PATH)
+    for name in (DIAGNOSTIC_PROJECT, DIAGNOSTIC_WORKFLOW):
+        path = root / name
+        if any(parent.is_symlink() for parent in (path, *path.parents) if parent != root.parent):
+            raise ValueError("reviewed project repair refuses symlinks: " + name)
+    try:
+        project = staged_bytes(root, DIAGNOSTIC_PROJECT)
+    except subprocess.CalledProcessError as error:
+        raise ValueError("resolve source conflicts first: " + DIAGNOSTIC_PROJECT) from error
+    if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", project):
+        raise ValueError("resolve staged conflict markers first: " + DIAGNOSTIC_PROJECT)
+    assert_merged_project_keeps_parent_files(root, project)
     if repository_docs.digest(project) != expected:
         raise ValueError("reviewed project SHA-256 does not match merged source")
-    stages = unmerged_stages(root, WORKFLOW_PATH)
-    if stages:
-        if len(stages) != 3 or {row[2] for row in stages if len(row) == 3} != {"1", "2", "3"}:
-            raise ValueError("diagnostic pin repair requires all three workflow stages")
-        if any(row[0] not in {"100644", "100755"} for row in stages):
-            raise ValueError("diagnostic pin repair requires a regular workflow file")
-        parents = {}
-        for stage in ("1", "2", "3"):
-            blob = show_stage(root, stage, WORKFLOW_PATH)
-            if CONFLICT_MARKER.search(blob):
-                raise ValueError("diagnostic pin repair refuses conflict markers in a parent")
-            parents[stage] = blob.decode()
-            replace_pin(parents[stage], "0" * 64)
-        if replace_pin(parents["2"], "0" * 64) != replace_pin(parents["3"], "0" * 64):
-            raise ValueError("diagnostic workflow conflict is not limited to the reviewed project pin")
-        updated = replace_pin(parents["2"], expected)
-        working = repository_docs.local(root, WORKFLOW_PATH).read_bytes()
-        # Keep a hand-resolved workflow; index stages must not overwrite it.
-        if not CONFLICT_MARKER.search(working) and working.decode() != updated:
-            raise ValueError(
-                "diagnostic pin repair refuses a manually edited workflow; review and stage it explicitly"
-            )
-        # Only an explicit reviewed digest may update this trust boundary; never derive it here.
-        return WORKFLOW_PATH, updated
-    workflow = repository_docs.local(root, WORKFLOW_PATH).read_bytes()
-    if staged_bytes(root, WORKFLOW_PATH) != workflow:
-        raise ValueError("stage reviewed project and workflow edits first: " + WORKFLOW_PATH)
-    if CONFLICT_MARKER.search(workflow):
-        raise ValueError("resolve staged conflict markers first: " + WORKFLOW_PATH)
+    template = conflicted_diagnostic_template(root)
+    # A conflicted diagnostic pin is replaced only by the reviewed project digest.
     # Only an explicit reviewed digest may update this trust boundary; never derive it here.
-    return WORKFLOW_PATH, replace_pin(workflow.decode(), expected)
+    updated, count = DIAGNOSTIC_PIN.subn(
+        lambda match: match.group(1) + expected + match.group(2), template, count=1,
+    )
+    if count != 1:
+        raise ValueError("expected exactly one diagnostic project pin")
+    return DIAGNOSTIC_WORKFLOW, updated
+
+
+def stage_conflicted_diagnostic_pin(root, pin_update, output):
+    workflow, updated = pin_update
+    path = repository_docs.local(root, workflow)
+    original = path.read_bytes()
+    # Keep a hand-resolved workflow; index stages must not overwrite it.
+    if (
+        not re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", original)
+        and original.decode() != updated
+    ):
+        raise ValueError(
+            "diagnostic pin repair refuses a manually edited workflow; review and stage it explicitly"
+        )
+    index = git_bytes(root, "ls-files", "--stage", "--", workflow)
+    try:
+        # Validate immutable imports before replacing the conflicted pin.
+        errors = repository_docs.run(root)
+        if errors and errors != ["source projection stale: " + output]:
+            raise ValueError("; ".join(errors))
+        path.write_bytes(updated.encode())
+        subprocess.run(["git", "add", "--", workflow], cwd=root, check=True)
+        resolve_staged(root)
+    except (ValueError, OSError, subprocess.CalledProcessError):
+        path.write_bytes(original)
+        subprocess.run(["git", "update-index", "--force-remove", "--", workflow], cwd=root, check=True)
+        subprocess.run(["git", "update-index", "--index-info"], cwd=root, input=index, check=True)
+        raise
+
+
+def reviewed_project_pin(root, expected):
+    project = "apps/ios/LogYourBody.xcodeproj/project.pbxproj"
+    workflow = ".github/workflows/ios-ui-diagnostics.yml"
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise ValueError("reviewed project SHA-256 must be 64 lowercase hex characters")
+    snapshots = {}
+    for name in (project, workflow):
+        path = root / name
+        if any(parent.is_symlink() for parent in (path, *path.parents) if parent != root.parent):
+            raise ValueError("reviewed project repair refuses symlinks: " + name)
+        snapshots[name] = repository_docs.local(root, name).read_bytes()
+        if staged_bytes(root, name) != snapshots[name]:
+            raise ValueError("stage reviewed project and workflow edits first: " + name)
+        # Git supports short markers; raw snapshots can also retain CRLF endings.
+        if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", snapshots[name]):
+            raise ValueError("resolve staged conflict markers first: " + name)
+    if repository_docs.digest(snapshots[project]) != expected:
+        raise ValueError("reviewed project SHA-256 does not match merged source")
+    source = snapshots[workflow].decode()
+    pattern = r"(?m)^( +'" + re.escape(project) + r"': ')[0-9a-f]{64}(',)$"
+    updated, count = re.subn(pattern, lambda match: match[1] + expected + match[2], source)
+    if count != 1:
+        raise ValueError("expected exactly one diagnostic project pin")
+    # Only an explicit reviewed digest may update this trust boundary; never derive it here.
+    return workflow, updated
 
 
 def projection_is_unmerged(root, output):
@@ -255,45 +331,39 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
     root = Path(root).resolve()
     config = json.loads(repository_docs.local(root, "repository-docs.json").read_text())
     output = repository_docs.local(root, config["output"]).relative_to(root).as_posix()
-    conflicts = conflict_names(root)
+    conflicts = subprocess.run(
+        ["git", "diff", "--name-only", "--diff-filter=U", "--relative", "-z"],
+        cwd=root, check=True, capture_output=True,
+    ).stdout.decode().split("\0")
+    # A conflicted correction ledger stays for its own resolver.
+    from manifest_union import LEDGER
+    unresolved = sorted(set(conflicts) - {"", output, LEDGER})
+    conflicted_pin = None
+    if reviewed_project_sha256 is not None and DIAGNOSTIC_WORKFLOW in unresolved:
+        conflicted_pin = reviewed_conflicted_pin(root, reviewed_project_sha256)
+        unresolved = [name for name in unresolved if name != DIAGNOSTIC_WORKFLOW]
+    if unresolved:
+        raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
+    if conflicted_pin is not None:
+        stage_conflicted_diagnostic_pin(root, conflicted_pin, output)
+        return
+    # A conflicted source map is rebuilt from the merged index.
+    # Unstaged worktree bytes and either parent's projection cannot change fingerprints.
+    # The worktree registry still fails closed: import and path errors are not a stale map.
+    if (
+        not refresh_lockfile
+        and not verify_lockfile
+        and reviewed_project_sha256 is None
+        and projection_is_unmerged(root, output)
+    ):
+        errors = repository_docs.run(root)
+        if errors and errors != ["source projection stale: " + output]:
+            raise ValueError("; ".join(errors))
+        resolve_staged(root)
+        return
     pin_update = None
     if reviewed_project_sha256 is not None:
-        # The ledger stays for its own resolver. Any other unmerged path still blocks.
-        extra = [name for name in conflicts if name not in {output, WORKFLOW_PATH, LEDGER_PATH}]
-        if extra:
-            raise ValueError("resolve source conflicts first: " + ", ".join(extra))
         pin_update = reviewed_project_pin(root, reviewed_project_sha256)
-        if projection_is_unmerged(root, output):
-            # A conflicted source map is rebuilt from the merged index.
-            # Unstaged worktree bytes and either parent's projection cannot change fingerprints.
-            errors = repository_docs.run(root)
-            if errors and errors != ["source projection stale: " + output]:
-                raise ValueError("; ".join(errors))
-            workflow_path = repository_docs.local(root, pin_update[0])
-            original_workflow = workflow_path.read_bytes()
-            try:
-                resolve_staged(root)
-                workflow_path.write_bytes(pin_update[1].encode())
-                subprocess.run(["git", "add", "--", pin_update[0]], cwd=root, check=True)
-            except (OSError, subprocess.CalledProcessError, ValueError):
-                workflow_path.write_bytes(original_workflow)
-                raise
-            print("repository-docs: regenerated and staged " + output)
-            return
-    else:
-        unresolved = [name for name in conflicts if name not in {output, LEDGER_PATH}]
-        if unresolved:
-            raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
-        # A conflicted source map is rebuilt from the merged index.
-        # Unstaged worktree bytes and either parent's projection cannot change fingerprints.
-        # The worktree registry still fails closed: import and path errors are not a stale map.
-        if not refresh_lockfile and not verify_lockfile and projection_is_unmerged(root, output):
-            errors = repository_docs.run(root)
-            if errors and errors != ["source projection stale: " + output]:
-                raise ValueError("; ".join(errors))
-            resolve_staged(root)
-            return
-    if pin_update is not None:
         # Validate immutable imports before changing either derived artifact.
         errors = repository_docs.run(root)
         if errors and errors != ["source projection stale: " + output]:

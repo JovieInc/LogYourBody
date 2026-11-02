@@ -106,6 +106,7 @@ struct ProgressPhotoAttachSheet: View {
     @State var isCameraPresented = false
     @State var cameraSessionStarted = false
     @State var photoSelectionLoadID = UUID()
+    @State var outlineAttachment = PersonalBodyOutlineAttachment()
     @State private var sheetDetent = NativeSheetPresentationPolicy.initialDetent(for: .progressPhotoAttach)
     @AccessibilityFocusState var isStatusFocused: Bool
 
@@ -142,6 +143,7 @@ struct ProgressPhotoAttachSheet: View {
                         header
                         previewPane(height: previewHeight(for: geometry.size.height))
                         statusPane
+                        personalBodyOffer
                         actionPane
                     }
                     .padding(.horizontal, JovieTokens.screenInset)

@@ -236,8 +236,7 @@ extension ProgressPhotoAttachSheet {
                     await onComplete()
                     try writeAdmission()
                     didFinishAttempt = true
-                    attachStatus = .success
-                    HapticManager.shared.successAction()
+                    markAttached(metricsId: metrics.id, accountId: userId)
                     return
                 }
                 #endif
@@ -276,7 +275,7 @@ extension ProgressPhotoAttachSheet {
                     history: history,
                     elapsed: Date().timeIntervalSince(started)
                 )
-                await finishCheckIn(attempt, ownership: ownership)
+                await finishCheckIn(attempt, ownership: ownership, metricsId: metrics.id, accountId: userId)
             } catch {
                 guard authManager.ownsAccountSession(ownership) else { return }
                 didFinishAttempt = true
@@ -330,7 +329,9 @@ extension ProgressPhotoAttachSheet {
 
     func finishCheckIn(
         _ attempt: WeeklyPhotoCheckInPolicy.Attempt,
-        ownership: AuthManager.ProfileSessionOwnership
+        ownership: AuthManager.ProfileSessionOwnership,
+        metricsId: String? = nil,
+        accountId: String? = nil
     ) async {
         guard authManager.ownsAccountSession(ownership) else { return }
         didFinishAttempt = true
@@ -341,8 +342,16 @@ extension ProgressPhotoAttachSheet {
         }
         await onComplete()
         onCheckInSaved(outcome)
-        attachStatus = .success
-        HapticManager.shared.successAction()
+        if let metricsId, let accountId {
+            markAttached(metricsId: metricsId, accountId: accountId)
+        } else {
+            attachStatus = .success
+            HapticManager.shared.successAction()
+        }
+        // The graduated outline offer needs the sheet. Closing still reveals the weekly reward.
+        if PersonalBodyPolicy.isEnabled(), !PersonalBodyEstimate.benefitCopy.isEmpty {
+            return
+        }
         dismiss()
     }
 

@@ -19,7 +19,7 @@ The asset file records the model version, topology id, parameter ranges, license
 
 The selectable male or female wireframe is the drawing for a Home day without a photo. It uses the existing empty stage and does not change that stage's height. `launch_timeline_add_photo` stays, so the no-photo repair does not wait on this family. Presentation is an explicit device preference. It is not inferred from a profile field or an uploaded image. Missing measurements do not create a body-fat value.
 
-Claims stay inside [body-composition visual claims](body-composition-visual-claims.md). Photo visibility stays inside [home photo visibility](home-photo-visibility.md).
+Claims stay inside [body-composition visual claims](body-composition-visual-claims.md). Photo visibility stays inside [home photo visibility](home-photo-visibility.md). Background strength and wireframe appearance stay inside [selfie background and wireframe](selfie-background-wireframe.md).
 
 ## Evidence
 

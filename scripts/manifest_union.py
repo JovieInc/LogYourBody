@@ -8,6 +8,7 @@ added test-script tokens and turbo strings are inserted.
 import json
 import re
 import subprocess
+from collections import Counter
 from pathlib import Path
 
 import repository_docs
@@ -258,3 +259,122 @@ def apply_manifest_union(root):
         for path, original in originals.items():
             path.write_bytes(original)
         raise
+
+
+def _blob(root, spec):
+    shown = subprocess.run(["git", "show", spec], cwd=root, capture_output=True)
+    if shown.returncode:
+        return None
+    try:
+        return shown.stdout.decode()
+    except UnicodeDecodeError as exc:
+        raise ValueError(UNION_REFUSAL + ": manifest is not text") from exc
+
+
+def _replacement_glob(token):
+    if token.count("*") != 1 or any(char in token for char in "?[]"):
+        return None
+    prefix, suffix = token.split("*", 1)
+    if not prefix or not suffix:
+        return None
+    return prefix, suffix
+
+
+def _covered_by_glob(token, item):
+    # A new glob does not cover itself or another pattern.
+    if item == token or "*" in item or "?" in item:
+        return False
+    parts = _replacement_glob(token)
+    if parts is None:
+        return False
+    prefix, suffix = parts
+    return item.startswith(prefix) and item.endswith(suffix) and len(item) >= len(prefix) + len(suffix)
+
+
+def _strip_replaced(sequence, globs):
+    return [item for item in sequence if not any(_covered_by_glob(glob, item) for glob in globs)]
+
+
+def _matches_union(expected, ours, theirs, merged):
+    return (
+        Counter(merged) == Counter(expected)
+        and _subsequence(ours, merged)
+        and _subsequence(theirs, merged)
+    )
+
+
+def _require_parent_inputs(base, ours, theirs, merged, path):
+    location = ".".join(path) or "manifest"
+    base, ours, theirs, merged = list(base), list(ours), list(theirs), list(merged)
+    try:
+        expected = union_strings(base, ours, theirs)
+    except ValueError:
+        # A parent may replace enumerated inputs with one new glob that matches them.
+        globs = [
+            token for token in ours + theirs
+            if token not in base and token in merged and _replacement_glob(token)
+        ]
+        if not globs:
+            raise ValueError(UNION_REFUSAL + ": auto-merged " + location) from None
+        stripped = [_strip_replaced(seq, globs) for seq in (base, ours, theirs, merged)]
+        try:
+            expected = union_strings(*stripped[:3])
+        except ValueError:
+            raise ValueError(UNION_REFUSAL + ": auto-merged " + location) from None
+        if not _matches_union(expected, *stripped[1:]):
+            raise ValueError(UNION_REFUSAL + ": auto-merged " + location)
+        return
+    if not _matches_union(expected, ours, theirs, merged):
+        raise ValueError(UNION_REFUSAL + ": auto-merged " + location)
+
+
+def _preserved(base, ours, theirs, merged, path):
+    if path == ("scripts", "test") and all(
+        isinstance(value, str) for value in (base, ours, theirs, merged)
+    ):
+        if ours != base and theirs != base:
+            _require_parent_inputs(
+                base.split(), ours.split(), theirs.split(), merged.split(), path,
+            )
+        return
+    if all(isinstance(value, list) for value in (base, ours, theirs, merged)) and all(
+        isinstance(item, str) for item in (*base, *ours, *theirs, *merged)
+    ):
+        if ours != base and theirs != base:
+            _require_parent_inputs(base, ours, theirs, merged, path)
+        return
+    if all(isinstance(value, dict) for value in (base, ours, theirs, merged)):
+        for key in set(base) & set(ours) & set(theirs) & set(merged):
+            _preserved(base[key], ours[key], theirs[key], merged[key], path + (str(key),))
+
+
+def assert_auto_merged_parent_inputs(root):
+    """An auto-merged manifest must keep every parent test input."""
+    root = Path(root).resolve()
+    if subprocess.run(
+        ["git", "rev-parse", "--verify", "MERGE_HEAD"], cwd=root, capture_output=True,
+    ).returncode:
+        return
+    base_rev = subprocess.run(
+        ["git", "merge-base", "HEAD", "MERGE_HEAD"],
+        cwd=root, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    for name in MANIFESTS:
+        unmerged = subprocess.run(
+            ["git", "ls-files", "--unmerged", "--", name],
+            cwd=root, check=True, capture_output=True, text=True,
+        ).stdout
+        if unmerged.strip():
+            raise ValueError("manifest union requires resolved stages before projection rebuild: " + name)
+        ours, theirs, base, merged = (
+            _blob(root, spec) for spec in (f"HEAD:{name}", f"MERGE_HEAD:{name}", f"{base_rev}:{name}", f":{name}")
+        )
+        if None in (ours, theirs, base, merged) or ours == base or theirs == base or ours == theirs:
+            continue
+        _preserved(
+            node_value(parse_json_spans(base)),
+            node_value(parse_json_spans(ours)),
+            node_value(parse_json_spans(theirs)),
+            node_value(parse_json_spans(merged)),
+            (),
+        )
