@@ -18,6 +18,14 @@ actor PersonalBodyEstimateStore {
         self.root = root
     }
 
+    func acceptedSnapshot(accountId: String, effectiveDate: String) -> PersonalBodySnapshot? {
+        load(accountId).snapshots.last {
+            $0.accountId == accountId &&
+                $0.effectiveDate == effectiveDate &&
+                $0.topologyId == PersonalBodyEstimate.topologyId
+        }
+    }
+
     func index(accountId: String, dates: [String]) -> PersonalBodyIndex {
         let archive = load(accountId)
         return PersonalBodyEstimate.index(
