@@ -2029,6 +2029,9 @@ final class LogYourBodyUITests: XCTestCase {
         launch(app, with: ["-lybUITestBodyScoreOnboardingFixture"])
 
         try assertAndCaptureOnboardingFixedCTA(in: app)
+        app.terminate()
+        try testDatedOutcomeFirstLaunchCancelBackAndManualBaseline()
+        try testDatedOutcomeGateOffKeepsExistingFirstRun()
     }
 
     func testLaunchQualityGateCapturesOnboardingFirstPhotoCTA() throws {

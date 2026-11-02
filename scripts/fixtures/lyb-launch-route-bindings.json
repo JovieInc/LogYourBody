@@ -3,10 +3,19 @@
     "LaunchJourneyTests/testBaselineDenialAndNoDataRecoverToOneAction()",
     "DatedTimelineTests/testDeniedAndInterruptedOptionalInputsAllowManualBaselineWithoutPolicy()",
     "DatedTimelineTests/testManualBodyFatAndFFMIBaselinesUseExistingInputs()",
-    "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()"
+    "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()",
+    "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()"
   ],
-  "launch.deadline": ["LaunchJourneyTests/testDatedOutcomeSurvivesAndEditRecomputes()"],
-  "launch.deadline-replan": ["LaunchJourneyTests/testDateEditRecomputesWithoutExtendingExpired()"],
+  "launch.deadline": [
+    "LaunchJourneyTests/testDatedOutcomeSurvivesAndEditRecomputes()",
+    "DatedOutcomeStoreTests/testEditorSaveIsAtomicAndUnchangedSaveCreatesNoRequest()",
+    "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()",
+    "DatedOutcomeStoreTests/testRawEditorDraftPreservesConstraintsAndRejectsInvalidTextWithoutFallback()"
+  ],
+  "launch.deadline-replan": [
+    "LaunchJourneyTests/testDateEditRecomputesWithoutExtendingExpired()",
+    "DatedOutcomeStoreTests/testEditorSaveIsAtomicAndUnchangedSaveCreatesNoRequest()"
+  ],
   "launch.directive": ["LaunchJourneyTests/testOneNextActionForReadyPlan()"],
   "launch.drift": ["LaunchJourneyTests/testDriftChangesTheSingleAction()"],
   "launch.memory-isolation": ["LaunchJourneyTests/testHealthMemoryIsolationFailClosed()"],
@@ -16,15 +25,26 @@
     "DatedOutcomeStoreTests/testPresentationReadAfterSessionChangeIsDiscarded()",
     "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()",
     "DatedTimelineTests/testSwitchingAccountsCannotExposePreviousHistoryOrRequireItsAction()",
-    "DatedTimelineTests/testDelayedSheetActionsRejectReplacementAccountAndSessionGeneration()"
+    "DatedTimelineTests/testDelayedSheetActionsRejectReplacementAccountAndSessionGeneration()",
+    "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()",
+    "DatedOutcomeStoreTests/testEditorAndReconciliationCannotCrossAccountSessions()",
+    "LaunchJourneyTests/testDatedManualTrackingCanProceedWithoutAFullProfile()"
   ],
-  "launch.promise": ["LaunchJourneyTests/testPromiseCopyStatesTheDate()"],
+  "launch.promise": [
+    "LaunchJourneyTests/testPromiseCopyStatesTheDate()",
+    "LaunchJourneyTests/testDatedOutcomeEntryUsesExistingDefaultOffPlatformGate()",
+    "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()"
+  ],
   "launch.recovery": [
     "LaunchJourneyTests/testOfflineStaleAndConflictRecover()",
     "DatedTimelineTests/testEveryTimelineStatePreservesOutcomeAndHasOneRecoveryDestination()",
     "DatedTimelineTests/testDeniedAndInterruptedOptionalInputsAllowManualBaselineWithoutPolicy()",
     "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()",
-    "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()"
+    "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()",
+    "DatedOutcomeStoreTests/testEditorInvalidAndFailedSaveKeepOpeningRevisionForRetry()",
+    "DatedOutcomeStoreTests/testStaleEditorCannotReplaceNewerValueOrDuplicateItsPendingRequest()",
+    "DatedOutcomeStoreTests/testConflictRetryKeepsIdentityAndExplicitReconciliationEmitsNoRequest()",
+    "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()"
   ],
   "launch.return": [
     "LaunchJourneyTests/testExpiredAndMaintenanceDoNotExtendTheDate()",
@@ -35,7 +55,9 @@
   "launch.safety": [
     "LaunchJourneyTests/testUnavailableSafetyAndUnsafeDatesFailClosed()",
     "DatedTimelineTests/testManualBaselineNeverAdmitsMissingOrIncompletePolicy()",
-    "DatedTimelineTests/testSafetyAndMaintenanceWithMissingPolicyRecoverWithoutAdmittingPlan()"
+    "DatedTimelineTests/testSafetyAndMaintenanceWithMissingPolicyRecoverWithoutAdmittingPlan()",
+    "LaunchJourneyTests/testAdoptedWeightCeilingRejectsBothDirectionsWithoutAdmittingPartialPolicy()",
+    "LaunchJourneyTests/testDatedAdmissionKeepsEligibilityUnavailableExpiryAndNoDataDistinct()"
   ],
   "launch.stats": ["LaunchJourneyTests/testStatsSurfaceProjectsEveryState()"],
   "launch.timeline": [

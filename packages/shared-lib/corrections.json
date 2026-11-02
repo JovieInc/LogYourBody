@@ -5885,5 +5885,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-341-consumes-adopted-native-promise",
+    "source": "https://linear.app/jovie/issue/LYB-341",
+    "correction": "LYB-341 requires the exact native sentence adopted by LYB-273 on 2026-10-30 through the LYB-286 table. The merged table still selected the older Jovie contract promise for every native launch.",
+    "mechanization": "Extend the existing canonical copy table and required launch-promise-copy test with the adopted sentence and native selector. Keep the legacy table entries for gate-off users, require both sign-in paths and the first data screen to consume the selector, and retain the prohibition on result guarantees. Removing the adopted sentence makes the real Vitest source guard fail; restored source passes. Jovie-owned policy, immutable fixtures and certification gates stay unchanged. The harness owns push and PR operations. Machine: built packages/shared-lib/src/launch-promise-copy.test.ts",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A shared table and selector remove runtime duplication, but code cannot establish exact parity with a separately recorded natural-language decision without the same literal comparison. The authoritative decision and Jovie policy remain separately owned."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib source guard can compare every canonical string and verify native launch consumers without adding a CI gate or treating a test-only policy as production approval."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-promise-copy.test.ts",
+      "anchor": "keeps the app copy table exactly equal to the approved strings"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

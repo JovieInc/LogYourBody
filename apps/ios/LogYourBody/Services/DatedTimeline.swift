@@ -11,6 +11,7 @@ actor DatedTimelineProjector {
         var entries: [String: Entry]
         var baselineTab: Int
         var containsOnlyOwnerRecords: Bool
+        var hasPendingOutcome = false
     }
 
     struct Entry {
@@ -168,7 +169,9 @@ extension LaunchJourney {
                 ))
             }
             return (input.offline ? .offline : .noData, Action(
-                title: "Add one measurement", detail: "One measurement starts the plan for \(outcome.outcomeDate)."
+                title: "Add one measurement", detail: input.enforcesDatedOutcomeDecision
+                    ? "One measurement starts tracking for \(outcome.outcomeDate)."
+                    : "One measurement starts the plan for \(outcome.outcomeDate)."
             ))
         }
         if input.offline { return decideOffline(input) }

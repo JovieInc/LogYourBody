@@ -3,6 +3,85 @@ import XCTest
 
 final class LaunchJourneyTests: XCTestCase {
     @MainActor
+    func testDatedOutcomeEntryUsesExistingDefaultOffPlatformGate() {
+        var queried: [String] = []
+        XCTAssertFalse(DatedOutcomeEntry.isEnabled(arguments: []) { queried.append($0); return false })
+        XCTAssertEqual(queried, [DatedOutcomeStore.featureGate])
+        XCTAssertTrue(DatedOutcomeEntry.isEnabled(arguments: []) { $0 == DatedOutcomeStore.featureGate })
+        XCTAssertEqual(
+            LaunchPromiseCopy.datedOutcomePromise,
+            "Pick a date. We build the plan backward from it and adjust every week."
+        )
+    }
+
+    func testAdoptedWeightCeilingRejectsBothDirectionsWithoutAdmittingPartialPolicy() {
+        // These wide arithmetic bounds are deliberately test-only. They are not
+        // reviewed absolute bounds or a production-policy admission receipt.
+        let arithmetic = OutcomeFeasibility.Thresholds(
+            minimumTarget: 40, maximumTarget: 200, minimumWeeklyChange: -10, maximumWeeklyChange: 10
+        )
+        var input = LaunchJourney.Input(
+            now: now, thresholds: [.weightKg: arithmetic],
+            enforcesDatedOutcomeDecision: true, isEligible: true
+        )
+        let readings = [LaunchJourney.Reading(date: now, metric: .weightKg, value: 100)]
+        let cases: [(Double, OutcomeFeasibility.Classification)] = [
+            (91, .ok), (90, .ok), (89.99, .impossible),
+            (109, .ok), (110, .ok), (110.01, .impossible), (100, .ok)
+        ]
+        for (target, expected) in cases {
+            let value = outcome(target: target, date: "2027-01-10") // Exactly ten elapsed weeks.
+            XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: readings), expected)
+            var production = input
+            production.thresholds = [:]
+            XCTAssertEqual(LaunchJourney.classify(value, input: production, readings: readings), .unsafe)
+        }
+        let value = outcome(target: 90, date: "2027-01-10")
+        input.thresholds[.weightKg]?.minimumTarget = nil
+        XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: readings), .unsafe)
+        input.thresholds = [:]
+        XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: readings), .unsafe)
+    }
+
+    func testDatedManualTrackingCanProceedWithoutAFullProfile() {
+        XCTAssertFalse(LaunchSurfacePolicy.requiresCompleteProfile(isProfileComplete: false, datedOutcomeEnabled: true))
+        XCTAssertTrue(LaunchSurfacePolicy.requiresCompleteProfile(isProfileComplete: false, datedOutcomeEnabled: false))
+        XCTAssertTrue(EntryDeepLinkPolicy.canOpenEntrySheet(
+            isAuthenticated: true, user: nil, hasCompletedOnboarding: true,
+            isSubscribed: true, datedOutcomeEnabled: true
+        ))
+        XCTAssertFalse(EntryDeepLinkPolicy.canOpenEntrySheet(
+            isAuthenticated: false, user: nil, hasCompletedOnboarding: true,
+            isSubscribed: true, datedOutcomeEnabled: true
+        ))
+        XCTAssertFalse(EntryDeepLinkPolicy.canOpenEntrySheet(
+            isAuthenticated: true, user: nil, hasCompletedOnboarding: true,
+            isSubscribed: false, datedOutcomeEnabled: true
+        ))
+    }
+
+    func testDatedAdmissionKeepsEligibilityUnavailableExpiryAndNoDataDistinct() {
+        var input = readyInput(outcome(date: "2026-12-27"), current: 78)
+        input.enforcesDatedOutcomeDecision = true
+        input.isEligible = false
+        let value = input.outcome!
+        XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: input.readings), .unsafe)
+        input.isEligible = nil
+        XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: input.readings), .unsafe)
+        input.isEligible = true
+        input.safetyAvailable = false
+        XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: input.readings), .unsafe)
+        let expired = outcome(date: "2000-01-01")
+        XCTAssertEqual(LaunchJourney.classify(expired, input: input, readings: []), .expired)
+        input.safetyAvailable = true
+        XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: []), .noData)
+        input.thresholds = [:]
+        var maintenance = outcome(target: 80, date: "2026-12-27")
+        maintenance.constraints.maintenance = [.init(start: "2026-11-01", end: "2026-11-07")]
+        XCTAssertEqual(LaunchJourney.classify(maintenance, input: input, readings: input.readings), .unsafe)
+    }
+
+    @MainActor
     func testDeadlineJourneyRequiresItsOwnEnableGate() {
         var queriedKeys: [String] = []
         XCTAssertFalse(LaunchJourney.isEnabled(arguments: []) { key in

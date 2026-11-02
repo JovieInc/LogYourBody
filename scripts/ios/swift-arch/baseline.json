@@ -124,7 +124,6 @@
       "apps/ios/LogYourBody/Services/BodySpecDexaImporter.swift": 1,
       "apps/ios/LogYourBody/Services/CoreDataWorkoutReconciliationStore.swift": 2,
       "apps/ios/LogYourBody/Services/PhotoUploadManager.swift": 2,
-      "apps/ios/LogYourBody/Services/ProductAPIClient+DatedOutcome.swift": 3,
       "apps/ios/LogYourBody/Services/ProductAPIClient+Part01.swift": 11,
       "apps/ios/LogYourBody/Services/ProductAPIClient.swift": 10,
       "apps/ios/LogYourBody/Services/RealtimeSyncManager+Part02.swift": 2,
