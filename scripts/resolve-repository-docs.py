@@ -88,6 +88,7 @@ def merge_sections(root, name):
 
 def union_manifests(root):
     """Additive manifest union keeps every parent test input."""
+    # A conflicted correction ledger stays for its own resolver.
     from manifest_union import apply_manifest_union
     apply_manifest_union(root)
 
@@ -195,6 +196,7 @@ def show_stage(root, stage, name):
 
 def reviewed_project_pin(root, expected):
     """Replace a pin-only diagnostic workflow conflict with the explicit reviewed project digest."""
+    # A conflicted diagnostic pin is replaced only by the reviewed project digest.
     if not re.fullmatch(r"[0-9a-f]{64}", expected):
         raise ValueError("reviewed project SHA-256 must be 64 lowercase hex characters")
     for name in (PROJECT_PATH, WORKFLOW_PATH):
@@ -279,7 +281,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             print("repository-docs: regenerated and staged " + output)
             return
     else:
-        unresolved = [name for name in conflicts if name != output]
+        unresolved = [name for name in conflicts if name not in {output, LEDGER_PATH}]
         if unresolved:
             raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
         # A conflicted source map is rebuilt from the merged index.

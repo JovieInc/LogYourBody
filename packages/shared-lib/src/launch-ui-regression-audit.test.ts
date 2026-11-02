@@ -70,10 +70,17 @@ it('checks Stats composition, card styling and provenance dismissal through the 
   expect(audit).not.toMatch(/^def write_outputs\(/m);
   expect(audit).not.toMatch(/^def check_timeline_calendar_day\(/m);
   expect(audit).not.toMatch(/^def check_home_interaction\(/m);
+  expect(audit).not.toMatch(/^def check_optional_cgfloat_opacity\(/m);
+  expect(audit).toContain('launch_ui_opacity_audit.py');
   readFileSync(
     new URL('../../../scripts/ios/launch_ui_home_interaction_audit.py', import.meta.url),
   );
   readFileSync(new URL('../../../scripts/ios/launch_ui_timeline_day.py', import.meta.url));
+  const opacity = readFileSync(
+    new URL('../../../scripts/ios/launch_ui_opacity_audit.py', import.meta.url),
+    'utf8',
+  );
+  expect(opacity).toContain('def contribute');
   const coverage = mkdtempSync(`${tmpdir()}/lyb-ui-audit-coverage-`);
   try {
     const pythonLibrary = execFileSync('python3', ['-c', 'import sys; print(sys.prefix)'], {

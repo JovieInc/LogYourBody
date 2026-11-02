@@ -10,10 +10,17 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+# Sibling imports such as launch_ui_timeline_audit resolve next to this file.
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
 
-def _load_sibling(module_name: str, filename: str, directory: Path | None = None):
-    """Load an extracted audit sibling. A missing module fails closed."""
-    path = (directory or Path(__file__).parent) / filename
+
+def _load_sibling(module_name: str, filename: str, directory: Path | str | None = None):
+    """Load an extracted audit sibling. A missing module or export fails closed."""
+    export = directory if isinstance(directory, str) else None
+    root = Path(__file__).parent if export is not None or directory is None else directory
+    path = root / filename
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Cannot load launch UI audit sibling: {path}")
@@ -22,7 +29,12 @@ def _load_sibling(module_name: str, filename: str, directory: Path | None = None
         spec.loader.exec_module(module)
     except FileNotFoundError as error:
         raise RuntimeError(f"Cannot load launch UI audit sibling: {path}") from error
-    return module
+    if export is None:
+        return module
+    loaded = getattr(module, export, None)
+    if not callable(loaded):
+        raise RuntimeError(f"Cannot load launch UI audit sibling: {path}")
+    return loaded
 
 
 def load_check_siblings(directory: Path | None = None):
@@ -34,16 +46,25 @@ def load_check_siblings(directory: Path | None = None):
     modules = []
     for path in paths:
         module = _load_sibling(path.stem, path.name, directory)
-        if not callable(getattr(module, "contribute", None)):
+        if callable(getattr(module, "contribute", None)):
+            modules.append(module)
+        elif getattr(module, "AuditViolation", None) is None:
+            # The shared violation type is not a check sibling.
             raise RuntimeError(f"Cannot load launch UI audit sibling: {path}")
-        modules.append(module)
+    if not modules:
+        raise RuntimeError(f"Cannot load launch UI audit sibling: {directory / 'launch_ui_*.py'}")
     return modules
 
 
+# Keep every size-ratchet extraction. Dropping one fails closed.
+# The opacity sibling defines check_optional_cgfloat_opacity(.
+_AUDIT_SIBLINGS = (
+    ("launch_ui_timeline_day", "launch_ui_timeline_day.py", "check_timeline_calendar_day"),
+    ("launch_ui_opacity_audit", "launch_ui_opacity_audit.py", "check_optional_cgfloat_opacity"),
+    ("launch_ui_regression_report", "launch-ui-regression-report.py", "write_outputs"),
+)
 _CHECK_SIBLINGS = load_check_siblings()
-write_outputs = _load_sibling(
-    "launch_ui_regression_report", "launch-ui-regression-report.py"
-).write_outputs
+write_outputs = _load_sibling(*_AUDIT_SIBLINGS[-1])
 
 
 @dataclass
