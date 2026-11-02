@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import variantSeed from './catalog-variant-seed.json';
 import { MUSCLE_GROUPS, type MuscleGroup } from './types';
 
 /**
