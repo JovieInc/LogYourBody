@@ -1044,11 +1044,12 @@ final class ChaosMonkeyUITests: XCTestCase {
               let value = field.value as? String else { return false }
         var expected = value == field.placeholderValue ? "" : value
         field.tap()
-        let keyboard = app.keyboards.firstMatch
+        let focused = app.descendants(matching: field.elementType).matching(identifier: field.identifier)
+            .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
         for character in text {
-            if !keyboard.exists {
+            if !focused.exists {
                 field.tap()
-                guard keyboard.waitForExistence(timeout: 1.5) else { return false }
+                guard focused.waitForExistence(timeout: 1.5) else { return false }
             }
             field.typeText(String(character))
             expected.append(character)
