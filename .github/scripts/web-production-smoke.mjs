@@ -4,10 +4,23 @@ import { pathToFileURL } from 'node:url';
 import { logYourBody } from '../../packages/product-registry/src/products/logyourbody.mjs';
 
 const PUBLIC_ROUTES = [
-  '/', '/about', '/brand', '/careers', '/security', '/privacy', '/terms',
-  '/health-disclosure', '/support', '/delete-account', '/changelog', '/blog',
-  '/signin', '/signup', '/download/ios', '/download/android',
+  '/', '/security', '/privacy', '/terms', '/health-disclosure', '/support',
+  '/delete-account', '/download/ios',
 ];
+// Landing-only enforcement (LYB-100) retired secondary surfaces as redirects to
+// the launch journey instead of deleting the paths. The smoke keeps visiting
+// every retired route and pins its exact destination, so a regressed 404, a
+// wrong landing, or a dropped redirect cannot ship quietly.
+export const REDIRECT_ROUTES = Object.freeze({
+  '/about': '/',
+  '/brand': '/',
+  '/careers': '/',
+  '/changelog': '/',
+  '/blog': '/',
+  '/signin': '/',
+  '/signup': '/',
+  '/download/android': '/download/ios',
+});
 const CANONICAL_ALIASES = { '/download/ios': '/' };
 const BACKOFF_MS = [0, 2_000, 5_000];
 
@@ -56,6 +69,12 @@ export async function runWebProductionSmoke({
   const targets = [['deployment', origin(deploymentUrl)], ['production', origin(productionUrl)]];
   const checks = [
     ...PUBLIC_ROUTES.map((path) => ({ path, method: 'GET', status: 200, metadata: true })),
+    ...Object.entries(REDIRECT_ROUTES).map(([path, destination]) => ({
+      path,
+      method: 'GET',
+      status: 200,
+      destination,
+    })),
     ...['/robots.txt', '/sitemap.xml'].map((path) => ({ path, method: 'GET', status: 200 })),
     { path: '/api/waitlist', method: 'POST', status: 202 },
   ];
@@ -74,7 +93,14 @@ export async function runWebProductionSmoke({
         });
         const body = await response.text();
         if (response.status !== check.status) throw new Error(`HTTP ${response.status}; expected ${check.status}`);
-        if (response.url && new URL(response.url).pathname !== check.path) throw new Error('Redirect changed the checked route');
+        if (check.destination) {
+          const landed = response.url ? new URL(response.url).pathname : response.url;
+          if (landed !== check.destination) {
+            throw new Error(`Redirect landed on ${landed || 'an unverifiable URL'}; expected ${check.destination}`);
+          }
+        } else if (response.url && new URL(response.url).pathname !== check.path) {
+          throw new Error('Redirect changed the checked route');
+        }
         if (check.metadata) assertMetadata(body, check.path);
         if (check.method === 'POST' && JSON.parse(body)?.success !== true) throw new Error('Waitlist did not accept honeypot');
         return { target, origin: base, path: check.path, method: check.method, ok: true, attempts: attempt + 1 };
