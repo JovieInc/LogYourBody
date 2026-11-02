@@ -225,6 +225,9 @@ enum BodyShapeCalibration {
         guard let gate = family(named: observation.family) else {
             return finish(status: "abstained", parameters: empty, muscleSource: nil, extra: ["unsupported-family"])
         }
+        if hasNonFinite(observation) {
+            return finish(status: "abstained", parameters: empty, muscleSource: nil, extra: ["non-finite"])
+        }
         if !inside(observation.ageYears, min: gate.ageMin, max: gate.ageMax) {
             return finish(status: "abstained", parameters: empty, muscleSource: nil, extra: ["unsupported-age"])
         }
@@ -233,9 +236,6 @@ enum BodyShapeCalibration {
         }
         guard let mass = observation.bodyMassKg, inside(mass, min: gate.massMin, max: gate.massMax) else {
             return finish(status: "abstained", parameters: empty, muscleSource: nil, extra: ["unsupported-mass"])
-        }
-        if hasNonFinite(observation) {
-            return finish(status: "abstained", parameters: empty, muscleSource: nil, extra: ["non-finite"])
         }
 
         var fat = observation.fatMassKg
@@ -408,7 +408,10 @@ enum BodyShapeCalibration {
     }
 
     private static func hasNonFinite(_ observation: BodyShapeObservation) -> Bool {
+        if !observation.ageYears.isFinite { return true }
         let values = [
+            observation.heightM,
+            observation.bodyMassKg,
             observation.bodyFatPercent,
             observation.fatMassKg,
             observation.fatFreeMassKg,

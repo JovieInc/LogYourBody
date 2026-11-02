@@ -364,7 +364,6 @@ final class BodyScoreShareCardTests: XCTestCase {
         XCTAssertEqual(payload.avatarMatch.assetName, "avatar_male_18")
         XCTAssertEqual(payload.avatarMatch.badgeText, "Illustrative, not body fat")
         XCTAssertEqual(payload.visualBadgeText(includeVisual: true), "Illustrative, not body fat")
-        XCTAssertFalse(payload.visualBadgeText(includeVisual: true).contains("%"))
         XCTAssertEqual(payload.visualBadgeText(includeVisual: false), "")
         XCTAssertFalse(payload.visualBadgeText(includeVisual: false).localizedCaseInsensitiveContains("private"))
         XCTAssertNil(payload.photoImage)
@@ -511,8 +510,8 @@ final class BodyScoreShareCardTests: XCTestCase {
                 scoreOnly, avatar, aspect: aspect, name: "avatar-opt-in-\(aspect.rawValue)"
             )
             let avatarText = try recognizedShareText(avatarImage, diagnosticName: "avatar-opt-in-\(aspect.rawValue)")
-            XCTAssertTrue(avatarText.lowercased().contains("male"))
-            XCTAssertTrue(avatarText.filter(\.isNumber).contains("15"))
+            XCTAssertTrue(avatarText.lowercased().contains("illustrative"))
+            XCTAssertTrue(avatarText.lowercased().contains("not body fat"))
             XCTAssertFalse(avatarText.lowercased().contains("private"))
             let minimumAvatarSamples = blueSampleCount(try renderFixture(
                 makeScorePayload(),

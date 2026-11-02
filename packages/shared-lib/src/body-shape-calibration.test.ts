@@ -19,7 +19,16 @@ import {
 } from './body-shape-calibration';
 
 const root = fileURLToPath(new URL('../../..', import.meta.url));
-const source = readFileSync(new URL('./body-shape-calibration.ts', import.meta.url), 'utf8');
+const types = readFileSync(new URL('./body-shape-calibration-types.ts', import.meta.url), 'utf8');
+const corpusSource = readFileSync(
+  new URL('./body-shape-calibration-corpus.ts', import.meta.url),
+  'utf8',
+);
+const mapSource = readFileSync(new URL('./body-shape-calibration-map.ts', import.meta.url), 'utf8');
+const evaluateSource = readFileSync(
+  new URL('./body-shape-calibration-evaluate.ts', import.meta.url),
+  'utf8',
+);
 const swift = readFileSync(
   `${root}/apps/ios/LogYourBody/Components/BodyShapeCalibration.swift`,
   'utf8',
@@ -39,12 +48,14 @@ const emptyStage = readFileSync(
 );
 
 it('declares promotion gates before the corpus and does not refit them', () => {
-  const thresholdsAt = source.indexOf('export const thresholds');
-  const corpusAt = source.indexOf('export const corpus');
-  const evaluateAt = source.indexOf('export function evaluate');
-  expect(thresholdsAt).toBeGreaterThan(0);
-  expect(thresholdsAt).toBeLessThan(corpusAt);
-  expect(corpusAt).toBeLessThan(evaluateAt);
+  expect(types.indexOf('export const thresholds')).toBeGreaterThan(0);
+  expect(corpusSource.indexOf('export const corpus')).toBeGreaterThan(0);
+  expect(evaluateSource.indexOf('export function evaluate')).toBeGreaterThan(0);
+  expect(corpusSource).toContain("from './body-shape-calibration-types'");
+  expect(mapSource.indexOf("['non-finite']")).toBeLessThan(
+    mapSource.indexOf("['unsupported-mass']"),
+  );
+  expect(evaluateSource).toContain('mapObservation');
   expect(thresholds.declaredBeforeEvaluation).toBe(true);
   expect(thresholds.personalizedShapeEstimate.minConsentedOrLicensedSubjectsPerSex).toBe(30);
   expect(thresholds.calibratedCompositionAppearance.minHeldOutSubjectsPerSex).toBe(30);
@@ -181,6 +192,14 @@ it('keeps muscle, lean tissue, and fat-free mass distinct and abstains outside t
 
   const child = mapObservation({ ...(male as Observation), id: 'child', ageYears: 16, ffmi: null });
   expect(child.status).toBe('abstained');
+  const infiniteMass = mapObservation({
+    ...(male as Observation),
+    id: 'infinite-mass',
+    bodyMassKg: Number.POSITIVE_INFINITY,
+    ffmi: null,
+  });
+  expect(infiniteMass.status).toBe('abstained');
+  expect(infiniteMass.reasons).toContain('non-finite');
   expect(child.parameters).toEqual({
     adiposity: null,
     muscularity: null,
