@@ -16,6 +16,8 @@ MANIFESTS = (
     "packages/shared-lib/package.json",
     "packages/shared-lib/turbo.json",
 )
+# The correction ledger has its own resolver and must not deadlock manifest union.
+LEDGER = "packages/shared-lib/corrections.json"
 UNION_REFUSAL = "additive manifest union keeps every parent test input"
 
 
@@ -221,7 +223,7 @@ def apply_manifest_union(root):
             cwd=root, check=True, capture_output=True,
         ).stdout.decode().split("\0") if name
     }
-    unrelated = sorted(conflicts - {output, *MANIFESTS})
+    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER})
     if unrelated:
         raise ValueError("manifest union refuses unrelated conflicts: " + ", ".join(unrelated))
     planned = []
