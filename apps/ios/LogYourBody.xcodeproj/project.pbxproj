@@ -201,9 +201,11 @@
 		AD3145C32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */; };
 		AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */; };
 		B314A11A0000000000000002 /* WireframeAvatarFamily.swift in Sources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000001 /* WireframeAvatarFamily.swift */; };
+		B318A11A0000000000000002 /* BodyShapeCalibration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B318A11A0000000000000001 /* BodyShapeCalibration.swift */; };
 		B314A11A0000000000000004 /* WireframeAvatarStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000003 /* WireframeAvatarStage.swift */; };
 		B314A11A0000000000000006 /* WireframeAvatarFamily.json in Resources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000005 /* WireframeAvatarFamily.json */; };
 		B314A11A0000000000000008 /* WireframeAvatarFamilyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000007 /* WireframeAvatarFamilyTests.swift */; };
+		B318A11A0000000000000004 /* BodyShapeCalibrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B318A11A0000000000000003 /* BodyShapeCalibrationTests.swift */; };
 		AD3145E22F0A030100ABCDEF /* DashboardMetricsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */; };
 		AD3145E42F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145E32F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift */; };
 		AD3145F22F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145F12F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift */; };
@@ -823,8 +825,10 @@
 		AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineInsights.swift"; sourceTree = "<group>"; };
 		AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AvatarBodyRenderer.swift; path = Components/AvatarBodyRenderer.swift; sourceTree = "<group>"; };
 		B314A11A0000000000000001 /* WireframeAvatarFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WireframeAvatarFamily.swift; path = Components/WireframeAvatarFamily.swift; sourceTree = "<group>"; };
+		B318A11A0000000000000001 /* BodyShapeCalibration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BodyShapeCalibration.swift; path = Components/BodyShapeCalibration.swift; sourceTree = "<group>"; };
 		B314A11A0000000000000003 /* WireframeAvatarStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WireframeAvatarStage.swift; path = Components/WireframeAvatarStage.swift; sourceTree = "<group>"; };
 		B314A11A0000000000000007 /* WireframeAvatarFamilyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WireframeAvatarFamilyTests.swift; sourceTree = "<group>"; };
+		B318A11A0000000000000003 /* BodyShapeCalibrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyShapeCalibrationTests.swift; sourceTree = "<group>"; };
 		AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricsSection.swift; sourceTree = "<group>"; };
 		AD3145E32F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+Glp1MetricCard.swift"; sourceTree = "<group>"; };
 		AD3145F12F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+FullScreenMetricData.swift"; sourceTree = "<group>"; };
@@ -1342,6 +1346,7 @@
 				A16800000000000000000002 /* ContextualMetricShare.swift */,
 				AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */,
 				B314A11A0000000000000001 /* WireframeAvatarFamily.swift */,
+				B318A11A0000000000000001 /* BodyShapeCalibration.swift */,
 				B314A11A0000000000000003 /* WireframeAvatarStage.swift */,
 				ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */,
 				ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */,
@@ -2007,6 +2012,7 @@
 				3CBF4E377107434EA53A2F1B /* PaidWeightLoggerMVPPolicyTests.swift */,
 				FE07A7A700000000000000F7 /* PhotoTimelineHUDPolicyTests.swift */,
 				B314A11A0000000000000007 /* WireframeAvatarFamilyTests.swift */,
+				B318A11A0000000000000003 /* BodyShapeCalibrationTests.swift */,
 				FE08A8A800000000000000F8 /* BodyScoreShareCardTests.swift */,
 				B04020261025000000000004 /* BodyScoreShareExportTests.swift */,
 				FE09A9A900000000000000F9 /* ProgressPhotoImagePipelineTests.swift */,
@@ -2495,6 +2501,7 @@
 				5DB1A0B114B3417EAE9E143B /* PaidWeightLoggerMVPPolicyTests.swift in Sources */,
 				FE07A7A700000000000000B7 /* PhotoTimelineHUDPolicyTests.swift in Sources */,
 				B314A11A0000000000000008 /* WireframeAvatarFamilyTests.swift in Sources */,
+				B318A11A0000000000000004 /* BodyShapeCalibrationTests.swift in Sources */,
 				FE08A8A800000000000000B8 /* BodyScoreShareCardTests.swift in Sources */,
 				B04020261025000000000003 /* BodyScoreShareExportTests.swift in Sources */,
 				FE09A9A900000000000000B9 /* ProgressPhotoImagePipelineTests.swift in Sources */,
@@ -2705,6 +2712,7 @@
 				AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */,
 				AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */,
 				B314A11A0000000000000002 /* WireframeAvatarFamily.swift in Sources */,
+				B318A11A0000000000000002 /* BodyShapeCalibration.swift in Sources */,
 				B314A11A0000000000000004 /* WireframeAvatarStage.swift in Sources */,
 				AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */,
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,

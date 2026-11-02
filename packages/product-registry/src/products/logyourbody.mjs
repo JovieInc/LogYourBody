@@ -351,6 +351,18 @@ export const logYourBody = {
         reason: 'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
       },
       { value: 'https://e', reason: 'Compact fixture host in timeline scrub tests.' },
+      {
+        value: 'https://www.proc.3dbody.tech/abstracts/2026/2661.html',
+        reason: 'LYB-318 citation of male-only CGI muscle and fat stimulus work. Not a clinical mapping or a runtime endpoint.',
+      },
+      {
+        value: 'https://www.proc.3dbody.tech/papers/2026/2629.pdf',
+        reason: 'LYB-318 citation of a standardized longitudinal scan paper. Not weekly phone-photo evidence or a runtime endpoint.',
+      },
+      {
+        value: 'https://www.nature.com/articles/s41366-026-02148-6',
+        reason: 'LYB-318 citation of DXA reference-method differences. Source-aware interpretation only, not a runtime endpoint.',
+      },
     ],
   },
   contacts: {
