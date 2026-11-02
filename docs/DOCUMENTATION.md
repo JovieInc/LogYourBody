@@ -57,8 +57,12 @@ The pre-commit hook runs `python3 scripts/resolve-repository-docs.py --staged`
 after formatting and correction classification, and before the merge ledger
 check. It refreshes the projection from indexed sources, preserves unstaged
 source edits, and refuses unstaged projection edits or pinned-source drift.
-Bot commits created outside local hooks still need this refresh during repair;
-CI continues to reject stale output.
+Bot commits created outside local hooks still need this refresh during repair.
+For workflow-only dependency bumps, run `python3 scripts/resolve-repository-docs.py`.
+The default repair uses indexed sources even without a projection conflict,
+preserves unstaged workflow edits, refuses unstaged projection edits, and restores
+the projection if staging fails. Stage reviewed source edits first. CI continues
+to reject stale output.
 
 When the generated source map and correction ledger both conflict, resolve and
 stage the source inputs, then run the same `--staged` command before the ledger

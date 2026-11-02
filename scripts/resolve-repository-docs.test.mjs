@@ -94,7 +94,7 @@ test('documentation merge requires an active conflict and a regular documentatio
   assert.notEqual(f.resolve().status, 0, 'ordinary commits cannot generate a merge');
 });
 
-function sourceMapFixture(t) {
+export function sourceMapFixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'lyb-source-map-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });

@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "workflow-only-source-map-index-repair",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1717",
+    "correction": "PR #1717, fix-red-1423773703 occurrence 20: merge origin/main without rebasing and repair Detect Changes, parity and CI Summary. Dependabot updated the setup-swift pin outside local hooks without refreshing the generated repository source map. Keep the v3 upgrade and the existing parity gates.",
+    "mechanization": "Extend the existing source-map resolver so ordinary workflow-only bot repairs use the index even when the projection has no merge conflict. Reuse its protection of unstaged edits and restoration after staging failures. The existing required pre-commit regression suite exercises a hook-free setup-swift bump, stale parity, indexed pin fingerprints, dirty workflow and projection edits, idempotence and an index lock. Three new cases fail against the previous resolver and pass after repair. Use the default resolver on this PR and verify parity and generator coverage. The harness retains push and PR-body ownership and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver owns projection generation and staging. Routing ordinary bot repairs through the indexed snapshot prevents unreviewed workflow bytes from becoming committed fingerprints and preserves local output on refusal or staging failure."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Bot repairs fingerprint the index even when the projection has no merge conflict."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "merged-project-keeps-parent-file-membership",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1705",
     "correction": "PR #1705 / LYB-317, fix-red-95726c4f82 occurrence 21: merge origin/main without rebasing. Both parents added different Xcode file membership and changed the diagnostic project pin, so Git conflicted the pin while the project auto-merged. Tently reports an AI-provider outage (reference 318a46a0-8b5d-48a5-817f-f3e4a8fcbbbc) and no source finding; do not bypass that gate. A reviewed pin must not accept a merged project that dropped the other parent's file.",
