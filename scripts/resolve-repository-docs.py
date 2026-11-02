@@ -93,7 +93,7 @@ def union_manifests(root):
     apply_manifest_union(root)
 
 
-def resolve_staged(root):
+def resolve_staged(root, extra_outputs=()):
     root = Path(root).resolve()
     # An auto-merged manifest must keep every parent test input.
     from manifest_union import assert_auto_merged_parent_inputs
@@ -137,7 +137,7 @@ def resolve_staged(root):
     original = output.read_bytes() if output.exists() else None
     try:
         output.write_bytes(projection)
-        subprocess.run(["git", "add", "--", config["output"]], cwd=root, check=True)
+        subprocess.run(["git", "add", "--", config["output"], *extra_outputs], cwd=root, check=True)
     except (OSError, subprocess.CalledProcessError):
         # Keep failed staging retryable, including the original conflict markers.
         if original is None:
@@ -392,6 +392,9 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                     ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
                     cwd=root, check=True,
                 )
+            # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
+            resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
+            return
         if pin_update:
             repository_docs.local(root, pin_update[0]).write_text(pin_update[1])
         errors = repository_docs.run(root, write=True)
