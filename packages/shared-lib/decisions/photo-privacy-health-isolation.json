@@ -1,0 +1,38 @@
+{
+  "id": "LYB-304",
+  "parent": "LYB-173",
+  "status": "accepted",
+  "recorded_on": "2026-11-02",
+  "approval_basis": "ships-if-unanswered",
+  "question": "May Jovie read LYB health or photo data, and may the app write back to third-party health sources?",
+  "decision": "No. Keep LYB health data and progress photos isolated from Jovie, keep third-party health sources read-only, and never label a synthetic image as a capture.",
+  "jovie_health_access": false,
+  "third_party_source_writes": false,
+  "synthetic_labeled_as_capture": false,
+  "isolation": "Jovie may not read LYB health data, progress photos, or their derived data. Shared Jovie Better Auth identity does not grant access to LYB data, including through chat, tools, or background integrations.",
+  "third_party_sources": "Import only with the user's permission. Do not write back to third-party health sources, including Apple Health. This policy does not prohibit saving the user's data inside LYB.",
+  "photo_retention": {
+    "until": "photo_or_account_deleted",
+    "policy": "Retain progress photos inside LYB while the account is active unless the user deletes the photo sooner. Photo or account deletion covers retained originals and derived photo assets. Retention does not authorize sharing or secondary reuse."
+  },
+  "photo_sharing": {
+    "default": "private",
+    "requires_explicit_user_action": true,
+    "policy": "Share only the photos the user explicitly selects, with the destination the user selects. No automatic, public, or cross-product sharing. Sharing does not authorize Jovie access to LYB health or photo data."
+  },
+  "permission_explanation": {
+    "timing": "moment_of_benefit",
+    "policy": "Show permission copy at the moment of benefit, immediately before the relevant system permission request. Explain which data is needed, what benefit it enables, and that the user can decline. Do not front-load unrelated permission requests."
+  },
+  "provenance": {
+    "access": "tap_target",
+    "policy": "Provenance stays available on a tap target for each displayed photo or health observation. Keep the source, available capture or import time, processing history, and measured, estimated, or synthetic status recoverable; unknown provenance stays unknown."
+  },
+  "synthetic_images": "Label synthetic images as synthetic or generated wherever shown. Never label them as captures, authentic progress photos, measurements, or proof of a user's body change; keep their synthetic provenance available.",
+  "boundaries": "Decision record only. This slice adds no capture UI, credentials, permissions, integrations, data transfers, retention/deletion implementation, or changes to existing HealthKit runtime access. The record sets the policy for implementation; it does not certify that existing runtime paths already enforce it.",
+  "standards": [
+    "docs/product/brand-ethos.md",
+    "docs/product/evidence-and-recommendation-standard.md",
+    "shared/legal/privacy-policy.md"
+  ]
+}

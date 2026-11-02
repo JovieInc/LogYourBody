@@ -111,6 +111,8 @@ For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --s
 merges and classifies the correction ledger after other conflicts are resolved.
 Union generation and parent verification share guard snapshots within that command;
 each retry reads the index and guard sources afresh.
+The reviewed diagnostic project-pin resolver also retains each newly added parent
+file's group and build-phase references; retaining a declaration alone is insufficient.
 For a documentation rewrite conflicting with incoming new sections, run
 `python3 scripts/resolve-repository-docs.py --merge-sections docs/path.md`.
 It prints a proposal from the three unmerged index stages, preserving the branch

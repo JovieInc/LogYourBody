@@ -1,0 +1,90 @@
+{
+  "id": "LYB-246",
+  "parent": "LYB-171",
+  "status": "accepted",
+  "recorded_on": "2026-11-01",
+  "approval_basis": "Recommended default adopted under LYB-246's ships-if-unanswered instruction. No BodySpec test account or token was provided. This records that default, not a separate human approval.",
+  "question": "Can a BodySpec test account or token be used for a one-time capability check?",
+  "decision": "polling_only",
+  "adapter_slice": "docs/architecture/metric-source-adapters.md",
+  "live_validation": false,
+  "authorizes_partner_webhook_client": false,
+  "invents_mcp_events": false,
+  "openapi": {
+    "url": "https://app.bodyspec.com/openapi.json",
+    "docs_url": "https://app.bodyspec.com/docs",
+    "retrieved_on": "2026-11-01",
+    "openapi": "3.1.0",
+    "info_version": "0.20.0",
+    "sha256": "fb531c62157e0ac2061aa43c65d67ed5a4a528608431cafcc4591f038b40662a"
+  },
+  "push": {
+    "mcp_events": false,
+    "user_oauth_events": false,
+    "partner_webhooks_documented": true,
+    "partner_event_types": [
+      "results_ready",
+      "reservation_created",
+      "reservation_canceled",
+      "reservation_no_show"
+    ],
+    "results_ready_delivery": "at_least_once",
+    "dedupe_key": "data.result_id",
+    "registration_can_return_503": true,
+    "adapter_push_events": false
+  },
+  "incremental_pull": {
+    "supported": true,
+    "endpoint": "/api/v1/users/me/results/",
+    "page_param": "page",
+    "page_size_param": "page_size",
+    "page_size_default": 20,
+    "page_size_max": 100,
+    "has_more": true,
+    "server_cursor": false,
+    "results_time_filter": false,
+    "client_filters_start_time": true,
+    "adapter_incremental_pull": true
+  },
+  "rate_limits": {
+    "published_quota": null,
+    "documents_429": false,
+    "documents_retry_after": false,
+    "live_headers_observed": false
+  },
+  "polling_policy": {
+    "mode": "scheduled_incremental_pull",
+    "on_app_open": true,
+    "daily_check": true,
+    "installs_app_open_caller": false,
+    "installs_background_timer": false,
+    "installs_event_endpoint": false,
+    "adapter_scheduled_poll": true
+  },
+  "required_adapter_phrases": [
+    "## BodySpec capabilities (LYB-246)",
+    "No BodySpec user or partner token was available",
+    "info.version 0.20.0",
+    "fb531c62157e0ac2061aa43c65d67ed5a4a528608431cafcc4591f038b40662a",
+    "POST /api/v1/partners/{partner_id}/webhooks",
+    "results_ready",
+    "Dedupe on `data.result_id`",
+    "Webhook system not configured",
+    "does not mention MCP events",
+    "`pushEvents` false",
+    "GET /api/v1/users/me/results/",
+    "maximum 100",
+    "pagination.has_more",
+    "no cursor",
+    "applies `replay(from:)` to `start_time`",
+    "no 429",
+    "no `Retry-After`",
+    "ship polling only",
+    "one daily `scheduledPoll`",
+    "does not install that app-open caller, a background timer, or an event endpoint",
+    "Published webhook docs are not MCP events"
+  ],
+  "capability_row": "| BodySpecDexaImporter | false      | true            | true          | false        |",
+  "revisit_when": "A BodySpec partner account can register a webhook and a delivery is observed. Published partner webhook docs alone do not enable push on the user-OAuth adapter.",
+  "testflight_evidence_owner": "LYB-171"
+}

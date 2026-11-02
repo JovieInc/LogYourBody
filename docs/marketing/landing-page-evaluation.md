@@ -56,3 +56,9 @@ changes. The sync copies the canonical Fastlane screenshot and app icon,
 records source/output hashes and actual PNG dimensions, and fails tests if the
 public asset drifts from the iOS source. Marketing code consumes only the
 registry URL, never a manually recreated dashboard.
+
+The sync retains the recorded capture date when the source path and SHA-256
+match. Without matching evidence, regenerate from complete Git history after
+committing the capture. Shallow merge commits and archive extraction times cannot
+establish capture dates. Missing evidence fails instead of resetting asset age;
+the existing 60-day freshness check still applies.

@@ -56,3 +56,10 @@ and LYB-171. Other LYB-311 work is outside this decision.
 
 This slice changes documentation only: no native app code, secrets, package
 manifests, provider configuration, or health artifacts are added or changed.
+
+## LYB-317 use
+
+The optional personal outline uses the on-device wireframe. It does not add a
+provider, credential, or upload. External processing is refused at the privacy
+consent boundary. Derived outlines are deleted with the source photo and the
+account. That later slice does not change this decision.

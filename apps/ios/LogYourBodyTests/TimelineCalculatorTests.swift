@@ -13,8 +13,21 @@ import UIKit
 
 
 final class TimelineCalculatorTests: XCTestCase {
-    private func makeMetric(id: String, daysAgo: Double, weight: Double? = 80) -> BodyMetrics {
-        let date = Date().addingTimeInterval(-daysAgo * 24 * 60 * 60)
+    private func makeMetric(
+        id: String,
+        daysAgo: Int,
+        weight: Double? = 80,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> BodyMetrics {
+        makeMetric(
+            id: id,
+            date: calendar.date(byAdding: .day, value: -daysAgo, to: now) ?? now,
+            weight: weight
+        )
+    }
+
+    private func makeMetric(id: String, date: Date, weight: Double? = 80) -> BodyMetrics {
         return BodyMetrics(
             id: id,
             userId: "user-1",
@@ -34,6 +47,14 @@ final class TimelineCalculatorTests: XCTestCase {
         )
     }
 
+    private func timelinePoints(
+        from metrics: [BodyMetrics],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [TimelineDataPoint] {
+        TimelineCalculator.calculateTimelinePoints(from: metrics, now: now, calendar: calendar)
+    }
+
     private func makePoint(index: Int, position: Double) -> TimelineDataPoint {
         TimelineDataPoint(
             id: "point-\(index)",
@@ -46,28 +67,59 @@ final class TimelineCalculatorTests: XCTestCase {
     }
 
     func testEmptyInputProducesNoPoints() {
-        XCTAssertTrue(TimelineCalculator.calculateTimelinePoints(from: []).isEmpty)
+        XCTAssertTrue(timelinePoints(from: []).isEmpty)
     }
 
     func testSingleRecentMetricMapsToDailyImportanceNearNewestPosition() {
-        let points = TimelineCalculator.calculateTimelinePoints(from: [makeMetric(id: "m1", daysAgo: 3)])
+        let now = Date()
+        let calendar = Calendar.current
+        let points = timelinePoints(
+            from: [makeMetric(id: "m1", daysAgo: 3, now: now, calendar: calendar)],
+            now: now,
+            calendar: calendar
+        )
+        let expected = 0.3 + ((1.0 - (3.0 / 30.0)) * 0.7)
 
         XCTAssertEqual(points.count, 1)
         XCTAssertEqual(points.first?.id, "m1")
         XCTAssertEqual(points.first?.index, 0)
         XCTAssertEqual(points.first?.importance, .daily)
-        XCTAssertEqual(points.first?.position ?? 0, 0.93, accuracy: 0.02)
+        XCTAssertEqual(points.first?.position ?? 0, expected)
+        XCTAssertEqual(expected, 0.93, accuracy: 0.000001)
+    }
+
+    func testPacificFallbackHourKeepsCalendarDayTimelinePosition() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        // 2026-11-01 10:54:55Z, the merge-group failure instant: 02:54 PST after the fallback.
+        let now = Date(timeIntervalSince1970: 1_793_530_495)
+        // pacific fallback hour keeps calendar-day timeline position
+        let metricDate = now.addingTimeInterval(-3 * 24 * 60 * 60)
+        let timeline = timelinePoints(
+            from: [makeMetric(id: "fallback-hour", date: metricDate)],
+            now: now,
+            calendar: calendar
+        )
+        let days = try XCTUnwrap(calendar.dateComponents([.day], from: metricDate, to: now).day)
+        let expected = 0.3 + ((1.0 - (Double(days) / 30.0)) * 0.7)
+
+        XCTAssertEqual(days, 2)
+        XCTAssertEqual(timeline.first?.importance, .daily)
+        XCTAssertEqual(timeline.first?.position ?? -1, expected)
+        XCTAssertGreaterThan(abs((timeline.first?.position ?? 0) - 0.93), 0.02)
     }
 
     func testImportanceTiersFollowAgeOfEntry() {
+        let now = Date()
+        let calendar = Calendar.current
         let metrics = [
-            makeMetric(id: "daily", daysAgo: 2),
-            makeMetric(id: "weekly", daysAgo: 15),
-            makeMetric(id: "monthly", daysAgo: 100),
-            makeMetric(id: "yearly", daysAgo: 500)
+            makeMetric(id: "daily", daysAgo: 2, now: now, calendar: calendar),
+            makeMetric(id: "weekly", daysAgo: 15, now: now, calendar: calendar),
+            makeMetric(id: "monthly", daysAgo: 100, now: now, calendar: calendar),
+            makeMetric(id: "yearly", daysAgo: 500, now: now, calendar: calendar)
         ]
 
-        let points = TimelineCalculator.calculateTimelinePoints(from: metrics)
+        let points = timelinePoints(from: metrics, now: now, calendar: calendar)
         var importanceById: [String: TimelineDataPoint.TimelineImportance] = [:]
         for point in points {
             importanceById[point.id] = point.importance
@@ -80,14 +132,16 @@ final class TimelineCalculatorTests: XCTestCase {
     }
 
     func testPositionsIncreaseWithRecencyAndStayWithinUnitRange() {
+        let now = Date()
+        let calendar = Calendar.current
         let metrics = [
-            makeMetric(id: "oldest", daysAgo: 500),
-            makeMetric(id: "month", daysAgo: 100),
-            makeMetric(id: "week", daysAgo: 15),
-            makeMetric(id: "day", daysAgo: 2)
+            makeMetric(id: "oldest", daysAgo: 500, now: now, calendar: calendar),
+            makeMetric(id: "month", daysAgo: 100, now: now, calendar: calendar),
+            makeMetric(id: "week", daysAgo: 15, now: now, calendar: calendar),
+            makeMetric(id: "day", daysAgo: 2, now: now, calendar: calendar)
         ]
 
-        let points = TimelineCalculator.calculateTimelinePoints(from: metrics)
+        let points = timelinePoints(from: metrics, now: now, calendar: calendar)
 
         XCTAssertEqual(points.map(\.id), ["oldest", "month", "week", "day"])
         for point in points {
@@ -102,13 +156,15 @@ final class TimelineCalculatorTests: XCTestCase {
     }
 
     func testDisplayLabelsReflectImportanceGranularity() {
+        let now = Date()
+        let calendar = Calendar.current
         let metrics = [
-            makeMetric(id: "daily", daysAgo: 2),
-            makeMetric(id: "monthly", daysAgo: 100),
-            makeMetric(id: "yearly", daysAgo: 500)
+            makeMetric(id: "daily", daysAgo: 2, now: now, calendar: calendar),
+            makeMetric(id: "monthly", daysAgo: 100, now: now, calendar: calendar),
+            makeMetric(id: "yearly", daysAgo: 500, now: now, calendar: calendar)
         ]
 
-        let points = TimelineCalculator.calculateTimelinePoints(from: metrics)
+        let points = timelinePoints(from: metrics, now: now, calendar: calendar)
         let yearlyPoint = points.first { $0.id == "yearly" }
         let monthlyPoint = points.first { $0.id == "monthly" }
         let dailyPoint = points.first { $0.id == "daily" }

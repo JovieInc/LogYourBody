@@ -1,0 +1,89 @@
+{
+  "id": "LYB-287",
+  "parent": "LYB-183",
+  "status": "accepted",
+  "approvalBasis": "ships-if-unanswered",
+  "recordedOn": "2026-11-01",
+  "kind": "safe_plan_claim_limits",
+  "appliesTo": ["product", "coach"],
+  "question": "Which body-composition, body-score, GLP-1, and DEXA statements may the product show, and which dates are unsafe or impossible?",
+  "decision": "Show no efficacy or safety claim. Keep GLP-1 and DEXA optional unlabeled inputs. Dates the contract marks unsafe, impossible, expired, or maintenance only expose a recovery next action.",
+  "source": {
+    "repository": "JovieInc/Jovie",
+    "sha": "197a96ff21c53cb4ccd8f6c1e3d733058b8c1cf7",
+    "issue": "JOV-6013",
+    "pullRequest": "JovieInc/Jovie#21838",
+    "contract": "docs/product/lyb-launch-contract.md",
+    "fixture": "scripts/fixtures/lyb-launch-contract.json",
+    "schema": "lyb-launch-contract/v1"
+  },
+  "inputs": {
+    "glp1Disclosure": { "required": false, "labeled": false },
+    "dexa": { "required": false, "labeled": false }
+  },
+  "allowedClaimIds": [],
+  "forbiddenClaimIds": [
+    "appearance_goal_assigned",
+    "body_score_clinical_accuracy",
+    "body_score_efficacy",
+    "body_score_safety",
+    "coach_dexa_clinical_accuracy",
+    "coach_dexa_efficacy",
+    "coach_efficacy",
+    "coach_glp1_direction",
+    "coach_glp1_efficacy",
+    "coach_glp1_safety",
+    "coach_result_guarantee",
+    "coach_safety",
+    "date_guarantees_result",
+    "dexa_clinical_accuracy",
+    "dexa_efficacy",
+    "dexa_required",
+    "dexa_safety",
+    "expired_date_silent_extension",
+    "glp1_efficacy",
+    "glp1_medication_direction",
+    "glp1_required",
+    "glp1_safety",
+    "impossible_date_feasible",
+    "invented_body_score",
+    "invented_trend",
+    "maintenance_efficacy",
+    "maintenance_safety",
+    "observed_uplift",
+    "plan_efficacy",
+    "plan_safety",
+    "safe_plan",
+    "unsafe_date_acceptable"
+  ],
+  "dates": [
+    {
+      "fixtureInput": "unsafe",
+      "recoveryState": "defer_or_revise_constraint",
+      "contractPath": "launch.safety",
+      "basis": "Impossible dates and unsafe targets defer or suggest revising the constraint.",
+      "exposedClaimIds": []
+    },
+    {
+      "fixtureInput": "impossible",
+      "recoveryState": "defer_or_revise_constraint",
+      "contractPath": "launch.safety",
+      "basis": "Impossible dates and unsafe targets defer or suggest revising the constraint.",
+      "exposedClaimIds": []
+    },
+    {
+      "fixtureInput": "expired",
+      "recoveryState": "offer_review_maintenance_or_new_date",
+      "contractPath": "launch.return",
+      "basis": "A completed/expired date offers review, maintenance, or a new date without silently extending it.",
+      "exposedClaimIds": []
+    },
+    {
+      "fixtureInput": "maintenance",
+      "recoveryState": "keep_maintenance_interval",
+      "contractPath": "launch.deadline",
+      "basis": "Saves an outcome, date, and constraints such as travel, availability, or a maintenance interval.",
+      "exposedClaimIds": []
+    }
+  ]
+}

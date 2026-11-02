@@ -1,5 +1,117 @@
 [
   {
+    "fingerprint": "merged-project-keeps-parent-file-membership",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1705",
+    "correction": "PR #1705 / LYB-317, fix-red-95726c4f82 occurrence 21: merge origin/main without rebasing. Both parents added different Xcode file membership and changed the diagnostic project pin, so Git conflicted the pin while the project auto-merged. Tently reports an AI-provider outage (reference 318a46a0-8b5d-48a5-817f-f3e4a8fcbbbc) and no source finding; do not bypass that gate. A reviewed pin must not accept a merged project that dropped the other parent's file.",
+    "mechanization": "Extend the conflicted diagnostic pin resolver so the staged merged project keeps every PBXBuildFile and PBXFileReference added by either parent before the reviewed digest replaces the pin. The new real-Git regression fails while the resolver accepts a digest of a project that dropped the incoming file and passes after the refusal; the pin-only success path still ignores unstaged source bytes. Use that command with the reviewed digest of this merge's project. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The conflicted pin resolver already runs before a merge commit is accepted. Refusing a merged project that lost a parent file membership prevents that dropped file from becoming the committed diagnostic digest."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "A merged diagnostic project must keep every parent file membership."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "auto-merged-manifest-parent-inputs",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1705",
+    "correction": "PR #1705 / LYB-317, fix-red-95726c4f82 occurrence 19: merge origin/main without rebasing. Both parents added different shared-lib test inputs, so Git auto-merged the manifest while the generated source map conflicted. Tently reports an AI-provider outage and no source finding; do not bypass that gate. A resolved manifest that drops the other parent's input must not be fingerprinted.",
+    "mechanization": "Extend the staged source-map resolver so an auto-merged shared-lib manifest keeps every parent test input before the projection is rebuilt. The new real-Git regression fails while the resolver accepts a staged manifest that dropped the incoming turbo input and passes after the refusal; the clean auto-merge still fingerprints index bytes and ignores dirty worktree text. Use that command to stage this merge's map. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The staged resolver already runs before a merge commit is accepted. Refusing a resolved manifest that lost a parent test input prevents that dropped input from becoming the committed source fingerprint."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "An auto-merged manifest must keep every parent test input."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "conflicted-source-map-index-rebuild",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1702",
+    "correction": "PR #1702 / LYB-337, fix-red-95726c4f82 occurrence 16: merge origin/main without rebasing. The generated source map conflicts because each parent changed a different fingerprint. Tently reports an AI-provider outage and no source finding; do not bypass that gate. Rebuilding the map from a dirty worktree would publish unstaged bytes as the committed fingerprints.",
+    "mechanization": "Extend the existing source-map resolver so an unmerged projection is rebuilt from the merged index and staged, leaving unstaged source edits untouched and refusing any other unmerged path. The new real-Git regression fails while the resolver reads the worktree and passes after the index rebuild; the unmerged-input refusal stays in the same required suite. Use that command to stage this merge's map. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The resolver owns writing and staging the projection during a merge. Reading stage-zero sources prevents unstaged worktree bytes and either parent projection from becoming the committed fingerprints."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "A conflicted source map is rebuilt from the merged index."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "marketing-assets-reject-future-capture-provenance",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1685",
+    "correction": "PR #1685 / LYB-277, fix-red-95726c4f82 occurrence 10: merge origin/main without rebasing and preserve verbatim program-revision rationale. Merge-group run 41290991865 fails marketing screenshot freshness because synthetic Git history emits a future capture date; Tently separately reports an AI-provider outage.",
+    "mechanization": "Merge main's hash-bound provenance repair and resolve the correction ledger with the existing classifier, retaining all 282 parent receipts. Extend the same marketing asset generator to reject future timestamps in retained manifests and complete Git history, recovering from complete history when possible. Four real-generator regressions fail against the merged main generator and pass after the extension; the existing required web suite runs them without changing its nonfuture or 60-day freshness gates. Run the extended generator on this checkout and retain the unchanged canonical capture manifest. The harness retains push and PR-body ownership and must add exactly one line: Machine: built scripts/marketing/sync-ios-marketing-assets.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator owns capture timestamp admission and can prevent future provenance from reaching its generated manifest, including when a saved timestamp matches the source hash. Incomplete or future Git evidence must fail rather than refresh the asset's age."
+      }
+    },
+    "guard": {
+      "path": "scripts/marketing/sync-ios-marketing-assets.mjs",
+      "anchor": "Date.parse(previous.capturedAt) <= latestCaptureTime"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "marketing-assets-git-capture-instant",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41290965357",
+    "correction": "PR #1683 / LYB-293, fix-red-e3b0c44298 occurrence 75: the complete-history marketing provenance fixture compares ISO timestamp spelling, so Git 2.56's UTC Z output fails against the equivalent +00:00 fixture on the repaired head.",
+    "mechanization": "Extend the existing required web provenance fixture into a real-Git matrix for UTC Z, UTC +00:00 and an equivalent nonzero offset. Compare exact parsed instants for history-derived evidence while retaining byte-exact assertions for preserved manifest dates and all freshness, hash and missing-evidence gates. The two alternate spellings fail with the previous string assertion and pass with instant comparison. Merge origin/main first; it is already an ancestor. Keep adherence offers and production generation unchanged. The harness owns push and PR-body updates and must add exactly one machine line: Machine: built apps/web/src/lib/marketing/__tests__/marketing-product-assets.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The generator already returns valid capture evidence for the same instant. This failure is in a test's representation-sensitive expectation; changing production timestamp spelling would not constrain external Git versions."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required web Jest suite can compare exact instants and exercise equivalent timestamp spellings without relaxing capture age, provenance or retained-date assertions."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/marketing/__tests__/marketing-product-assets.test.ts",
+      "anchor": "derives the exact capture instant from complete history (%s)"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "marketing-assets-retain-hash-bound-capture-date",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41289916374",
+    "correction": "PR #1683 / LYB-293, fix-red-95726c4f82 occurrence 8: merge-group JavaScript/TypeScript fails the marketing asset freshness assertion because shallow Git history dates an unchanged screenshot from a future synthetic merge commit. Tently separately reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing marketing asset sync generator to retain capture timestamps only for matching source paths and SHA-256 bytes. Missing evidence requires complete committed asset history; shallow boundaries, uncommitted bytes and source archives cannot refresh capture age. Exercise the actual generator in temporary Git repositories through the existing required web Jest suite, including a future synthetic merge cloned at depth one, repeat sync, archive extraction, complete-history recovery and missing, malformed or mismatched provenance. The regressions fail against the prior generator and pass after repair. Preserve the existing nonfuture and 60-day freshness assertions. Merge origin/main first and keep the adherence offer implementation intact. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/marketing/sync-ios-marketing-assets.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator can bind capture provenance to source content and refuse incomplete evidence before writing a manifest, preventing synthetic merge and extraction timestamps from falsely establishing freshness."
+      }
+    },
+    "guard": {
+      "path": "scripts/marketing/sync-ios-marketing-assets.mjs",
+      "anchor": "// Capture provenance follows the image bytes, never checkout or synthetic merge time."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "lyb-web-landing-only-v1",
     "source": "https://github.com/JovieInc/LogYourBody/tree/codex/lyb-100-20261101t042159#lyb-100-task",
     "correction": "Tim's lyb-web-landing-only-v1 lock: after 1.2.0 submission, remove authenticated web app UI and navigation while retaining the landing, marketing/legal pages and first-party iOS APIs.",
@@ -1150,6 +1262,24 @@
     "correction": "LYB-236: Dependabot's pnpm update commands exited successfully while retaining vulnerable fast-uri 3.1.8 and undici 8.11.2. Enforce patched transitive floors without weakening maturity settings or Dependency Review.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40035673426",
     "mechanization": "Both pnpm override declarations require fast-uri ^3.1.9 and undici ^8.12.2. The existing required shared-lib dependency-security tests reject vulnerable lockfile copies, inconsistent overrides and vulnerable versions resolved through the installed AJV and Eve parents.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Package-manager overrides enforce the patched minimum for every transitive parent during resolution, without a parent major upgrade or an age-gate exception."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/dependency-security.test.ts",
+      "anchor": "%s has no vulnerable locked copies below %s"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependabot-transitive-security-floors",
+    "correction": "LYB-354: Dependabot cannot raise transitive minimatch 3.1.5 to the GHSA-g3hv-75wg-m249 floor 11.0.1 because the eslint, glob 10, and glob 13 parents still request older majors. Force every copy to minimatch >=11.0.1 without an ignore or an age-gate exception.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41216930482",
+    "mechanization": "Both pnpm override declarations require minimatch ^11.0.1 and glob ^14.0.2, because glob 10 and 13 walk minimatch sets as regular expressions and cannot use minimatch 11. A minimatch patch restores the callable module export, Babel default, Minimatch class, and makeRe for the ESLint 3.x parents. The required shared-lib dependency-security tests reject vulnerable lockfile copies, inconsistent overrides, and a minimatch export those parents cannot call.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -5485,6 +5615,170 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "24cef6eff7f0",
+    "source": "https://github.com/JovieInc/LogYourBody/tree/codex/lyb-277-20261101t082148#lyb-277-task",
+    "correction": "LYB-277: Store only the user's utterance verbatim as the program revision rationale, without a generated coach sentence, template name or trademark. Retain one checked-in wording policy and a fixed utterance fixture under CI.",
+    "mechanization": "Retain the accepted default in the shared-lib decisions directory and validate a fixed revision fixture against the supplied utterance. The existing required shared-lib suite rejects absent, duplicate and renamed policies, changed defaults, altered rationale text and extra wording fields. Preserve whitespace in the existing structured steering schema while retaining nonblank and length checks. The existing persistence regression fails with trimming and passes after its removal, asserting the saved steering record, proposal reason, intent and summary. Card and chat presentation remain outside this slice; the harness owns push and PR operations.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The existing writer can preserve supplied text without transforming it, but cannot enforce the uniqueness of a checked-in decision or prove future rationale authorship from its single rationale field by construction."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib suite can enforce one accepted policy and exact equality of the revision rationale fixture to its supplied user utterance, with negative controls for alternate text and generated wording fields. The existing web suite verifies verbatim persistence through the actual writer."
+      }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant",
+    "guard": {
+      "path": "packages/shared-lib/src/program-revision-rationale-wording.test.ts",
+      "anchor": "program revision rationale wording policy (LYB-277)"
+    }
+  },
+  {
+    "fingerprint": "timeline-calendar-day-position",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41299089691",
+    "correction": "PR #1687 / LYB-286, fix-red-95726c4f82 occurrence 11: merge-group iOS failed testSingleRecentMetricMapsToDailyImportanceNearNewestPosition because a 72-hour offset is two Pacific calendar days during the DST fallback hour (position 0.9533333333333334 versus 0.93 +/- 0.02). Tently reports an AI-provider outage without code findings.",
+    "mechanization": "Extend TimelineCalculator to take the caller clock and calendar, and build timeline fixtures with calendar day offsets from that same clock. Extend the existing launch UI regression audit to reject a fresh clock inside the position functions and elapsed day offsets in the timeline tests, and require the Pacific fallback-hour regression. The new audit cases fail on the recorded helper and a restored live clock, then pass on the repaired sources. The harness owns push and PR-body updates and must add exactly one machine line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Injecting the clock makes one calculation reproducible, but the calculator cannot stop a test from building its metric with elapsed seconds and expecting a three-calendar-day position."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required launch UI audit can reject a recaptured clock and elapsed day-offset fixtures, and can require the fallback-hour regression that failed in the merge group."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "Timeline positions follow the injected calendar day, not elapsed 86400-second offsets."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "launch-audit-keep-both-size-siblings",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1696",
+    "correction": "PR #1696 / LYB-333, fix-red-95726c4f82 occurrence 14: merge origin/main without rebasing. Both parents extracted a different helper from the launch UI audit to stay under the 500-line company ratchet, so taking one side drops the other. Tently reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing launch UI audit loader so timeline-day checks and the report writer both load through one fail-closed sibling import. Extend the existing required shared-lib audit test to require both module names, both Turbo inputs, and the fail-closed loader, and to reject inlined write_outputs or check_timeline_calendar_day. Each parent audit fails that contract; the merged audit passes. Retain the release-signing provision check. Do not bypass Tently. The harness owns push and PR-body updates and must add exactly one machine line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A missing sibling file fails the audit import, but the loader cannot stop a later edit from inlining one extracted check and deleting the other parent's module."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib launch audit test reads the audit source and Turbo inputs, so a merge that keeps only one size-ratchet extraction fails before the audit can run."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "Cannot load launch UI audit sibling"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "shared-lib-test-wiring-union",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1696",
+    "correction": "PR #1696 / LYB-333, fix-red-95726c4f82 occurrence 16: merge origin/main without rebasing. Both parents added different shared-lib node test files and Turbo cache inputs, so taking one side drops the other's release-signing or signing-expiry coverage. Tently reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing repository-docs resolver with --union-manifests. It unions additive shared-lib test-script tokens and Turbo inputs from the three unmerged stages, preserves repeated inputs, refuses deletions, reorders, replacements, symlink stages and unrelated conflicts, then regenerates the source projection. The existing required pre-commit suite runs the real-Git regressions. Use that command for this merge so release-signing and signing-expiry tests both stay wired. Do not bypass Tently. The harness owns push and PR-body updates and must add exactly one machine line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing merge resolver owns these manifest writes. Keeping every parent test input while refusing removals and reorders prevents a one-sided merge from dropping required coverage."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Additive manifest union keeps every parent test input"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "conflicted-diagnostic-project-pin",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1700",
+    "correction": "PR #1700 / LYB-313, fix-red-95726c4f82 occurrence 18: merge origin/main without rebasing. Both parents changed the Xcode project, so the diagnostic workflow pin and the generated source map conflict. Neither parent pin matches the merged project. Tently reports an AI-provider outage and no source finding; do not bypass that gate.",
+    "mechanization": "Extend the source-map resolver so an explicit reviewed project digest replaces a workflow conflict that differs only in that pin, then rebuilds the conflicted source map from the index. A wrong digest, a broader workflow conflict, and an unresolved project leave the files and index unchanged. The new real-Git regressions fail on the previous resolver and pass after the extension. Use that command for this merge. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The resolver owns the workflow pin write and the projection staging during a merge. Accepting only an explicit digest that matches the staged project prevents either parent pin, or a derived hash, from becoming the committed trust boundary."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "A conflicted diagnostic pin is replaced only by the reviewed project digest."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "swift-optional-cgfloat-opacity",
+    "correction": "PR #1700 (fix-red-cc900b961c, occurrence 3): Launch Quality run 41337583400 failed to compile HomeV2CompareView.swift because blend?.earlierOpacity is CGFloat? and SwiftUI opacity expects Double?. Tently failed because its AI provider was unreachable; that outage is not a source defect.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41337583400/job/124940773836",
+    "mechanization": "Change BodyPhotoTransition earlierOpacity and laterOpacity to Double so the compare dissolve type-checks without reshaping the blend. Extend the existing launch UI regression audit to reject an optional-chained CGFloat member inside .opacity unless it is wrapped in Double. The new behavior case fails when earlierOpacity is restored to CGFloat and passes after the Double property and after an explicit Double cast. Non-optional CGFloat opacity expressions stay allowed because Swift still converts those. The existing required shared-lib suite executes the audit. Tently reports an AI-provider outage, so no gate is bypassed. Native XCTest execution remains required on macOS CI. The harness owns push and PR-body updates and must add exactly one machine line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Exposing these two opacities as Double fixes this call site, but a product type cannot stop a later view from optional-chaining another CGFloat into SwiftUI opacity. An opacity(CGFloat) overload would make numeric literals ambiguous."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required launch UI audit can reject optional-chained CGFloat members passed to opacity while allowing Double properties, explicit Double casts, and non-optional CGFloat expressions."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "check_optional_cgfloat_opacity("
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "launch-audit-keep-every-size-sibling",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1700",
+    "correction": "PR #1700 / LYB-313, fix-red-95726c4f82 occurrence 19: merge origin/main without rebasing. Both parents extracted a different launch UI helper to stay under the 500-line ratchet, so taking one side drops timeline-day or opacity checks. Tently reports an AI-provider outage and no source finding; do not bypass that gate.",
+    "mechanization": "Extend the existing fail-closed sibling loader to a roster of timeline day, opacity, and the report writer. A missing file or export raises the existing sibling error. Extend the required shared-lib audit test to require every roster filename and reject inlined checks. The new behavior case fails on the two-argument loader and passes after the roster. Manifest union keeps both Turbo inputs. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A missing sibling fails the audit import, but the loader cannot stop a later edit from inlining one extracted check and deleting its roster entry."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib launch audit test reads the roster and Turbo inputs, so a merge that drops timeline day, opacity, or the report writer fails before the audit can run."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "Keep every size-ratchet extraction. Dropping one fails closed."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "manifest-union-leaves-correction-ledger",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1700",
+    "correction": "PR #1700 / LYB-313, fix-red-95726c4f82 occurrence 19: manifest union refused the conflicted correction ledger, so the source-map resolver and the ledger resolver deadlocked. Tently reports an AI-provider outage and no source finding; do not bypass that gate.",
+    "mechanization": "Extend manifest union and the source-map resolver to leave packages/shared-lib/corrections.json for the classifier. Unrelated conflicts, deletions, and symlink stages still fail without staging. The new real-Git regression fails with the previous unrelated-conflict refusal and passes after the exemption. Use --union-manifests, then the classifier, for this merge. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The merge resolver owns these writes. Ignoring only the ledger path lets manifest union stage test inputs and the source projection while the classifier still owns the ledger."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "A conflicted correction ledger stays for its own resolver."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-95726c4f82",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1679",
     "correction": "PR #1679 / LYB-245, occurrence 4 in 14 days: merge origin/main without rebasing and repair the generated repository source-map conflict while preserving sync-state copy, receipt placement and every parent correction receipt. Tently failed because its AI provider was unreachable, with no code finding.",
@@ -5603,5 +5897,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "merged-project-parent-file-references",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679",
+    "correction": "PR #1679 / LYB-245, fix-red-95726c4f82 occurrence 22: merge origin/main without rebasing and preserve both HomeV2RecentReadings.swift and SubjectPlateView.swift group registrations. The existing reviewed diagnostic project-pin resolver accepts a retained declaration with a missing group reference. Tently check 124791749497 reports its AI-provider outage without code findings.",
+    "mechanization": "Extend the existing project-pin/source-map resolver to require every newly added parent file identifier to retain at least its parent reference count. A real-Git negative control accepts the broken project before this change and refuses it afterward without changing the workflow, source map or index; the complete merged project then succeeds. The required Detect Changes pre-commit suite already runs this test module. Preserve both parents staged-marker and source-map tests, moving staged-marker cases into the existing pin module to retain the file-size limit. Use the extended resolver with reviewed digest 52639494cc700ebfd3fdd174d4820d6409cc9fafaf4bb5f2552a300234d1e935, then union the ledger and verify both parents. The harness owns push and PR-body updates and must retain exactly one machine line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver owns the reviewed project-pin update and can refuse a merged project that loses a newly added parent file reference before staging any derived artifacts. This directly prevents publishing a trusted project digest for this incomplete merge."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "merged project dropped a parent file reference: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
