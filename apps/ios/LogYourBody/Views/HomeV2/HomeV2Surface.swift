@@ -95,18 +95,22 @@ struct HomeV2Surface: View {
         .task(id: personalBodyToken) { await reloadPersonalBody() }
     }
 
-    /// The date list, not the scrub position, owns this load. A date change only
-    /// looks up the display that was already built.
-    private var personalBodyToken: String {
-        let dates = timeline.chronologicalDates.map(PersonalBodyDay.key).joined(separator: ",")
-        return metric.userId + "|" + dates
+    private var personalBodyDates: [String] {
+        // key(_:calendar:) is not (Date) -> String when passed unapplied.
+        timeline.chronologicalDates.map { PersonalBodyDay.key($0) }
     }
 
+    private var personalBodyToken: String {
+        metric.userId + "|" + personalBodyDates.joined(separator: ",")
+    }
+
+    /// The date list, not the scrub position, owns this load. A date change only
+    /// looks up the display that was already built.
     private func reloadPersonalBody() async {
         personalBodyDisplays = [:]
         personalBodyEnabled = false
         let accountId = metric.userId
-        let dates = timeline.chronologicalDates.map(PersonalBodyDay.key)
+        let dates = personalBodyDates
         guard PersonalBodyPolicy.isEnabled() else { return }
         let index = await PersonalBodyEstimateStore.shared.index(accountId: accountId, dates: dates)
         guard !Task.isCancelled else { return }

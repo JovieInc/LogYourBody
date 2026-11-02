@@ -12,8 +12,10 @@ from split_size_ratchet import (  # noqa: E402
     argument_order_violations,
     check_repo,
     compare,
+    defaulted_static_methods,
     source_lines,
     split_namesake,
+    unapplied_default_references,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -51,6 +53,18 @@ class SplitSizeRatchetTest(unittest.TestCase):
         self.assertTrue(any("grew" in item for item in compare({"a.swift": 11}, {"a.swift": 10})))
         self.assertTrue(any("not baselined" in item for item in compare({"new.swift": 501}, {})))
         self.assertEqual(compare({"a.swift": 10}, {"a.swift": 10}), [])
+
+    def test_defaulted_method_reference_is_rejected_until_it_is_called(self):
+        declaration = (
+            "enum PersonalBodyDay {\n"
+            "    static func key(_ date: Date, calendar: Calendar = .current) -> String { \"\" }\n"
+            "}\n"
+        )
+        methods = defaulted_static_methods(declaration)
+        bad = "let dates = items.map(PersonalBodyDay.key)\n"
+        good = "let dates = items.map { PersonalBodyDay.key($0) }\n"
+        self.assertEqual(unapplied_default_references(bad, methods), [(1, "PersonalBodyDay.key")])
+        self.assertEqual(unapplied_default_references(good, methods), [])
 
     def test_argument_order_rejects_online_after_route(self):
         violations = argument_order_violations(CALLS)

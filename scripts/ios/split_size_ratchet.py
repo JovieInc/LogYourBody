@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Split oversized Swift and keep company size-500 plus Swift argument order green.
+"""Split oversized Swift and keep company size-500 plus Swift call shape green.
 
 Company guards reject a new file over 500 lines and any growth of a baselined
 file. Xcode 26 rejects a call whose explicit labels are not in declaration
-order. This packs whole top-level Swift types, keeps the namesake type in the
-original file, and checks both gates. It does not edit the Xcode project.
+order, and a method reference whose defaulted parameters widen the function
+type. This packs whole top-level Swift types, keeps the namesake type in the
+original file, and checks those gates. It does not edit the Xcode project.
 """
 import argparse
 import json
@@ -22,6 +23,12 @@ TYPE_RE = re.compile(
 FUNC_RE = re.compile(r"\bfunc\s+([A-Za-z_]\w*)\s*(?:<[^>(]*)>\s*\(|\bfunc\s+([A-Za-z_]\w*)\s*\(")
 CALL_RE = re.compile(r"(?<![\w.])([A-Za-z_]\w*)\s*\(")
 LABEL_RE = re.compile(r"(?:([A-Za-z_]\w*)\s+)?([A-Za-z_]\w*)\s*:")
+TYPE_NAME_RE = re.compile(r"\b(?:struct|enum|class|actor|extension)\s+([A-Za-z_]\w*)")
+STATIC_FUNC_RE = re.compile(r"\bstatic\s+func\s+([A-Za-z_]\w*)\s*(?:<[^>(]*)?\s*\(")
+DEFAULT_REF_RE = re.compile(
+    r"\.(?:map|compactMap|flatMap|filter|forEach|sorted|reduce|contains|allSatisfy|first)\(\s*"
+    r"([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)\s*\)"
+)
 
 
 def source_lines(text):
@@ -277,6 +284,35 @@ def declared_labels(text):
     return labels
 
 
+def defaulted_static_methods(text):
+    """Static methods whose signature includes a defaulted parameter."""
+    owners = [(match.start(), match.group(1)) for match in TYPE_NAME_RE.finditer(text)]
+    found = set()
+    for match in STATIC_FUNC_RE.finditer(text):
+        end = _signature_end(text, match.end() - 1)
+        if "=" not in text[match.end() : end]:
+            continue
+        prior = [name for pos, name in owners if pos < match.start()]
+        if prior:
+            found.add((prior[-1], match.group(1)))
+    return found
+
+
+def unapplied_default_references(text, methods):
+    """Higher-order calls that pass a defaulted method instead of calling it.
+
+    Xcode types `key(_:calendar:)` as `(Date, Calendar) -> String`, so
+    `dates.map(PersonalBodyDay.key)` does not match `(Date) -> String`.
+    """
+    violations = []
+    for match in DEFAULT_REF_RE.finditer(text):
+        parts = match.group(1).split(".")
+        if (parts[-2], parts[-1]) not in methods:
+            continue
+        violations.append((text.count("\n", 0, match.start()) + 1, match.group(1)))
+    return violations
+
+
 def argument_order_violations(text):
     """Explicit call labels that are not in the same-file declaration order."""
     labels = declared_labels(text)
@@ -328,13 +364,22 @@ def check_repo(root):
     baseline_path = root / ".company-guards" / "size-baseline.json"
     baseline = json.loads(baseline_path.read_text()) if baseline_path.exists() else {}
     fails = compare(current, baseline)
+    swift = []
+    methods = set()
     for name in files:
-        if name.endswith(".swift"):
-            path = root / name
-            if not path.is_file():
-                continue
-            for line, func, order in argument_order_violations(path.read_text(errors="replace")):
-                fails.append(name + ":" + str(line) + ": argument order for " + func + " " + ",".join(order))
+        if not name.endswith(".swift"):
+            continue
+        path = root / name
+        if not path.is_file():
+            continue
+        text = path.read_text(errors="replace")
+        swift.append((name, text))
+        methods.update(defaulted_static_methods(text))
+        for line, func, order in argument_order_violations(text):
+            fails.append(name + ":" + str(line) + ": argument order for " + func + " " + ",".join(order))
+    for name, text in swift:
+        for line, ref in unapplied_default_references(text, methods):
+            fails.append(name + ":" + str(line) + ": defaulted reference " + ref)
     return fails
 
 
