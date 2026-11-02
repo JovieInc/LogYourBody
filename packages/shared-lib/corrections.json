@@ -5946,5 +5946,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "catalog-split-preserves-public-export-identity",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-95726c4f82 occurrence 22: merge origin/main without rebasing. Concurrent catalog extractions conflict in catalog.ts and the newly added catalog-schema.ts. Keeping the branch loader alongside main's schema loader silently retains two implementations behind the public API. Tently separately reports an AI-provider outage without a code finding; retain that gate.",
+    "mechanization": "Extend the existing required web catalog contract tests to require identical runtime exports through the public catalog and its schema module, and every base and reviewed variant through the public library. The export-identity test fails when the branch catalog is combined with main's schema, even though the existing 19 behavior tests pass. Resolve both files to main's complete source split and run the same regression successfully. Weekly photo code remains intact. The harness owns pushes and PR-body edits and must add exactly one machine line: Machine: built apps/web/src/lib/training/catalog.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A source split alone cannot prevent a later merge from retaining a second implementation in its public barrel; TypeScript permits a local export to shadow a star re-export."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required catalog suite compares every schema runtime export by identity and the complete base/reviewed record list, rejecting duplicated implementations or dropped records after a source split."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/catalog.test.ts",
+      "anchor": "keeps one schema implementation behind every public catalog export after a source split"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   }
 ]

@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { MUSCLE_GROUPS, type MuscleGroup } from './types';
 
+/**
+ * Reviewed exercise catalog: the engine's setup-aware substitution source.
+ * Every record describes the *expected* setup of the variant — never a
+ * user-reported experience and never a precise fatigue score.
+ */
 export const CATALOG_EQUIPMENT = [
   'dumbbells',
   'barbell',
@@ -160,3 +165,49 @@ export const catalogVariantSchema = z
     },
   );
 export type CatalogVariant = z.infer<typeof catalogVariantSchema>;
+
+export type ExerciseVariantLoadTolerance = {
+  tolerance: VariantToleranceTags | typeof VARIANT_MEASURE_UNKNOWN;
+  fatigue: readonly string[] | typeof VARIANT_MEASURE_UNKNOWN;
+  rom: readonly string[] | typeof VARIANT_MEASURE_UNKNOWN;
+};
+
+/** Read view over one library record. Setup fields reuse the catalog taxonomy. */
+export type LoadedExerciseVariant = {
+  record: CatalogVariant;
+  targetedMuscle:
+    NonNullable<CatalogVariant['variantMetadata']>['targetRegion'] | typeof VARIANT_MEASURE_UNKNOWN;
+  bodyPosition: string;
+  support:
+    NonNullable<CatalogVariant['variantMetadata']>['support'] | typeof VARIANT_MEASURE_UNKNOWN;
+  romSetupCaveat: string | typeof VARIANT_MEASURE_UNKNOWN;
+  equipment: readonly CatalogEquipment[];
+  loadTolerance: ExerciseVariantLoadTolerance;
+};
+
+const OMITTED_LOAD_TOLERANCE: ExerciseVariantLoadTolerance = {
+  tolerance: VARIANT_MEASURE_UNKNOWN,
+  fatigue: VARIANT_MEASURE_UNKNOWN,
+  rom: VARIANT_MEASURE_UNKNOWN,
+};
+
+/** Load one library record. Omitted tolerance, fatigue, and ROM stay unknown, never 0. */
+export function loadExerciseVariantRecord(raw: unknown): LoadedExerciseVariant {
+  const record = catalogVariantSchema.parse(raw);
+  const metadata = record.variantMetadata;
+  return {
+    record,
+    targetedMuscle: metadata?.targetRegion ?? VARIANT_MEASURE_UNKNOWN,
+    bodyPosition: record.bodyPosition,
+    support: metadata?.support ?? VARIANT_MEASURE_UNKNOWN,
+    romSetupCaveat: metadata?.romSetupCaveat ?? VARIANT_MEASURE_UNKNOWN,
+    equipment: record.requires,
+    loadTolerance: metadata
+      ? {
+          tolerance: metadata.toleranceTags,
+          fatigue: metadata.toleranceTags.axialTrunkFatigue,
+          rom: metadata.toleranceTags.rom,
+        }
+      : OMITTED_LOAD_TOLERANCE,
+  };
+}
