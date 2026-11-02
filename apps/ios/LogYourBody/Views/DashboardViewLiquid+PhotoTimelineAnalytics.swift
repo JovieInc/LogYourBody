@@ -17,16 +17,26 @@ extension DashboardViewLiquid {
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: JovieTokens.sectionGap) {
-                    metricsView
+                    if isDatedTimelineEnabled {
+                        if isStatsDestinationActive { datedTimelineDirective }
+                        if datedTimelineIsOwned, let stats = datedTimelineSnapshot?.stats {
+                            DatedOutcomeStatsView(stats: stats)
+                                .padding(.horizontal, JovieTokens.screenInset)
+                        } else {
+                            ProgressView()
+                        }
+                    } else {
+                        metricsView
 
-                    if isGlp1WeeklyCheckInEnabled {
-                        hudGlp1WeeklyCheckIn
-                            .padding(.horizontal, JovieTokens.screenInset)
-                    }
+                        if isGlp1WeeklyCheckInEnabled {
+                            hudGlp1WeeklyCheckIn
+                                .padding(.horizontal, JovieTokens.screenInset)
+                        }
 
-                    if isPhaseInsightEnabled {
-                        hudPhaseInsight
-                            .padding(.horizontal, JovieTokens.screenInset)
+                        if isPhaseInsightEnabled {
+                            hudPhaseInsight
+                                .padding(.horizontal, JovieTokens.screenInset)
+                        }
                     }
                 }
                 .padding(.top, JovieTokens.itemGap)

@@ -204,7 +204,8 @@ extension DashboardViewLiquid {
     @ViewBuilder
     private var photoTimelineHomeContent: some View {
         ZStack {
-            if isDatedTimelineEnabled && !datedTimelineCanShowHistory {
+            if isDatedTimelineEnabled && (!datedTimelineIsOwned || datedTimelineSnapshot == nil ||
+                (!isDatedStatsSurface && !datedTimelineCanShowHistory)) {
                 ProgressView()
             } else {
                 switch selectedPhotoTimelineRootPage {
@@ -232,7 +233,9 @@ extension DashboardViewLiquid {
                             id: "photo_timeline_root_page_analytics",
                             label: "Stats page"
                         )
-                        if HomeV2Policy.isEnabled() {
+                        if isDatedTimelineEnabled {
+                            photoTimelineAnalyticsPage
+                        } else if HomeV2Policy.isEnabled() {
                             homeV2ProgressView
                         } else {
                             photoTimelineAnalyticsPage

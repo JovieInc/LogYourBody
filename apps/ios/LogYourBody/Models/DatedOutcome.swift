@@ -14,6 +14,13 @@ struct DatedOutcome: Codable, Equatable, Sendable {
         var targetValue: Double
     }
 
+    /// Local journal metadata. It is never part of the user's target or wire edit.
+    struct PlanBaseline: Codable, Equatable, Sendable {
+        var date: Date
+        var metric: Metric
+        var value: Double
+    }
+
     struct Interval: Codable, Equatable, Sendable {
         var start: String
         var end: String
@@ -109,6 +116,7 @@ struct DatedOutcomeEdit: Codable, Equatable, Sendable {
 struct DatedOutcomeSnapshot: Codable, Equatable, Sendable {
     let revision: UUID
     let value: DatedOutcome
+    var planBaseline: DatedOutcome.PlanBaseline?
 }
 
 enum DatedOutcomeError: Error {
