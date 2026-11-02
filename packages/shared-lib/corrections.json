@@ -5777,5 +5777,41 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "marketing-capture-provenance-content-identity",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1682",
+    "correction": "PR #1682 / LYB-267, fix-red-95726c4f82 occurrence 7: merge origin/main without rebasing and repair the rejected merge groups. The prebuild marketing sync uses a shallow merge commit timestamp for unchanged screenshots, making capturedAt future-dated and failing marketing-product-assets.test.ts. Tently separately reports an AI-provider outage.",
+    "mechanization": "Extend the existing marketing asset generator to retain capture dates only for the same source path and SHA-256. New provenance requires complete Git history and committed matching bytes; missing archive evidence, changed shallow sources, uncommitted images and invalid retained dates fail before outputs or receipts are rewritten. Track the generator and both canonical image inputs in the existing Turbo global dependencies so future edits invalidate build and test cache receipts. Six real-Git cases in the existing required web Jest suite fail before the repair and pass afterward, covering repeated builds, depth-one checkouts and refusal paths. Keep the existing 60-day freshness, future-date and byte-integrity gates unchanged. The lanes harness retains push and PR-body ownership and must include exactly one machine line: Machine: built scripts/marketing/sync-ios-marketing-assets.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing prebuild generator owns capture provenance and can preserve it by content identity, preventing shallow history and archive extraction times from refreshing unchanged captures by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/marketing/sync-ios-marketing-assets.mjs",
+      "anchor": "Unchanged image bytes retain their capture age, including in shallow CI clones."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "marketing-provenance-validates-all-assets-before-publication",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1682",
+    "correction": "PR #1682 / LYB-267, fix-red-95726c4f82 occurrence 22: merge origin/main without rebasing. Both parents repaired the merge-group marketing timestamp failure, but resolving to either parent loses future-date admission or validation before publication. The rejected CI logs fail the nonfuture capture assertion. Tently separately reports an AI-provider outage, reference c02ecbb6-5f05-41ab-be60-6008a9f28d76, with no code finding.",
+    "mechanization": "Extend the existing marketing generator to validate every asset, including future retained and Git-derived dates, before publishing public files or the manifest. Preserve hash-bound capture ages, bounded Git commands, exact committed-byte evidence, full-history recovery and both parents' regression suites. Add real-generator cases for existing and absent public outputs when the later app icon has unsupported future provenance. Both cases fail against each immutable parent generator and pass with the combined admission rules. Use the extended generator on this checkout and verify unchanged capture receipts. Resolve the correction union with the existing classifier and regenerate the source map. Keep the deload decision and all freshness, integrity and CI gates. The harness owns push and PR edits and must add exactly one PR-body line: Machine: built scripts/marketing/sync-ios-marketing-assets.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing prebuild generator owns all asset provenance and publication. Applying future-date admission before its existing publication phase prevents a later invalid capture from refreshing any public output by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/marketing/sync-ios-marketing-assets.mjs",
+      "anchor": "Date.parse(timestamp) > latestCaptureTime"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
