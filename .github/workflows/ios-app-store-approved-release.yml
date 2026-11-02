@@ -1,17 +1,21 @@
 name: iOS App Store Approved Release
 
-# Kept clock (external fact): Apple App Review state changes in App Store
-# Connect, which emits no GitHub event here. Replacement: an App Store Connect
-# webhook (appStoreVersion state) bridged to repository_dispatch. The run only
-# checks release health before releasing and throughout phased rollout.
-# Unhealthy or unverified active rollouts are paused and tracked in an issue.
+# Apple App Review state changes in App Store Connect and emits no GitHub event
+# here. The cron is the backstop. GitHub delivers `*/30` hours late. Scheduled
+# runs from 2026-10-28 15:17Z through 2026-11-01 17:12Z started about 3-7 hours apart
+# (20:26Z, 00:11Z, 06:09Z, and 13:28Z on Oct 28-29 are in that range). LYB-139's
+# health gate uses that gap as the latency for a release request and for pausing
+# a rollout. The prompt path still to build is an App Store Connect
+# appStoreVersion webhook bridged to repository_dispatch. This job checks
+# release health before releasing and throughout phased rollout. Unhealthy or
+# unverified active rollouts are paused and tracked in an issue.
 on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       app_version:
-        description: 'Optional App Store version to release after Apple approval'
+        description: 'Optional App Store version to release after Apple approval. Leave empty to release any PENDING_DEVELOPER_RELEASE version.'
         required: false
         type: string
 
@@ -70,18 +74,15 @@ jobs:
         env:
           INPUT_APP_VERSION: ${{ github.event.inputs.app_version }}
         run: |
+          # Only an explicit manual app_version pins the lookup. Scheduled runs
+          # and a manual run with an empty input leave it empty, so the script
+          # prefers any PENDING_DEVELOPER_RELEASE version over the marketing
+          # version currently on main.
           if [ -n "$INPUT_APP_VERSION" ]; then
-            version="$INPUT_APP_VERSION"
+            echo "version=$INPUT_APP_VERSION" >> "$GITHUB_OUTPUT"
           else
-            version="$(awk -F ' = ' '/MARKETING_VERSION = / { gsub(/[;[:space:]]/, "", $2); if ($2 ~ /^[0-9]+[.][0-9]+/) { print $2; exit } }' apps/ios/LogYourBody.xcodeproj/project.pbxproj)"
+            echo "version=" >> "$GITHUB_OUTPUT"
           fi
-
-          if [ -z "$version" ]; then
-            echo "::error::Unable to resolve App Store version"
-            exit 1
-          fi
-
-          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Check Release Health and Release Approved Version
         run: |

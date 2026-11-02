@@ -63,3 +63,7 @@ matching bytes and complete Git history; fetch that history before syncing.
 An archive without matching provenance must not substitute extraction time for
 capture time. The existing 60-day freshness and source/output hash checks remain
 authoritative.
+
+Future capture dates require recovery from complete, committed history. Every
+asset's provenance is checked before any public asset or manifest is written,
+so an invalid later asset cannot leave partially refreshed outputs.

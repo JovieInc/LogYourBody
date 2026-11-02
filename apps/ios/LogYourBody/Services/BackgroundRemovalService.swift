@@ -53,6 +53,15 @@ class BackgroundRemovalService {
         }.value
     }
 
+    /// Copies the Vision mask into a value grid so the buffer is not retained.
+    func personMaskGrid(for cgImage: CGImage, quality: Float) async throws -> PersonMaskGrid {
+        let buffer = try await personMask(for: cgImage, quality: quality)
+        guard let grid = PersonMaskGrid(pixelBuffer: buffer) else {
+            throw BackgroundRemovalError.processingFailed
+        }
+        return grid
+    }
+
     /// Apply the segmentation mask to create transparent background
     func applySegmentationMask(to cgImage: CGImage, mask: CVPixelBuffer, quality: Float) throws -> UIImage {
         let ciImage = CIImage(cgImage: cgImage)

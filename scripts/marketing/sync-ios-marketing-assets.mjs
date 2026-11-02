@@ -41,12 +41,14 @@ function pngDimensions(buffer) {
 }
 
 function capturedAtFor(source, sourceSha256, previous) {
+  // Capture provenance follows the image bytes, never checkout or synthetic merge time.
+  const latestCaptureTime = Date.now();
   // Unchanged image bytes retain their capture age, including in shallow CI clones.
   if (previous?.source === source && previous.sourceSha256 === sourceSha256) {
     if (!Number.isFinite(Date.parse(previous.capturedAt))) {
-      throw new Error(`Invalid capture provenance date: ${source}`);
+      throw new Error(`Invalid capture timestamp in capture provenance: ${source}`);
     }
-    return previous.capturedAt;
+    if (Date.parse(previous.capturedAt) <= latestCaptureTime) return previous.capturedAt;
   }
 
   const git = (...args) =>
@@ -66,13 +68,16 @@ function capturedAtFor(source, sourceSha256, previous) {
       .split('\n');
     if (
       !Number.isFinite(Date.parse(timestamp)) ||
+      Date.parse(timestamp) > latestCaptureTime ||
       sha256(git('show', `${commit}:${source}`)) !== sourceSha256
     ) {
       throw new Error('The capture must match committed source bytes');
     }
     return timestamp;
   } catch (error) {
-    throw new Error(`Missing capture provenance for ${source}: ${error.message}`);
+    throw new Error(
+      `Cannot establish capture timestamp; missing capture provenance for ${source}: ${error.message}`,
+    );
   }
 }
 

@@ -10,8 +10,8 @@ extension LegalDocumentView.LegalDocumentType: Identifiable {
 
 enum HomeV2OnboardingCopy {
     static let brand = "LogYourBody"
-    static let signInTitle = "See how you’re really doing."
-    static let signInBody = "Weight, body fat and progress photos from Apple Health, on one timeline."
+    static let signInTitle = LaunchPromiseCopy.headline
+    static let signInBody = LaunchPromiseCopy.explanation
     static let continueWithApple = "Continue with Apple"
     static let openingApple = "Opening Apple…"
     static let legalPrefix = "By continuing you agree to the"
