@@ -205,6 +205,7 @@ test('conflicted source map refuses unstaged pinned drift without rewriting the 
   assert.equal(f.git('ls-files', '--stage'), index);
 });
 
+
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
   for (const present of [true, false]) {
     test(`dependency repair ${mode} restores ${present ? 'existing' : 'missing'} outputs after staging fails`, (t) => {
@@ -392,6 +393,46 @@ for (const [name, testScript, inputs] of [
     assert.equal(fixture.git('ls-files', '--stage'), index);
   });
 }
+
+test('manifest union leaves a conflicted correction ledger for its resolver', (t) => {
+  const fixture = manifestRepo(t);
+  const ledger = 'packages/shared-lib/corrections.json';
+  const writeLedger = (body) => {
+    mkdirSync(dirname(join(fixture.root, ledger)), { recursive: true });
+    writeFileSync(join(fixture.root, ledger), body);
+  };
+  writeLedger('[]\n');
+  fixture.git('add', ledger);
+  fixture.git('commit', '-qm', 'ledger base');
+  fixture.git('switch', '-qc', 'incoming');
+  writeLedger('[{"fingerprint":"theirs"}]\n');
+  fixture.commit(
+    'node --test shared.test.mjs theirs.test.mjs',
+    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
+    'incoming',
+  );
+  fixture.git('switch', '-q', 'feature');
+  writeLedger('[{"fingerprint":"ours"}]\n');
+  fixture.commit(
+    'node --test shared.test.mjs ours.test.mjs',
+    ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs'],
+    'ours',
+  );
+  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: fixture.root, env });
+  assert.equal(merge.status, 1, merge.stderr?.toString());
+  const beforeLedger = readFileSync(join(fixture.root, ledger), 'utf8');
+  const result = spawnSync('python3', [resolver, '--root', fixture.root, '--union-manifests'], {
+    env, encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fixture.git('diff', '--name-only', '--diff-filter=U').trim(), ledger);
+  assert.equal(readFileSync(join(fixture.root, ledger), 'utf8'), beforeLedger);
+  assert.match(beforeLedger, /^<<<<<<< /m);
+  const testScript = JSON.parse(readFileSync(join(fixture.root, fixture.pkg), 'utf8')).scripts.test;
+  assert.match(testScript, /ours\.test\.mjs/);
+  assert.match(testScript, /theirs\.test\.mjs/);
+  assert.equal(fixture.git('ls-files', '-u', '--', fixture.output).trim(), '');
+});
 
 test('manifest union refuses an unrelated conflict without staging', (t) => {
   const fixture = manifestRepo(t);
