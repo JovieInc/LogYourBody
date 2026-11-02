@@ -51,6 +51,7 @@ export function verifyCompanyGuards(ciWorkflow, companyGuardsWorkflow) {
   const detection = job(ciWorkflow, 'detect-changes').split('\n    steps:')[0];
   const summary = job(ciWorkflow, 'ci-summary');
   const shared = job(companyGuardsWorkflow, 'company-guards');
+  const sharedPin = shared.match(/uses: JovieInc\/ci\/\.github\/workflows\/company-guards.yml@([a-f0-9]{40})\n/)?.[1];
   assert(
     caller.includes('    uses: ./.github/workflows/company-guards.yml\n'),
     'Company Guards must run the canonical reusable workflow',
@@ -67,12 +68,13 @@ export function verifyCompanyGuards(ciWorkflow, companyGuardsWorkflow) {
   }
   assert(
     /\n  workflow_call:\s*\n/.test(companyGuardsWorkflow) &&
-      /uses: JovieInc\/ci\/\.github\/workflows\/company-guards.yml@[a-f0-9]{40}\n/.test(shared),
+      sharedPin && shared.includes(`      ci-ref: ${sharedPin}\n`),
     'Company Guards must expose the pinned company workflow through workflow_call',
   );
   assert(
     /\n    if: always\(\)\n/.test(summary) &&
       /\n    needs: \[detect-changes,/.test(summary) &&
+      !/\n(?: {4}continue-on-error:| {8}(?:if|continue-on-error):)/.test(summary) &&
       summary.includes('needs.detect-changes.result }}" != "success"'),
     'Company Guards failures must reach the required CI Summary',
   );
