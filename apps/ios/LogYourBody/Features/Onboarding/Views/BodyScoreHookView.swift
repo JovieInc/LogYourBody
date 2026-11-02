@@ -216,7 +216,7 @@ struct DatedOutcomeLaunchView: View {
         .sheet(isPresented: $showsMeasurement) {
             AddEntrySheet(
                 isPresented: $showsMeasurement,
-                initialTab: model.snapshot?.value.outcome.metric == .bodyFatPercentage ? 1 : 0,
+                initialTab: baselineSnapshot?.baselineTab ?? 0,
                 onWeightSaved: { _ in complete() },
                 onBodyFatSaved: { _ in complete() },
                 presentationOwner: owner
