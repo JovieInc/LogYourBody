@@ -1,421 +1,281 @@
 #!/usr/bin/env python3
-"""Split a Swift file at top-level types so it fits the company 500-line guard.
+"""Split oversized Swift and keep company size-500 plus Swift call shape green.
 
-Company guards reject a new file over 500 lines. This packs whole top-level
-types into sibling files. It refuses to cut inside a type: extract that piece
-by hand, then run again. A split that would leave an XCTestCase extension in
-another file rehomes that extension onto an independent superclass instead.
-It does not edit the Xcode project.
+Company guards reject a new file over 500 lines and any growth of a baselined
+file. Xcode 26 rejects a call whose explicit labels are not in declaration
+order, and a method reference whose defaulted parameters widen the function
+type. This packs whole top-level Swift types, keeps the namesake type in the
+original file, and checks those gates. It does not edit the Xcode project.
 """
 import argparse
+import json
 import re
+import subprocess
 from pathlib import Path
 
+from split_swift_types import (
+    apply_rehome, apply_split, line_count, pack, rehome_suite_extension,
+    source_lines, split_namesake, stranded_suite_extensions,
+)
+
 LIMIT = 500
-TYPE_RE = re.compile(
-    r"^(?:(?:public|open|internal|fileprivate|private|final|nonisolated)\s+)*"
-    r"(?:struct|enum|class|actor|extension|protocol)\s+(\w+)",
+CODE = re.compile(r"\.(ts|tsx|js|jsx|mjs|cjs|py|swift|ex|exs|sh|rb|go|rs)$")
+SKIP = re.compile(r"(^|/)(node_modules|vendor|dist|build|\.next|Pods)/|\.gen\.|\.generated\.|\.min\.|\.d\.ts$|lock")
+FUNC_RE = re.compile(r"\bfunc\s+([A-Za-z_]\w*)\s*(?:<[^>(]*)>\s*\(|\bfunc\s+([A-Za-z_]\w*)\s*\(")
+CALL_RE = re.compile(r"(?<![\w.])([A-Za-z_]\w*)\s*\(")
+LABEL_RE = re.compile(r"(?:([A-Za-z_]\w*)\s+)?([A-Za-z_]\w*)\s*:")
+TYPE_NAME_RE = re.compile(r"\b(?:struct|enum|class|actor|extension)\s+([A-Za-z_]\w*)")
+STATIC_FUNC_RE = re.compile(r"\bstatic\s+func\s+([A-Za-z_]\w*)\s*(?:<[^>(]*)?\s*\(")
+DEFAULT_REF_RE = re.compile(
+    r"\.(?:map|compactMap|flatMap|filter|forEach|sorted|reduce|contains|allSatisfy|first)\(\s*"
+    r"([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)\s*\)"
 )
 
 
-def line_count(text):
-    return len(text.splitlines())
+def relocate_prefix(text, marker, sibling):
+    """Move the prefix before marker into a sibling module and re-export it."""
+    lines = text.splitlines(keepends=True)
+    index = next((i for i, line in enumerate(lines) if line.startswith(marker)), None)
+    if index is None:
+        raise ValueError("marker not found: " + marker)
+    prefix = "".join(lines[:index])
+    prefix = re.sub(r"(?m)^(function )\b", r"export \1", prefix)
+    if not prefix.endswith("\n"):
+        prefix += "\n"
+    tail = "".join(lines[index:])
+    names = re.findall(r"(?m)^export (?:async )?(?:function|const|class|type|interface|enum) (\w+)", prefix)
+    if not names:
+        raise ValueError("prefix has no exports")
+    spec = "./" + Path(sibling).stem
+    original = (
+        "export * from '" + spec + "';\nimport {\n"
+        + "".join("  " + name + ",\n" for name in names)
+        + "} from '" + spec + "';\n\n"
+        + tail
+    )
+    return prefix, original if original.endswith("\n") else original + "\n"
 
 
-def top_level_braces(text):
-    """Return inclusive [open, close] indexes of every top-level brace pair."""
-    spans = []
-    i, n, depth, start = 0, len(text), 0, None
-    while i < n:
+def _signature_end(text, open_at):
+    depth = 0
+    i = open_at
+    while i < len(text):
         c = text[i]
-        if c == "/" and i + 1 < n and text[i + 1] == "/":
+        if c == "/" and i + 1 < len(text) and text[i + 1] == "/":
             i = text.find("\n", i)
             if i < 0:
-                break
+                return len(text)
             continue
-        if c == "/" and i + 1 < n and text[i + 1] == "*":
-            end = text.find("*/", i + 2)
-            i = n if end < 0 else end + 2
-            continue
-        if c == "#":
-            hashes = 0
-            j = i
-            while j < n and text[j] == "#":
-                hashes += 1
-                j += 1
-            if j < n and text[j] == '"':
-                if text.startswith('"""', j):
-                    closer = '"""' + ("#" * hashes)
-                    end = text.find(closer, j + 3)
-                else:
-                    closer = '"' + ("#" * hashes)
-                    end = text.find(closer, j + 1)
-                i = n if end < 0 else end + len(closer)
-                continue
         if c == '"':
-            if text.startswith('"""', i):
-                end = text.find('"""', i + 3)
-                i = n if end < 0 else end + 3
-                continue
             i += 1
-            while i < n:
-                if text[i] == "\\":
-                    i += 2
-                    continue
-                if text[i] in {'"', "\n"}:
-                    i += 1
-                    break
-                i += 1
+            while i < len(text) and text[i] not in {'"', "\n"}:
+                i += 2 if text[i] == "\\" else 1
+            i += 1
             continue
-        if c == "{":
-            if depth == 0:
-                start = i
+        if c == "(":
             depth += 1
-        elif c == "}":
+        elif c == ")":
             depth -= 1
-            if depth == 0 and start is not None:
-                spans.append((start, i))
-                start = None
-            if depth < 0:
-                raise ValueError("unbalanced braces")
+            if depth == 0:
+                return i
         i += 1
-    if depth != 0:
-        raise ValueError("unbalanced braces")
-    return spans
+    return len(text)
 
 
-def _line_index(text, offset):
-    return text.count("\n", 0, offset)
+def _top_level_pieces(body):
+    parts = []
+    start = 0
+    depth = 0
+    i = 0
+    while i < len(body):
+        c = body[i]
+        if c == '"':
+            i += 1
+            while i < len(body) and body[i] not in {'"', "\n"}:
+                i += 2 if body[i] == "\\" else 1
+        elif c in "([{<":
+            depth += 1
+        elif c in ")]}>":
+            depth = max(0, depth - 1)
+        elif c == "," and depth == 0:
+            parts.append(body[start:i])
+            start = i + 1
+        i += 1
+    parts.append(body[start:])
+    return parts
 
 
-def declaration_chunks(text):
-    """Return (header, [declaration chunks]) covering the file exactly once."""
-    lines = text.splitlines(keepends=True)
-    spans = top_level_braces(text)
-    if not spans:
-        raise ValueError("no top-level Swift type to split")
-    keyword_lines = []
-    for open_at, _close_at in spans:
-        line_no = _line_index(text, open_at)
-        while line_no > 0 and not TYPE_RE.match(lines[line_no].strip()):
-            line_no -= 1
-        if not TYPE_RE.match(lines[line_no].strip()):
-            raise ValueError("top-level brace is not a type declaration")
-        keyword_lines.append(line_no)
-    starts = []
-    for keyword in keyword_lines:
-        start = keyword
-        while start > 0:
-            prev = lines[start - 1].strip()
-            if prev.startswith(("///", "//", "@")):
-                start -= 1
-                continue
-            if prev == "":
-                before = lines[start - 2].strip() if start >= 2 else ""
-                if before.startswith(("///", "//", "@")):
-                    start -= 1
-                    continue
-                start -= 1
-                break
-            break
-        starts.append(start)
-    chunks = []
-    for index, start in enumerate(starts):
-        end = starts[index + 1] if index + 1 < len(starts) else len(lines)
-        chunks.append("".join(lines[start:end]))
-    return "".join(lines[: starts[0]]), chunks
+def _external_label(piece):
+    match = LABEL_RE.search(piece.strip())
+    if not match:
+        return None
+    external = match.group(1) or match.group(2)
+    return None if external == "_" else external
 
 
-def _type_name(chunk):
-    for line in chunk.splitlines():
-        match = TYPE_RE.match(line.strip())
-        if match:
-            return match.group(1)
-    raise ValueError("split chunk has no top-level type name")
+def declared_labels(text):
+    labels = {}
+    for match in FUNC_RE.finditer(text):
+        name = match.group(1) or match.group(2)
+        end = _signature_end(text, match.end() - 1)
+        found = [label for piece in _top_level_pieces(text[match.end() : end]) if (label := _external_label(piece))]
+        labels.setdefault(name, found)
+    return labels
 
 
-def _second_header(header):
-    imports = [line for line in header.splitlines(keepends=True) if line.startswith("import ")]
-    if not imports:
-        return ""
-    text = "".join(imports)
-    if not text.endswith("\n"):
-        text += "\n"
-    return text + "\n"
-
-
-def _too_big(chunk, limit):
-    raise ValueError(
-        _type_name(chunk) + " is over " + str(limit)
-        + " lines; extract part of that type by hand"
-    )
-
-
-_PROPERTY = re.compile(
-    r"^[ \t]*(?:(?:public|open|internal|fileprivate|private|static|class|final|lazy)[ \t]+)*"
-    r"(?:let|var)[ \t]+([A-Za-z_]\w*)\b"
-)
-_SUITE_CLASS = re.compile(
-    r"(?m)^[ \t]*(?:final[ \t]+)?class[ \t]+(\w+)[ \t]*:[ \t]*(?:XCTest\.)?XCTestCase\b"
-)
-_EXTENSION_LINE = re.compile(r"(?m)^[ \t]*extension[ \t]+(\w+)\b")
-
-
-def fixture_case_name(suite_name):
-    """Independent superclass name for helpers that must leave a suite file."""
-    if suite_name.endswith("Tests") and len(suite_name) > len("Tests"):
-        return suite_name[: -len("Tests")] + "FixtureCase"
-    return suite_name + "FixtureCase"
-
-
-def _declaration_at(text, open_at):
-    line_start = text.rfind("\n", 0, open_at) + 1
-    return text[line_start:open_at]
-
-
-def _suite_brace(text, name):
-    pattern = re.compile(
-        r"\bclass\s+" + re.escape(name) + r"\s*:\s*(?:XCTest\.)?XCTestCase\b"
-    )
-    for open_at, close_at in top_level_braces(text):
-        if pattern.search(_declaration_at(text, open_at)):
-            return open_at, close_at
-    return None
-
-
-def _extension_brace(text):
-    for open_at, close_at in top_level_braces(text):
-        match = re.search(r"\bextension\s+(\w+)\s*$", _declaration_at(text, open_at))
-        if match:
-            return match.group(1), open_at, close_at
-    return None
-
-
-def _leading_properties(text, open_at):
-    found = []
-    for line in text[open_at + 1 :].splitlines(keepends=True):
-        stripped = line.strip()
-        if stripped == "" or stripped.startswith(("//", "///")):
+def defaulted_static_methods(text):
+    """Static methods whose signature includes a defaulted parameter."""
+    owners = [(match.start(), match.group(1)) for match in TYPE_NAME_RE.finditer(text)]
+    found = set()
+    for match in STATIC_FUNC_RE.finditer(text):
+        end = _signature_end(text, match.end() - 1)
+        if "=" not in text[match.end() : end]:
             continue
-        match = _PROPERTY.match(line)
-        if not match:
-            break
-        found.append((match.group(1), line))
+        prior = [name for pos, name in owners if pos < match.start()]
+        if prior:
+            found.add((prior[-1], match.group(1)))
     return found
 
 
-def _widen_property(line):
-    """A superclass in another file cannot keep file-private stored state."""
-    return re.sub(r"\b(?:private|fileprivate)[ \t]+", "", line, count=1)
+def unapplied_default_references(text, methods):
+    """Higher-order calls that pass a defaulted method instead of calling it.
 
-
-def _rehome(suite_text, extension_text, name, ext_open, ext_close):
-    suite_brace = _suite_brace(suite_text, name)
-    if suite_brace is None:
-        raise ValueError(name + " is not an XCTestCase in the suite file")
-    same_file = suite_text == extension_text
-    ext_body = extension_text[ext_open + 1 : ext_close]
-    movable = [
-        (prop, line)
-        for prop, line in _leading_properties(suite_text, suite_brace[0])
-        if re.search(r"\b" + re.escape(prop) + r"\b", ext_body)
-    ]
-    case_name = fixture_case_name(name)
-    new_suite = suite_text
-    for _prop, line in movable:
-        new_suite = new_suite.replace(line, "", 1)
-    new_suite = re.sub(
-        r"(\bclass\s+" + re.escape(name) + r"\s*:\s*)(?:XCTest\.)?XCTestCase\b",
-        r"\1" + case_name,
-        new_suite,
-        count=1,
-    )
-    prop_block = "".join(_widen_property(line) for _prop, line in movable)
-    if same_file:
-        new_suite = new_suite.replace(
-            "extension " + name + " {",
-            "class " + case_name + ": XCTestCase {",
-            1,
-        )
-        needle = "class " + case_name + ": XCTestCase {"
-        brace = new_suite.find(needle)
-        if brace < 0:
-            raise ValueError("rehome lost the fixture case declaration")
-        insert_at = new_suite.find("{", brace) + 1
-        if new_suite[insert_at : insert_at + 1] == "\n":
-            insert_at += 1
-        return new_suite[:insert_at] + prop_block + new_suite[insert_at:], new_suite
-    new_ext = extension_text.replace(
-        "extension " + name + " {",
-        "class " + case_name + ": XCTestCase {",
-        1,
-    )
-    needle = "class " + case_name + ": XCTestCase {"
-    brace = new_ext.find(needle)
-    if brace < 0:
-        raise ValueError("rehome lost the fixture case declaration")
-    insert_at = new_ext.find("{", brace) + 1
-    if new_ext[insert_at : insert_at + 1] == "\n":
-        insert_at += 1
-    new_ext = new_ext[:insert_at] + prop_block + new_ext[insert_at:]
-    return new_suite, new_ext
-
-
-def rehome_suite_extension(suite_text, extension_text):
-    """Move a cross-file XCTestCase extension onto an independent superclass."""
-    found = _extension_brace(extension_text)
-    if found is None:
-        raise ValueError("companion file has no XCTestCase extension to rehome")
-    name, ext_open, ext_close = found
-    return _rehome(suite_text, extension_text, name, ext_open, ext_close)
-
-
-def rehome_extensions_in_source(text):
-    """Rehome a same-file XCTestCase extension before a split can strand it."""
-    found = _extension_brace(text)
-    if found is None:
-        return text
-    name, ext_open, ext_close = found
-    if _suite_brace(text, name) is None:
-        return text
-    rewritten, _same = _rehome(text, text, name, ext_open, ext_close)
-    return rewritten
-
-
-def stranded_suite_extensions(bodies):
-    """Names of XCTestCase extensions that landed outside their suite file."""
-    suites = {}
-    extensions = []
-    for index, body in enumerate(bodies):
-        for match in _SUITE_CLASS.finditer(body):
-            suites[match.group(1)] = index
-        for match in _EXTENSION_LINE.finditer(body):
-            extensions.append((index, match.group(1)))
-    return [
-        name
-        for index, name in extensions
-        if name in suites and suites[name] != index
-    ]
-
-
-def _pack_types(text, limit):
-    header, chunks = declaration_chunks(text)
-    extra_header = _second_header(header)
-    files = []
-    current = header
-    held = 0
-    for chunk in chunks:
-        candidate = (header if held == 0 else current) + chunk
-        if line_count(candidate) <= limit:
-            current = candidate
-            held += 1
+    Xcode types `key(_:calendar:)` as `(Date, Calendar) -> String`, so
+    `dates.map(PersonalBodyDay.key)` does not match `(Date) -> String`.
+    """
+    violations = []
+    for match in DEFAULT_REF_RE.finditer(text):
+        parts = match.group(1).split(".")
+        if (parts[-2], parts[-1]) not in methods:
             continue
-        if held == 0:
-            _too_big(chunk, limit)
-        files.append(current if current.endswith("\n") else current + "\n")
-        current = extra_header + chunk.lstrip("\n")
-        held = 1
-        if line_count(current) > limit:
-            _too_big(chunk, limit)
-    if current and not current.endswith("\n"):
-        current += "\n"
-    files.append(current)
-    return files
+        violations.append((text.count("\n", 0, match.start()) + 1, match.group(1)))
+    return violations
 
 
-def pack(text, limit=LIMIT):
-    """Return sibling file bodies. The first body keeps the original header."""
-    if line_count(text) <= limit:
-        return [text]
-    bodies = _pack_types(text, limit)
-    if not stranded_suite_extensions(bodies):
-        return bodies
-    rewritten = rehome_extensions_in_source(text)
-    if rewritten == text:
-        raise ValueError(
-            "split would leave a cross-file XCTestCase extension; "
-            "use an independent XCTestCase"
-        )
-    bodies = _pack_types(rewritten, limit)
-    if stranded_suite_extensions(bodies):
-        raise ValueError(
-            "split would leave a cross-file XCTestCase extension; "
-            "use an independent XCTestCase"
-        )
-    return bodies
+def argument_order_violations(text):
+    """Explicit call labels that are not in the same-file declaration order."""
+    labels = declared_labels(text)
+    violations = []
+    for match in CALL_RE.finditer(text):
+        if text[max(0, match.start() - 5) : match.start()] == "func ":
+            continue
+        name = match.group(1)
+        expected = labels.get(name)
+        if not expected:
+            continue
+        end = _signature_end(text, match.end() - 1)
+        provided = [label for piece in _top_level_pieces(text[match.end() : end]) if (label := _external_label(piece))]
+        order = [label for label in provided if label in expected]
+        ranked = [expected.index(label) for label in order]
+        if ranked != sorted(ranked):
+            violations.append((text.count("\n", 0, match.start()) + 1, name, order))
+    return violations
 
 
-def output_paths(source, bodies):
-    source = Path(source)
-    paths = [source]
-    used = {source.name}
-    for body in bodies[1:]:
-        name = _type_name(body) + ".swift"
-        if name in used:
-            raise ValueError("split would overwrite " + name)
-        used.add(name)
-        paths.append(source.with_name(name))
-    return paths
+def measure(files, read):
+    out = {}
+    for name in files:
+        if not CODE.search(name) or SKIP.search(name):
+            continue
+        text = read(name)
+        if text is None:
+            continue
+        count = source_lines(text)
+        if count > LIMIT:
+            out[name] = count
+    return out
 
 
-def apply_split(source, limit=LIMIT, dry_run=False):
-    source = Path(source)
-    text = source.read_text()
-    bodies = pack(text, limit)
-    paths = output_paths(source, bodies)
-    if len(bodies) == 1:
-        return paths
-    for path in paths[1:]:
-        if path.exists():
-            raise ValueError("refusing to overwrite " + str(path))
-    if dry_run:
-        return paths
-    for path, body in zip(paths, bodies):
-        path.write_text(body)
-    return paths
+def compare(current, baseline):
+    fails = []
+    for name, count in current.items():
+        if name not in baseline:
+            fails.append(name + ": " + str(count) + " lines, over " + str(LIMIT) + " and not baselined")
+        elif count > baseline[name]:
+            fails.append(name + ": grew " + str(baseline[name]) + " -> " + str(count))
+    return fails
 
 
-def apply_rehome(suite, companion):
-    suite = Path(suite)
-    companion = Path(companion)
-    suite_text, companion_text = rehome_suite_extension(suite.read_text(), companion.read_text())
-    suite.write_text(suite_text)
-    companion.write_text(companion_text)
-    return suite, companion
+def check_repo(root):
+    root = Path(root)
+    files = subprocess.check_output(["git", "ls-files"], cwd=root, text=True).splitlines()
+    current = measure(files, lambda name: (root / name).read_text(errors="replace") if (root / name).is_file() else None)
+    baseline_path = root / ".company-guards" / "size-baseline.json"
+    baseline = json.loads(baseline_path.read_text()) if baseline_path.exists() else {}
+    fails = compare(current, baseline)
+    swift = []
+    methods = set()
+    for name in files:
+        if not name.endswith(".swift"):
+            continue
+        path = root / name
+        if not path.is_file():
+            continue
+        text = path.read_text(errors="replace")
+        swift.append((name, text))
+        methods.update(defaulted_static_methods(text))
+        for line, func, order in argument_order_violations(text):
+            fails.append(name + ":" + str(line) + ": argument order for " + func + " " + ",".join(order))
+    for name, text in swift:
+        for line, ref in unapplied_default_references(text, methods):
+            fails.append(name + ":" + str(line) + ": defaulted reference " + ref)
+    return fails
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("source", type=Path, help="Swift file to split")
+    parser.add_argument("source", nargs="?", type=Path)
     parser.add_argument("--limit", type=int, default=LIMIT)
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument(
-        "--rehome-extension",
-        type=Path,
-        help="Rehome this cross-file XCTestCase extension onto an independent superclass",
-    )
+    parser.add_argument("--check", action="store_true")
+    parser.add_argument("--root", type=Path, default=Path("."))
+    parser.add_argument("--relocate-prefix", help="move the prefix before this exact line into --sibling")
+    parser.add_argument("--sibling", type=Path)
+    parser.add_argument("--rehome-extension", type=Path,
+                        help="move a cross-file XCTestCase extension to an independent superclass")
     args = parser.parse_args()
     try:
-        if args.rehome_extension:
-            suite_text, companion_text = rehome_suite_extension(
-                args.source.read_text(), args.rehome_extension.read_text()
-            )
-            if not args.dry_run:
-                args.source.write_text(suite_text)
-                args.rehome_extension.write_text(companion_text)
-            print(args.source.name + ": " + str(line_count(suite_text)) + " lines")
-            print(args.rehome_extension.name + ": " + str(line_count(companion_text)) + " lines")
+        if args.check:
+            fails = check_repo(args.root)
+            for fail in fails:
+                print("size-500: " + fail)
+            if fails:
+                parser.exit(1, "split-size-ratchet: " + str(len(fails)) + " violation(s)\n")
+            print("split-size-ratchet: clean")
             return
-        paths = apply_split(args.source, args.limit, args.dry_run)
-        bodies = pack(args.source.read_text(), args.limit) if args.dry_run else None
-    except (OSError, ValueError) as exc:
+        if args.relocate_prefix:
+            if args.source is None or args.sibling is None:
+                raise ValueError("relocate-prefix needs a source and --sibling")
+            prefix, original = relocate_prefix(args.source.read_text(), args.relocate_prefix, args.sibling.name)
+            if source_lines(prefix) > args.limit or source_lines(original) > args.limit:
+                raise ValueError("relocate still exceeds " + str(args.limit) + " lines")
+            if not args.dry_run:
+                args.sibling.write_text(prefix)
+                args.source.write_text(original)
+            print(args.sibling.name + ": " + str(source_lines(prefix)) + " lines")
+            print(args.source.name + ": " + str(source_lines(original)) + " lines")
+            return
+        if args.rehome_extension:
+            if args.source is None:
+                raise ValueError("--rehome-extension needs a source")
+            suite, companion = rehome_suite_extension(args.source.read_text(), args.rehome_extension.read_text())
+            if not args.dry_run:
+                args.source.write_text(suite)
+                args.rehome_extension.write_text(companion)
+            print(args.source.name + ": " + str(line_count(suite)) + " lines")
+            print(args.rehome_extension.name + ": " + str(line_count(companion)) + " lines")
+            return
+        if args.source is None:
+            raise ValueError("a Swift source or --check is required")
+        if args.dry_run:
+            parts = split_namesake(args.source.read_text(), args.source.name, args.limit)
+            for name, body in parts:
+                print(name + ": " + str(source_lines(body)) + " lines")
+            return
+        for path in apply_split(args.source, args.limit, False):
+            print(str(path) + ": " + str(source_lines(path.read_text())) + " lines")
+    except (OSError, ValueError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
         parser.exit(1, "split-size-ratchet: " + str(exc) + "\n")
-    if args.dry_run:
-        for path, body in zip(paths, bodies):
-            print(path.name + ": " + str(line_count(body)) + " lines")
-        return
-    for path in paths:
-        print(str(path) + ": " + str(line_count(path.read_text())) + " lines")
 
 
 if __name__ == "__main__":

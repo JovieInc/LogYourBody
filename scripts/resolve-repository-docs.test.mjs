@@ -5,11 +5,10 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
-import './resolve-repository-docs-manifest.test.mjs';
 import { fileURLToPath } from 'node:url';
 
-const resolver = fileURLToPath(new URL('./resolve-repository-docs.py', import.meta.url));
-const env = {
+export const resolver = fileURLToPath(new URL('./resolve-repository-docs.py', import.meta.url));
+export const env = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
   GIT_CONFIG_NOSYSTEM: '1',
   GIT_CONFIG_GLOBAL: '/dev/null',
@@ -401,4 +400,62 @@ elif lock.read_text() != 'resolved lock\\n':
       assert.equal(git('ls-files', '--stage'), repairedIndex);
     });
   }
+}
+
+export function manifestRepo(t) {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-manifest-union-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+  const pkg = 'packages/shared-lib/package.json';
+  const turbo = 'packages/shared-lib/turbo.json';
+  const output = 'docs/REPOSITORY_SOURCES.md';
+  const writeManifests = (testScript, inputs) => {
+    mkdirSync(dirname(join(root, pkg)), { recursive: true });
+    writeFileSync(join(root, pkg), `${JSON.stringify({
+      name: 'shared',
+      scripts: { test: testScript },
+    }, null, 2)}\n`);
+    writeFileSync(join(root, turbo), `{
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "outputs": ["$TURBO_EXTENDS$"],
+      "inputs": [
+${inputs.map((item) => `        ${JSON.stringify(item)}`).join(',\n')}
+      ]
+    },
+    "test:mutation": {
+      "cache": false
+    }
+  }
+}
+`);
+  };
+  const project = () => execFileSync('python3', [
+    fileURLToPath(new URL('./repository_docs.py', import.meta.url)), '--root', root, '--write',
+  ], { env });
+  const commit = (testScript, inputs, message) => {
+    writeManifests(testScript, inputs);
+    project();
+    git('add', '.');
+    git('commit', '-qm', message);
+  };
+  git('init', '-q', '-b', 'feature');
+  git('config', 'core.hooksPath', '/dev/null');
+  mkdirSync(join(root, 'docs'), { recursive: true });
+  writeFileSync(join(root, 'README.md'), 'Local instructions\n');
+  writeFileSync(join(root, 'NOTES.md'), 'Shared note\n');
+  writeFileSync(join(root, 'repository-docs.json'), JSON.stringify({
+    schemaVersion: 1,
+    repository: 'example/app',
+    entrypoints: ['README.md'],
+    sources: [
+      { path: pkg, purpose: 'Test wiring' },
+      { path: turbo, purpose: 'Cache inputs' },
+    ],
+    imports: [],
+    output,
+  }));
+  commit('node --test shared.test.mjs', ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml'], 'base');
+  return { root, git, pkg, turbo, output, commit };
 }

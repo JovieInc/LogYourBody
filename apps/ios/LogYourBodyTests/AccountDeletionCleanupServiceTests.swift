@@ -16,6 +16,7 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
     private enum TestError: Error, Equatable {
         case productDeletionFailed
         case coreDataCleanupFailed
+        case visualizationCleanupFailed
     }
 
     func testTrainingDraftCleanupRequiresProductDeletionAndStillRunsWhenCoreDataFails() async {
@@ -200,24 +201,45 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
     }
 
     func testPerformDeletionClearsVisualizationAssetsWithTheAuthorizedLocalCleanup() async {
-        var events: [String] = []
-        let service = AccountDeletionCleanupService(dependencies: .init(
-            logoutSubscriptionProvider: { events.append("provider") },
-            resetHealthKitAnchors: { events.append("health") },
-            deleteProductAccount: { events.append("product") },
-            deleteCoreData: { events.append("coredata") },
-            clearKeychain: { events.append("keychain") },
-            deleteSpotlightMetrics: { events.append("spotlight") },
-            clearUserDefaults: { events.append("defaults"); return [] },
-            logoutAuthSession: { events.append("auth") },
-            deleteTrainingDrafts: { events.append("drafts") },
-            deleteVisualizationAssets: { events.append("visualization") }
-        ))
-        try? await service.performDeletion()
-        XCTAssertEqual(
-            events,
-            ["provider", "health", "product", "drafts", "visualization", "coredata", "keychain", "defaults", "spotlight", "auth"]
-        )
+        for failure in [nil, TestError.productDeletionFailed, TestError.visualizationCleanupFailed] {
+            var events: [String] = []
+            let service = AccountDeletionCleanupService(dependencies: .init(
+                logoutSubscriptionProvider: { events.append("provider") },
+                resetHealthKitAnchors: { events.append("health") },
+                deleteProductAccount: {
+                    events.append("product")
+                    if failure == .productDeletionFailed { throw TestError.productDeletionFailed }
+                },
+                deleteCoreData: { events.append("coredata") },
+                clearKeychain: { events.append("keychain") },
+                deleteSpotlightMetrics: { events.append("spotlight") },
+                clearUserDefaults: { events.append("defaults"); return [] },
+                logoutAuthSession: { events.append("auth") },
+                deleteTrainingDrafts: { events.append("drafts") },
+                deleteVisualizationAssets: {
+                    events.append("visualization")
+                    if failure == .visualizationCleanupFailed { throw TestError.visualizationCleanupFailed }
+                },
+                deletePersonalBodyEstimates: { events.append("personal") }
+            ))
+            do {
+                try await service.performDeletion()
+                XCTAssertNil(failure)
+            } catch {
+                XCTAssertEqual(error as? TestError, failure)
+            }
+            if failure == .productDeletionFailed {
+                XCTAssertEqual(events, ["provider", "health", "product"])
+                continue
+            }
+            XCTAssertEqual(
+                events,
+                [
+                    "provider", "health", "product", "drafts", "personal", "visualization",
+                    "coredata", "keychain", "defaults", "spotlight", "auth"
+                ]
+            )
+        }
     }
 
     func testClearAccountUserDefaultsRemovesAuthHealthKitBillingAndLaunchState() {

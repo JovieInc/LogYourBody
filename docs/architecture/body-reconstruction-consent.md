@@ -62,3 +62,10 @@ placeholders in the account's application-support directory. Authentic photos
 may only reference the existing progress-photo prefix above. That work adds no
 provider, credential, or upload. The interface is
 [body visualization snapshots](../engineering/body-visualization-snapshots.md).
+
+## LYB-317 use
+
+The optional personal outline uses the on-device wireframe. It does not add a
+provider, credential, or upload. External processing is refused at the privacy
+consent boundary. Derived outlines are deleted with the source photo and the
+account. That later slice does not change this decision.
