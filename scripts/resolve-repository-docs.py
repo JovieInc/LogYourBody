@@ -34,6 +34,22 @@ def staged_bytes(root, name):
     ).stdout
 
 
+def verify_react_renderer_versions(root):
+    # A dependency repair must keep React and its DOM renderer on the same version.
+    lockfile = repository_docs.local(root, "pnpm-lock.yaml").read_text()
+    snapshots = re.findall(
+        r"""(?m)^ {2}['"]?react-dom@([^\s(]+)\(react@([^\s)]+)\)['"]?:\s*$""",
+        lockfile,
+    )
+    for renderer, react in snapshots:
+        if renderer != react:
+            raise ValueError(f"react-dom@{renderer} requires matching react, got {react}")
+    # The web consumer and linked UI workspace must share one React runtime.
+    versions = sorted({react for _, react in snapshots})
+    if len(versions) > 1:
+        raise ValueError("multiple React runtime versions: " + ", ".join(versions))
+
+
 def merge_sections(root, name):
     """Propose an additive documentation merge from immutable index stages; never write."""
     root = Path(root).resolve()
@@ -392,6 +408,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                     ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
                     cwd=root, check=True,
                 )
+            verify_react_renderer_versions(root)
         if pin_update:
             repository_docs.local(root, pin_update[0]).write_text(pin_update[1])
         errors = repository_docs.run(root, write=True)

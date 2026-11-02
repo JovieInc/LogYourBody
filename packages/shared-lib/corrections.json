@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-react-renderer-version-alignment",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1734",
+    "correction": "PR #1734, fix-red-1423773703 occurrence 36: the React DOM 19.3.1 update retained an outdated lockfile and source projection, failing Detect Changes, parity, CI Summary and Vercel. Refreshing only React DOM resolves it against React 19.3.0 and breaks server rendering; upgrading only the web runtime leaves the linked UI workspace on React 19.3.0 and causes invalid hook calls.",
+    "mechanization": "Extend the existing explicit dependency/source-map repair helper to reject mismatched React DOM peers and multiple locked React runtimes before staging either artifact. Eight real-Git rejection regressions fail before their corresponding guard extensions and pass afterward; both matching-version cases pass, and the existing required change-detection suite runs all ten. Use the extended helper to reject the supplied mismatched lockfile, align React and React DOM to 19.3.1 in the web consumer and UI development dependencies, then refresh and freeze both dependency artifacts. Preserve the UI library's supported peer ranges. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper owns lockfile verification and source-map staging. Refusing incompatible React renderer snapshots inside its artifact rollback boundary prevents the repair from accepting dependencies that cannot render, without changing frozen CI installs or adding another shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "A dependency repair must keep React and its DOM renderer on the same version."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "pr1712-dated-timeline-red-checks",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1712",
     "correction": "LYB-342 / fix-red-b87016832d occurrence 3: repair the dated-outcome timeline checks after merging origin/main. Company guards reject oversized Swift growth; static audits pin a baselined sheet to exact size; Mac routing rejects the stale reviewed-project digest; launch quality loses the Add photo identifier and checks keyboard presence instead of field focus. Tently reports an AI-provider outage.",

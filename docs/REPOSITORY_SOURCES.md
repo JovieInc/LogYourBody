@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0f5b2f05e66e04105ed6b858cf3dcc041a75a9d2ade482589dbaebf11a149afe`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `291a52ca4fb52576a519da14d301930952d88024f038eba6137ed83e10962357`)
 
 ### `apps/web/package.json`: engines
 
@@ -137,9 +137,9 @@ A changed fingerprint requires review of its related documentation; it does not 
   "pdf-lib": "^1.17.1",
   "pdf-parse": "^1.1.4",
   "pdfjs-dist": "^6.3.289",
-  "react": "^19.3.0",
+  "react": "^19.3.1",
   "react-day-picker": "^10.0.2",
-  "react-dom": "^19.3.0",
+  "react-dom": "^19.3.1",
   "react-hook-form": "^7.88.0",
   "react-markdown": "^10.1.0",
   "react-resizable-panels": "^3.0.6",

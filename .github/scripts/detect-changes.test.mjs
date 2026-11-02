@@ -1051,12 +1051,13 @@ with Path('pnpm-calls').open('a') as log:
 if os.environ.get('FAIL_INSTALL') or (os.environ.get('FAIL_FREEZE') and '--frozen-lockfile' in sys.argv):
     sys.exit(42)
 assert json.loads(Path('package.json').read_text())['dependencies']['switch'] == '1.3.8'
+resolved = os.environ.get('RESOLVED_LOCKFILE', 'resolved lock\\n')
 if '--no-frozen-lockfile' in sys.argv:
-    Path('pnpm-lock.yaml').write_text('resolved lock\\n')
+    Path('pnpm-lock.yaml').write_text(resolved)
     if os.environ.get('FAIL_REFRESH'):
         sys.exit(42)
 else:
-    if Path('pnpm-lock.yaml').read_text() != 'resolved lock\\n':
+    if Path('pnpm-lock.yaml').read_text() != resolved:
         print('ERR_PNPM_OUTDATED_LOCKFILE', file=sys.stderr)
         sys.exit(1)
     if os.environ.get('FAIL_RECHECK'):
@@ -1076,6 +1077,47 @@ function verifyDependencyLockfile(fx, env = {}) {
     path.join(scriptDir, '../../scripts/resolve-repository-docs.py'),
     '--root', fx.root, '--verify-lockfile',
   ], { encoding: 'utf8', env: { ...gitEnv, PATH: `${path.join(fx.root, 'bin')}:${process.env.PATH}`, ...env } });
+}
+
+for (const mode of ['refresh', 'verify']) {
+  for (const [quote, react, compatible, extra = ''] of [
+    ['', '19.3.0', false],
+    ["'", '19.3.0', false],
+    ['"', '19.3.0', false],
+    ['', '19.3.1', true],
+    ['', '19.3.1', false, '  react-dom@19.3.0(react@19.3.0):\n'],
+  ]) {
+    test(`dependency ${mode} ${compatible ? 'accepts matching' : 'refuses incompatible'} React renderer versions (${extra ? 'mixed' : quote || 'unquoted'})`, () => {
+      const fx = dependencyRefreshFixture();
+      try {
+        const resolved = `snapshots:\n  ${quote}react-dom@19.3.1(react@${react})${quote}:\n    dependencies:\n      react: ${react}\n${extra}`;
+        if (mode === 'verify') {
+          fs.writeFileSync(path.join(fx.root, 'pnpm-lock.yaml'), resolved);
+          git(fx.root, 'add', 'pnpm-lock.yaml');
+        }
+        const index = git(fx.root, 'ls-files', '--stage');
+        const lock = fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8');
+        const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+        const env = { RESOLVED_LOCKFILE: resolved };
+        const result = mode === 'refresh' ? fx.refresh([], env) : verifyDependencyLockfile(fx, env);
+        if (compatible) {
+          assert.equal(result.status, 0, result.stderr);
+          assert.equal(git(fx.root, 'show', ':pnpm-lock.yaml'), resolved.trim());
+          assert.match(git(fx.root, 'show', `:${fx.output}`), /"switch": "1\.3\.8"/);
+        } else {
+          assert.notEqual(result.status, 0, result.stdout);
+          assert.match(result.stderr, extra
+            ? /multiple React runtime versions: 19\.3\.0, 19\.3\.1/
+            : /react-dom@19\.3\.1 requires matching react, got 19\.3\.0/);
+          assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+          assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), lock);
+          assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+        }
+      } finally {
+        fs.rmSync(fx.root, { recursive: true, force: true });
+      }
+    });
+  }
 }
 
 test('dependency refresh keeps a valid bot lockfile without invoking the resolver', () => {
