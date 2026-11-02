@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-const resolver = fileURLToPath(new URL('./resolve-repository-docs.py', import.meta.url));
-const env = {
+export const resolver = fileURLToPath(new URL('./resolve-repository-docs.py', import.meta.url));
+export const env = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
   GIT_CONFIG_NOSYSTEM: '1',
   GIT_CONFIG_GLOBAL: '/dev/null',
@@ -94,6 +93,118 @@ test('documentation merge requires an active conflict and a regular documentatio
   assert.notEqual(f.resolve().status, 0, 'ordinary commits cannot generate a merge');
 });
 
+export function sourceMapFixture(t) {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-source-map-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+  const output = 'SOURCES.md';
+  git('init', '-q', '-b', 'ours');
+  git('config', 'core.hooksPath', '/dev/null');
+  writeFileSync(join(root, 'README.md'), 'Local instructions\n');
+  writeFileSync(join(root, 'repository-docs.json'), JSON.stringify({
+    schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+    sources: [
+      { path: 'a.txt', purpose: 'First fingerprint' },
+      { path: 'b.txt', purpose: 'Second fingerprint' },
+    ],
+    imports: [], output,
+  }));
+  writeFileSync(join(root, 'a.txt'), 'base-a\n');
+  writeFileSync(join(root, 'b.txt'), 'base-b\n');
+  const generate = () => execFileSync('python3', [
+    fileURLToPath(new URL('./repository_docs.py', import.meta.url)), '--root', root, '--write',
+  ], { env });
+  const commit = () => {
+    git('add', '-A');
+    git('commit', '-qm', 'fixture');
+  };
+  generate();
+  commit();
+  git('branch', 'theirs');
+  return { root, git, output, generate, commit };
+}
+
+test('conflicted source map keeps both merged fingerprints and ignores unstaged source bytes', (t) => {
+  const f = sourceMapFixture(t);
+  writeFileSync(join(f.root, 'a.txt'), 'ours-a\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  writeFileSync(join(f.root, 'b.txt'), 'theirs-b\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  const merge = spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: f.root, env, encoding: 'utf8' });
+  assert.equal(merge.status, 1, merge.stderr);
+  assert.match(f.git('diff', '--name-only', '--diff-filter=U'), /^SOURCES\.md$/m);
+  const before = f.git('ls-files', '--stage');
+  writeFileSync(join(f.root, 'a.txt'), 'DIRTY\n');
+  const result = spawnSync('python3', [resolver, '--root', f.root], { env, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const staged = f.git('show', ':SOURCES.md');
+  const digest = (text) => createHash('sha256').update(text).digest('hex');
+  assert.equal(staged.includes('<<<<<<<'), false);
+  assert.match(staged, new RegExp(digest('ours-a\n')));
+  assert.match(staged, new RegExp(digest('theirs-b\n')));
+  assert.doesNotMatch(staged, new RegExp(digest('DIRTY\n')));
+  assert.equal(f.git('show', ':a.txt'), 'ours-a\n');
+  assert.equal(readFileSync(join(f.root, 'a.txt'), 'utf8'), 'DIRTY\n');
+  assert.equal(f.git('ls-files', '--unmerged'), '');
+  assert.notEqual(f.git('ls-files', '--stage'), before);
+});
+
+test('conflicted source map refuses an unmerged fingerprint input', (t) => {
+  const f = sourceMapFixture(t);
+  writeFileSync(join(f.root, 'a.txt'), 'ours-a\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  writeFileSync(join(f.root, 'a.txt'), 'theirs-a\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  const merge = spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: f.root, env, encoding: 'utf8' });
+  assert.equal(merge.status, 1, merge.stderr);
+  const before = readFileSync(join(f.root, f.output), 'utf8');
+  const index = f.git('ls-files', '--stage');
+  const result = spawnSync('python3', [resolver, '--root', f.root], { env, encoding: 'utf8' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /resolve source conflicts first: a\.txt/);
+  assert.equal(readFileSync(join(f.root, f.output), 'utf8'), before);
+  assert.equal(f.git('ls-files', '--stage'), index);
+});
+
+test('conflicted source map refuses unstaged pinned drift without rewriting the projection', (t) => {
+  const f = sourceMapFixture(t);
+  writeFileSync(join(f.root, 'a.txt'), 'ours-a\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  writeFileSync(join(f.root, 'b.txt'), 'theirs-b\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  const merge = spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: f.root, env, encoding: 'utf8' });
+  assert.equal(merge.status, 1, merge.stderr);
+  const registry = JSON.parse(readFileSync(join(f.root, 'repository-docs.json'), 'utf8'));
+  registry.imports = [{
+    repository: 'example/policy',
+    revision: 'a'.repeat(40),
+    path: 'policy.md',
+    destination: 'policy.md',
+    sha256: '0'.repeat(64),
+  }];
+  writeFileSync(join(f.root, 'repository-docs.json'), JSON.stringify(registry));
+  const before = readFileSync(join(f.root, f.output));
+  const index = f.git('ls-files', '--stage');
+  const result = spawnSync('python3', [resolver, '--root', f.root], { env, encoding: 'utf8' });
+  assert.notEqual(result.status, 0, result.stdout);
+  assert.match(result.stderr, /pinned copy missing or changed: policy\.md/);
+  assert.deepEqual(readFileSync(join(f.root, f.output)), before);
+  assert.equal(f.git('ls-files', '--stage'), index);
+});
+
+
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
   for (const present of [true, false]) {
     test(`dependency repair ${mode} restores ${present ? 'existing' : 'missing'} outputs after staging fails`, (t) => {
@@ -161,152 +272,217 @@ elif lock.read_text() != 'resolved lock\\n':
   }
 }
 
-function jsonConflict(t, base, ours, theirs, path = 'config/inputs.json') {
-  const root = mkdtempSync(join(tmpdir(), 'lyb-json-union-'));
+export function manifestRepo(t) {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-manifest-union-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
-  mkdirSync(dirname(join(root, path)), { recursive: true });
-  const commit = (content) => {
-    writeFileSync(join(root, path), content);
-    git('add', path);
-    git('commit', '-qm', 'fixture');
-  };
-  git('init', '-q', '-b', 'feature');
-  git('config', 'core.hooksPath', '/dev/null');
-  commit(base);
-  git('switch', '-qc', 'incoming');
-  commit(theirs);
-  git('switch', '-q', 'feature');
-  commit(ours);
-  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: root, env });
-  assert.equal(merge.status, 1, 'fixture must contain a real merge conflict');
-  const resolve = () => spawnSync('python3', [
-    resolver, '--root', root, '--union-json', path,
-  ], { env, encoding: 'utf8' });
-  return { root, git, path, resolve };
-}
-
-const jsonBase = '{\n  "items": ["a", "b"],\n  "n": 1\n}\n';
-const jsonOurs = '{\n  "items": ["a", "x", "b"],\n  "n": 1,\n  "ours": true\n}\n';
-const jsonTheirs = '{\n  "items": ["a", "b", "y"],\n  "nested": {"z": 1},\n  "n": 1\n}\n';
-
-test('json union keeps branch order and incoming additions without staging', (t) => {
-  const f = jsonConflict(t, jsonBase, jsonOurs, jsonTheirs);
-  writeFileSync(join(f.root, f.path), 'Unrelated working edits must survive.\n');
-  const index = f.git('ls-files', '--stage');
-  const result = f.resolve();
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, [
-    '{',
-    '  "items": [',
-    '    "a",',
-    '    "x",',
-    '    "b",',
-    '    "y"',
-    '  ],',
-    '  "nested": {',
-    '    "z": 1',
-    '  },',
-    '  "n": 1,',
-    '  "ours": true',
-    '}',
-    '',
-  ].join('\n'));
-  assert.equal(f.git('ls-files', '--stage'), index);
-  assert.equal(readFileSync(join(f.root, f.path), 'utf8'), 'Unrelated working edits must survive.\n');
-  assert.equal(f.resolve().stdout, result.stdout, 'repeated generation uses immutable index stages');
-});
-
-test('json union preserves a duplicate inherited from the merge base', (t) => {
-  const base = '{\n  "items": ["a", "a", "b"]\n}\n';
-  const ours = '{\n  "items": ["a", "a", "x", "b"]\n}\n';
-  const theirs = '{\n  "items": ["a", "a", "b", "y"]\n}\n';
-  const result = jsonConflict(t, base, ours, theirs).resolve();
-  assert.equal(result.status, 0, result.stderr);
-  assert.deepEqual(JSON.parse(result.stdout).items, ['a', 'a', 'x', 'b', 'y']);
-});
-
-for (const [name, ours, theirs, pattern] of [
-  ['list deletion', jsonBase.replace('"b"', '"z"'), jsonTheirs, /list deletions or reorders/],
-  ['list reorder', jsonBase.replace('["a", "b"]', '["b", "a"]'), jsonTheirs, /list deletions or reorders/],
-  ['scalar replacement', jsonOurs.replace('"n": 1', '"n": 2'), jsonTheirs, /conflicting replacement/],
-  ['duplicate values', jsonOurs.replace('["a", "x", "b"]', '["a", "x", "x", "b"]'), jsonTheirs, /duplicate/],
-  ['conflict markers', jsonOurs, jsonTheirs.replace('\n  "n": 1\n', '\n<<<<<<< incoming\n  "n": 1\n'), /conflict markers/],
-]) {
-  test(`json union refuses ${name} without changing files or index`, (t) => {
-    const f = jsonConflict(t, jsonBase, ours, theirs);
-    const before = readFileSync(join(f.root, f.path), 'utf8');
-    const index = f.git('ls-files', '--stage');
-    const result = f.resolve();
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, pattern);
-    assert.equal(result.stdout, '');
-    assert.equal(readFileSync(join(f.root, f.path), 'utf8'), before);
-    assert.equal(f.git('ls-files', '--stage'), index);
-  });
-}
-
-test('json union requires an active conflict and a regular json path', (t) => {
-  const f = jsonConflict(t, jsonBase, jsonOurs, jsonTheirs);
-  for (const path of ['../escape.json', 'AGENTS.md', 'docs/engineering/selection.md']) {
-    const result = spawnSync('python3', [resolver, '--root', f.root, '--union-json', path], { env, encoding: 'utf8' });
-    assert.notEqual(result.status, 0, path);
-  }
-  const blob = f.git('rev-parse', `:3:${f.path}`).trim();
-  execFileSync('git', ['update-index', '--index-info'], {
-    cwd: f.root, env, input: `120000 ${blob} 3\t${f.path}\n`,
-  });
-  assert.match(f.resolve().stderr, /regular indexed files/);
-  f.git('merge', '--abort');
-  assert.notEqual(f.resolve().status, 0, 'ordinary commits cannot generate a merge');
-});
-
-test('projection merge fingerprints the merged source instead of either parent', (t) => {
-  const root = mkdtempSync(join(tmpdir(), 'lyb-projection-merge-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
-  const source = 'packages/shared-lib/turbo.json';
+  const pkg = 'packages/shared-lib/package.json';
+  const turbo = 'packages/shared-lib/turbo.json';
   const output = 'docs/REPOSITORY_SOURCES.md';
-  const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
-  const turbo = (ours, theirs) => `${JSON.stringify({ oursSlot: ['a', ...ours], theirsSlot: ['b', ...theirs] }, null, 2)}\n`;
-  const commit = (content) => {
-    mkdirSync(dirname(join(root, source)), { recursive: true });
-    writeFileSync(join(root, 'README.md'), 'Local instructions\n');
-    writeFileSync(join(root, 'repository-docs.json'), `${JSON.stringify({
-      schemaVersion: 1,
-      repository: 'example/app',
-      entrypoints: ['README.md'],
-      sources: [{ path: source, purpose: 'Test cache inputs' }],
-      imports: [],
-      output,
-    })}\n`);
-    writeFileSync(join(root, source), content);
-    execFileSync('python3', [
-      fileURLToPath(new URL('./repository_docs.py', import.meta.url)), '--root', root, '--write',
-    ], { env });
+  const writeManifests = (testScript, inputs) => {
+    mkdirSync(dirname(join(root, pkg)), { recursive: true });
+    writeFileSync(join(root, pkg), `${JSON.stringify({
+      name: 'shared',
+      scripts: { test: testScript },
+    }, null, 2)}\n`);
+    writeFileSync(join(root, turbo), `{
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "outputs": ["$TURBO_EXTENDS$"],
+      "inputs": [
+${inputs.map((item) => `        ${JSON.stringify(item)}`).join(',\n')}
+      ]
+    },
+    "test:mutation": {
+      "cache": false
+    }
+  }
+}
+`);
+  };
+  const project = () => execFileSync('python3', [
+    fileURLToPath(new URL('./repository_docs.py', import.meta.url)), '--root', root, '--write',
+  ], { env });
+  const commit = (testScript, inputs, message) => {
+    writeManifests(testScript, inputs);
+    project();
     git('add', '.');
-    git('commit', '-qm', 'fixture');
+    git('commit', '-qm', message);
   };
   git('init', '-q', '-b', 'feature');
   git('config', 'core.hooksPath', '/dev/null');
-  commit(turbo([], []));
-  git('switch', '-qc', 'incoming');
-  commit(turbo([], ['expiry']));
-  git('switch', '-q', 'feature');
-  commit(turbo(['cert'], []));
-  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: root, env, encoding: 'utf8' });
-  assert.equal(merge.status, 1, merge.stderr);
-  assert.equal(git('diff', '--name-only', '--diff-filter=U').trim(), output);
-  const parents = ['HEAD', 'MERGE_HEAD'].map((rev) => digest(git('show', `${rev}:${source}`)));
-  const result = spawnSync('python3', [resolver, '--root', root], { env, encoding: 'utf8' });
+  mkdirSync(join(root, 'docs'), { recursive: true });
+  writeFileSync(join(root, 'README.md'), 'Local instructions\n');
+  writeFileSync(join(root, 'NOTES.md'), 'Shared note\n');
+  writeFileSync(join(root, 'repository-docs.json'), JSON.stringify({
+    schemaVersion: 1,
+    repository: 'example/app',
+    entrypoints: ['README.md'],
+    sources: [
+      { path: pkg, purpose: 'Test wiring' },
+      { path: turbo, purpose: 'Cache inputs' },
+    ],
+    imports: [],
+    output,
+  }));
+  commit('node --test shared.test.mjs', ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml'], 'base');
+  return { root, git, pkg, turbo, output, commit };
+}
+
+function conflictingManifests(t, theirsTest, theirsInputs, oursTest = 'node --test shared.test.mjs ours.test.mjs', oursInputs = ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs']) {
+  const fixture = manifestRepo(t);
+  fixture.git('switch', '-qc', 'incoming');
+  fixture.commit(theirsTest, theirsInputs, 'incoming');
+  fixture.git('switch', '-q', 'feature');
+  fixture.commit(oursTest, oursInputs, 'ours');
+  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: fixture.root, env });
+  assert.equal(merge.status, 1, 'fixture must contain a real merge conflict');
+  const run = (flag) => spawnSync('python3', [resolver, '--root', fixture.root, flag], { env, encoding: 'utf8' });
+  return { ...fixture, run };
+}
+
+test('manifest union keeps both parents test inputs and inline turbo arrays', (t) => {
+  const fixture = conflictingManifests(
+    t,
+    'node --test shared.test.mjs theirs.test.mjs',
+    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
+  );
+  writeFileSync(join(fixture.root, 'NOTES.md'), 'Unstaged note\n');
+  assert.notEqual(fixture.run('--staged').status, 0);
+  const refused = spawnSync('python3', [resolver, '--root', fixture.root], { env, encoding: 'utf8' });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /resolve source conflicts first/);
+  const result = fixture.run('--union-manifests');
   assert.equal(result.status, 0, result.stderr);
-  const merged = readFileSync(join(root, source));
-  assert.match(merged.toString(), /cert/);
-  assert.match(merged.toString(), /expiry/);
-  const projection = git('show', `:${output}`);
-  assert.equal(git('diff', '--name-only', '--diff-filter=U').trim(), '');
-  assert.match(projection, new RegExp(digest(merged)));
-  for (const parent of parents) assert.equal(projection.includes(parent), false);
-  assert.equal(projection.includes('<<<<<<<'), false);
-  assert.equal(spawnSync('python3', [resolver, '--root', root], { env, encoding: 'utf8' }).status, 0);
+  assert.equal(
+    JSON.parse(readFileSync(join(fixture.root, fixture.pkg), 'utf8')).scripts.test,
+    'node --test shared.test.mjs theirs.test.mjs ours.test.mjs',
+  );
+  const turbo = readFileSync(join(fixture.root, fixture.turbo), 'utf8');
+  assert.match(turbo, /"extends": \["\/\/"\]/);
+  assert.match(turbo, /"outputs": \["\$TURBO_EXTENDS\$"\]/);
+  assert.deepEqual(JSON.parse(turbo).tasks.test.inputs, [
+    '$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs',
+  ]);
+  assert.equal(fixture.git('ls-files', '-u'), '');
+  const projection = fixture.git('show', `:${fixture.output}`);
+  assert.match(projection, /theirs\.test\.mjs/);
+  assert.match(projection, /ours\.test\.mjs/);
+  assert.equal(readFileSync(join(fixture.root, 'NOTES.md'), 'utf8'), 'Unstaged note\n');
+  const index = fixture.git('ls-files', '--stage');
+  assert.equal(fixture.run('--union-manifests').status, 0, 'resolved manifests stay idempotent');
+  assert.equal(fixture.git('ls-files', '--stage'), index);
+});
+
+for (const [name, testScript, inputs] of [
+  ['deleted test', 'node --test', ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml']],
+  ['reordered input', 'node --test shared.test.mjs extra.test.mjs', ['shared.mjs', '$TURBO_DEFAULT$', 'workflow.yml', 'workflow.yml', 'theirs.mjs']],
+  ['replaced script', 'node --test other.test.mjs', ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'extra.mjs']],
+  ['dropped repeated input', 'node --test shared.test.mjs extra.test.mjs', ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml']],
+]) {
+  test(`manifest union refuses ${name} without staging`, (t) => {
+    const fixture = conflictingManifests(t, testScript, inputs);
+    const before = readFileSync(join(fixture.root, fixture.pkg), 'utf8');
+    const index = fixture.git('ls-files', '--stage');
+    const result = fixture.run('--union-manifests');
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /additive manifest union keeps every parent test input/);
+    assert.equal(readFileSync(join(fixture.root, fixture.pkg), 'utf8'), before);
+    assert.equal(fixture.git('ls-files', '--stage'), index);
+  });
+}
+
+test('manifest union leaves a conflicted correction ledger for its resolver', (t) => {
+  const fixture = manifestRepo(t);
+  const ledger = 'packages/shared-lib/corrections.json';
+  const writeLedger = (body) => {
+    mkdirSync(dirname(join(fixture.root, ledger)), { recursive: true });
+    writeFileSync(join(fixture.root, ledger), body);
+  };
+  writeLedger('[]\n');
+  fixture.git('add', ledger);
+  fixture.git('commit', '-qm', 'ledger base');
+  fixture.git('switch', '-qc', 'incoming');
+  writeLedger('[{"fingerprint":"theirs"}]\n');
+  fixture.commit(
+    'node --test shared.test.mjs theirs.test.mjs',
+    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
+    'incoming',
+  );
+  fixture.git('switch', '-q', 'feature');
+  writeLedger('[{"fingerprint":"ours"}]\n');
+  fixture.commit(
+    'node --test shared.test.mjs ours.test.mjs',
+    ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs'],
+    'ours',
+  );
+  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: fixture.root, env });
+  assert.equal(merge.status, 1, merge.stderr?.toString());
+  const beforeLedger = readFileSync(join(fixture.root, ledger), 'utf8');
+  const result = spawnSync('python3', [resolver, '--root', fixture.root, '--union-manifests'], {
+    env, encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fixture.git('diff', '--name-only', '--diff-filter=U').trim(), ledger);
+  assert.equal(readFileSync(join(fixture.root, ledger), 'utf8'), beforeLedger);
+  assert.match(beforeLedger, /^<<<<<<< /m);
+  const testScript = JSON.parse(readFileSync(join(fixture.root, fixture.pkg), 'utf8')).scripts.test;
+  assert.match(testScript, /ours\.test\.mjs/);
+  assert.match(testScript, /theirs\.test\.mjs/);
+  assert.equal(fixture.git('ls-files', '-u', '--', fixture.output).trim(), '');
+});
+
+test('manifest union refuses an unrelated conflict without staging', (t) => {
+  const fixture = manifestRepo(t);
+  fixture.git('switch', '-qc', 'incoming');
+  writeFileSync(join(fixture.root, 'NOTES.md'), 'Incoming note\n');
+  fixture.commit(
+    'node --test shared.test.mjs theirs.test.mjs',
+    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
+    'incoming',
+  );
+  fixture.git('switch', '-q', 'feature');
+  writeFileSync(join(fixture.root, 'NOTES.md'), 'Branch note\n');
+  fixture.commit(
+    'node --test shared.test.mjs ours.test.mjs',
+    ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs'],
+    'ours',
+  );
+  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: fixture.root, env });
+  assert.equal(merge.status, 1);
+  const before = readFileSync(join(fixture.root, fixture.pkg), 'utf8');
+  const index = fixture.git('ls-files', '--stage');
+  const result = spawnSync('python3', [resolver, '--root', fixture.root, '--union-manifests'], {
+    env, encoding: 'utf8',
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /unrelated conflicts/);
+  assert.equal(readFileSync(join(fixture.root, fixture.pkg), 'utf8'), before);
+  assert.equal(fixture.git('ls-files', '--stage'), index);
+});
+
+test('manifest union refuses a symlink stage and a commit that is not a merge', (t) => {
+  const fixture = conflictingManifests(
+    t,
+    'node --test shared.test.mjs theirs.test.mjs',
+    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
+  );
+  const blob = fixture.git('rev-parse', `:3:${fixture.pkg}`).trim();
+  const before = readFileSync(join(fixture.root, fixture.pkg), 'utf8');
+  execFileSync('git', ['update-index', '--index-info'], {
+    cwd: fixture.root,
+    env,
+    input: `120000 ${blob} 3\t${fixture.pkg}\n`,
+  });
+  const index = fixture.git('ls-files', '--stage');
+  const symlink = fixture.run('--union-manifests');
+  assert.notEqual(symlink.status, 0);
+  assert.match(symlink.stderr, /regular files/);
+  assert.equal(readFileSync(join(fixture.root, fixture.pkg), 'utf8'), before);
+  assert.equal(fixture.git('ls-files', '--stage'), index);
+  fixture.git('merge', '--abort');
+  const absent = fixture.run('--union-manifests');
+  assert.notEqual(absent.status, 0);
+  assert.match(absent.stderr, /repository-docs:/);
 });

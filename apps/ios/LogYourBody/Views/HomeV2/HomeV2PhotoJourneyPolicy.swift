@@ -50,6 +50,8 @@ enum HomeV2PhotoCopy {
     static let shareLoadFailed = "Couldn’t load both photos. Try again, or choose different photos."
     static let shareRenderFailed = "Couldn’t prepare the share card. Try again."
     static let retryPhotos = "Retry photos"
+    static let retryFraming = "Retry framing"
+    static let differentPose = "Different pose. Showing both photos."
 
     static func insufficientPhotos(for tool: HomeV2PhotoTool) -> String {
         tool == .share ? "Two photos are needed to share progress." : notEnoughPhotos

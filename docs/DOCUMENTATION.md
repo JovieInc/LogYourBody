@@ -29,22 +29,29 @@ python3 scripts/repository_docs.py --root /path/to/this-repo --write \
 
 After merging a branch, resolve source conflicts first, then run
 `python3 scripts/resolve-repository-docs.py` to regenerate and stage the source
-map from the merged sources. This wraps the pinned generator and refuses to
-write while any other file is unmerged or a shared import fails parity. It
-stages only the generated output; review the source diff before committing.
+map from the merged sources. A conflicted map is rebuilt from the merged index,
+so unstaged source edits and either parent projection cannot change its
+fingerprints. This wraps the pinned generator and refuses to write while any
+other file is unmerged or a shared import fails parity. It stages only the
+generated output; review the source diff before committing.
 
 When a merged Xcode project changes the diagnostic workflow's exact project pin,
-review and stage the project and workflow first, retaining one project-pin line.
-Then refresh that pin and the source map together using the reviewed digest:
+stage the merged project. If that workflow conflict differs only by the pin,
+pass the merged project's digest. The resolver writes that pin and rebuilds a
+conflicted source map from the index, ignoring unstaged source bytes. It refuses
+a digest that does not match the staged project, a merged project that dropped
+a parent file membership, any other workflow difference, and every other
+unmerged path.
 
 ```sh
 python3 scripts/resolve-repository-docs.py --reviewed-project-sha256 <reviewed-merged-project-sha256>
 ```
 
-This explicit mode verifies the supplied digest against the staged project,
-refuses unstaged edits, symlinks, conflict markers and ambiguous pins, and stages
-only the updated workflow and source map. Other diagnostic pins and all trust
-checks remain intact. Ordinary repair and commit hooks never grant this review.
+Staging the workflow yourself, with one project-pin line, still works. This
+explicit mode verifies the supplied digest against the staged project, refuses
+unstaged edits, symlinks, conflict markers and ambiguous pins, and stages only
+the updated workflow and source map. Other diagnostic pins and all trust checks
+remain intact. Ordinary repair and commit hooks never grant this review.
 
 The pre-commit hook runs `python3 scripts/resolve-repository-docs.py --staged`
 after formatting and correction classification, and before the merge ledger
@@ -67,6 +74,9 @@ existing lockfile with pinned Corepack pnpm (frozen, offline, lockfile-only,
 lifecycle scripts disabled) before regenerating and staging only the source map.
 It retains the refusal of unstaged dependency/output edits and pinned-source drift
 without re-resolving unrelated dependencies.
+Both dependency modes render the source map from the Git index, preserving
+unrelated unstaged source edits without fingerprinting them. Refresh mode stages
+the lockfile and projection together; verify mode stages only the projection.
 
 For dependency PRs, stage the reviewed manifests and run
 `python3 scripts/resolve-repository-docs.py --refresh-lockfile`. This explicit
@@ -81,6 +91,9 @@ lock and unrelated edits remain untouched.
 It then stages the lockfile and source map, refusing unresolved source conflicts,
 unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift. It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.
+Both dependency modes check pnpm hooks (`.pnpmfile.cjs`), workspace `.npmrc`
+files and `patches/` as dependency inputs. Stage reviewed changes to these files
+before repair; local edits remain untouched when the preflight refuses them.
 
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the

@@ -83,12 +83,24 @@ App Review notes and metadata live in `apps/ios/fastlane/metadata/`. Fix, push t
 
 ## Release health and phased rollout (LYB-139)
 
-`ios-app-store-approved-release.yml` runs every 30 minutes. Before requesting
-release, and on each run for every ACTIVE or PAUSED live rollout, it reads the
-build attached to that App Store version. Sentry's identity must match the app's
-existing `ios-<marketing version> (<build>)` release name. A newer TestFlight
-build with the same marketing version cannot substitute. Active rollouts remain
-monitored even when the project or manual `app_version` selects another version.
+`ios-app-store-approved-release.yml` requests release of any App Store version
+in `PENDING_DEVELOPER_RELEASE`. Scheduled runs leave `APP_VERSION` empty, so a
+marketing-version bump on main (for example 1.3.0 while 1.2.0 is approved and
+waiting) still releases 1.2.0. A manual `app_version` input selects that exact
+version instead. Before requesting release, and on each run for every ACTIVE or
+PAUSED live rollout, it reads the build attached to that App Store version.
+Sentry's identity must match the app's existing `ios-<marketing version>
+(<build>)` release name. A newer TestFlight build with the same marketing
+version cannot substitute. Active rollouts remain monitored on every run,
+including when a manual `app_version` selects another version.
+
+The workflow cron is `*/30 * * * *`. GitHub Actions delivered that schedule
+hours late. Scheduled runs from 2026-10-28 15:17Z through 2026-11-01 17:12Z
+started about 3-7 hours apart, including 20:26Z, 00:11Z, 06:09Z, and 13:28Z on
+Oct 28-29. LYB-139's health gate uses that gap as the latency for a release
+request and for pausing a rollout. `workflow_dispatch` runs the same check on
+demand. The prompt path still to build is an App Store Connect `appStoreVersion`
+webhook bridged to `repository_dispatch`; the cron stays the backstop.
 
 The monitor queries [Sentry release-health session statistics](https://docs.sentry.io/api/releases/retrieve-release-health-session-statistics/)
 for each exact build in the `production` environment with a `24h` window and

@@ -26,6 +26,14 @@ One Linear issue on team LYB, fingerprint `remediation:signing-expiry`.
 
 30 days exactly is not under 30. 7 days exactly stays High and does not escalate. The issue body contains only the asset kind and the day count, plus this runbook path.
 
+## Pull request check
+
+The **Release signing provisioned** job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs when a pull request changes `apps/ios/fastlane/`, a `project.pbxproj`, or an entitlements file. `CI Summary` requires it for those pulls. It reads the bundle IDs that `setup_provisioning` passes to match for `type:appstore` and `readonly:true` in [`apps/ios/fastlane/Fastfile.release`](../../apps/ios/fastlane/Fastfile.release). If that lane omits `app_identifier`, the Matchfile list is the fallback. The check then GETs App Store Connect. It fails when a required bundle ID is not registered, has no active App Store profile (`IOS_APP_STORE`), or that profile does not allow a capability the target entitlements need. A profile value of `*` or a prefix ending in `*` allows the more specific value the target claims (TN3125). Associated Domains is stored as `*` in the profile while the target lists each service and domain. A missing key still fails, and a boolean capability still has to be true.
+
+A failure is a provisioning step for Tim. Use step 2 below from a machine that already has the Match and App Store Connect secrets. The check does not create profiles. Its output has no key IDs, bundle IDs, team IDs, or profile bytes.
+
+A fork pull request has no App Store Connect credentials. That job finishes neutral and says it did not pass. A pull request from this repository fails closed when those credentials are missing.
+
 ## Renew before nuke
 
 Stop at the first step that leaves a usable distribution certificate and App Store profile. Run these from a machine that already has the Match and App Store Connect secrets. Do not put those values in the command line, the shell history you paste into chat, or the Linear issue.

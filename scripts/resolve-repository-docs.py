@@ -10,6 +10,7 @@ from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 import repository_docs
+from json_union import _unmerged_texts, union_json
 
 
 @contextmanager
@@ -32,210 +33,6 @@ def staged_bytes(root, name):
     return subprocess.run(
         ["git", "show", ":" + name], cwd=root, check=True, capture_output=True,
     ).stdout
-
-
-def _unmerged_texts(root, name, kind):
-    """Return base, ours, and theirs for one unmerged regular file. Never writes."""
-    root = Path(root).resolve()
-    repository_docs.local(root, name)
-
-    def git(*args):
-        return subprocess.run(
-            ["git", *args], cwd=root, check=True, capture_output=True, text=True,
-        ).stdout
-
-    git("rev-parse", "--verify", "MERGE_HEAD")
-    entries = git("ls-files", "--unmerged", "-z", "--", name).strip("\0").split("\0")
-    stages = [entry.split("\t", 1)[0].split() for entry in entries if entry]
-    if len(stages) != 3 or {row[2] for row in stages if len(row) == 3} != {"1", "2", "3"}:
-        raise ValueError(kind + " requires all three unmerged stages")
-    if any(row[0] not in {"100644", "100755"} for row in stages):
-        raise ValueError(kind + " requires regular indexed files")
-    blobs = [git("show", f":{stage}:{name}") for stage in (1, 2, 3)]
-    for source in blobs:
-        if re.search(r"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", source):
-            raise ValueError(kind + " refuses conflict markers in a parent")
-    return blobs
-
-
-def _json_token(value):
-    return json.dumps(value, sort_keys=True, ensure_ascii=False)
-
-
-def _insert_absent(spine, incoming):
-    """Keep spine order and insert incoming values that spine does not already contain."""
-    tokens = [_json_token(item) for item in spine]
-    index = {token: position for position, token in enumerate(tokens)}
-    if len(index) != len(spine) or len({_json_token(item) for item in incoming}) != len(incoming):
-        raise ValueError("json union refuses duplicate values")
-    pending = []
-    inserts = {}
-    for item in incoming:
-        token = _json_token(item)
-        if token in index:
-            if pending:
-                inserts.setdefault(index[token], []).extend(pending)
-                pending = []
-        else:
-            pending.append(item)
-    if pending:
-        inserts.setdefault(len(spine), []).extend(pending)
-    merged = []
-    for position, item in enumerate(spine):
-        merged.extend(inserts.get(position, []))
-        merged.append(item)
-    merged.extend(inserts.get(len(spine), []))
-    return merged
-
-
-def _merge_sequences(spine, incoming):
-    """Keep the maximum multiplicity, spine order, and incoming-only values at their anchor."""
-    target = {}
-    for item in spine:
-        token = _json_token(item)
-        target[token] = target.get(token, 0) + 1
-    incoming_counts = {}
-    for item in incoming:
-        token = _json_token(item)
-        incoming_counts[token] = incoming_counts.get(token, 0) + 1
-    for token, count in incoming_counts.items():
-        if count > target.get(token, 0):
-            target[token] = count
-    emitted = {}
-    result = []
-    index = 0
-
-    def emit_spine_through(match):
-        nonlocal index
-        while index < len(spine):
-            current = spine[index]
-            index += 1
-            token = _json_token(current)
-            if emitted.get(token, 0) < target[token]:
-                result.append(current)
-                emitted[token] = emitted.get(token, 0) + 1
-            if current == match:
-                return
-
-    for item in incoming:
-        token = _json_token(item)
-        if emitted.get(token, 0) >= target[token]:
-            continue
-        if any(spine[position] == item for position in range(index, len(spine))):
-            emit_spine_through(item)
-        else:
-            result.append(item)
-            emitted[token] = emitted.get(token, 0) + 1
-    while index < len(spine):
-        current = spine[index]
-        index += 1
-        token = _json_token(current)
-        if emitted.get(token, 0) < target[token]:
-            result.append(current)
-            emitted[token] = emitted.get(token, 0) + 1
-    return result
-
-
-def _union_added(ours, theirs):
-    if ours == theirs:
-        return ours
-    if isinstance(ours, dict) and isinstance(theirs, dict):
-        return _union_object({}, ours, theirs)
-    if isinstance(ours, list) and isinstance(theirs, list):
-        return _union_list([], ours, theirs)
-    raise ValueError("json union refuses a conflicting addition")
-
-
-def _union_object(base, ours, theirs):
-    for key in base:
-        if key not in ours or key not in theirs:
-            raise ValueError("json union refuses a deletion: " + key)
-    merged = {}
-    for key in _insert_absent(list(ours), list(theirs)):
-        if key in ours and key in theirs:
-            merged[key] = (
-                _union_value(base[key], ours[key], theirs[key])
-                if key in base else _union_added(ours[key], theirs[key])
-            )
-        else:
-            merged[key] = ours[key] if key in ours else theirs[key]
-    return merged
-
-
-def _new_duplicate(base, side):
-    base_counts = {}
-    for item in base:
-        token = _json_token(item)
-        base_counts[token] = base_counts.get(token, 0) + 1
-    seen = {}
-    for item in side:
-        token = _json_token(item)
-        seen[token] = seen.get(token, 0) + 1
-        if seen[token] > 1 and seen[token] > base_counts.get(token, 0):
-            return True
-    return False
-
-
-def _union_list(base, ours, theirs):
-    for sequence in (base, ours, theirs):
-        if not all(isinstance(item, (str, int, float, bool, type(None))) for item in sequence):
-            raise ValueError("json union refuses non-scalar list edits")
-        if _new_duplicate(base, sequence):
-            raise ValueError("json union refuses duplicate list values")
-
-    def keeps_base(side):
-        cursor = 0
-        for item in side:
-            if cursor < len(base) and item == base[cursor]:
-                cursor += 1
-        if cursor != len(base):
-            raise ValueError("json union refuses list deletions or reorders")
-
-    keeps_base(ours)
-    keeps_base(theirs)
-    return _merge_sequences(ours, theirs)
-
-
-def _union_value(base, ours, theirs):
-    if ours == theirs:
-        return ours
-    if isinstance(base, dict) and isinstance(ours, dict) and isinstance(theirs, dict):
-        return _union_object(base, ours, theirs)
-    if isinstance(base, list) and isinstance(ours, list) and isinstance(theirs, list):
-        return _union_list(base, ours, theirs)
-    raise ValueError("json union refuses a conflicting replacement")
-
-
-def _render_json(value, level=0):
-    """Match the repository's compact short arrays and expanded longer ones."""
-    pad = "  " * level
-    if isinstance(value, dict):
-        if not value:
-            return "{}"
-        rows = [f"{pad}  {json.dumps(key, ensure_ascii=False)}: {_render_json(item, level + 1)}"
-                for key, item in value.items()]
-        return "{\n" + ",\n".join(rows) + "\n" + pad + "}"
-    if isinstance(value, list):
-        if not value:
-            return "[]"
-        compact = json.dumps(value, ensure_ascii=False)
-        scalars = all(isinstance(item, (str, int, float, bool, type(None))) for item in value)
-        if scalars and len(value) <= 2 and len(compact) <= 80:
-            return compact
-        rows = [pad + "  " + _render_json(item, level + 1) for item in value]
-        return "[\n" + ",\n".join(rows) + "\n" + pad + "]"
-    return json.dumps(value, ensure_ascii=False)
-
-
-def union_json(root, name):
-    """Print an additive JSON merge from immutable index stages; never write."""
-    if not str(name).endswith(".json"):
-        raise ValueError("json union requires a .json path")
-    try:
-        parsed = [json.loads(blob) for blob in _unmerged_texts(root, name, "json union")]
-    except json.JSONDecodeError as exc:
-        raise ValueError("json union requires valid JSON parents") from exc
-    return _render_json(_union_value(*parsed)) + "\n"
 
 
 def merge_sections(root, name):
@@ -275,8 +72,18 @@ def merge_sections(root, name):
     return ours.rstrip("\n") + "\n\n" + "\n\n".join(additions) + "\n"
 
 
-def resolve_staged(root):
+def union_manifests(root):
+    """Additive manifest union keeps every parent test input."""
+    # A conflicted correction ledger stays for its own resolver.
+    from manifest_union import apply_manifest_union
+    apply_manifest_union(root)
+
+
+def resolve_staged(root, extra_outputs=()):
     root = Path(root).resolve()
+    # An auto-merged manifest must keep every parent test input.
+    from manifest_union import assert_auto_merged_parent_inputs
+    assert_auto_merged_parent_inputs(root)
     registry = staged_bytes(root, "repository-docs.json")
     config = json.loads(registry)
     output = repository_docs.local(root, config["output"])
@@ -316,7 +123,7 @@ def resolve_staged(root):
     original = output.read_bytes() if output.exists() else None
     try:
         output.write_bytes(projection)
-        subprocess.run(["git", "add", "--", config["output"]], cwd=root, check=True)
+        subprocess.run(["git", "add", "--", config["output"], *extra_outputs], cwd=root, check=True)
     except (OSError, subprocess.CalledProcessError):
         # Keep failed staging retryable, including the original conflict markers.
         if original is None:
@@ -325,6 +132,131 @@ def resolve_staged(root):
             output.write_bytes(original)
         raise
     print("repository-docs: regenerated and staged " + config["output"] + " from index")
+
+
+DIAGNOSTIC_PROJECT = "apps/ios/LogYourBody.xcodeproj/project.pbxproj"
+DIAGNOSTIC_WORKFLOW = ".github/workflows/ios-ui-diagnostics.yml"
+DIAGNOSTIC_PIN = re.compile(
+    r"(?m)^( +'" + re.escape(DIAGNOSTIC_PROJECT) + r"': ')[0-9a-f]{64}(',)$"
+)
+
+
+def git_bytes(root, *args):
+    return subprocess.run(
+        ["git", *args], cwd=root, check=True, capture_output=True,
+    ).stdout
+
+
+def conflicted_diagnostic_template(root):
+    """Return one parent workflow when every stage differs only by the project pin."""
+    entries = [
+        entry for entry in git_bytes(
+            root, "ls-files", "--unmerged", "-z", "--", DIAGNOSTIC_WORKFLOW,
+        ).decode().split("\0") if entry
+    ]
+    stages = [entry.split("\t", 1)[0].split() for entry in entries]
+    if len(stages) != 3 or {row[2] for row in stages if len(row) == 3} != {"1", "2", "3"}:
+        raise ValueError("diagnostic pin repair requires all three workflow stages")
+    if any(row[0] not in {"100644", "100755"} for row in stages):
+        raise ValueError("diagnostic pin repair requires a regular workflow file")
+    texts = []
+    for stage in ("1", "2", "3"):
+        text = git_bytes(root, "show", f":{stage}:{DIAGNOSTIC_WORKFLOW}").decode()
+        if re.search(r"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", text):
+            raise ValueError("diagnostic pin repair refuses conflict markers in a parent")
+        masked, count = DIAGNOSTIC_PIN.subn(
+            lambda match: match.group(1) + ("0" * 64) + match.group(2), text, count=1,
+        )
+        if count != 1:
+            raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+        texts.append((text, masked))
+    if len({masked for _text, masked in texts}) != 1:
+        raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+    return texts[1][0]
+
+
+PBX_MEMBER = re.compile(
+    r"(?m)^\t\t([A-Za-z0-9]+) /\* .*? \*/ = \{isa = PBX(?:BuildFile|FileReference);"
+)
+
+
+def assert_merged_project_keeps_parent_files(root, project):
+    """A merged diagnostic project must keep every parent file membership."""
+    if subprocess.run(
+        ["git", "rev-parse", "--verify", "MERGE_HEAD"], cwd=root, capture_output=True,
+    ).returncode:
+        raise ValueError("diagnostic pin repair requires an active merge")
+    base_rev = subprocess.run(
+        ["git", "merge-base", "HEAD", "MERGE_HEAD"],
+        cwd=root, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+    def blob(spec):
+        try:
+            return git_bytes(root, "show", spec).decode()
+        except subprocess.CalledProcessError as error:
+            raise ValueError("diagnostic pin repair cannot read " + spec) from error
+        except UnicodeDecodeError as error:
+            raise ValueError("diagnostic project is not text: " + spec) from error
+
+    base_ids = set(PBX_MEMBER.findall(blob(f"{base_rev}:{DIAGNOSTIC_PROJECT}")))
+    added = set()
+    for parent in ("HEAD", "MERGE_HEAD"):
+        added.update(set(PBX_MEMBER.findall(blob(f"{parent}:{DIAGNOSTIC_PROJECT}"))) - base_ids)
+    try:
+        merged_ids = set(PBX_MEMBER.findall(project.decode()))
+    except UnicodeDecodeError as error:
+        raise ValueError("diagnostic project is not text") from error
+    missing = sorted(added - merged_ids)
+    if missing:
+        raise ValueError("merged project dropped a parent file: " + ", ".join(missing))
+
+
+def reviewed_conflicted_pin(root, expected):
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise ValueError("reviewed project SHA-256 must be 64 lowercase hex characters")
+    for name in (DIAGNOSTIC_PROJECT, DIAGNOSTIC_WORKFLOW):
+        path = root / name
+        if any(parent.is_symlink() for parent in (path, *path.parents) if parent != root.parent):
+            raise ValueError("reviewed project repair refuses symlinks: " + name)
+    try:
+        project = staged_bytes(root, DIAGNOSTIC_PROJECT)
+    except subprocess.CalledProcessError as error:
+        raise ValueError("resolve source conflicts first: " + DIAGNOSTIC_PROJECT) from error
+    if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", project):
+        raise ValueError("resolve staged conflict markers first: " + DIAGNOSTIC_PROJECT)
+    assert_merged_project_keeps_parent_files(root, project)
+    if repository_docs.digest(project) != expected:
+        raise ValueError("reviewed project SHA-256 does not match merged source")
+    template = conflicted_diagnostic_template(root)
+    # A conflicted diagnostic pin is replaced only by the reviewed project digest.
+    # Only an explicit reviewed digest may update this trust boundary; never derive it here.
+    updated, count = DIAGNOSTIC_PIN.subn(
+        lambda match: match.group(1) + expected + match.group(2), template, count=1,
+    )
+    if count != 1:
+        raise ValueError("expected exactly one diagnostic project pin")
+    return DIAGNOSTIC_WORKFLOW, updated
+
+
+def stage_conflicted_diagnostic_pin(root, pin_update, output):
+    workflow, updated = pin_update
+    path = repository_docs.local(root, workflow)
+    original = path.read_bytes()
+    index = git_bytes(root, "ls-files", "--stage", "--", workflow)
+    try:
+        # Validate immutable imports before replacing the conflicted pin.
+        errors = repository_docs.run(root)
+        if errors and errors != ["source projection stale: " + output]:
+            raise ValueError("; ".join(errors))
+        path.write_bytes(updated.encode())
+        subprocess.run(["git", "add", "--", workflow], cwd=root, check=True)
+        resolve_staged(root)
+    except (ValueError, OSError, subprocess.CalledProcessError):
+        path.write_bytes(original)
+        subprocess.run(["git", "update-index", "--force-remove", "--", workflow], cwd=root, check=True)
+        subprocess.run(["git", "update-index", "--index-info"], cwd=root, input=index, check=True)
+        raise
 
 
 def reviewed_project_pin(root, expected):
@@ -354,6 +286,14 @@ def reviewed_project_pin(root, expected):
     return workflow, updated
 
 
+def projection_is_unmerged(root, output):
+    result = subprocess.run(
+        ["git", "ls-files", "--unmerged", "--", output],
+        cwd=root, check=True, capture_output=True, text=True,
+    )
+    return bool(result.stdout.strip())
+
+
 def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_project_sha256=None):
     root = Path(root).resolve()
     config = json.loads(repository_docs.local(root, "repository-docs.json").read_text())
@@ -362,9 +302,32 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
         ["git", "diff", "--name-only", "--diff-filter=U", "--relative", "-z"],
         cwd=root, check=True, capture_output=True,
     ).stdout.decode().split("\0")
-    unresolved = sorted(set(conflicts) - {"", output})
+    # A conflicted correction ledger stays for its own resolver.
+    from manifest_union import LEDGER
+    unresolved = sorted(set(conflicts) - {"", output, LEDGER})
+    conflicted_pin = None
+    if reviewed_project_sha256 is not None and DIAGNOSTIC_WORKFLOW in unresolved:
+        conflicted_pin = reviewed_conflicted_pin(root, reviewed_project_sha256)
+        unresolved = [name for name in unresolved if name != DIAGNOSTIC_WORKFLOW]
     if unresolved:
         raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
+    if conflicted_pin is not None:
+        stage_conflicted_diagnostic_pin(root, conflicted_pin, output)
+        return
+    # A conflicted source map is rebuilt from the merged index.
+    # Unstaged worktree bytes and either parent's projection cannot change fingerprints.
+    # The worktree registry still fails closed: import and path errors are not a stale map.
+    if (
+        not refresh_lockfile
+        and not verify_lockfile
+        and reviewed_project_sha256 is None
+        and projection_is_unmerged(root, output)
+    ):
+        errors = repository_docs.run(root)
+        if errors and errors != ["source projection stale: " + output]:
+            raise ValueError("; ".join(errors))
+        resolve_staged(root)
+        return
     pin_update = None
     if reviewed_project_sha256 is not None:
         pin_update = reviewed_project_pin(root, reviewed_project_sha256)
@@ -374,8 +337,10 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             raise ValueError("; ".join(errors))
     with ExitStack() as rollback:
         if refresh_lockfile or verify_lockfile:
+            # Pnpm hooks, workspace npmrc files and patches also affect dependency resolution.
             inputs = ["package.json", "**/package.json", "pnpm-workspace.yaml",
-                      "pnpm-lock.yaml", ".npmrc", output]
+                      "pnpm-lock.yaml", ".npmrc", "**/.npmrc", ".pnpmfile.cjs",
+                      "**/.pnpmfile.cjs", "patches/**", output]
             dirty = subprocess.run(
                 ["git", "diff", "--name-only", "--", *inputs],
                 cwd=root, check=True, capture_output=True, text=True,
@@ -415,6 +380,9 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                     ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
                     cwd=root, check=True,
                 )
+            # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
+            resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
+            return
         if pin_update:
             repository_docs.local(root, pin_update[0]).write_text(pin_update[1])
         errors = repository_docs.run(root, write=True)
@@ -437,12 +405,16 @@ def main():
     mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
     mode.add_argument("--union-json", metavar="PATH", help="print an additive JSON merge from index stages; review and stage explicitly")
+    mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
     args = parser.parse_args()
     try:
         if args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
         elif args.union_json:
             print(union_json(args.root, args.union_json), end="")
+        elif args.union_manifests:
+            union_manifests(args.root)
+            resolve(args.root)
         elif args.staged:
             resolve_staged(args.root)
         else:

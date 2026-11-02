@@ -1,6 +1,11 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["**/.env.*local"],
+  "globalDependencies": [
+    "**/.env.*local",
+    "scripts/marketing/sync-ios-marketing-assets.mjs",
+    "apps/ios/fastlane/screenshots/en-US/01_APP_IPHONE_65.png",
+    "apps/ios/LogYourBody/Assets.xcassets/AppIcon.appiconset/lyb_icon-iOS-Dark-1024x1024@1x.png"
+  ],
   "globalEnv": ["CI", "GITHUB_ACTIONS", "VERCEL", "VERCEL_ENV"],
   "tasks": {
     "build": {
