@@ -125,6 +125,39 @@ class RealtimeSyncManager: ObservableObject {
         self.userDefaults = userDefaults
         self.analyticsService = analyticsService
     }
+
+    // MARK: - Network Monitoring
+    func setupNetworkMonitoring(arguments: [String] = ProcessInfo.processInfo.arguments) {
+        #if DEBUG
+        if arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument) {
+            isOnline = false
+            syncStatus = .offline
+            return
+        }
+        #endif
+        let queue = DispatchQueue.global(qos: .background)
+        networkMonitor.start(queue: queue)
+
+        networkMonitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+
+                let wasOffline = !self.isOnline
+                self.isOnline = path.status == .satisfied
+
+                if self.isOnline {
+                    self.syncStatus = .idle
+                    if wasOffline {
+                        // Coming back online - sync immediately
+                        self.syncAll()
+                    }
+                } else {
+                    self.syncStatus = .offline
+                    self.disconnectRealtime()
+                }
+            }
+        }
+    }
 }
 
 extension PendingBodyMetricSyncItem {

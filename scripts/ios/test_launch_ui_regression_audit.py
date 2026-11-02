@@ -351,6 +351,32 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
             self.assert_rejected("settings.logout_alert_action_selection")
             ui_path.write_text(helper)
 
+    def test_offline_fixture_must_precede_live_network_monitoring(self):
+        path = self.app / "Services/RealtimeSyncManager.swift"
+        source = path.read_text()
+        self.assertEqual(self.run_audit()[0], 0)
+        for before, after in (
+            ('#if DEBUG\n        if arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument)',
+             'if arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument)'),
+            ('isOnline = false\n            syncStatus = .offline', 'isOnline = true'),
+            ('syncStatus = .offline\n            return', 'syncStatus = .offline'),
+            ('#if DEBUG\n        if arguments.contains(',
+             'networkMonitor.start(queue: .global())\n        #if DEBUG\n        if arguments.contains('),
+        ):
+            with self.subTest(before=before):
+                self.assertIn(before, source)
+                path.write_text(source.replace(before, after, 1))
+                self.assert_rejected("timeline.offline_fixture_network")
+        path.write_text(source)
+
+    def test_offline_retry_scenario_must_request_the_offline_fixture(self):
+        path = self.root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests+DatedTimeline.swift"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / path.relative_to(self.root), path)
+        self.assertEqual(self.run_audit()[0], 0)
+        path.write_text(path.read_text().replace('"-lybUITestHomeV2OfflineFixture"', '"online"'))
+        self.assert_rejected("timeline.offline_retry_fixture")
+
     def test_header_title_cannot_lose_navigation_or_its_hit_region(self):
         for token in (".gesture(photoTimelineSwipe)", ".contentShape(Rectangle())",
                       ", minHeight: JovieTokens.minimumHitTarget"):

@@ -4,6 +4,31 @@ import re
 
 
 def check_home_interactions(root: Path, texts: dict, violations: list, violation) -> None:
+    # Offline fixtures must stop the real monitor before it can overwrite their state.
+    sync = root / "apps/ios/LogYourBody/Services/RealtimeSyncManager.swift"
+    setup = texts[sync].split("func setupNetworkMonitoring(", 1)[-1]
+    offline_guard = re.search(
+        r'#if DEBUG\s+if arguments.contains\(HomeV2SystemStatePolicy.offlineFixtureArgument\) '
+        r'\{\s+isOnline = false\s+syncStatus = \.offline\s+return\s+\}\s+#endif', setup
+    )
+    if (not offline_guard or 'arguments: [String] = ProcessInfo.processInfo.arguments' not in setup
+            or any(setup.find(token) < offline_guard.end() for token in (
+                'networkMonitor.start(', 'networkMonitor.pathUpdateHandler ='
+            ))):
+        violations.append(violation(
+            check="timeline.offline_fixture_network", file=str(sync.relative_to(root)), line=1,
+            detail="Keep offline fixtures DEBUG-only and return before starting the live network monitor.",
+        ))
+    dated = root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests+DatedTimeline.swift"
+    if dated.is_file():
+        scenario = dated.read_text().split(
+            "func testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()", 1
+        )[-1]
+        if '"-lybUITestHomeV2OfflineFixture"' not in scenario.split('let target =', 1)[0]:
+            violations.append(violation(
+                check="timeline.offline_retry_fixture", file=str(dated.relative_to(root)), line=1,
+                detail="The offline retry scenario must explicitly request the offline fixture.",
+            ))
     hud_path = root / "apps/ios/LogYourBody/Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
     hud = texts[hud_path]
     body = hud.split("var photoTimelineRoot: some View {", 1)[-1].split(

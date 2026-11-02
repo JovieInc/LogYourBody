@@ -5907,5 +5907,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "timeline-offline-fixture-prevents-live-monitor-overwrite",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41527398415",
+    "correction": "PR #1698 / LYB-338, fix-red-95726c4f82 occurrence 24: Launch Quality fails testLaunchQualityGateCapturesTimelineSurfaces in the dated timeline offline-retry scenario: Record a fresh measurement is shown instead of Retry sync. The fixture sets isOnline false once, but NWPathMonitor can overwrite it with the host network state. Tently reports an AI-provider outage, reference a96998e7-1d78-43f3-a8a0-b3f3624d6c27, without source findings. The fetched origin/main is already an ancestor of the repair head.",
+    "mechanization": "Reuse the existing HomeV2 offline fixture argument at sync initialization. In DEBUG, initialize offline and return before installing or starting the live monitor, so host connectivity cannot overwrite the scenario. Add that argument to the failing native scenario; preserve its exact Retry sync assertion, actual retry, provenance, swipe and account-isolation checks. Move the existing network setup method into the main manager file to avoid growing its oversized extension. Add native cases proving the offline fixture installs no callback and starts no sync, and ordinary launch retains monitoring. Extend the existing required launch UI audit with real-source mutations rejecting missing DEBUG isolation, lost offline state, lost early return, premature monitor startup and missing scenario argument. The new audit rejects both original sources, then passes all 39 behavior cases after repair. Native XCTest execution and coverage remain unverified on Linux and require the existing macOS runner. The harness owns pushing and PR-body edits and must replace the current machine line with exactly one line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing sync initialization boundary can keep the requested DEBUG offline fixture deterministic by never starting a live monitor. All scenarios using that fixture inherit the prevention without per-test timing waits or a second fixture mode."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "# Offline fixtures must stop the real monitor before it can overwrite their state."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
