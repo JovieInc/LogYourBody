@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `7f8da705a4ed11c1be7e915f7363a8143753b728294489607d376cbb859e4036`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `4120c7f718ace1bddde4936fae0f7f8fd35ebe722618e028b07f194f6fe58890`)
 
 ### `apps/web/package.json`: engines
 
@@ -102,7 +102,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-slot": "^1.3.3",
   "@radix-ui/react-switch": "^1.4.1",
   "@radix-ui/react-tabs": "^1.1.22",
-  "@radix-ui/react-toast": "^1.2.23",
+  "@radix-ui/react-toast": "^1.3.1",
   "@radix-ui/react-toggle": "^1.2.1",
   "@radix-ui/react-toggle-group": "^1.1.19",
   "@radix-ui/react-tooltip": "^1.3.0",
