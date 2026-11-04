@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `9a730d688b23e368d2fde99c471dc36e0fa82b1248cf1bc2e5540b00586db574`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `da7600b480ece4ee1ea0f103a358f8b424b6841c9b9eb08c1dbdba861e6f63aa`)
 
 ### `apps/web/package.json`: engines
 
@@ -143,7 +143,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "react-hook-form": "^7.88.0",
   "react-markdown": "^10.1.0",
   "react-resizable-panels": "^3.0.6",
-  "react-syntax-highlighter": "^16.1.1",
+  "react-syntax-highlighter": "^16.1.2",
   "read-excel-file": "^6.0.3",
   "recharts": "^3.10.1",
   "server-only": "^0.0.1",
