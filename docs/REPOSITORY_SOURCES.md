@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f119df0b3848ad8afd8bc81241cafb6bedfe69ebec6315b8720fac86c8365e76`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c8a666fccda242a89836745ffdff28dbd1a953f712b8b7d2372ee48a73502bd6`)
 
 ### `apps/web/package.json`: engines
 
@@ -125,7 +125,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "exifr": "^7.1.3",
   "framer-motion": "^14.0.0",
   "glob": "^14.0.2",
-  "idb": "^8.0.3",
+  "idb": "^8.0.4",
   "input-otp": "^1.5.0",
   "jose": "^6.2.14",
   "js-yaml": "5.4.3",
