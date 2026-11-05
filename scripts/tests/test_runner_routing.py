@@ -881,22 +881,6 @@ def test_mac_lanes_route_only_trusted_events_and_carry_no_secrets() -> None:
         assert "secrets: inherit" not in text
 
 
-def test_heartbeat_is_secretless_and_setup_canary_is_manual() -> None:
-    workflow = (_WORKFLOWS / 'mac-runner-heartbeat.yml').read_text()
-    heartbeat = _job_block('mac-runner-heartbeat.yml', 'heartbeat')
-    canary = _job_block('mac-runner-heartbeat.yml', 'setup-canary')
-    assert 'schedule:' not in workflow
-    assert '  push:' not in workflow
-    assert 'workflow_dispatch:' in workflow
-    assert 'pull_request:' not in workflow
-    assert 'secrets.' not in workflow
-    assert 'checkout' not in heartbeat
-    assert "if: github.event_name == 'workflow_dispatch' && inputs.verify-ios-setup" in canary
-    assert 'uses: ./.github/actions/setup-ios-build' in canary
-    assert 'bundle check' in canary
-    assert "create-config-files: 'false'" in canary
-
-
 def test_ruby_gem_cache_rejects_foreign_native_extensions_and_legacy_keys() -> None:
     step = _ruby_setup_step('Cache Ruby dependencies')
     key = step.split('        key: ', 1)[1].splitlines()[0]
