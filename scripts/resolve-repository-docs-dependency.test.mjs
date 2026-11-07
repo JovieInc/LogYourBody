@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -197,3 +198,69 @@ if not marker.exists():
     });
   }
 }
+
+function actionPinRepo(t) {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-action-pin-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+  git('init', '-q', '-b', 'actions');
+  git('config', 'core.hooksPath', '/dev/null');
+  const workflow = '.github/workflows/security-scan.yml';
+  const notes = 'notes.txt';
+  mkdirSync(join(root, '.github/workflows'), { recursive: true });
+  const pin = (version) => `name: scan\njobs:\n  secrets:\n    steps:\n      - uses: example/action@${version}\n`;
+  writeFileSync(join(root, workflow), pin('v1.0.0'));
+  writeFileSync(join(root, notes), 'reviewed notes\n');
+  writeFileSync(join(root, 'README.md'), 'Local instructions\n');
+  writeFileSync(join(root, 'repository-docs.json'), JSON.stringify({
+    schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+    sources: [
+      { path: workflow, purpose: 'Security scan workflow' },
+      { path: notes, purpose: 'Reviewed notes' },
+    ],
+    imports: [], output: 'SOURCES.md',
+  }));
+  execFileSync('python3', [
+    fileURLToPath(new URL('./repository_docs.py', import.meta.url)), '--root', root, '--write',
+  ], { env });
+  git('add', '.');
+  git('commit', '-qm', 'fixture');
+  const resolve = () => spawnSync('python3', [resolver, '--root', root], { env, encoding: 'utf8' });
+  const digest = (text) => createHash('sha256').update(text).digest('hex');
+  return { root, git, workflow, notes, pin, resolve, digest };
+}
+
+test('action pin repair fingerprints the staged workflow and preserves unrelated edits', (t) => {
+  const f = actionPinRepo(t);
+  writeFileSync(join(f.root, f.workflow), f.pin('v1.0.1'));
+  f.git('add', f.workflow);
+  writeFileSync(join(f.root, f.notes), 'DIRTY\n');
+  const result = f.resolve();
+  assert.equal(result.status, 0, result.stderr);
+  const projection = f.git('show', ':SOURCES.md');
+  assert.match(projection, new RegExp(f.digest(f.pin('v1.0.1'))));
+  assert.match(projection, new RegExp(f.digest('reviewed notes\n')));
+  assert.doesNotMatch(projection, new RegExp(f.digest('DIRTY\n')));
+  assert.equal(readFileSync(join(f.root, f.notes), 'utf8'), 'DIRTY\n');
+  assert.equal(f.git('show', `:${f.workflow}`), f.pin('v1.0.1'));
+  const index = f.git('ls-files', '--stage');
+  assert.equal(f.resolve().status, 0, 'action pin repair stays idempotent');
+  assert.equal(f.git('ls-files', '--stage'), index);
+});
+
+test('action pin repair ignores an unstaged workflow pin', (t) => {
+  const f = actionPinRepo(t);
+  writeFileSync(join(f.root, f.workflow), f.pin('v1.0.1'));
+  writeFileSync(join(f.root, f.notes), 'DIRTY\n');
+  const index = f.git('ls-files', '--stage');
+  const result = f.resolve();
+  assert.equal(result.status, 0, result.stderr);
+  const projection = f.git('show', ':SOURCES.md');
+  assert.match(projection, new RegExp(f.digest(f.pin('v1.0.0'))));
+  assert.doesNotMatch(projection, new RegExp(f.digest(f.pin('v1.0.1'))));
+  assert.doesNotMatch(projection, new RegExp(f.digest('DIRTY\n')));
+  assert.equal(readFileSync(join(f.root, f.workflow), 'utf8'), f.pin('v1.0.1'));
+  assert.equal(readFileSync(join(f.root, f.notes), 'utf8'), 'DIRTY\n');
+  assert.equal(f.git('show', `:${f.workflow}`), f.pin('v1.0.0'));
+  assert.equal(f.git('ls-files', '--stage'), index);
+});

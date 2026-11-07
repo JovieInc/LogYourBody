@@ -418,8 +418,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
             resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
             return
-        if pin_update:
-            repository_docs.local(root, pin_update[0]).write_text(pin_update[1])
+        if not pin_update:
+            # Action pin repairs fingerprint only staged sources, preserving unrelated edits.
+            resolve_staged(root)
+            return
+        repository_docs.local(root, pin_update[0]).write_text(pin_update[1])
         errors = repository_docs.run(root, write=True)
         if errors:
             raise ValueError("; ".join(errors))

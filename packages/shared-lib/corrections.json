@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "action-pin-staged-source-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1751",
+    "correction": "PR #1751, fix-red-1423773703 occurrence 48: merge origin/main without rebasing and preserve the TruffleHog 3.99.8 action pin. The pin left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, parity and CI Summary. The plain source repair still fingerprinted unstaged worktree bytes.",
+    "mechanization": "Extend the existing source-map resolver so a repair without a lockfile or reviewed project pin rebuilds the projection from the Git index. Two real-Git regressions fail against the previous worktree renderer and pass after the change, proving a staged action pin is fingerprinted, an unstaged pin and unrelated source edits are preserved, and the repair is idempotent. The existing required Detect Changes pre-commit suite runs them. Use the extended resolver to stage this pin's source map. The harness owns pushing and PR updates and must include exactly one line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The source-map resolver owns projection refresh. Rendering action-pin repairs from the Git index prevents unstaged workflow or source bytes from becoming the committed fingerprints, while parity still rejects a stale map."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Action pin repairs fingerprint only staged sources, preserving unrelated edits."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-ignored-resolver-inputs",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1729",
     "correction": "PR #1729, fix-red-1423773703 occurrence 48: the Statsig 3.33.7 manifest bump retained the 3.33.5 lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Recurring dependency repairs must not depend on ignored local resolver configuration, hooks or patches.",
