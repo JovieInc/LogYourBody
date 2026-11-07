@@ -50,10 +50,13 @@ def check_dated_stats_fixture(root: Path, texts: dict, violations: list, violati
     dated = texts[dated_path]
 
     handler = part.split("networkMonitor.pathUpdateHandler", 1)[-1].split("func setupAuthListener", 1)[0]
+    update = _function_body(sync, "handleNetworkPathUpdate")
     online = _function_body(sync, "online")
     fixture_list = sync.split("static let offlineUITestFixtures", 1)[-1].split("]", 1)[0]
     offline_ok = (
-        "self.isOnline = Self.online(path.status == .satisfied)" in handler
+        "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)" in handler
+        and "self.isOnline = Self.online(isOnline)" in update
+        and "guard !usesOfflineUITestFixture else { return }" in update
         and "self.isOnline = path.status == .satisfied" not in handler
         and "guard pathSatisfied else { return false }" in online
         and "offlineUITestFixtures.contains" in online

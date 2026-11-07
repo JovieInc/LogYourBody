@@ -217,6 +217,48 @@ function projectMember(id, name) {
   return `\t\t${id} /* ${name} */ = {isa = PBXFileReference; path = ${name}; };\n`;
 }
 
+test('reviewed digest refuses a retained file declaration with a missing group reference', (t) => {
+  const f = pinFixture(t);
+  const oursId = 'B317A11A0000000000000001';
+  const theirsId = 'B313F11E0000000000000A01';
+  const member = (id, name) => projectMember(id, name) + `\t\t\t\t${id} /* ${name} */,\n`;
+  const ours = member(oursId, 'HomeV2RecentReadings.swift');
+  const theirs = member(theirsId, 'SubjectPlateView.swift');
+  f.writeProject(ours);
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  f.writeProject(theirs);
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  mergePinFixture(f);
+  const dropped = ours + projectMember(theirsId, 'SubjectPlateView.swift');
+  writeFileSync(join(f.root, DIAGNOSTIC_PROJECT), dropped);
+  f.git('add', '--', DIAGNOSTIC_PROJECT);
+  const beforeWorkflow = readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW));
+  const beforeMap = readFileSync(join(f.root, f.output));
+  const index = f.git('ls-files', '--stage');
+  const resolve = (project) => spawnSync('python3', [
+    resolver, '--root', f.root, '--reviewed-project-sha256',
+    createHash('sha256').update(project).digest('hex'),
+  ], { env, encoding: 'utf8' });
+  const refused = resolve(dropped);
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /merged project dropped a parent file reference: B313F11E0000000000000A01/);
+  assert.deepEqual(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW)), beforeWorkflow);
+  assert.deepEqual(readFileSync(join(f.root, f.output)), beforeMap);
+  assert.equal(f.git('ls-files', '--stage'), index);
+  const kept = ours + theirs;
+  writeFileSync(join(f.root, DIAGNOSTIC_PROJECT), kept);
+  f.git('add', '--', DIAGNOSTIC_PROJECT);
+  const accepted = resolve(kept);
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.equal(f.git('show', `:${DIAGNOSTIC_PROJECT}`), kept);
+  assert.match(f.git('show', `:${DIAGNOSTIC_WORKFLOW}`), new RegExp(createHash('sha256').update(kept).digest('hex')));
+  assert.equal(f.git('ls-files', '--unmerged'), '');
+});
+
 test('reviewed digest refuses a merged project that dropped a parent file', (t) => {
   const f = pinFixture(t);
   const oursId = 'B317A11A0000000000000001';
@@ -375,4 +417,83 @@ test('reviewed audit digest refuses to move the workflow pin without the routing
   assert.match(refused.stderr, /absent from the routing tests/);
   assert.deepEqual(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW)), beforeWorkflow);
   assert.equal(f.git('ls-files', '--stage'), index);
+});
+for (const [name, marker] of [
+  ['source', '<<<<<<< HEAD\n'],
+  ['source', '||||||| base\n'],
+  ['source', '=======\n'],
+  ['source', '>>>>>>> main\n'],
+  ['source', '|| base\r\n'],
+  ['README.md', '<< HEAD\r\n'],
+]) {
+  test(`staged projection refuses ${name} marker ${JSON.stringify(marker)} and permits a clean retry`, (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'lyb-doc-source-markers-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+    git('init', '-q', '-b', 'repair');
+    git('config', 'core.hooksPath', '/dev/null');
+    writeFileSync(join(root, 'repository-docs.json'), JSON.stringify({
+      schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+      sources: [{ path: 'source', purpose: 'Merged source' }], imports: [], output: 'SOURCES.md',
+    }));
+    for (const path of ['README.md', 'source']) writeFileSync(join(root, path), 'Clean input\n');
+    git('add', '.');
+    git('commit', '-qm', 'fixture');
+    const resolve = () => spawnSync('python3', [resolver, '--root', root, '--staged'], {
+      env, encoding: 'utf8',
+    });
+    assert.equal(resolve().status, 0);
+    const before = readFileSync(join(root, 'SOURCES.md'), 'utf8');
+    writeFileSync(join(root, name), `Staged resolution\n${marker}`);
+    git('add', name);
+    // A clean working copy must not hide unresolved markers in the staged source.
+    writeFileSync(join(root, name), 'Clean input\n');
+    const index = git('ls-files', '--stage');
+    const refused = resolve();
+    assert.notEqual(refused.status, 0, refused.stdout);
+    assert.match(refused.stderr, /resolve staged conflict markers first:/);
+    assert.equal(readFileSync(join(root, 'SOURCES.md'), 'utf8'), before);
+    assert.equal(git('ls-files', '--stage'), index);
+    git('add', name);
+    // Conversely, unstaged markers must not invalidate the clean staged snapshot.
+    writeFileSync(join(root, name), marker);
+    const retry = resolve();
+    assert.equal(retry.status, 0, retry.stderr);
+    assert.equal(readFileSync(join(root, 'SOURCES.md'), 'utf8'), before);
+    assert.equal(git('show', ':SOURCES.md'), before);
+    assert.equal(readFileSync(join(root, name), 'utf8'), marker);
+    assert.equal(resolve().status, 0, 'clean staged retry remains idempotent');
+  });
+}
+
+// Token counts alone must not certify swapped PBXBuildFile -> fileRef edges.
+test('reviewed project merge refuses rewired parent build-file mappings', (t) => {
+  const f = pinFixture(t);
+  const member = (build, file, name) =>
+    projectMember(file, name) + `\t\t${build} /* ${name} in Sources */ = {isa = PBXBuildFile; fileRef = ${file} /* ${name} */; };\n`;
+  const ours = member('BUILD1', 'FILE1', 'DatedOutcomeStats.swift');
+  const theirs = member('BUILD2', 'FILE2', 'HealthSyncPresentationStore.swift');
+  f.writeProject(ours); f.generate(); f.commit();
+  f.git('switch', '-q', 'theirs');
+  f.writeProject(theirs); f.generate(); f.commit();
+  f.git('switch', '-q', 'ours');
+  mergePinFixture(f);
+  const kept = ours + theirs;
+  const swapped = kept.replace('fileRef = FILE1', 'fileRef = TEMP')
+    .replace('fileRef = FILE2', 'fileRef = FILE1').replace('fileRef = TEMP', 'fileRef = FILE2');
+  writeFileSync(join(f.root, DIAGNOSTIC_PROJECT), swapped);
+  f.git('add', '--', DIAGNOSTIC_PROJECT);
+  const index = f.git('ls-files', '--stage');
+  const workflow = readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW));
+  const output = readFileSync(join(f.root, f.output));
+  const resolve = (source) => resolveProjectPin(f, createHash('sha256').update(source).digest('hex'));
+  assert.notEqual(resolve(swapped).status, 0, 'swapped mappings must fail with identical identifier counts');
+  assert.match(resolve(swapped).stderr, /merged project changed a parent build-file mapping/);
+  assert.equal(f.git('ls-files', '--stage'), index);
+  assert.deepEqual(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW)), workflow);
+  assert.deepEqual(readFileSync(join(f.root, f.output)), output);
+  writeFileSync(join(f.root, DIAGNOSTIC_PROJECT), kept);
+  f.git('add', '--', DIAGNOSTIC_PROJECT);
+  const accepted = resolve(kept);
+  assert.equal(accepted.status, 0, accepted.stderr);
 });

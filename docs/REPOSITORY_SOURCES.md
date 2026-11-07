@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `320c50db6a6c92a7f2913472873561f08406e6bde5ecfef48099f849ab434b09`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `d4ab884e38455b2dce38b0a41218f15a9416105588a04779623d4386f2058222`)
 
 ### `apps/web/package.json`: engines
 
@@ -94,7 +94,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-navigation-menu": "^1.2.22",
   "@radix-ui/react-popover": "^1.1.23",
   "@radix-ui/react-progress": "^1.2.1",
-  "@radix-ui/react-radio-group": "^1.4.7",
+  "@radix-ui/react-radio-group": "^1.5.1",
   "@radix-ui/react-scroll-area": "^1.2.18",
   "@radix-ui/react-select": "^2.3.8",
   "@radix-ui/react-separator": "^1.2.0",
@@ -387,7 +387,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fc5a43b2fed86c3144518403ef49c0b5e2f5709099b2233d7c3db4a4d2f0ae5b`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `d9a32b60e75f66cf3fdb97e2cf6b0a43f469acce57ce0dda32a96ec2b65c2870`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `3a2a2d8598c2b8ad0f792f723fa3c1c34ef423cf8aef384ba24cf7db4f4d57e2`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)

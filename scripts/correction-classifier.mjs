@@ -204,6 +204,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
     let path;
     let result;
     let stageResolution;
+    let working;
     if (resolvingMerge || checkingMerge) {
       const git = (...gitArgs) =>
         execute('git', ['-C', args[1], ...gitArgs], {
@@ -219,7 +220,9 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
       const readIndex = () => git('--literal-pathspecs', 'ls-files', '--stage', '-z');
       const indexSnapshot = readIndex();
       const index = indexSnapshot.split('\0');
-      const assertMergeUnchanged = (working) => {
+      // Snapshot before readiness checks so an edit during validation cannot be overwritten.
+      working = readSource(LEDGER_PATH, { root });
+      const assertMergeUnchanged = () => {
         assert.ok(
           readIndex() === indexSnapshot,
           'merge index changed during validation; retry from the current index',
@@ -300,19 +303,18 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
           regularGuards.has(LEDGER_PATH),
           'staged source must be a regular file: correction ledger',
         );
-        const working = readSource(LEDGER_PATH, { root });
+        const current = readSource(LEDGER_PATH, { root });
         const staged = readLedgers().get(`:0:${LEDGER_PATH}`);
         verifyMerge(JSON.parse(staged));
         assert.equal(
-          working,
+          current,
           staged,
           'staged retry refuses unstaged ledger edits; review and stage them explicitly',
         );
-        assertMergeUnchanged(working);
+        assertMergeUnchanged();
         logger.log('correction-classifier: verified staged ledger against both merge parents');
         return 0;
       }
-      const working = readSource(LEDGER_PATH, { root }); // Refuse symlinked output.
       if (!/^(?:<+|\|+|=+|>+)(?: |$)/m.test(working)) {
         // Validate manual input, but require explicit staging if it differs from the union.
         classifyLedger(JSON.parse(working));
@@ -354,7 +356,11 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
         verifyMerge(result);
         stageResolution = () => git('add', '--', LEDGER_PATH);
       }
-      assertMergeUnchanged(working);
+      assertMergeUnchanged();
+      // Sample the index so the pre-write comparison observes a concurrent writer.
+      // The sample itself is not a verdict: a writer can land while it is read.
+      readIndex();
+      assertMergeUnchanged();
     } else {
       path = args[0] ?? resolve(ROOT, LEDGER_PATH);
       const receipts = JSON.parse(readFileSync(path, 'utf8'));
@@ -365,6 +371,14 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
       result = args.length === 3 ? mergeLedgers(receipts, incoming) : classifyLedger(receipts);
     }
     const original = readFileSync(path, 'utf8');
+    if (resolvingMerge) {
+      // Recheck the working ledger immediately before replacing it.
+      assert.equal(
+        original,
+        working,
+        'merge ledger changed during validation; retry from the current ledger',
+      );
+    }
     const formatted = `${JSON.stringify(result, null, 2)}\n`;
     // Validate the entire ledger before writing; a repeat run preserves bytes.
     if (

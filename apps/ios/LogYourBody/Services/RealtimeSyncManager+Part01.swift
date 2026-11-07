@@ -7,27 +7,12 @@ extension RealtimeSyncManager {
 // MARK: - Network Monitoring
     func setupNetworkMonitoring() {
         let queue = DispatchQueue.global(qos: .background)
-        networkMonitor.start(queue: queue)
-
         networkMonitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor [weak self] in
-                guard let self = self else { return }
-
-                let wasOffline = !self.isOnline
-                self.isOnline = Self.online(path.status == .satisfied)
-
-                if self.isOnline {
-                    self.syncStatus = .idle
-                    if wasOffline {
-                        // Coming back online - sync immediately
-                        self.syncAll()
-                    }
-                } else {
-                    self.syncStatus = .offline
-                    self.disconnectRealtime()
-                }
+                self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)
             }
         }
+        networkMonitor.start(queue: queue)
     }
 
 // MARK: - Auth Listener

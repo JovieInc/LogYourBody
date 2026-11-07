@@ -40,8 +40,8 @@ stage the merged project. If that workflow conflict differs only by the pin,
 pass the merged project's digest. The resolver writes that pin and rebuilds a
 conflicted source map from the index, ignoring unstaged source bytes. It refuses
 a digest that does not match the staged project, a merged project that dropped
-a parent file membership, any other workflow difference, and every other
-unmerged path.
+a parent file membership or changed a new parent build-file mapping, any other
+workflow difference, and every other unmerged path.
 
 ```sh
 python3 scripts/resolve-repository-docs.py --reviewed-project-sha256 <reviewed-merged-project-sha256>

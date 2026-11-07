@@ -396,11 +396,8 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         self.assertEqual(
             [item[0] for item in AUDIT._AUDIT_SIBLINGS],
             [
-                "launch_ui_timeline_day",
-                "launch_ui_opacity_audit",
-                "launch_ui_timeline_gesture_audit",
-                "launch_ui_dated_stats_audit",
-                "launch_ui_regression_report",
+                "launch_ui_timeline_day", "launch_ui_opacity_audit",
+                "launch_ui_timeline_gesture_audit", "launch_ui_dated_stats_audit", "launch_ui_regression_report",
             ],
         )
         for export in loaded:
@@ -466,8 +463,12 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         self.assertEqual(self.run_audit()[0], 0)
         cases = [
             ("Services/RealtimeSyncManager+Part01.swift",
-             "self.isOnline = Self.online(path.status == .satisfied)",
+             "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)",
              "self.isOnline = path.status == .satisfied", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "self.isOnline = Self.online(isOnline)",
+             "self.isOnline = isOnline", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "guard !usesOfflineUITestFixture else { return }",
+             "", "dated_stats.offline_survives_path"),
             ("Services/RealtimeSyncManager.swift", "return !fixtureForcesOffline",
              "return pathSatisfied", "dated_stats.offline_survives_path"),
             ("Services/RealtimeSyncManager.swift", '"-lybUITestPhotoTimelineHUDFixture"',
@@ -482,10 +483,10 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
             with self.subTest(before=before):
                 path = self.app / relative
                 source = path.read_text()
+                self.assertIn(before, source)
                 path.write_text(source.replace(before, after, 1))
                 self.assert_rejected(check)
                 path.write_text(source)
-
 
 def run_behavior_suite(suite):
     expected = suite.countTestCases()
