@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `5d87cac18621150114c73a18ccf298e8952b16c3ff61ead7a2c8760d4e79c009`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1dca6637672cdc80544eb422a0cc3496420e043eaa39cd0d47b8354320547047`)
 
 ### `apps/web/package.json`: engines
 
@@ -162,7 +162,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 ```json
 {
   "@eslint/eslintrc": "^3.3.7",
-  "@next/bundle-analyzer": "^15.5.26",
+  "@next/bundle-analyzer": "^16.4.3",
   "@playwright/test": "^1.63.0",
   "@testing-library/dom": "^10.4.2",
   "@testing-library/jest-dom": "^6.9.1",

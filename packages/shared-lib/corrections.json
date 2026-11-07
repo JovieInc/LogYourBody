@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-index-change-during-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1758",
+    "correction": "PR #1758, fix-red-1423773703 occurrence 55: merge origin/main without rebasing and repair the bundle-analyzer 16.4.3 update. Detect Changes and parity reject a stale source projection, causing CI Summary to fail. The dependency helper must not stage a projection for an index changed during rendering.",
+    "mechanization": "Extend the existing staged projection renderer to recheck its source index before writing, carrying the dependency verifier snapshot through rendering in both repair modes. Two real-Git regressions fail against the old helper and pass after the extension, preserving concurrent staged manifest edits, lockfile and projection bytes, then proving successful retry and idempotence. Extend the existing ignored-input fixtures to retain generated Next.js manifests while still refusing local-only workspace manifests, hooks, npmrc files and patches; all eight cases fail without the output exclusion. Move the existing unmerged-index query to the companion module to retain the 500-line limit. The required Detect Changes pre-commit suite already imports these cases. Use the extended --verify-lockfile helper to retain the merged lockfile resolutions and regenerate source parity. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing helper owns staged source rendering and artifact writes. Comparing the verified index after rendering prevents observed concurrent edits from producing a stale committed source map by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Refuse a source index changed while rendering instead of staging stale parity."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-ignores-workspace-manifests",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1736",
     "correction": "PR #1736, fix-red-1423773703 occurrence 48: merge origin/main without rebasing and repair the Radix radio-group 1.5.1 update. Detect Changes and parity reject the stale source projection, causing CI Summary to fail. Ignored workspace package.json manifests still bypass the dependency-repair preflight and can enter a lockfile destined for CI.",
