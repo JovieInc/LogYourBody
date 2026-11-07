@@ -113,7 +113,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
-    "@next/bundle-analyzer": "^15.5.26",
+    "@next/bundle-analyzer": "^16.4.3",
     "@playwright/test": "^1.63.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.9.1",

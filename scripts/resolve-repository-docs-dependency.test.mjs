@@ -45,6 +45,69 @@ function fixture(t, input, state) {
 }
 
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
+  test(`dependency repair ${mode} refuses lockfile changes while rendering source parity`, (t) => {
+    const f = fixture(t, '.npmrc', 'staged');
+    const gitBinary = execFileSync('which', ['git'], { env, encoding: 'utf8' }).trim();
+    const index = f.git('ls-files', '--stage');
+    const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+    writeFileSync(join(f.root, 'bin/git'), `#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+result = subprocess.run([${JSON.stringify(gitBinary)}, *sys.argv[1:]])
+marker = Path('changed-once')
+if sys.argv[1:] == ['show', ':package.json'] and not marker.exists():
+    Path('pnpm-lock.yaml').write_text('unverified resolution\\n')
+    marker.touch()
+sys.exit(result.returncode)
+`, { mode: 0o755 });
+    const result = f.resolve(mode);
+    assert.notEqual(result.status, 0, 'rendering must not authorize an unverified lockfile');
+    assert.match(result.stderr, /lockfile changed during projection generation/);
+    assert.equal(f.git('ls-files', '--stage'), index);
+    for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+      assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
+      assert.deepEqual(Buffer.from(f.git('show', `:${name}`)), outputs[i]);
+    }
+    const retry = f.resolve(mode);
+    assert.equal(retry.status, 0, retry.stderr);
+    assert.deepEqual(readFileSync(join(f.root, 'pnpm-lock.yaml')), outputs[0]);
+    assert.equal(f.git('show', ':SOURCES.md'), readFileSync(join(f.root, 'SOURCES.md'), 'utf8'));
+    const repairedIndex = f.git('ls-files', '--stage');
+    assert.equal(f.resolve(mode).status, 0, 'repair stays idempotent after restoring the verified lockfile');
+    assert.equal(f.git('ls-files', '--stage'), repairedIndex);
+  });
+  test(`dependency repair ${mode} refuses index changes while rendering source parity`, (t) => {
+    const f = fixture(t, '.npmrc', 'staged');
+    const gitBinary = execFileSync('which', ['git'], { env, encoding: 'utf8' }).trim();
+    const index = f.git('ls-files', '--stage', '--', ':(exclude)package.json');
+    const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+    writeFileSync(join(f.root, 'bin/git'), `#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+result = subprocess.run([${JSON.stringify(gitBinary)}, *sys.argv[1:]])
+marker = Path('changed-once')
+if sys.argv[1:] == ['show', ':package.json'] and not marker.exists():
+    Path('package.json').write_text('{"dependencies":{"example":"3.0.0"}}\\n')
+    subprocess.run([${JSON.stringify(gitBinary)}, 'add', 'package.json'], check=True)
+    marker.touch()
+sys.exit(result.returncode)
+`, { mode: 0o755 });
+    const result = f.resolve(mode);
+    assert.notEqual(result.status, 0, 'a projection must not describe an index replaced during rendering');
+    assert.match(result.stderr, /source index changed during projection generation/);
+    assert.equal(f.git('show', ':package.json'), '{"dependencies":{"example":"3.0.0"}}\n');
+    assert.equal(f.git('ls-files', '--stage', '--', ':(exclude)package.json'), index);
+    for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+      assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
+      assert.deepEqual(Buffer.from(f.git('show', `:${name}`)), outputs[i]);
+    }
+    const retry = f.resolve(mode);
+    assert.equal(retry.status, 0, retry.stderr);
+    assert.match(f.git('show', ':SOURCES.md'), /"example": "3\.0\.0"/);
+    const repairedIndex = f.git('ls-files', '--stage');
+    assert.equal(f.resolve(mode).status, 0, 'repair stays idempotent after rendering the reviewed index');
+    assert.equal(f.git('ls-files', '--stage'), repairedIndex);
+  });
   test(`dependency repair ${mode} refuses lockfile drift during frozen verification`, (t) => {
     const f = fixture(t, '.npmrc', 'staged');
     const index = f.git('ls-files', '--stage');
@@ -111,8 +174,12 @@ if not marker.exists():
   for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch', 'apps/local-only/package.json']) {
     test(`dependency repair ${mode} refuses ignored ${input} before invoking pnpm`, (t) => {
       const f = fixture(t, input, 'untracked');
-      writeFileSync(join(f.root, '.gitignore'), `${input}\nnode_modules/\n`);
+      writeFileSync(join(f.root, '.gitignore'), `${input}\nnode_modules/\n.next/\n`);
       f.git('add', '.gitignore');
+      for (const generated of ['apps/web/.next/package.json', 'apps/web/.next/types/package.json']) {
+        mkdirSync(dirname(join(f.root, generated)), { recursive: true });
+        writeFileSync(join(f.root, generated), '{"type":"commonjs"}\n');
+      }
       mkdirSync(join(f.root, 'node_modules/example'), { recursive: true });
       writeFileSync(join(f.root, 'node_modules/example/.npmrc'), 'vendor config\n');
       writeFileSync(join(f.root, 'node_modules/example/package.json'), '{"name":"vendor"}\n');
@@ -123,6 +190,7 @@ if not marker.exists():
       assert.match(result.stderr, /ignored dependency inputs:/);
       assert.ok(result.stderr.includes(input), result.stderr);
       assert.equal(result.stderr.includes('node_modules/'), false, result.stderr);
+      assert.equal(result.stderr.includes('.next/'), false, result.stderr);
       assert.equal(existsSync(join(f.root, 'pnpm-calls')), false);
       assert.equal(f.git('ls-files', '--stage'), index);
       assert.equal(readFileSync(f.path, 'utf8'), 'local input\n');
@@ -135,6 +203,7 @@ if not marker.exists():
       const repairedIndex = f.git('ls-files', '--stage');
       assert.equal(f.resolve(mode).status, 0, 'repair stays idempotent with ignored vendor config');
       assert.equal(f.git('ls-files', '--stage'), repairedIndex);
+      assert.equal(readFileSync(join(f.root, 'apps/web/.next/package.json'), 'utf8'), '{"type":"commonjs"}\n');
     });
   }
   test(`dependency repair ${mode} requires staged projection configuration before invoking pnpm`, (t) => {
