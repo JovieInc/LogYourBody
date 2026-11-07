@@ -16,7 +16,7 @@ Repository: `JovieInc/LogYourBody`
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
 - `.github/workflows/advisory-ai-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e92850748e44b4e1b7b8f966dad0ee036ecf455c453a2c4837329bbf104e0f97`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e3d3a3618fb558a7412bed92feaed38cd8eb6b991eb3d223a31c3845a0138e04`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `77d2ed2cd02ee612fddfb8e53a06b7766d6f87c97c3b203f3538eab4102296f6`)
 - `.github/workflows/codeql-analysis.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e37420a26b4176ca77a7f67e4b67223b1bfa104727a9fb1af5c0ffc0dde76b73`)
 - `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3e943ed690246c6dd743d840f05a79e219103e6c4fac9e9495db2985b412c48d`)
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `86c9b97d1058a55f4e972f97dbeb88fe579a904b1f763df28b2a8af948e67022`)
@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f119df0b3848ad8afd8bc81241cafb6bedfe69ebec6315b8720fac86c8365e76`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `da7600b480ece4ee1ea0f103a358f8b424b6841c9b9eb08c1dbdba861e6f63aa`)
 
 ### `apps/web/package.json`: engines
 
@@ -88,7 +88,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-context-menu": "^2.3.8",
   "@radix-ui/react-dialog": "^1.1.23",
   "@radix-ui/react-dropdown-menu": "^2.1.24",
-  "@radix-ui/react-hover-card": "^1.1.23",
+  "@radix-ui/react-hover-card": "^1.1.24",
   "@radix-ui/react-label": "^2.1.15",
   "@radix-ui/react-menubar": "^1.2.1",
   "@radix-ui/react-navigation-menu": "^1.2.22",
@@ -101,12 +101,12 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-slider": "^1.4.7",
   "@radix-ui/react-slot": "^1.3.3",
   "@radix-ui/react-switch": "^1.4.1",
-  "@radix-ui/react-tabs": "^1.1.21",
-  "@radix-ui/react-toast": "^1.2.23",
+  "@radix-ui/react-tabs": "^1.1.22",
+  "@radix-ui/react-toast": "^1.3.1",
   "@radix-ui/react-toggle": "^1.2.1",
   "@radix-ui/react-toggle-group": "^1.1.19",
   "@radix-ui/react-tooltip": "^1.3.0",
-  "@radix-ui/react-visually-hidden": "^1.2.11",
+  "@radix-ui/react-visually-hidden": "^1.2.13",
   "@sentry/nextjs": "^11.9.0",
   "@statsig/js-client": "^3.33.5",
   "@statsig/statsig-node-core": "0.23.1",
@@ -125,7 +125,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "exifr": "^7.1.3",
   "framer-motion": "^14.0.0",
   "glob": "^14.0.2",
-  "idb": "^8.0.3",
+  "idb": "^8.0.4",
   "input-otp": "^1.5.0",
   "jose": "^6.2.14",
   "js-yaml": "5.4.3",
@@ -143,7 +143,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "react-hook-form": "^7.88.0",
   "react-markdown": "^10.1.0",
   "react-resizable-panels": "^3.0.6",
-  "react-syntax-highlighter": "^16.1.1",
+  "react-syntax-highlighter": "^16.1.2",
   "read-excel-file": "^6.0.3",
   "recharts": "^3.10.1",
   "server-only": "^0.0.1",
@@ -167,7 +167,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@testing-library/dom": "^10.4.2",
   "@testing-library/jest-dom": "^6.9.1",
   "@testing-library/react": "^16.3.3",
-  "@testing-library/user-event": "^14.6.7",
+  "@testing-library/user-event": "^14.6.8",
   "@types/jest": "^30.0.0",
   "@types/js-yaml": "4.0.9",
   "@types/lodash": "^4.17.27",
