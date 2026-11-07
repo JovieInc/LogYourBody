@@ -17,6 +17,34 @@ function expectAtLeast(version: string, minimum: string) {
 }
 
 describe('Dependabot security update resolution', () => {
+  it('does not let workspace overrides hide direct dependency bumps', () => {
+    const rootRequire = createRequire(new URL('package.json', root));
+    const webRequire = createRequire(new URL('apps/web/package.json', root));
+    const { load } = webRequire('js-yaml');
+    const { satisfies, validRange } = createRequire(rootRequire.resolve('eslint/package.json'))(
+      'semver',
+    );
+    const { overrides } = load(readFileSync(new URL('pnpm-workspace.yaml', root), 'utf8'));
+    const lockfile = load(readFileSync(new URL('pnpm-lock.yaml', root), 'utf8')) as {
+      importers: Record<string, Record<string, Record<string, { version: string }>>>;
+    };
+
+    for (const [importer, locked] of Object.entries(lockfile.importers)) {
+      const manifest: Record<string, Record<string, string>> = JSON.parse(
+        readFileSync(new URL(`${importer}/package.json`, root), 'utf8'),
+      );
+      for (const section of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+        for (const [dependency, requested] of Object.entries(manifest[section] ?? {})) {
+          if (!Object.hasOwn(overrides, dependency) || !validRange(requested)) continue;
+          const resolved = locked[section]?.[dependency]?.version?.split('(')[0];
+          const context = `${importer} ${dependency}: ${resolved} must satisfy ${requested}`;
+          expect(resolved, context).toBeDefined();
+          expect(satisfies(resolved, requested), context).toBe(true);
+        }
+      }
+    }
+  });
+
   it('keeps web React and React DOM dependency ranges in lockstep', () => {
     const manifest = JSON.parse(readFileSync(new URL('apps/web/package.json', root), 'utf8'));
     expect(manifest.dependencies.react).toBe(manifest.dependencies['react-dom']);
@@ -38,6 +66,13 @@ describe('Dependabot security update resolution', () => {
     expect(uiRequire('react')).toBe(webRequire('react'));
   });
 
+  it('keeps all locked PostCSS copies at the requested patch version', () => {
+    const lockfile = readFileSync(new URL('pnpm-lock.yaml', root), 'utf8');
+    const versions = [...lockfile.matchAll(/^ {2}postcss@([^:\s]+):/gm)];
+    expect(versions.length).toBeGreaterThan(0);
+    for (const [, version] of versions) expectAtLeast(version, '8.5.32');
+  });
+
   it.each([
     ['fast-uri', '3.1.9'],
     ['glob', '14.0.2'],
@@ -56,6 +91,7 @@ describe('Dependabot security update resolution', () => {
     ['fast-uri', '3.1.9'],
     ['glob', '14.0.2'],
     ['minimatch', '11.0.1'],
+    ['postcss', '8.5.32'],
     ['undici', '8.12.2'],
   ])('%s keeps manifest, workspace and lockfile overrides consistent', (dependency, minimum) => {
     const manifest = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
@@ -78,6 +114,9 @@ describe('Dependabot security update resolution', () => {
     ['glob', '14.0.2', ['apps/web/package.json']],
     ['minimatch', '11.0.1', ['eslint']],
     ['minimatch', '11.0.1', ['eslint-plugin-react']],
+    ['postcss', '8.5.32', ['apps/web/package.json']],
+    ['postcss', '8.5.32', ['apps/web/package.json', '@tailwindcss/postcss']],
+    ['postcss', '8.5.32', ['apps/web/package.json', 'next']],
     ['undici', '8.12.2', ['eve']],
   ])(
     '%s resolves to a patched version through its installed parent',

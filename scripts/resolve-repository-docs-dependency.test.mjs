@@ -44,6 +44,48 @@ function fixture(t, input, state) {
   return { root, git, path, resolve };
 }
 
+for (const code of ['ERR_PNPM_OUTDATED_LOCKFILE', 'ERR_PNPM_LOCKFILE_CONFIG_MISMATCH', 'ERR_PNPM_FETCH_401', 'ERR_PNPM_BROKEN_LOCKFILE']) {
+  for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
+    test(`dependency repair ${mode} handles ${code} without relaxing frozen verification`, (t) => {
+      const f = fixture(t, '.pnpmfile.cjs', 'staged');
+      writeFileSync(join(f.root, 'bin/corepack'), `#!/usr/bin/env python3
+import json
+import sys
+from pathlib import Path
+lock = Path('pnpm-lock.yaml')
+with Path('pnpm-calls').open('a') as calls:
+    calls.write(json.dumps(sys.argv[1:]) + '\\n')
+if '--no-frozen-lockfile' in sys.argv:
+    lock.write_text('resolved lockfile\\n')
+elif lock.read_text() != 'resolved lockfile\\n':
+    print('${code}')
+    sys.exit(1)
+`, { mode: 0o755 });
+      const index = f.git('ls-files', '--stage');
+      const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+      const result = f.resolve(mode);
+      const calls = readFileSync(join(f.root, 'pnpm-calls'), 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+      const repairable = mode === '--refresh-lockfile' && ['ERR_PNPM_OUTDATED_LOCKFILE', 'ERR_PNPM_LOCKFILE_CONFIG_MISMATCH'].includes(code);
+      if (repairable) {
+        assert.equal(result.status, 0, result.stderr);
+        assert.deepEqual(calls.map((args) => args.slice(4)), [
+          ['--frozen-lockfile', '--offline'], ['--no-frozen-lockfile'], ['--frozen-lockfile', '--offline'],
+        ]);
+        assert.equal(f.git('show', ':pnpm-lock.yaml'), 'resolved lockfile\n');
+        assert.equal(f.git('show', ':SOURCES.md'), readFileSync(join(f.root, 'SOURCES.md'), 'utf8'));
+      } else {
+        assert.notEqual(result.status, 0, result.stdout);
+        assert.equal(calls.length, 1);
+        assert.equal(f.git('ls-files', '--stage'), index);
+        for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+          assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
+        }
+      }
+      for (const args of calls) assert.deepEqual(args.slice(0, 4), ['pnpm', 'install', '--lockfile-only', '--ignore-scripts']);
+    });
+  }
+}
+
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
   for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch']) {
     test(`dependency repair ${mode} refuses indexed symlink ${input} before invoking pnpm`, (t) => {

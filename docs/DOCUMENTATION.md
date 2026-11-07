@@ -81,7 +81,8 @@ the lockfile and projection together; verify mode stages only the projection.
 For dependency PRs, stage the reviewed manifests and run
 `python3 scripts/resolve-repository-docs.py --refresh-lockfile`. This explicit
 repair first verifies the existing lockfile offline with pinned Corepack pnpm.
-Only a confirmed manifest mismatch (`ERR_PNPM_OUTDATED_LOCKFILE`) triggers
+Only a confirmed manifest mismatch (`ERR_PNPM_OUTDATED_LOCKFILE`) or override
+mismatch (`ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`) triggers
 regeneration without lifecycle scripts and a second frozen offline check.
 Valid lockfiles keep their resolutions; other installation failures stop repair.
 If resolution, frozen verification, projection generation or Git staging fails,
