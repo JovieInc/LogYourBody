@@ -138,6 +138,50 @@ test('reviewed digest refuses a workflow conflict that changes more than the pro
   assert.equal(f.git('ls-files', '--stage'), index);
 });
 
+test('reviewed digest keeps branch workflow edits when incoming changes only the project pin', (t) => {
+  const f = pinFixture(t);
+  const extra = `              'scripts/ios/xcodebuild-command-timeout.py': '${'a'.repeat(64)}',\n`;
+  f.writeProject('ours-project\n');
+  const workflowPath = join(f.root, DIAGNOSTIC_WORKFLOW);
+  // Keep the extra pin away from the project pin so Git conflicts only that line.
+  writeFileSync(workflowPath, extra + readFileSync(workflowPath, 'utf8'));
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  f.writeProject('theirs-project\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  mergePinFixture(f);
+  const merged = 'ours-project\ntheirs-project\n';
+  writeFileSync(join(f.root, DIAGNOSTIC_PROJECT), merged);
+  f.git('add', '--', DIAGNOSTIC_PROJECT);
+  const digest = createHash('sha256').update(merged).digest('hex');
+  const conflicted = readFileSync(workflowPath);
+  const beforeMap = readFileSync(join(f.root, f.output));
+  const index = f.git('ls-files', '--stage');
+  writeFileSync(workflowPath, Buffer.concat([conflicted, Buffer.from('hand edit\n')]));
+  const dirty = spawnSync('python3', [
+    resolver, '--root', f.root, '--reviewed-project-sha256', digest,
+  ], { env, encoding: 'utf8' });
+  assert.notEqual(dirty.status, 0);
+  assert.match(dirty.stderr, /not limited to the project pin/);
+  assert.deepEqual(readFileSync(workflowPath), Buffer.concat([conflicted, Buffer.from('hand edit\n')]));
+  assert.deepEqual(readFileSync(join(f.root, f.output)), beforeMap);
+  assert.equal(f.git('ls-files', '--stage'), index);
+  writeFileSync(workflowPath, conflicted);
+  const result = spawnSync('python3', [
+    resolver, '--root', f.root, '--reviewed-project-sha256', digest,
+  ], { env, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const staged = f.git('show', `:${DIAGNOSTIC_WORKFLOW}`);
+  assert.match(staged, new RegExp(digest));
+  assert.match(staged, /xcodebuild-command-timeout\.py/);
+  assert.doesNotMatch(staged, new RegExp(createHash('sha256').update('ours-project\n').digest('hex')));
+  assert.doesNotMatch(staged, new RegExp(createHash('sha256').update('theirs-project\n').digest('hex')));
+  assert.equal(f.git('diff', '--name-only', '--diff-filter=U'), '');
+});
+
 function projectMember(id, name) {
   return `\t\t${id} /* ${name} */ = {isa = PBXFileReference; path = ${name}; };\n`;
 }

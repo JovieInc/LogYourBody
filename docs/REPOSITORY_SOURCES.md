@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `e674878291c615b53dedcfbe419217aaa0863b79256f899605a119de70ff1f6b`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `320c50db6a6c92a7f2913472873561f08406e6bde5ecfef48099f849ab434b09`)
 
 ### `apps/web/package.json`: engines
 
@@ -108,8 +108,8 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-tooltip": "^1.3.0",
   "@radix-ui/react-visually-hidden": "^1.2.13",
   "@sentry/nextjs": "^11.9.0",
-  "@statsig/js-client": "^3.33.5",
-  "@statsig/statsig-node-core": "0.23.1",
+  "@statsig/js-client": "^3.33.7",
+  "@statsig/statsig-node-core": "0.24.0",
   "@tailwindcss/postcss": "^4.3.3",
   "@tailwindcss/typography": "^0.5.20",
   "@tanstack/react-query": "^5.104.5",
@@ -387,12 +387,12 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fc5a43b2fed86c3144518403ef49c0b5e2f5709099b2233d7c3db4a4d2f0ae5b`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `f95348566d0b327a236e04947bbdd7ca30798f8e4a0972ae03d13d81a17cc5e8`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4c4da70bab66393bf9384eafd35791cfb52a948e98d23c615808ddc5be67feda`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
 - `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `042891d949b3f241fef29104e9396531ebdddced0f27375135def85c46b8d80d`)
+- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `ea5e66e43d150d8de85338a3bfd29ed72fdc0fee37c9fd8a839c031009bdaa0e`)
 - `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `87941ea0acf0ad3f0bf3e729c0c3ca6b33f66b191c838d84bfe18954291587c4`)
 
 ## Pinned shared sources
