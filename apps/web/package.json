@@ -98,7 +98,7 @@
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^3.0.6",
     "react-syntax-highlighter": "^16.1.2",
-    "read-excel-file": "^6.0.3",
+    "read-excel-file": "^9.3.14",
     "recharts": "^3.10.1",
     "server-only": "^0.0.1",
     "sonner": "^2.0.8",
