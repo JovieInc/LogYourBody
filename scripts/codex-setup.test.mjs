@@ -52,7 +52,65 @@ test('installs the correction ledger merge driver in a git checkout', (t) => {
   execFileSync('git', ['init'], options);
   assert.equal(installCorrectionLedgerMergeDriver(root, options.env), true);
   assert.equal(
-    execFileSync('git', ['config', '--local', '--get', 'merge.correction-ledger.driver'], options).trim(),
+    execFileSync(
+      'git',
+      ['config', '--local', '--get', 'merge.correction-ledger.driver'],
+      options,
+    ).trim(),
+    'node scripts/correction-classifier.mjs --merge-driver %O %A %B',
+  );
+});
+
+test('propagates merge driver configuration failures and signals', (t) => {
+  for (const [behavior, expected] of [
+    ['exit 42', /merge driver was not installed \(42\)/],
+    ['kill -TERM $$', /merge driver was not installed \(SIGTERM\)/],
+  ]) {
+    const { root, env } = fixture(t);
+    writeFileSync(
+      join(root, 'bin/git'),
+      `#!/bin/bash\nif [[ "$1" == 'rev-parse' ]]; then exit 0; fi\n${behavior}\n`,
+      { mode: 0o755 },
+    );
+    assert.throws(() => installCorrectionLedgerMergeDriver(root, env), expected);
+  }
+});
+
+test('handles missing git and reports its disappearance after the checkout probe', (t) => {
+  const { root } = fixture(t);
+  assert.equal(installCorrectionLedgerMergeDriver(root, { PATH: join(root, 'missing') }), false);
+  writeFileSync(join(root, 'bin/git'), '#!/bin/bash\n/bin/rm -- "$0"\n', { mode: 0o755 });
+  assert.throws(() => installCorrectionLedgerMergeDriver(root, { PATH: join(root, 'bin') }), {
+    code: 'ENOENT',
+  });
+});
+
+test('the successful CLI installs dependencies and the merge driver in its own checkout', (t) => {
+  const { root, env } = fixture(t);
+  mkdirSync(join(root, 'scripts'));
+  mkdirSync(join(root, 'nested'));
+  copyFileSync(resolve('scripts/codex-setup.mjs'), join(root, 'scripts/codex-setup.mjs'));
+  const options = {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  execFileSync('git', ['init', '--quiet'], options);
+  const result = spawnSync(process.execPath, [join(root, 'scripts/codex-setup.mjs')], {
+    ...options,
+    cwd: join(root, 'nested'),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    readFileSync(join(root, 'install-receipt'), 'utf8'),
+    `${root}\ninstall --frozen-lockfile --prefer-offline\n1\nunset\n`,
+  );
+  assert.equal(
+    execFileSync(
+      'git',
+      ['config', '--local', '--get', 'merge.correction-ledger.driver'],
+      options,
+    ).trim(),
     'node scripts/correction-classifier.mjs --merge-driver %O %A %B',
   );
 });

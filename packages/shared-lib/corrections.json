@@ -6019,5 +6019,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "codex-merge-driver-lifecycle-failure-coverage",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42353047378/job/128345127629",
+    "correction": "PR #1698 / LYB-338, fix-red-d5dac7802d occurrence 4: Detect Changes fails the unchanged agent lifecycle coverage floors after the merge-driver bootstrap was added. All 11 cases pass, but line coverage is 87.10% against 90% and branch coverage is 86.96% against 90%; CI Summary consequently fails. Merge origin/main without rebasing before repair and retain signing renewal intent.",
+    "mechanization": "Extend the existing lifecycle suite, already executed on every diff by required Detect Changes, to assert configuration exit failures, termination signals, missing Git, executable disappearance after the probe, and a successful CLI installing both frozen dependencies and the exact driver in its own checkout from a nested cwd. Reproduce the original coverage failure, retain every floor, then use the extended suite on this repair. Negative controls that swallow configuration status or spawn errors must fail the new tests. The harness owns push and PR edits and must replace the existing machine line with exactly one line: Machine: built scripts/codex-setup.test.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The bootstrap already propagates configuration exit failures, signals and spawn errors correctly. Changing that production behavior cannot prevent missing behavioral test coverage."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing deterministic lifecycle tests can execute real subprocess failure paths and the successful CLI, protecting error propagation and meeting the unchanged required coverage floors on every diff."
+      }
+    },
+    "guard": {
+      "path": "scripts/codex-setup.test.mjs",
+      "anchor": "propagates merge driver configuration failures and signals"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
