@@ -5965,5 +5965,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "xctest-launch-recovery-cases-own-execution-budgets",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
+    "correction": "PR #1746 / LYB-343, fix-red-5df69c1e5f occurrence 25: merge origin/main without rebasing and repair CI Summary and iOS Launch Quality. Run 42356725053 exceeded the two-minute test allowance because the Timeline capture test called four other tests, including a ten-state recovery loop; a later termination failure was the timeout symptom. Keep goal-relative stats and all recovery assertions.",
+    "mechanization": "Extend the existing required shared-lib launch-quality evidence suite to reject XCTest-to-XCTest calls across native UI sources and require a separately selected native case for every Stats manifest state and dated journey. The two new checks fail against the original four nested calls and missing independent state cases, then pass after splitting the matrix and adding exact selectors. The existing runner derives --expected-test for every selector and rejects missing, skipped, failed and duplicate receipts. Keep one UI runner launch, native per-test limits, outer workflow caps and coverage floors. Budget 30 minutes for the complete UI matrix because the failing invocation already used 24m15s before most new states ran. Record fresh macOS execution and coverage as unverified on this Linux host. The harness owns push and PR-body edits and must include exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Swift XCTest discovery requires callable test methods; runtime app types cannot prevent future test-to-test calls or omissions from a shell selector list."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required source-contract suite can reject nested test calls and compare each manifest recovery state and dated method with the runner selectors before spending native CI time. Existing Turbo inputs cover the test suite, native sources and launcher."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "keeps XCTest methods independent so each receives its own execution budget"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

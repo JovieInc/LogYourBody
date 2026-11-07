@@ -100,6 +100,55 @@ it('keeps replay and onboarding state fixtures free of UIKit and SwiftUI animati
   );
 });
 
+it('keeps XCTest methods independent so each receives its own execution budget', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const paths = execFileSync('git', ['ls-files', 'apps/ios/LogYourBodyUITests'], {
+    cwd: root,
+    encoding: 'utf8',
+  })
+    .trim()
+    .split('\n')
+    .filter((path) => path.endsWith('.swift'));
+  const calls = /(?<!\bfunc\s+)\b(?:self\.)?(test[A-Z]\w*)\s*\(/g;
+  expect('func testExample() throws { assertRecovery() }'.match(calls)).toBeNull();
+  expect('func testExample() throws { try self.testNested() }'.match(calls)).toEqual([
+    'self.testNested(',
+  ]);
+  const nested = paths.flatMap((path) =>
+    [...readFileSync(`${root}/${path}`, 'utf8').matchAll(calls)].map(
+      (match) => `${path}: ${match[1]}`,
+    ),
+  );
+  expect(nested, 'Select separate XCTest cases instead of calling tests from tests').toEqual([]);
+});
+
+it('selects every dated recovery state and journey as independent native evidence', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const native = readFileSync(
+    `${root}/apps/ios/LogYourBodyUITests/LogYourBodyUITests+DatedTimeline.swift`,
+    'utf8',
+  );
+  const audit = readFileSync(`${root}/scripts/ios/launch-quality-audit.sh`, 'utf8');
+  const selectors = audit.split('LAUNCH_QUALITY_UI_TESTS=(')[1].split('\n)')[0];
+  const journey = readFileSync(`${root}/apps/ios/LogYourBody/Services/LaunchJourney.swift`, 'utf8');
+  const registry = journey.match(/enum RouteState[^{]*\{([^}]+)\}/)?.[1];
+  expect(registry).toBeDefined();
+  const states = [...registry!.matchAll(/case (\w+)(?: = "([\w-]+)")?/g)].map(
+    (match) => match[2] ?? match[1],
+  );
+  const cases = [...native.matchAll(/func (testDated\w+)\(\) throws \{/g)];
+  const recoveryCases = [
+    ...native.matchAll(
+      /func (testDatedStats\w+HasOneReachableRecovery)\(\) throws \{\s*assertDatedStatsRecovery\(state: "([\w-]+)"\)\s*\}/g,
+    ),
+  ];
+  expect(recoveryCases.map((match) => match[2]).sort()).toEqual(states.sort());
+  expect(cases.length).toBeGreaterThan(recoveryCases.length);
+  for (const [, name] of cases) {
+    expect(selectors.match(new RegExp(`"LogYourBodyUITests/${name}"`, 'g')), name).toHaveLength(1);
+  }
+});
+
 it('rejects incomplete XCTest proof through the launch gate validator with executed line coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const coverage = mkdtempSync(`${tmpdir()}/lyb-evidence-coverage-`);

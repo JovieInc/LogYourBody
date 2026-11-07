@@ -77,18 +77,35 @@ bounds, expiry, baseline preservation, date edits and account replacement.
 `DatedOutcomeStoreTests` adds baseline reopen/acknowledgement/edit persistence,
 wire isolation, stale revision and account checks.
 
-The existing UI target includes
-`testDatedStatsEveryManifestStateHasOneReachableRecovery` and
-`testDatedStatsManualMeasurementDateEditExpiryAndAccountReturn`. The first uses
-DEBUG-only synthetic policy and records; the second uses the real editor,
-journal and logger without numeric policy injection. Both flows also run from
-the already selected `testLaunchQualityGateCapturesTimelineSurfaces` test.
-The LYB-271 route bindings include that real selected wrapper as well as the
-individual methods and service cases. Calling another test method from the
-wrapper executes assertions under the wrapper's XCTest identity; it does not
-create a separate native execution receipt for the called method.
+The existing UI target gives each of the ten manifest states its own
+`testDatedStats<State>HasOneReachableRecovery` XCTest case using the shared
+`assertDatedStatsRecovery` helper. The real editor, journal, logger, expiry,
+optional-photo cancellation and account-isolation journeys are also selected
+independently by `scripts/ios/launch-quality-audit.sh`. Every selected case must
+produce its own passing execution receipt; none run inside another test method.
+The existing shared-lib evidence suite rejects nested test calls, missing state
+cases and omitted selectors before using the native runner.
 
-Local Linux validation:
+CI run `42356725053` exceeded the two-minute test allowance while the old
+Timeline wrapper was still calling the recovery-state loop. Its subsequent
+termination error was a timeout symptom. The repair retains the per-test and
+outer step limits. The aggregate UI command budget grows from 25 to 30 minutes
+for the complete matrix: the failed run already spent 24m15s in that command
+with most of the matrix still unexecuted. Native execution on the repaired head
+remains required; source checks cannot prove runtime or coverage.
+
+Repair validation on 2026-11-07: root `pnpm lint`, `pnpm typecheck` and
+`pnpm test` passed using the pinned toolchain. Both new source guards reject
+the immutable original PR sources and pass with the repair. The existing native
+evidence suite executed its 34 behavior cases. Scoped strict SwiftLint found
+no violations (the five SourceKit rules remain unavailable on Linux); the
+architecture ratchet, launch UI static audit, correction coverage, manifest
+generation equality, shell syntax and documentation parity checks also passed.
+The native XCTest attempt could not run because this host has no `xcodebuild`.
+GBrain write and same-slug readback succeeded outside the network sandbox at
+`engineering/lyb-343-launch-quality-case-budgets` (page 77662).
+
+Original implementation validation (2026-11-02):
 
 - Root `pnpm lint` and `pnpm typecheck` passed through Turbo cache. Root
   `pnpm test` passed after retrying outside sandbox subprocess restrictions:

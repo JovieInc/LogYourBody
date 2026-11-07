@@ -24,15 +24,9 @@ XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNIN
 TEST_TIMEOUTS_ENABLED="${TEST_TIMEOUTS_ENABLED:-YES}"
 DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE="${DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE:-90}"
 MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-180}"
-# Passing hosted invocations took up to 672s (2026-10-12), and a cold first UI
-# invocation spent ~10m in xcodebuild startup before any test ran, so 720s
-# killed healthy runs. 1020s still stops a hung simulator well inside the step
-# budget. A command timeout is not retried; see is_simulator_infra_failure.
+# Hosted startup can take ~10m; retain the bounded, non-retried command timeout.
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
-# Bound the one cold build independently of XCTest execution. Run 40388372132
-# missed every Swift package cache and was still compiling test targets at 600s.
-# Allow 15m for compilation; keep test timeouts, retries and the outer step cap.
-BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"
+BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}" # Bound the one cold build independently of XCTest execution.
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
@@ -578,12 +572,8 @@ python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --scheme "$SCHEME" --only-testing LogYourBodyTests \
   > "$ARTIFACT_DIR/launch-quality-unit-tests.ratchet.json"
 
-# Every UI check runs in ONE xcodebuild invocation. On hosted macOS each
-# test-without-building invocation pays 3-6 min launching the UI test runner
-# before its first test (xcresult action log, run 38320479871: runner launch
-# 340-537s per invocation). Three separate UI invocations plus the unit target
-# overran the 40-minute step with every test passing. Same tests, same exact
-# evidence checks, one runner launch.
+# Keep one UI runner launch: run 38320479871 paid 340-537s per invocation.
+# Select separate XCTest cases so each retains its execution budget and receipt.
 LAUNCH_QUALITY_UI_TESTS=(
   "HomeV2TimelineIntegrationUITests/testPhotoHoldScrubsBothDirectionsThenAnotherHoldRestoresTap"
   "HomeV2TimelineIntegrationUITests/testPhotoScrubResetsWhenNavigatingToTheMenuAndBack"
@@ -598,14 +588,26 @@ LAUNCH_QUALITY_UI_TESTS=(
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces"
+  "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn"
+  "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation"
+  "LogYourBodyUITests/testDatedTimelineExpiredOutcomeOpensEditorWithoutExtendingDate"
+  "LogYourBodyUITests/testDatedStatsManualMeasurementDateEditExpiryAndAccountReturn"
+  "LogYourBodyUITests/testDatedStatsReadyHasOneReachableRecovery"
+  "LogYourBodyUITests/testDatedStatsDenialHasOneReachableRecovery"
+  "LogYourBodyUITests/testDatedStatsNoDataHasOneReachableRecovery"
+  "LogYourBodyUITests/testDatedStatsOfflineHasOneReachableRecovery"
+  "LogYourBodyUITests/testDatedStatsStaleHasOneReachableRecovery"
+  "LogYourBodyUITests/testDatedStatsConflictingHasOneReachableRecovery"
+  "LogYourBodyUITests/testDatedStatsUnsafeDateHasOneReachableRecovery"
+  "LogYourBodyUITests/testDatedStatsImpossibleDateHasOneReachableRecovery"
+  "LogYourBodyUITests/testDatedStatsExpiredDateHasOneReachableRecovery"
+  "LogYourBodyUITests/testDatedStatsMaintenanceHasOneReachableRecovery"
   "LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail"
   "OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal"
   "MesocycleCanvasUITests/testReducedMotionUsesStackedDayCards"
   "MesocycleCanvasUITests/testGoalThroughUndoKeepsTheCanvasAndReadbackTogether"
 )
 
-# Security-sensitive chaos regressions use the same native execution and
-# exact-test evidence validator as the existing launch quality checks.
 CHAOS_REGRESSIONS=(
   "ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration"
   "ChaosEdgeCaseUITests/testIntegrationDirectorySeparatesHealthAccessAndScanHistory"
@@ -628,10 +630,8 @@ for test_id in "${LAUNCH_QUALITY_UI_TESTS[@]}" "${CHAOS_REGRESSIONS[@]}"; do
 done
 UI_RESULT_BUNDLE="$ARTIFACT_DIR/launch-quality-ui.xcresult"
 UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")
-# One runner launch (up to ~9 min hosted) plus all selected UI tests
-# replaces three separately bounded invocations, so its own bound is the
-# per-invocation limit plus the work the other two used to carry.
-UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1500}"
+# Budget the full dated-state matrix; per-test timeouts and the 52m step stay fixed.
+UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1800}"
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_xcodebuild_test \
   "launch-quality-ui" \
   "$UI_RESULT_BUNDLE" \

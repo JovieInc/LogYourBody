@@ -2,47 +2,82 @@ import XCTest
 import UIKit
 
 extension LogYourBodyUITests {
-    func testDatedStatsEveryManifestStateHasOneReachableRecovery() throws {
-        let states = ["ready", "denial", "no-data", "offline", "stale", "conflicting",
-                      "unsafe-date", "impossible-date", "expired-date", "maintenance"]
-        for state in states {
-            let app = XCUIApplication()
-            launch(app, with: [
-                "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
-                "-lybUITestPhotoTimelineAnalyticsFixture", "-lybUITestDatedTimelineFixture",
-                "-lybUITestDatedStatsState", state
-            ])
-            let surface = app.descendants(matching: .any)["dated_stats_\(state)"]
-            XCTAssertTrue(surface.waitForExistence(timeout: 15), state)
-            XCTAssertEqual(app.buttons.matching(identifier: "launch_next_action").count, 1, state)
-            XCTAssertFalse(app.descendants(matching: .any)["dashboard_body_score_hero"].exists)
-            if state != "ready" {
-                XCTAssertFalse(app.descendants(matching: .any)["dated_stats_drift"].exists, state)
-            }
-            let action = app.buttons["launch_next_action"]
-            XCTAssertTrue(action.isHittable, state)
-            attachScreenshot(named: "dated-stats-\(state)", from: app)
-            action.tap()
-            switch state {
-            case "unsafe-date", "impossible-date", "expired-date", "maintenance":
-                let date = app.textFields["launch_outcome_date"]
-                XCTAssertTrue(date.waitForExistence(timeout: 8), state)
-                XCTAssertEqual(date.value as? String,
-                               state == "expired-date" ? "2026-10-01" : state == "impossible-date" ? "2026-11-08" : "2026-12-27")
-                XCTAssertTrue(app.switches["launch_outcome_maintenance"].exists)
-                app.buttons["launch_outcome_cancel"].tap()
-                XCTAssertTrue(surface.waitForExistence(timeout: 8), state)
-            case "denial", "no-data", "stale", "conflicting":
-                XCTAssertTrue(app.textFields["Weight value"].waitForExistence(timeout: 8), state)
-                app.buttons["Cancel"].tap()
-                XCTAssertTrue(surface.waitForExistence(timeout: 8), state)
-            case "offline":
-                XCTAssertTrue(surface.waitForExistence(timeout: 8))
-            default:
-                let returned = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: surface)
-                XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 8), .completed)
-            }
-            app.terminate()
+    func testDatedStatsReadyHasOneReachableRecovery() throws {
+        assertDatedStatsRecovery(state: "ready")
+    }
+
+    func testDatedStatsDenialHasOneReachableRecovery() throws {
+        assertDatedStatsRecovery(state: "denial")
+    }
+
+    func testDatedStatsNoDataHasOneReachableRecovery() throws {
+        assertDatedStatsRecovery(state: "no-data")
+    }
+
+    func testDatedStatsOfflineHasOneReachableRecovery() throws {
+        assertDatedStatsRecovery(state: "offline")
+    }
+
+    func testDatedStatsStaleHasOneReachableRecovery() throws {
+        assertDatedStatsRecovery(state: "stale")
+    }
+
+    func testDatedStatsConflictingHasOneReachableRecovery() throws {
+        assertDatedStatsRecovery(state: "conflicting")
+    }
+
+    func testDatedStatsUnsafeDateHasOneReachableRecovery() throws {
+        assertDatedStatsRecovery(state: "unsafe-date")
+    }
+
+    func testDatedStatsImpossibleDateHasOneReachableRecovery() throws {
+        assertDatedStatsRecovery(state: "impossible-date")
+    }
+
+    func testDatedStatsExpiredDateHasOneReachableRecovery() throws {
+        assertDatedStatsRecovery(state: "expired-date")
+    }
+
+    func testDatedStatsMaintenanceHasOneReachableRecovery() throws {
+        assertDatedStatsRecovery(state: "maintenance")
+    }
+
+    private func assertDatedStatsRecovery(state: String) {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestPhotoTimelineAnalyticsFixture", "-lybUITestDatedTimelineFixture",
+            "-lybUITestDatedStatsState", state
+        ])
+        let surface = app.descendants(matching: .any)["dated_stats_\(state)"]
+        XCTAssertTrue(surface.waitForExistence(timeout: 15), state)
+        XCTAssertEqual(app.buttons.matching(identifier: "launch_next_action").count, 1, state)
+        XCTAssertFalse(app.descendants(matching: .any)["dashboard_body_score_hero"].exists)
+        if state != "ready" {
+            XCTAssertFalse(app.descendants(matching: .any)["dated_stats_drift"].exists, state)
+        }
+        let action = app.buttons["launch_next_action"]
+        XCTAssertTrue(action.isHittable, state)
+        attachScreenshot(named: "dated-stats-\(state)", from: app)
+        action.tap()
+        switch state {
+        case "unsafe-date", "impossible-date", "expired-date", "maintenance":
+            let date = app.textFields["launch_outcome_date"]
+            XCTAssertTrue(date.waitForExistence(timeout: 8), state)
+            XCTAssertEqual(date.value as? String,
+                           state == "expired-date" ? "2026-10-01" : state == "impossible-date" ? "2026-11-08" : "2026-12-27")
+            XCTAssertTrue(app.switches["launch_outcome_maintenance"].exists)
+            app.buttons["launch_outcome_cancel"].tap()
+            XCTAssertTrue(surface.waitForExistence(timeout: 8), state)
+        case "denial", "no-data", "stale", "conflicting":
+            XCTAssertTrue(app.textFields["Weight value"].waitForExistence(timeout: 8), state)
+            app.buttons["Cancel"].tap()
+            XCTAssertTrue(surface.waitForExistence(timeout: 8), state)
+        case "offline":
+            XCTAssertTrue(surface.waitForExistence(timeout: 8))
+        default:
+            let returned = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: surface)
+            XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 8), .completed)
         }
     }
 
