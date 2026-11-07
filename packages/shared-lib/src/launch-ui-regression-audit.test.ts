@@ -4,6 +4,41 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 
+it('keeps voice hardware dormant during ordinary chat construction and dismissal', () => {
+  const source = readFileSync(
+    new URL('../../../apps/ios/LogYourBody/Services/VoiceCaptureService.swift', import.meta.url),
+    'utf8',
+  );
+  const capture =
+    source.split('final class VoiceCaptureService {')[1]?.split('enum VoiceCoachPolicy')[0] ?? '';
+  expect(capture).toMatch(/@ObservationIgnored\s+private lazy var audioEngine/);
+  expect(capture.split('func start()')[0]).not.toMatch(
+    /(?:let|var) recognizer[^\n]*=\s*SFSpeechRecognizer/,
+  );
+  const start = capture.split('func start()')[1]?.split('func finish()')[0] ?? '';
+  expect(start.indexOf('try await requestPermissions()')).toBeGreaterThan(-1);
+  expect(start.indexOf('SFSpeechRecognizer(locale:')).toBeGreaterThan(
+    start.indexOf('try await requestPermissions()'),
+  );
+  const cancel =
+    capture.split('func cancel()')[1]?.split('private func requestPermissions()')[0] ?? '';
+  expect(cancel).toMatch(
+    /if request != nil \{\s*audioEngine\.stop\(\)\s*audioEngine\.inputNode\.removeTap\(onBus: 0\)\s*try\? AVAudioSession\.sharedInstance\(\)\.setActive\(false, options: \.notifyOthersOnDeactivation\)\s*\}/,
+  );
+  expect(cancel.match(/audioEngine/g)).toHaveLength(2);
+  expect(cancel.match(/AVAudioSession/g)).toHaveLength(1);
+  const playback = readFileSync(
+    new URL('../../../apps/ios/LogYourBody/Services/VoicePlaybackService.swift', import.meta.url),
+    'utf8',
+  );
+  expect(playback).toMatch(/private lazy var synthesizer/);
+  expect(playback).not.toMatch(/(?:let|var) synthesizer[^\n]*=\s*AVSpeechSynthesizer\(\)/);
+  const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
+  for (const file of ['VoiceCaptureService.swift', 'VoicePlaybackService.swift']) {
+    expect(turbo.tasks.test.inputs).toContain(`$TURBO_ROOT$/apps/ios/LogYourBody/Services/${file}`);
+  }
+});
+
 it('requires verified native text entry before testing draft preservation', () => {
   const source = readFileSync(
     new URL('../../../apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift', import.meta.url),

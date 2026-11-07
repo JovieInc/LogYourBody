@@ -138,6 +138,50 @@ test('reviewed digest refuses a workflow conflict that changes more than the pro
   assert.equal(f.git('ls-files', '--stage'), index);
 });
 
+test('reviewed digest keeps branch workflow edits when incoming changes only the project pin', (t) => {
+  const f = pinFixture(t);
+  const extra = `              'scripts/ios/xcodebuild-command-timeout.py': '${'a'.repeat(64)}',\n`;
+  f.writeProject('ours-project\n');
+  const workflowPath = join(f.root, DIAGNOSTIC_WORKFLOW);
+  // Keep the extra pin away from the project pin so Git conflicts only that line.
+  writeFileSync(workflowPath, extra + readFileSync(workflowPath, 'utf8'));
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  f.writeProject('theirs-project\n');
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  mergePinFixture(f);
+  const merged = 'ours-project\ntheirs-project\n';
+  writeFileSync(join(f.root, DIAGNOSTIC_PROJECT), merged);
+  f.git('add', '--', DIAGNOSTIC_PROJECT);
+  const digest = createHash('sha256').update(merged).digest('hex');
+  const conflicted = readFileSync(workflowPath);
+  const beforeMap = readFileSync(join(f.root, f.output));
+  const index = f.git('ls-files', '--stage');
+  writeFileSync(workflowPath, Buffer.concat([conflicted, Buffer.from('hand edit\n')]));
+  const dirty = spawnSync('python3', [
+    resolver, '--root', f.root, '--reviewed-project-sha256', digest,
+  ], { env, encoding: 'utf8' });
+  assert.notEqual(dirty.status, 0);
+  assert.match(dirty.stderr, /not limited to the project pin/);
+  assert.deepEqual(readFileSync(workflowPath), Buffer.concat([conflicted, Buffer.from('hand edit\n')]));
+  assert.deepEqual(readFileSync(join(f.root, f.output)), beforeMap);
+  assert.equal(f.git('ls-files', '--stage'), index);
+  writeFileSync(workflowPath, conflicted);
+  const result = spawnSync('python3', [
+    resolver, '--root', f.root, '--reviewed-project-sha256', digest,
+  ], { env, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const staged = f.git('show', `:${DIAGNOSTIC_WORKFLOW}`);
+  assert.match(staged, new RegExp(digest));
+  assert.match(staged, /xcodebuild-command-timeout\.py/);
+  assert.doesNotMatch(staged, new RegExp(createHash('sha256').update('ours-project\n').digest('hex')));
+  assert.doesNotMatch(staged, new RegExp(createHash('sha256').update('theirs-project\n').digest('hex')));
+  assert.equal(f.git('diff', '--name-only', '--diff-filter=U'), '');
+});
+
 function projectMember(id, name) {
   return `\t\t${id} /* ${name} */ = {isa = PBXFileReference; path = ${name}; };\n`;
 }
@@ -224,6 +268,89 @@ test('reviewed digest refuses a merged project that dropped a parent file', (t) 
   assert.equal(f.git('diff', '--name-only', '--diff-filter=U'), '');
 });
 
+test('additive project union keeps both parent file memberships', (t) => {
+  const f = pinFixture(t);
+  const oursId = 'B318A11A0000000000000001';
+  const theirsId = 'B317A11A0000000000000001';
+  f.writeProject(`base-project\n${projectMember(oursId, 'BodyShapeCalibration.swift')}`);
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  f.writeProject(`base-project\n${projectMember(theirsId, 'PersonalBodyEstimate.swift')}`);
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  mergePinFixture(f);
+  const beforeWorkflow = readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW));
+  const union = spawnSync('python3', [resolver, '--root', f.root, '--union-project'], {
+    env,
+    encoding: 'utf8',
+  });
+  assert.equal(union.status, 0, union.stderr);
+  const staged = f.git('show', `:${DIAGNOSTIC_PROJECT}`);
+  assert.match(staged, new RegExp(oursId));
+  assert.match(staged, new RegExp(theirsId));
+  assert.doesNotMatch(staged, /^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |$)/m);
+  assert.equal(f.git('diff', '--name-only', '--diff-filter=U', '--', DIAGNOSTIC_PROJECT), '');
+  assert.match(f.git('diff', '--name-only', '--diff-filter=U'), /ios-ui-diagnostics/);
+  assert.deepEqual(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW)), beforeWorkflow);
+  writeFileSync(join(f.root, 'a.txt'), 'DIRTY\n');
+  const bytes = execFileSync('git', ['show', `:${DIAGNOSTIC_PROJECT}`], { cwd: f.root });
+  const digest = createHash('sha256').update(bytes).digest('hex');
+  const pinned = spawnSync('python3', [
+    resolver, '--root', f.root, '--reviewed-project-sha256', digest,
+  ], { env, encoding: 'utf8' });
+  assert.equal(pinned.status, 0, pinned.stderr);
+  assert.match(f.git('show', `:${DIAGNOSTIC_WORKFLOW}`), new RegExp(digest));
+  assert.doesNotMatch(f.git('show', `:${f.output}`), new RegExp(createHash('sha256').update('DIRTY\n').digest('hex')));
+  assert.equal(readFileSync(join(f.root, 'a.txt'), 'utf8'), 'DIRTY\n');
+  assert.equal(f.git('diff', '--name-only', '--diff-filter=U'), '');
+});
+
+test('project union refuses a parent that edits an existing project line', (t) => {
+  const f = pinFixture(t);
+  f.writeProject(`base-project\n${projectMember('B318A11A0000000000000001', 'BodyShapeCalibration.swift')}`);
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  f.writeProject(`changed-project\n${projectMember('B317A11A0000000000000001', 'PersonalBodyEstimate.swift')}`);
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  mergePinFixture(f);
+  const beforeProject = readFileSync(join(f.root, DIAGNOSTIC_PROJECT));
+  const index = f.git('ls-files', '--stage', '--', DIAGNOSTIC_PROJECT);
+  const refused = spawnSync('python3', [resolver, '--root', f.root, '--union-project'], {
+    env,
+    encoding: 'utf8',
+  });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /parent changed an existing project line/);
+  assert.deepEqual(readFileSync(join(f.root, DIAGNOSTIC_PROJECT)), beforeProject);
+  assert.equal(f.git('ls-files', '--stage', '--', DIAGNOSTIC_PROJECT), index);
+});
+
+test('project union refuses duplicate file membership ids', (t) => {
+  const f = pinFixture(t);
+  const shared = 'B318A11A0000000000000001';
+  f.writeProject(`base-project\n${projectMember(shared, 'BodyShapeCalibration.swift')}`);
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  f.writeProject(`base-project\n${projectMember(shared, 'PersonalBodyEstimate.swift')}`);
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  mergePinFixture(f);
+  const index = f.git('ls-files', '--stage', '--', DIAGNOSTIC_PROJECT);
+  const refused = spawnSync('python3', [resolver, '--root', f.root, '--union-project'], {
+    env,
+    encoding: 'utf8',
+  });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, new RegExp(`duplicate file membership ${shared}`));
+  assert.equal(f.git('ls-files', '--stage', '--', DIAGNOSTIC_PROJECT), index);
+});
 for (const [name, marker] of [
   ['source', '<<<<<<< HEAD\n'],
   ['source', '||||||| base\n'],

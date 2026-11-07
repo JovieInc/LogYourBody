@@ -120,6 +120,11 @@ and appending distinct incoming level-two sections. Review the proposal, replace
 the conflicted file and stage it explicitly. This mode never writes or stages;
 it refuses incoming edits/deletions, duplicate headings, unheaded additions and
 non-documentation paths. It does not adjudicate contradictory prose.
+For a conflicted Xcode project whose parents only insert file membership, run
+`python3 scripts/resolve-repository-docs.py --union-project`.
+It stages those insertions from both parents and refuses an edit or deletion of
+an existing line. Review the staged project, then pass its digest to
+`--reviewed-project-sha256`. The union never derives that digest.
 Repair a conflicted source projection first with
 `python3 scripts/resolve-repository-docs.py --staged`. If staging fails, it restores
 the original projection bytes (or absence), so the same command remains retryable.
