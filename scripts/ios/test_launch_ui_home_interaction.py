@@ -1,5 +1,9 @@
 """Mutation cases shared by the existing required launch UI audit suite."""
 
+import importlib.util
+import sys
+import tempfile
+import unittest
 from pathlib import Path
 import shutil
 
@@ -90,3 +94,107 @@ class HomeInteractionAuditTests:
                 path.write_text(original.replace(before, after, 1))
                 self.assert_rejected("sync.ui_test_offline_survives_path")
                 path.write_text(original)
+
+
+def launch_ui_audit():
+    """Return the audit module already loaded by the behavior suite."""
+    loaded = sys.modules.get("launch_ui_audit")
+    if loaded is not None:
+        return loaded
+    root = Path(__file__).resolve().parents[2]
+    spec = importlib.util.spec_from_file_location(
+        "launch_ui_audit", root / "scripts/ios/launch-ui-regression-audit.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+class CheckSiblingDiscoveryTests(unittest.TestCase):
+    def test_every_size_ratchet_sibling_loads_or_the_audit_fails_closed(self):
+        audit = launch_ui_audit()
+        loaded = [
+            audit._load_sibling(module_name, filename, export)
+            for module_name, filename, export in audit._AUDIT_SIBLINGS
+        ]
+        self.assertEqual(
+            [item[0] for item in audit._AUDIT_SIBLINGS],
+            [
+                "launch_ui_timeline_day",
+                "launch_ui_opacity_audit",
+                "launch_ui_timeline_gesture_audit",
+                "launch_ui_regression_report",
+            ],
+        )
+        for export in loaded:
+            self.assertTrue(callable(export))
+        with self.assertRaises(RuntimeError) as missing_file:
+            audit._load_sibling("missing_sibling", "missing_launch_ui_sibling.py", "missing")
+        self.assertIn("Cannot load launch UI audit sibling", str(missing_file.exception))
+        with self.assertRaises(RuntimeError) as missing_export:
+            audit._load_sibling(
+                "launch_ui_timeline_day", "launch_ui_timeline_day.py", "not_an_export",
+            )
+        self.assertIn("Cannot load launch UI audit sibling", str(missing_export.exception))
+
+    def test_every_check_sibling_contributes_and_a_missing_hook_fails_closed(self):
+        # The coverage tracer reads these modules after the suite returns.
+        audit = launch_ui_audit()
+        directory = Path(tempfile.mkdtemp(prefix="lyb-audit-siblings-"))
+        (directory / "launch_ui_beta.py").write_text(
+            "def contribute(bucket, *args):\n    bucket.append('beta')\n"
+        )
+        (directory / "launch_ui_alpha.py").write_text(
+            "def contribute(bucket, *args):\n    bucket.append('alpha')\n"
+        )
+        (directory / "notes.py").write_text("def contribute(bucket, *args):\n    bucket.append('nope')\n")
+        seen = []
+        for module in audit.load_check_siblings(directory):
+            module.contribute(seen)
+        self.assertEqual(seen, ["alpha", "beta"])
+        (directory / "launch_ui_broken.py").write_text("def check():\n    return None\n")
+        with self.assertRaises(RuntimeError) as broken:
+            audit.load_check_siblings(directory)
+        self.assertIn("Cannot load launch UI audit sibling", str(broken.exception))
+        empty = directory / "empty"
+        empty.mkdir()
+        with self.assertRaises(RuntimeError) as missing:
+            audit.load_check_siblings(empty)
+        self.assertIn("Cannot load launch UI audit sibling", str(missing.exception))
+        with self.assertRaises(RuntimeError) as absent:
+            audit._load_sibling("absent.py", "absent.py", empty)
+        self.assertIn("Cannot load launch UI audit sibling", str(absent.exception))
+
+    def test_required_named_sibling_cannot_hide_behind_audit_violation(self):
+        audit = launch_ui_audit()
+        directory = Path(tempfile.mkdtemp(prefix="lyb-audit-required-"))
+        (directory / "launch_ui_alpha.py").write_text(
+            "def contribute(bucket, *args):\n    bucket.append('alpha')\n"
+        )
+        (directory / "launch_ui_gesture.py").write_text(
+            "class AuditViolation:\n    pass\n"
+            "def check_timeline_gestures():\n    return None\n"
+        )
+        required = (("launch_ui_gesture", "launch_ui_gesture.py", "check_timeline_gestures"),)
+        with self.assertRaises(RuntimeError) as hidden:
+            audit.load_check_siblings(directory, required=required)
+        self.assertIn("launch_ui_gesture.py", str(hidden.exception))
+        (directory / "launch_ui_gesture.py").write_text(
+            "class AuditViolation:\n    pass\n"
+            "def check_timeline_gestures():\n    return None\n"
+            "def contribute(bucket, *args):\n    bucket.append('gesture')\n"
+        )
+        seen = []
+        for module in audit.load_check_siblings(directory, required=required):
+            module.contribute(seen)
+        self.assertEqual(seen, ["alpha", "gesture"])
+
+    def test_shipped_check_siblings_include_home_and_timeline(self):
+        names = [module.__name__ for module in launch_ui_audit()._CHECK_SIBLINGS]
+        self.assertIn("launch_ui_home_interaction_audit", names)
+        self.assertIn("launch_ui_timeline_day", names)
+        self.assertIn("launch_ui_opacity_audit", names)
+        self.assertIn("launch_ui_timeline_gesture_audit", names)
+        self.assertNotIn("launch_ui_timeline_audit", names)
+        self.assertNotIn("launch_ui_timeline_calendar_audit", names)

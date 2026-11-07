@@ -19,6 +19,8 @@ MANIFESTS = (
 )
 # The correction ledger has its own resolver and must not deadlock manifest union.
 LEDGER = "packages/shared-lib/corrections.json"
+# A conflicted diagnostic project pin stays for the reviewed digest resolver.
+DIAGNOSTIC_PIN_WORKFLOW = ".github/workflows/ios-ui-diagnostics.yml"
 UNION_REFUSAL = "additive manifest union keeps every parent test input"
 
 
@@ -106,7 +108,7 @@ def _subsequence(needle, haystack):
     return position == len(needle)
 
 
-def union_strings(base, ours, theirs):
+def _union_strings_exact(base, ours, theirs):
     # Preserved repeated inputs, such as a workflow listed twice, stay in branch order.
     for sequence in (ours, theirs):
         if not _subsequence(base, sequence):
@@ -125,6 +127,26 @@ def union_strings(base, ours, theirs):
     if set(result) != set(ours) | set(theirs):
         raise ValueError(UNION_REFUSAL)
     return result
+
+
+def union_strings(base, ours, theirs):
+    try:
+        return _union_strings_exact(base, ours, theirs)
+    except ValueError:
+        # A parent may replace enumerated inputs with one new glob that matches them.
+        globs = [
+            token for token in (*ours, *theirs)
+            if token not in base and _replacement_glob(token)
+        ]
+        covered = [
+            item for item in (*base, *ours, *theirs)
+            if any(_covered_by_glob(glob, item) for glob in globs)
+        ]
+        if not globs or not covered:
+            raise ValueError(UNION_REFUSAL) from None
+        return _union_strings_exact(
+            *[_strip_replaced(list(sequence), globs) for sequence in (base, ours, theirs)]
+        )
 
 
 def union_json(base, ours, theirs, path=(), union_arrays=False):
@@ -224,7 +246,7 @@ def apply_manifest_union(root):
             cwd=root, check=True, capture_output=True,
         ).stdout.decode().split("\0") if name
     }
-    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER})
+    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER, DIAGNOSTIC_PIN_WORKFLOW})
     if unrelated:
         raise ValueError("manifest union refuses unrelated conflicts: " + ", ".join(unrelated))
     planned = []
@@ -307,7 +329,7 @@ def _require_parent_inputs(base, ours, theirs, merged, path):
     location = ".".join(path) or "manifest"
     base, ours, theirs, merged = list(base), list(ours), list(theirs), list(merged)
     try:
-        expected = union_strings(base, ours, theirs)
+        expected = _union_strings_exact(base, ours, theirs)
     except ValueError:
         # A parent may replace enumerated inputs with one new glob that matches them.
         globs = [
@@ -318,7 +340,7 @@ def _require_parent_inputs(base, ours, theirs, merged, path):
             raise ValueError(UNION_REFUSAL + ": auto-merged " + location) from None
         stripped = [_strip_replaced(seq, globs) for seq in (base, ours, theirs, merged)]
         try:
-            expected = union_strings(*stripped[:3])
+            expected = _union_strings_exact(*stripped[:3])
         except ValueError:
             raise ValueError(UNION_REFUSAL + ": auto-merged " + location) from None
         if not _matches_union(expected, *stripped[1:]):

@@ -381,9 +381,10 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
     with ExitStack() as rollback:
         if refresh_lockfile or verify_lockfile:
             # Pnpm hooks, workspace npmrc files and patches also affect dependency resolution.
+            # Projection configuration must be staged before dependency verification.
             inputs = ["package.json", "**/package.json", "pnpm-workspace.yaml",
                       "pnpm-lock.yaml", ".npmrc", "**/.npmrc", ".pnpmfile.cjs",
-                      "**/.pnpmfile.cjs", "patches/**", output]
+                      "**/.pnpmfile.cjs", "patches/**", "repository-docs.json", output]
             dirty = subprocess.run(
                 ["git", "diff", "--name-only", "--", *inputs],
                 cwd=root, check=True, capture_output=True, text=True,
@@ -397,6 +398,15 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             ).stdout.strip("\0")
             if untracked:
                 raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
+            # Ignored hooks, npmrc files and patches are still local-only resolver inputs.
+            ignored = subprocess.run(
+                ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
+                 ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
+                 ":(glob,exclude)**/node_modules/**"],
+                cwd=root, check=True, capture_output=True, text=True,
+            ).stdout.strip("\0")
+            if ignored:
+                raise ValueError("ignored dependency inputs: " + ignored.replace("\0", ", "))
             # Dependency resolution inputs must be regular indexed files, never symlinks.
             for entry in git_bytes(root, "ls-files", "--stage", "-z", "--", *inputs).split(b"\0"):
                 if entry and entry.split(b" ", 1)[0] not in {b"100644", b"100755"}:
@@ -407,6 +417,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             if errors and errors != ["source projection stale: " + output]:
                 raise ValueError("; ".join(errors))
             rollback.enter_context(restore_dependency_artifacts_on_failure(root, output))
+            verified_index = git_bytes(root, "ls-files", "--stage", "-z")
             # Verify valid bot lockfiles without re-resolving unrelated dependencies.
             modes = [["--frozen-lockfile", "--offline"]]
             # Explicit repair only: normal commit hooks and CI retain frozen installs.
@@ -428,6 +439,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                     ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
                     cwd=root, check=True,
                 )
+            # Refuse inputs changed during verification before staging dependency artifacts.
+            if (git_bytes(root, "ls-files", "--stage", "-z") != verified_index
+                    or git_bytes(root, "diff", "--name-only", "--",
+                                 *[name for name in inputs if name != "pnpm-lock.yaml"])):
+                raise ValueError("dependency inputs changed during verification; stage reviewed inputs and retry")
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
             resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
             return
@@ -459,7 +475,13 @@ def main():
             print(merge_sections(args.root, args.merge_sections), end="")
         elif args.union_manifests:
             union_manifests(args.root)
-            resolve(args.root)
+            # A conflicted diagnostic project pin stays for the reviewed digest resolver.
+            pending_pin = subprocess.run(
+                ["git", "ls-files", "--unmerged", "--", DIAGNOSTIC_WORKFLOW],
+                cwd=args.root, check=True, capture_output=True,
+            ).stdout
+            if not pending_pin.strip():
+                resolve(args.root)
         elif args.staged:
             resolve_staged(args.root)
         else:

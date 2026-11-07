@@ -34,7 +34,7 @@ sys.modules[SPEC.name] = AUDIT
 SPEC.loader.exec_module(AUDIT)
 
 
-from test_launch_ui_home_interaction import HomeInteractionAuditTests
+from test_launch_ui_home_interaction import CheckSiblingDiscoveryTests, HomeInteractionAuditTests
 from launch_ui_timeline_day import check_timeline_calendar_day
 
 
@@ -343,6 +343,54 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                     self.assert_rejected("timeline.header_swipe_excludes_buttons")
                     path.write_text(source)
 
+    def test_edge_swipe_cannot_share_the_menu_button(self):
+        self.assertEqual(self.run_audit()[0], 0)
+        path = self.app / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
+        source = path.read_text()
+        content_overlay = """                .overlay(alignment: .leading) {
+                    Color.clear
+                        .frame(width: 20)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(photoTimelineSwipe)
+                        .accessibilityHidden(true)
+                }
+"""
+        self.assertIn(content_overlay, source)
+        detached = source.replace(content_overlay, "", 1)
+        header_end = """        .onChange(of: selectedPhotoTimelineRootPage) { _, _ in
+            isHomeChatExpanded = false
+        }
+"""
+        parent_overlay = header_end + """        .overlay(alignment: .leading) {
+            Color.clear
+                .frame(width: 20)
+                .padding(.top, 56)
+                .contentShape(Rectangle())
+                .highPriorityGesture(photoTimelineSwipe)
+                .accessibilityHidden(true)
+        }
+"""
+        self.assertIn(header_end, detached)
+        path.write_text(detached.replace(header_end, parent_overlay, 1))
+        self.assert_rejected("timeline.edge_swipe_excludes_header")
+
+        padded = source.replace(
+            """.frame(width: 20)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(photoTimelineSwipe)""",
+            """.frame(width: 20)
+                        .padding(.top, 56)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(photoTimelineSwipe)""",
+            1,
+        )
+        self.assertNotEqual(padded, source)
+        path.write_text(padded)
+        self.assert_rejected("timeline.edge_swipe_excludes_header")
+        path.write_text(source)
+
     def test_header_title_cannot_lose_navigation_or_its_hit_region(self):
         for token in (".gesture(photoTimelineSwipe)", ".contentShape(Rectangle())",
                       ", minHeight: JovieTokens.minimumHitTarget"):
@@ -366,29 +414,13 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 self.assert_rejected("dashboard.checkin_card_hit_region")
                 path.write_text(source)
 
-    def test_every_size_ratchet_sibling_loads_or_the_audit_fails_closed(self):
-        loaded = [
-            AUDIT._load_sibling(module_name, filename, export)
-            for module_name, filename, export in AUDIT._AUDIT_SIBLINGS
-        ]
-        self.assertEqual(
-            [item[0] for item in AUDIT._AUDIT_SIBLINGS],
-            [
-                "launch_ui_timeline_day",
-                "launch_ui_opacity_audit",
-                "launch_ui_regression_report",
-            ],
+    def test_parent_audit_stays_within_the_company_size_ratchet(self):
+        # The parent audit stays within the company 500-line ratchet.
+        count = len(Path(AUDIT.__file__).read_text().splitlines())
+        self.assertLessEqual(
+            count, 500, "extract a sibling before the company size guard",
         )
-        for export in loaded:
-            self.assertTrue(callable(export))
-        with self.assertRaises(RuntimeError) as missing_file:
-            AUDIT._load_sibling("missing_sibling", "missing_launch_ui_sibling.py", "missing")
-        self.assertIn("Cannot load launch UI audit sibling", str(missing_file.exception))
-        with self.assertRaises(RuntimeError) as missing_export:
-            AUDIT._load_sibling(
-                "launch_ui_timeline_day", "launch_ui_timeline_day.py", "not_an_export",
-            )
-        self.assertIn("Cannot load launch UI audit sibling", str(missing_export.exception))
+        self.assertNotIn("def check_timeline_gestures", Path(AUDIT.__file__).read_text())
 
     def test_optional_cgfloat_opacity_must_be_explicit_double(self):
         policy = self.app / "Services/PersonMaskPolicy.swift"
@@ -437,43 +469,6 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
 
         calculator.write_text(original.replace("now: Date = Date(),\n        ", "", 1))
         self.assert_rejected("timeline.injected_calendar_day")
-
-
-class CheckSiblingDiscoveryTests(unittest.TestCase):
-    def test_every_check_sibling_contributes_and_a_missing_hook_fails_closed(self):
-        # The coverage tracer reads these modules after the suite returns.
-        directory = Path(tempfile.mkdtemp(prefix="lyb-audit-siblings-"))
-        (directory / "launch_ui_beta.py").write_text(
-            "def contribute(bucket, *args):\n    bucket.append('beta')\n"
-        )
-        (directory / "launch_ui_alpha.py").write_text(
-            "def contribute(bucket, *args):\n    bucket.append('alpha')\n"
-        )
-        (directory / "notes.py").write_text("def contribute(bucket, *args):\n    bucket.append('nope')\n")
-        seen = []
-        for module in AUDIT.load_check_siblings(directory):
-            module.contribute(seen)
-        self.assertEqual(seen, ["alpha", "beta"])
-        (directory / "launch_ui_broken.py").write_text("def check():\n    return None\n")
-        with self.assertRaises(RuntimeError) as broken:
-            AUDIT.load_check_siblings(directory)
-        self.assertIn("Cannot load launch UI audit sibling", str(broken.exception))
-        empty = directory / "empty"
-        empty.mkdir()
-        with self.assertRaises(RuntimeError) as missing:
-            AUDIT.load_check_siblings(empty)
-        self.assertIn("Cannot load launch UI audit sibling", str(missing.exception))
-        with self.assertRaises(RuntimeError) as absent:
-            AUDIT._load_sibling("absent.py", "absent.py", empty)
-        self.assertIn("Cannot load launch UI audit sibling", str(absent.exception))
-
-    def test_shipped_check_siblings_include_home_and_timeline(self):
-        names = [module.__name__ for module in AUDIT._CHECK_SIBLINGS]
-        self.assertIn("launch_ui_home_interaction_audit", names)
-        self.assertIn("launch_ui_timeline_day", names)
-        self.assertIn("launch_ui_opacity_audit", names)
-        self.assertNotIn("launch_ui_timeline_audit", names)
-        self.assertNotIn("launch_ui_timeline_calendar_audit", names)
 
 
 def run_behavior_suite(suite):

@@ -202,6 +202,7 @@ struct AccountDeletionCleanupService {
         var clearUserDefaults: () -> [String]
         var logoutAuthSession: () async -> Void
         var deleteTrainingDrafts: () async throws -> Void = {}
+        var deleteVisualizationAssets: () async throws -> Void = {}
         var deletePersonalBodyEstimates: () async -> Void = {}
     }
 
@@ -292,6 +293,10 @@ struct AccountDeletionCleanupService {
                         try TrainingDraftStore.shared.purge(ownerId: ownership.subject)
                     }
                 },
+                deleteVisualizationAssets: {
+                    guard let ownership else { throw AuthError.invalidToken }
+                    try await BodyVisualizationLedger.shared.purge(accountId: ownership.subject)
+                },
                 deletePersonalBodyEstimates: {
                     guard let subject = ownership?.subject else { return }
                     await PersonalBodyEstimateStore.shared.forgetAccount(subject)
@@ -324,6 +329,11 @@ struct AccountDeletionCleanupService {
             localCleanupError = error
         }
         await dependencies.deletePersonalBodyEstimates()
+        do {
+            try await dependencies.deleteVisualizationAssets()
+        } catch {
+            localCleanupError = localCleanupError ?? error
+        }
         do {
             try await dependencies.deleteCoreData()
         } catch {

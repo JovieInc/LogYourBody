@@ -39,15 +39,17 @@ def _load_sibling(module_name: str, filename: str, directory: Path | str | None 
     return loaded
 
 
-def load_check_siblings(directory: Path | None = None):
+def load_check_siblings(directory: Path | None = None, *, required: tuple = ()):
     """Load every launch_ui check sibling. A missing contribute fails closed."""
     directory = directory or Path(__file__).parent
     paths = sorted(directory.glob("launch_ui_*.py"))
     if not paths:
         raise RuntimeError(f"Cannot load launch UI audit sibling: {directory / 'launch_ui_*.py'}")
     modules = []
+    by_name = {}
     for path in paths:
         module = _load_sibling(path.stem, path.name, directory)
+        by_name[path.name] = module
         if callable(getattr(module, "contribute", None)):
             modules.append(module)
         elif getattr(module, "AuditViolation", None) is None:
@@ -55,6 +57,17 @@ def load_check_siblings(directory: Path | None = None):
             raise RuntimeError(f"Cannot load launch UI audit sibling: {path}")
     if not modules:
         raise RuntimeError(f"Cannot load launch UI audit sibling: {directory / 'launch_ui_*.py'}")
+    # A listed launch_ui sibling must contribute. AuditViolation cannot hide it.
+    for _module_name, filename, export in required:
+        if not (filename.startswith("launch_ui_") and filename.endswith(".py")):
+            continue
+        module = by_name.get(filename)
+        if (
+            module is None
+            or not callable(getattr(module, "contribute", None))
+            or not callable(getattr(module, export, None))
+        ):
+            raise RuntimeError(f"Cannot load launch UI audit sibling: {directory / filename}")
     return modules
 
 
@@ -63,9 +76,10 @@ def load_check_siblings(directory: Path | None = None):
 _AUDIT_SIBLINGS = (
     ("launch_ui_timeline_day", "launch_ui_timeline_day.py", "check_timeline_calendar_day"),
     ("launch_ui_opacity_audit", "launch_ui_opacity_audit.py", "check_optional_cgfloat_opacity"),
+    ("launch_ui_timeline_gesture_audit", "launch_ui_timeline_gesture_audit.py", "check_timeline_gestures"),
     ("launch_ui_regression_report", "launch-ui-regression-report.py", "write_outputs"),
 )
-_CHECK_SIBLINGS = load_check_siblings()
+_CHECK_SIBLINGS = load_check_siblings(required=_AUDIT_SIBLINGS)
 write_outputs = _load_sibling(*_AUDIT_SIBLINGS[-1])
 
 
@@ -419,22 +433,7 @@ def main() -> int:
     )
 
     # Header navigation drags must not own either button's touch region.
-    hud_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
-    hud = swift_sources.text_for(hud_path)
-    header_call = hud.split("photoTimelineRootNavigation\n", 1)[-1].split("photoTimelineHomeContent\n", 1)[0]
-    header = hud.split("private var photoTimelineRootNavigation: some View {", 1)[-1].split(
-        "private var photoTimelineSwipe:", 1
-    )[0]
-    title = header.split("VStack(spacing: 2) {", 1)[-1].split("if isHomeV2CheckIn {", 1)[0]
-    gesture = re.compile(r"\.(?:gesture|simultaneousGesture|highPriorityGesture)\s*\(")
-    if (gesture.search(header_call) or gesture.search(header.replace(title, ""))
-            or ".gesture(photoTimelineSwipe)" not in title
-            or ".contentShape(Rectangle())" not in title
-            or "minHeight: JovieTokens.minimumHitTarget" not in title):
-        violations.append(AuditViolation(
-            check="timeline.header_swipe_excludes_buttons", file=str(hud_path.relative_to(root)), line=1,
-            detail="Attach the header swipe only to the full-height title hit region, outside the menu and detail buttons.",
-        ))
+    # timeline.edge_swipe_excludes_header stays on the content below the header.
 
     checkin_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
     checkin_card = swift_sources.text_for(checkin_path).split("var hudGlp1WeeklyCheckIn:", 1)[-1].split(
