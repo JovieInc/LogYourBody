@@ -5833,7 +5833,6 @@
     "ruleId": "code-prevention"
   },
   {
-
     "fingerprint": "company-guards-required-ci-summary",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1681",
     "correction": "LYB-347 / PR #1681, fix-red-95726c4f82 occurrence 9: Company Guards size-500 was advisory because its standalone check did not gate the required CI Summary. Preserve the required dependency across pull requests, merge groups and main pushes during merge repairs. Occurrence 22: merge origin/main first and retain its completed catalog extraction when both parents add catalog-schema.ts; preserve every correction receipt. The current Tently failure is an AI-provider outage (33148843-5b87-4908-b69d-24b16c5bbcd8), not a source finding.",
@@ -5905,6 +5904,42 @@
     "guard": {
       "path": "scripts/resolve-repository-docs.py",
       "anchor": "Pnpm hooks, workspace npmrc files and patches also affect dependency resolution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "746733c9ca17",
+    "source": "https://linear.app/jovie/issue/LYB-298",
+    "correction": "LYB-298: Persistent pain, worsening pain or neurologic symptoms must pause the movement with no swap and no continued coaching. Keep trunk fatigue, missing feedback and joint pain without those flags outside this concerning-pain trigger; use the exact authorized clinician-evaluation sentence without injury-prevention, zero-load or safety assurances.",
+    "mechanization": "Add one typed movement-pain policy and shared message, consumed by selection and swap approval while retaining the broader existing symptom and session holds. The existing required web Jest discovery runs policy, selector and approval regressions; exact string equality and a prohibited-claims assertion lock the copy. Negative controls independently disable each trigger and append injury-prevention, zero-spinal-load and safe-to-continue-coaching claims; each must fail the policy tests. No LYB-114 observation schema, questionnaire, prescription or rollout changes. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One pure policy returns a discriminated movement pause with swapAllowed and coachingAllowed fixed to false, and owns the canonical message. Selection retains stronger exclusions and the approval boundary suppresses all controls for either a movement pause or selector symptom hold."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/pain-policy.test.ts",
+      "anchor": "concerning-pain movement policy (LYB-298)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-ledger-concurrent-worktree-edits",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1686#repair-concurrent-ledger-edits",
+    "correction": "PR #1686 / LYB-298, fix-red-95726c4f82 occurrence 24: merge origin/main without rebasing and retain the concerning-pain policy and both parents correction receipts. A concurrent edit of the working ledger during validation must not be overwritten or receive a stale successful merge verdict. Tently reports an AI-provider outage with no source finding.",
+    "mechanization": "Extend the existing correction classifier snapshot check to re-read the working ledger after index and parent validation in both resolver modes and staged verification. The existing required shared-lib runner exercises concurrent edits and safe retries at 100% classifier coverage. Three new negative controls returned success without the check and pass with it, asserting that the concurrent bytes and index are preserved. Use the extended resolver for this merge. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Compare the reviewed working ledger bytes before writing or returning success so every merge repair refuses stale output and preserves concurrent edits by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "merge ledger changed during validation; retry from the current ledger"
     },
     "level": "codebase",
     "ruleId": "code-prevention"

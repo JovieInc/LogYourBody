@@ -3,6 +3,7 @@ import { suggestAlternatives } from './alternatives';
 import { applyWorkoutAction, logTrainingSet, recordTrainingFeedback } from './commands';
 import { MemoryTrainingRecords } from './memory-records.testing';
 import { reviewExerciseSelection, exerciseSelectionEnabled } from './selection';
+import { CONCERNING_PAIN_MESSAGE } from './pain-policy';
 import {
   applyExerciseSwaps,
   learnedExerciseSwaps,
@@ -158,6 +159,7 @@ describe('curated exercise selection', () => {
       expect(reviewExerciseSelection(snapshot, session, 'cable_curl', context)).toMatchObject({
         status: 'symptom_safety',
         options: [],
+        message: CONCERNING_PAIN_MESSAGE,
       });
       expect(await action(records)).toEqual({ kind: 'no_eligible_substitution' });
     },
