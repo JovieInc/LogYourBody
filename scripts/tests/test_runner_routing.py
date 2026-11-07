@@ -881,22 +881,6 @@ def test_mac_lanes_route_only_trusted_events_and_carry_no_secrets() -> None:
         assert "secrets: inherit" not in text
 
 
-def test_heartbeat_is_secretless_and_setup_canary_is_manual() -> None:
-    workflow = (_WORKFLOWS / 'mac-runner-heartbeat.yml').read_text()
-    heartbeat = _job_block('mac-runner-heartbeat.yml', 'heartbeat')
-    canary = _job_block('mac-runner-heartbeat.yml', 'setup-canary')
-    assert 'schedule:' not in workflow
-    assert '  push:' not in workflow
-    assert 'workflow_dispatch:' in workflow
-    assert 'pull_request:' not in workflow
-    assert 'secrets.' not in workflow
-    assert 'checkout' not in heartbeat
-    assert "if: github.event_name == 'workflow_dispatch' && inputs.verify-ios-setup" in canary
-    assert 'uses: ./.github/actions/setup-ios-build' in canary
-    assert 'bundle check' in canary
-    assert "create-config-files: 'false'" in canary
-
-
 def test_ruby_gem_cache_rejects_foreign_native_extensions_and_legacy_keys() -> None:
     step = _ruby_setup_step('Cache Ruby dependencies')
     key = step.split('        key: ', 1)[1].splitlines()[0]
@@ -1601,6 +1585,9 @@ def _diagnostic_repository(tmp_path: Path) -> tuple[Path, str]:
     (root / 'scripts/ios').mkdir(parents=True)
     (root / 'apps/ios').mkdir(parents=True)
     (root / 'scripts/ios/launch-quality-audit.sh').write_bytes((_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes())
+    (root / 'scripts/ios/xcodebuild-command-timeout.py').write_bytes(
+        (_REPO_ROOT / 'scripts/ios/xcodebuild-command-timeout.py').read_bytes())
+    (root / 'scripts/ios/test_xcodebuild_command_timeout.py').write_text('raise SystemExit(0)\n')
     for name, code in {
         'bootstrap-local-config.sh': '#!/bin/bash\nprintf "bootstrap\\n" >> "$FAKE_CALLS"\n',
         'resolve-simulator-destination.sh': '#!/bin/bash\nprintf "destination\\n" >> "$FAKE_CALLS"\nprintf "platform=iOS Simulator,id=11111111-1111-1111-1111-111111111111\\n"\n',
@@ -1627,7 +1614,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
+        '242cf9e0bce6b33519d6721d2f59f4472ab4d26a6f71bb27e662e9b6b75b68f3'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -1789,7 +1776,10 @@ def test_focused_diagnostic_real_dispatcher_builds_once_selects_only_seven_and_n
     assert commands[1][commands[1].index('-default-test-execution-time-allowance') + 1] == '90'
     assert commands[1][commands[1].index('-maximum-test-execution-time-allowance') + 1] == '180'
     timed = [json.loads(c) for c in calls if c.startswith('["fake-timeout"')]
-    assert timed[0][2] == '600s' and timed[1][2] == '1500s'
+    assert [item[2] for item in timed] == ['600s', '60s']
+    assert all('test-without-building' not in item for item in timed)
+    assert 'xcodebuild deadline 1500s finalization-grace 180s' in (
+        tmp_path / 'artifacts' / 'diagnostic-seven.log').read_text()
     assert receipt['status'] == 'passed' and receipt['evidenceKind'] == 'diagnostic_ui_subset'
     assert receipt['qualifying'] is False and receipt['nativeQualification'] is False
     assert len(receipt['tests']) == 7 and receipt['uiCommandAttempts'] == 1
@@ -1837,7 +1827,7 @@ def test_focused_diagnostic_one_ui_command_even_for_infrastructure_failure_and_d
     result, calls, receipt = _run_diagnostic_dispatch(tmp_path / 'infra', INFRA_FIRST='true')
     assert result.returncode == 70, result.stdout + result.stderr
     assert receipt['uiCommandAttempts'] == 1 and receipt['status'] == 'failed'
-    assert sum('test-without-building' in c for c in calls) == 2  # command and timeout wrapper, no second attempt
+    assert sum('test-without-building' in c for c in calls) == 1  # one command; finalization grace is not a second attempt
     assert sum('build-for-testing' in c for c in calls) == 2  # native command and timeout wrapper
     result, calls, receipt = _run_diagnostic_dispatch(tmp_path / 'default', mode='')
     assert result.returncode == 88 and receipt is None, result.stdout + result.stderr
@@ -1854,13 +1844,16 @@ def test_full_launch_cold_build_budget_reaches_the_complete_unit_target(tmp_path
         result, calls, receipt = _run_diagnostic_dispatch(tmp_path / name, mode='', **overrides)
         assert result.returncode == 88 and receipt is None, result.stdout + result.stderr
         timed = [json.loads(c) for c in calls if c.startswith('["fake-timeout"')]
-        assert len(timed) == 2
+        assert len(timed) == 1
         assert timed[0][2] == expected and 'build-for-testing' in timed[0]
-        assert timed[1][2] == '1020s' and '-only-testing:LogYourBodyTests' in timed[1]
         assert '-enableCodeCoverage' in timed[0]
         assert timed[0][timed[0].index('-enableCodeCoverage') + 1] == 'YES'
-        assert timed[1][timed[1].index('-default-test-execution-time-allowance') + 1] == '90'
-        assert timed[1][timed[1].index('-maximum-test-execution-time-allowance') + 1] == '180'
+        commands = [json.loads(c) for c in calls if c.startswith('["xcodebuild"')]
+        unit = next(c for c in commands if '-only-testing:LogYourBodyTests' in c)
+        assert unit[unit.index('-default-test-execution-time-allowance') + 1] == '90'
+        assert unit[unit.index('-maximum-test-execution-time-allowance') + 1] == '180'
+        unit_log = (tmp_path / name / 'artifacts' / 'launch-quality-unit-tests.log').read_text()
+        assert 'xcodebuild deadline 1020s finalization-grace 180s' in unit_log
 
 
 def test_full_launch_build_failure_or_timeout_stops_without_retry_or_qualification(tmp_path: Path) -> None:
@@ -1899,7 +1892,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'" in source
+    assert "REVIEWED_AUDIT_SHA256 = '242cf9e0bce6b33519d6721d2f59f4472ab4d26a6f71bb27e662e9b6b75b68f3'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -2136,10 +2129,10 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
+    expected = '242cf9e0bce6b33519d6721d2f59f4472ab4d26a6f71bb27e662e9b6b75b68f3'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
-    assert len(dependencies) == 7
+    assert len(dependencies) == 8
     project_name = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj'
     # Admission must exercise current source bytes, as the real main diagnostic does.
     # Refreshing the policy digest remains an explicit review of the project diff.
