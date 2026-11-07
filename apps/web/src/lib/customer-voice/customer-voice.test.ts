@@ -253,6 +253,7 @@ describe('raw-body inbound authentication', () => {
       jest.spyOn(console, name as 'log').mockImplementation(() => {}),
     );
     try {
+      jest.useFakeTimers({ now: new Date(AT) });
       const { store, read } = memoryStore();
       const capture = createCustomerVoiceCapture({
         store,
@@ -266,19 +267,11 @@ describe('raw-body inbound authentication', () => {
       expect(response.status).toBe(202);
       expect(response.headers.get('cache-control')).toBe('no-store');
       expect(read()?.event.test).toBe(true);
-      const stored = read();
-      // Stage clocks are wall time. Their digits are not customer health text.
-      const scanned = stored && {
-        ...stored,
-        stages: {
-          ...stored.stages,
-          forwarded: AT,
-          pinged: stored.stages.pinged ? AT : undefined,
-        },
-      };
-      expect(JSON.stringify(scanned)).not.toMatch(/93|diagnosis/);
+      expect(read()?.stages.forwarded).toBe(AT);
+      expect(JSON.stringify(read())).not.toMatch(/93|diagnosis/);
       logs.forEach((log) => expect(log).not.toHaveBeenCalled());
     } finally {
+      jest.useRealTimers();
       logs.forEach((log) => log.mockRestore());
     }
   });

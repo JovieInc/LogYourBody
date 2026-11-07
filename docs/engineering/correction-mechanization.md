@@ -164,3 +164,6 @@ changed parents invalidate the review even when the index is unchanged.
 Both resolver modes and staged verification also recheck the working ledger
 after validation. Concurrent ledger edits are preserved and require a fresh retry;
 they cannot be overwritten by a resolution computed from earlier bytes.
+The pre-write boundary samples the index, then repeats the index, parent and
+ledger comparison before replacement. A writer that lands during that sample
+cannot authorize the write, staging or a successful verdict.

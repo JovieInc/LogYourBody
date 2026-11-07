@@ -190,7 +190,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f61df4f6a15b6f3bcf4dd0cafec6a025d5eae0696bade1f96537bc7a73424f3e`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `753bf047595be8a3bd599d2248db44c6297df59133d473378de54d886a7d4bd2`)
 
 ### `package.json`: packageManager
 
@@ -280,7 +280,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "eslint-plugin-react-hooks": "^5.2.0",
   "husky": "^9.1.7",
   "lint-staged": "^15.5.2",
-  "prettier": "^3.9.9",
+  "prettier": "^3.9.10",
   "prettier-plugin-tailwindcss": "^0.8.1",
   "rollup": "^4.65.0",
   "turbo": "^2.11.9",
@@ -325,7 +325,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/product-registry/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `9182036b8113abbbb1d1daee07c04dbd79b92e5ef7b7090cdf61da91ef4b7ffb`)
+- `packages/product-registry/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1a424be8f931f22855a53e0b20c61342d5012a9c34fa8011c08ad9c409683e43`)
 
 ### `packages/product-registry/package.json`: scripts
 
@@ -349,7 +349,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@typescript-eslint/eslint-plugin": "^8.71.0",
   "@typescript-eslint/parser": "^8.71.0",
   "eslint": "^9.39.5",
-  "prettier": "^3.9.9",
+  "prettier": "^3.9.10",
   "typescript": "^5.9.3"
 }
 ```
