@@ -3,6 +3,7 @@
 import { useId, useRef, useState } from 'react';
 import type { AlternativeOption, AlternativeSuggestions } from '@/lib/training/alternatives';
 import type { DeloadState } from '@/lib/training/types';
+import { CONCERNING_PAIN_MESSAGE, type MovementPainDecision } from '@/lib/training/pain-policy';
 
 const SUPPORT_REASON = 'Support may reduce trunk demand; it does not mean zero spinal load.';
 const REASON_TEXT = {
@@ -26,7 +27,7 @@ type Props = {
   currentExercise: { id: string; name: string };
   suggestions: AlternativeSuggestions;
   variantNames: Readonly<Record<string, string>>;
-  painPolicy: Pick<DeloadState, 'action' | 'explanation'>;
+  painPolicy: MovementPainDecision | Pick<DeloadState, 'action' | 'explanation'>;
   /** Upstream constraint outcomes, never inferred from symptoms or inventory here. */
   reasonCodes?: readonly ConstraintReason[];
   /** Persist this exact variant through the existing swap API. Resolve only on success;
@@ -44,7 +45,10 @@ export function ExerciseSwapApproval(props: Props) {
       aria-label="Review exercise swap"
       className="space-y-4 rounded-2xl border border-white/10 bg-black p-4 text-white"
     >
-      {props.painPolicy.action === 'pause_session' ? (
+      {props.painPolicy.action === 'pause_movement' ||
+      props.suggestions.status === 'symptom_safety' ? (
+        <p>{CONCERNING_PAIN_MESSAGE}</p>
+      ) : props.painPolicy.action === 'pause_session' ? (
         <p>{props.painPolicy.explanation}</p>
       ) : (
         <SwapReview key={props.reviewId} {...props} />
