@@ -6500,5 +6500,117 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "reviewed-audit-pin-follows-explicit-digest",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
+    "correction": "PR #1746 / LYB-343, fix-red-d96bbbfa0f occurrence 5: Mac Runner Routing Tests rejected the dated-recovery launch audit because REVIEWED_AUDIT_SHA256 stayed at the previous digest after launch-quality-audit.sh selected each recovery case on its own. Merge origin/main without rebasing and keep goal-relative stats.",
+    "mechanization": "Extend the existing diagnostic pin resolver so one explicit reviewed audit digest replaces the workflow pin and every current routing-test copy, refusing a mismatched digest, unstaged audit bytes, or a workflow move that leaves the routing tests behind. Historical fixture digests stay. Two real-Git regressions fail on the previous resolver and pass after the extension. Use that command for the reviewed digest 2b9b36774845a7e67864c40bc8d3f2f5e2900de149e42a1b5aff38298024526d. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing pin resolver owns this trust boundary and can move every current audit pin from one reviewed digest, so a later repair cannot update the workflow and leave a routing-test copy behind."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Only an explicit reviewed audit digest may update every current pin."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "xctest-launch-recovery-cases-own-execution-budgets",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
+    "correction": "PR #1746 / LYB-343, fix-red-5df69c1e5f occurrence 25: merge origin/main without rebasing and repair CI Summary and iOS Launch Quality. Run 42356725053 exceeded the two-minute test allowance because the Timeline capture test called four other tests, including a ten-state recovery loop; a later termination failure was the timeout symptom. Keep goal-relative stats and all recovery assertions.",
+    "mechanization": "Extend the existing required shared-lib launch-quality evidence suite to reject XCTest-to-XCTest calls across native UI sources and require a separately selected native case for every Stats manifest state and dated journey. The two new checks fail against the original four nested calls and missing independent state cases, then pass after splitting the matrix and adding exact selectors. The existing runner derives --expected-test for every selector and rejects missing, skipped, failed and duplicate receipts. Keep one UI runner launch, native per-test limits, outer workflow caps and coverage floors. Budget 30 minutes for the complete UI matrix because the failing invocation already used 24m15s before most new states ran. Record fresh macOS execution and coverage as unverified on this Linux host. The harness owns push and PR-body edits and must include exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Swift XCTest discovery requires callable test methods; runtime app types cannot prevent future test-to-test calls or omissions from a shell selector list."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required source-contract suite can reject nested test calls and compare each manifest recovery state and dated method with the runner selectors before spending native CI time. Existing Turbo inputs cover the test suite, native sources and launcher."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "keeps XCTest methods independent so each receives its own execution budget"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-keeps-one-sided-audit-pin",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
+    "correction": "PR #1746 / LYB-343, fix-red-e3b0c44298 occurrence 86: merge origin/main without rebasing. Both parents changed the diagnostic project pin, and this branch also changed the reviewed audit pin. The resolver refused that workflow as more than a project-pin conflict, which would drop the one-sided audit digest or block the repair. Keep goal-relative stats, dated recovery states, visualization membership, and the content-level edge swipe.",
+    "mechanization": "Extend the existing diagnostic pin resolver so a workflow conflict whose only extra difference is a one-sided reviewed audit pin keeps the parent that changed that pin, while the project pin still requires an explicit reviewed digest. Divergent audit pins and any other workflow edit still fail closed without writing. Three real-Git regressions cover the branch pin, the incoming pin, divergent pins, and a matching pin with an unrelated edit. The one-sided and divergent cases failed on the previous resolver and pass after the extension. Use that command with reviewed project digest d9a32b60e75f66cf3fdb97e2cf6b0a43f469acce57ce0dda32a96ec2b65c2870, which keeps every parent file membership. The reviewed audit digest stays 2b9b36774845a7e67864c40bc8d3f2f5e2900de149e42a1b5aff38298024526d. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The diagnostic pin resolver owns the three workflow stages. Masking the project pin and the reviewed audit pin, then keeping the parent that changed the audit pin, prevents a project-pin repair from discarding a one-sided audit digest."
+      }
+    },
+    "guard": {
+      "path": "scripts/reviewed_audit_pin.py",
+      "anchor": "A one-sided reviewed audit pin follows the parent that changed it."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dated-stats-fixture-survives-path-and-account",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42381056124",
+    "correction": "PR #1746 / LYB-343, fix-red-5df69c1e5f occurrence 29: Launch Quality run 42381056124 failed testDatedStatsManualMeasurementDateEditExpiryAndAccountReturn because dated_stats_offline never appeared. The paid UI fixture forces offline, then a satisfied path can mark the app online, and account publication can leave the analytics fixture. Keep goal-relative stats and every recovery assertion. The generic red-check fingerprint keeps its existing shell-fixture guard.",
+    "mechanization": "Keep paid UI fixtures offline when the path is satisfied, and keep the analytics fixture on Stats when the account session is published. Extend the existing launch UI regression audit with dated_stats.offline_survives_path and dated_stats.analytics_survives_account. Those behavior cases fail on the direct path assignment, a raw path return, a dropped photo-timeline fixture, the timeline reset, and a dropped analytics return, then pass on the repaired sources. The existing required shared-lib suite runs that audit. Launch Quality keeps the manual measurement, expiry, and account-return assertions. Native execution remains unverified on this Linux host. Do not bypass Tently. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The path decision and the account-page decision now honor the fixture arguments that forced offline and Stats, so a later path update or account publication cannot hide dated_stats_offline. The existing launch UI audit rejects both regressions before native CI."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "dated_stats.fixture_survives_path_and_account"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merged-project-preserves-parent-build-file-mappings",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746#repair-20261107",
+    "correction": "PR #1746 / LYB-343, fix-red-e3b0c44298 occurrence 86: merge origin/main without rebasing and preserve dated Stats, date recovery, the Apple Health receipt, and both parents correction receipts. The project-pin resolver counted identifiers but could certify PBXBuildFile entries rewired to the wrong fileRef.",
+    "mechanization": "Extend the existing reviewed project-pin merge resolver to preserve new parent PBXBuildFile-to-fileRef mappings. The real-Git negative control accepted swapped mappings before the change, then refused them without changing the workflow, projection or index; the intact merge passed. The unchanged required Detect Changes pre-commit suite imports this regression. Use the extended resolver with reviewed merged project digest 3a2a2d8598c2b8ad0f792f723fa3c1c34ef423cf8aef384ba24cf7db4f4d57e2 and the parent-preserving correction classifier for this merge. Preserve both the shared late-callback fixture guard and the dated fixture policy through one network handler; update both existing launch guards accordingly. The harness owns push and PR edits and must add exactly one declaration: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver owns the trusted merged project pin, so it can refuse changed parent build-file mappings before staging any derived artifacts."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "merged project changed a parent build-file mapping: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "diagnostic-pin-keeps-one-sided-dependency-lines",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
+    "correction": "PR #1746 / LYB-343, fix-red-e3b0c44298 occurrence 86: merge origin/main without rebasing and keep dated stats, date recovery, and the xcodebuild finalization dependency. Both parents changed the diagnostic project pin and the reviewed audit pin, and only main added the timeout helper digest. Keeping the branch workflow blob would drop that dependency.",
+    "mechanization": "Extend the conflicted diagnostic pin resolver so one-sided dependency lines are unioned and divergent audit pins update only from an explicit reviewed audit digest. A real-Git regression fails with divergent reviewed audit pins and an unchanged workflow until that digest is staged, then keeps the dependency line, both reviewed digests, and the routing-test pins. Use the extended resolver with the reviewed digests of this merge's project and launch-quality audit. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing pin resolver owns this workflow conflict. Unioning one-sided dependency lines and requiring an explicit audit digest keeps both parents' pins without deriving either digest."
+      }
+    },
+    "guard": {
+      "path": "scripts/reviewed_audit_pin.py",
+      "anchor": "One-sided dependency lines stay; divergent audit pins need an explicit digest."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B34320261102000000000008 /* DatedOutcomeStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000007 /* DatedOutcomeStatsTests.swift */; };
+		B34320261102000000000006 /* DatedOutcomeStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000005 /* DatedOutcomeStatsView.swift */; };
+		B34320261102000000000004 /* DatedStatsUITestFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000003 /* DatedStatsUITestFixture.swift */; };
+		B34320261102000000000002 /* DatedOutcomeStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000001 /* DatedOutcomeStats.swift */; };
 		BEEBD28BAE7D75F643B57401 /* LogYourBodyUITests+DatedTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C39AFD0DDC54F0A277E3CB7 /* LogYourBodyUITests+DatedTimeline.swift */; };
 		294043012B1F57D5DB855A4E /* ProgressPhotoAttachPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C7B5D2A98D2FD60B4B552BB /* ProgressPhotoAttachPolicy.swift */; };
 		CDF7E6A48F140BF5E51755F0 /* DashboardViewLiquid+PhotoAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 503BB9A884FFFEB9129BEE3A /* DashboardViewLiquid+PhotoAttachment.swift */; };
@@ -638,6 +642,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B34320261102000000000007 /* DatedOutcomeStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStatsTests.swift; sourceTree = "<group>"; };
+		B34320261102000000000005 /* DatedOutcomeStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DatedOutcomeStatsView.swift; path = Components/DatedOutcomeStatsView.swift; sourceTree = "<group>"; };
+		B34320261102000000000003 /* DatedStatsUITestFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedStatsUITestFixture.swift; sourceTree = "<group>"; };
+		B34320261102000000000001 /* DatedOutcomeStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStats.swift; sourceTree = "<group>"; };
 		7C39AFD0DDC54F0A277E3CB7 /* LogYourBodyUITests+DatedTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogYourBodyUITests+DatedTimeline.swift"; sourceTree = "<group>"; };
 		4C7B5D2A98D2FD60B4B552BB /* ProgressPhotoAttachPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProgressPhotoAttachPolicy.swift"; sourceTree = "<group>"; };
 		503BB9A884FFFEB9129BEE3A /* DashboardViewLiquid+PhotoAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoAttachment.swift"; sourceTree = "<group>"; };
@@ -1410,6 +1418,7 @@
 				ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */,
 				ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */,
 				ADA4B74E2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift */,
+				B34320261102000000000005 /* DatedOutcomeStatsView.swift */,
 				ADA4B7482ECFE59C00F4262A /* DashboardMetricsList.swift */,
 				ADA4B7462ECFE34F00F4262A /* DashboardHeaderCompact.swift */,
 				ADA4B7442ECFE0F300F4262A /* FullMetricChartView.swift */,
@@ -1563,6 +1572,7 @@
 				B31520261101000000000009 /* BodyVisualizationSnapshotFixtures.swift */,
 				B18320261101000000000003 /* LaunchJourneyTests.swift */,
 				B34220261102000000000005 /* DatedTimelineTests.swift */,
+				B34320261102000000000007 /* DatedOutcomeStatsTests.swift */,
 				B27020261029000000000003 /* OutcomeFeasibilityTests.swift */,
 				B26920261025000000000005 /* lyb-launch-contract.json */,
 				896E3815B745A313FCD93C78 /* DesignSystem */,
@@ -1780,6 +1790,8 @@
 				B18320261101000000000001 /* LaunchJourney.swift */,
 				B34220261102000000000003 /* DatedTimelineUI.swift */,
 				B34220261102000000000001 /* DatedTimeline.swift */,
+				B34320261102000000000003 /* DatedStatsUITestFixture.swift */,
+				B34320261102000000000001 /* DatedOutcomeStats.swift */,
 				B18320261101000000000005 /* LaunchJourneyUI.swift */,
 				B27020261029000000000001 /* OutcomeFeasibility.swift */,
 				C7A700012F20000000C0A701 /* ChatService.swift */,
@@ -2566,6 +2578,7 @@
 				B3152026110100000000000A /* BodyVisualizationSnapshotFixtures.swift in Sources */,
 				B18320261101000000000004 /* LaunchJourneyTests.swift in Sources */,
 				B34220261102000000000006 /* DatedTimelineTests.swift in Sources */,
+				B34320261102000000000008 /* DatedOutcomeStatsTests.swift in Sources */,
 				B27020261029000000000004 /* OutcomeFeasibilityTests.swift in Sources */,
 				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
 				E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */,
@@ -2780,6 +2793,9 @@
 				B18320261101000000000002 /* LaunchJourney.swift in Sources */,
 				B34220261102000000000004 /* DatedTimelineUI.swift in Sources */,
 				B34220261102000000000002 /* DatedTimeline.swift in Sources */,
+				B34320261102000000000006 /* DatedOutcomeStatsView.swift in Sources */,
+				B34320261102000000000004 /* DatedStatsUITestFixture.swift in Sources */,
+				B34320261102000000000002 /* DatedOutcomeStats.swift in Sources */,
 				B18320261101000000000006 /* LaunchJourneyUI.swift in Sources */,
 				B27020261029000000000002 /* OutcomeFeasibility.swift in Sources */,
 				AD8F12EA2ED6AA76003C4559 /* AnalyticsService.swift in Sources */,
