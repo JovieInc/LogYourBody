@@ -94,6 +94,24 @@ test('exceptions cover only a counted identifier in one file and require a reaso
   );
 });
 
+test('LYB-304 policy exceptions allow one flag per file and reject copies elsewhere', (t) => {
+  const { root, write } = fixtureRepo(t);
+  const flag = ['jovie', 'health', 'access'].join('_');
+  const paths = [
+    'packages/shared-lib/decisions/photo-privacy-health-isolation.json',
+    'packages/shared-lib/src/photo-privacy-health-isolation.test.ts',
+  ];
+  for (const path of paths) write(path, flag);
+  assert.doesNotThrow(() => runSeparation({ root }));
+  for (const path of paths) {
+    write(path, `${flag}\n${flag}`);
+    assert.throws(() => runSeparation({ root }), /Jovie separation failed/);
+    write(path, flag);
+  }
+  write('apps/web/src/copied.ts', flag);
+  assert.throws(() => runSeparation({ root }), /copied.ts:1/);
+});
+
 test('the real CLI scans this checkout and rejects unsupported arguments', () => {
   const cli = fileURLToPath(new URL('./jovie-separation.mjs', import.meta.url));
   const success = spawnSync(process.execPath, [cli], { encoding: 'utf8' });

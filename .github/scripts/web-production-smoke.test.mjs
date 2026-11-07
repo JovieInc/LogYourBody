@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { logYourBody } from '../../packages/product-registry/src/products/logyourbody.mjs';
+import { REDIRECT_ROUTES } from './web-production-smoke.mjs';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const workflow = readFileSync(join(root, '.github/workflows/deploy.yml'), 'utf8');
@@ -16,6 +17,9 @@ const pages = [
   '/signin', '/signup', '/download/ios', '/download/android',
 ];
 const paths = [...pages, '/robots.txt', '/sitemap.xml', '/api/waitlist'];
+// Retired routes: each source path still gets one request, then the redirect
+// follow-up adds a second request for its destination.
+const expectedRequests = [...paths, ...Object.values(REDIRECT_ROUTES)];
 const html = `<html><head><title>${logYourBody.identity.name} | Public page</title>
   <link href='${logYourBody.links.home}/' rel='canonical'/></head><body>Public page</body></html>`;
 
@@ -26,6 +30,13 @@ function pageHtml(path) {
 function healthyResponse(url) {
   const path = new URL(url).pathname;
   if (path === '/api/waitlist') return Response.json({ success: true }, { status: 202 });
+  const destination = REDIRECT_ROUTES[path];
+  if (destination) {
+    // Emulate redirect: 'follow' — the served response is the destination's.
+    const response = healthyResponse(new URL(destination, url).href);
+    Object.defineProperty(response, 'url', { value: new URL(destination, url).href });
+    return response;
+  }
   return new Response(pageHtml(path), { headers: { 'content-type': 'text/html' } });
 }
 
@@ -76,6 +87,11 @@ test('both origins get every check; 308 redirects preserve the honeypot POST', a
         assert.deepEqual(JSON.parse(body), WAITLIST_HONEYPOT);
         response.writeHead(202, { 'content-type': 'application/json' });
         response.end('{"success":true}');
+      } else if (REDIRECT_ROUTES[request.url]) {
+        assert.equal(request.headers.accept, 'text/html');
+        const origin = target === 'deployment' ? deploymentUrl : www;
+        response.writeHead(307, { location: `${origin}${REDIRECT_ROUTES[request.url]}` });
+        response.end();
       } else {
         assert.equal(request.headers.accept, 'text/html');
         response.writeHead(200, { 'content-type': 'text/html' });
@@ -93,7 +109,7 @@ test('both origins get every check; 308 redirects preserve the honeypot POST', a
   assert.equal(results.length, paths.length * 2);
   assert.ok(results.every((result) => result.ok), JSON.stringify(results));
   for (const target of ['deployment', 'production']) {
-    assert.deepEqual(requests.filter((request) => request.target === target).map((request) => request.path).sort(), [...paths].sort());
+    assert.deepEqual(requests.filter((request) => request.target === target).map((request) => request.path).sort(), expectedRequests.sort());
     assert.equal(requests.find((request) => request.target === target && request.path === '/api/waitlist').method, 'POST');
   }
   assert.equal('email' in WAITLIST_HONEYPOT, false, 'probe must be invalid for persistence if the trap regresses');
@@ -108,6 +124,13 @@ for (const [name, path, response] of [
     Object.defineProperty(response, 'url', { value: logYourBody.links.home });
     return response;
   }],
+  ['retired route lands on the wrong page', '/about', () => {
+    const response = new Response('');
+    Object.defineProperty(response, 'url', { value: `${logYourBody.links.home}/brand` });
+    return response;
+  }],
+  ['retired route lost its redirect', '/signin', () => new Response('', { status: 404 })],
+  ['retired route hides its landing URL', '/signup', () => new Response(html)],
   ['missing title', '/support', () => new Response(html.replace(/<title>.*?<\/title>/, ''))],
   ['soft 404 title', '/terms', () => new Response(html.replace('Public page', '404: Not found'))],
   ['missing canonical', '/', () => new Response(html.replace(/<link[^>]+>/, ''))],
@@ -189,8 +212,12 @@ test('the exact workflow command exits nonzero and writes smoke failures to the 
   try {
     const preload = join(directory, 'fetch.mjs');
     writeFileSync(preload, `globalThis.fetch = async (url) => {
-      if (new URL(url).pathname === '/api/waitlist') return Response.json({success:true}, {status:202});
-      return new Response(${JSON.stringify(html)}.replace("/' rel=", (new URL(url).pathname === '/download/ios' ? '/' : new URL(url).pathname) + "' rel="), {status: new URL(url).pathname === '/support' ? 500 : 200});
+      const path = new URL(url).pathname;
+      if (path === '/api/waitlist') return Response.json({success:true}, {status:202});
+      const destination = ${JSON.stringify(REDIRECT_ROUTES)}[path] ?? path;
+      const response = new Response(${JSON.stringify(html)}.replace("/' rel=", (destination === '/download/ios' ? '/' : destination) + "' rel="), {status: path === '/support' ? 500 : 200});
+      Object.defineProperty(response, 'url', { value: new URL(destination, url).href });
+      return response;
     };`);
     const command = workflow.match(/run: (node \.github\/scripts\/web-production-smoke\.mjs)/)?.[1];
     assert.ok(command);
