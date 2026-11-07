@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
-import { verifyPolicy, verifyRepository } from './verify-merge-queue-policy.mjs';
+import { verifyCompanyGuards, verifyPolicy, verifyRepository } from './verify-merge-queue-policy.mjs';
 import './merge-queue-enrollment.test.mjs';
 
 const validPolicy = {
@@ -72,6 +73,54 @@ script: |
 
 test('current repository satisfies the native queue contract', () => {
   assert.equal(verifyRepository(process.cwd()), true);
+});
+
+test('Company Guards must block detection and the required CI Summary', () => {
+  const ci = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
+  const guards = fs.readFileSync('.github/workflows/company-guards.yml', 'utf8');
+  assert.equal(verifyCompanyGuards(ci, guards), true);
+  for (const changed of [
+    ci.replace('    needs: company-guards\n', ''),
+    ci.replace('    needs: company-guards\n', '    needs: company-guards\n    if: always()\n'),
+    ci.replace('    name: Company Guards\n', '    name: Company Guards\n    if: false\n'),
+    ci.replace(
+      '    name: Company Guards\n',
+      '    name: Company Guards\n    continue-on-error: true\n',
+    ),
+    ci.replace('uses: ./.github/workflows/company-guards.yml', 'uses: ./advisory.yml'),
+    ci.replace('    name: CI Summary\n', '    name: CI Summary\n    continue-on-error: true\n'),
+    ci.replace('    if: always()\n    needs: [detect-changes,', '    needs: [detect-changes,'),
+    ci.replace('      - name: Check results\n', '      - name: Check results\n        if: false\n'),
+    ci.replace(
+      '      - name: Check results\n',
+      '      - name: Check results\n        continue-on-error: true\n',
+    ),
+    ci.replaceAll('needs: [detect-changes,', 'needs: ['),
+    ci.replace('\n            exit 1\n', '\n            exit 0\n'),
+    ci.replace('\n            exit 1\n', '\n'),
+    ci.replace(
+      'needs.detect-changes.result }}" != "success"',
+      'needs.detect-changes.result }}" == "success"',
+    ),
+  ]) {
+    assert.notEqual(changed, ci, 'negative control must change the workflow');
+    assert.throws(() => verifyCompanyGuards(changed, guards), /Company Guards/);
+  }
+  assert.throws(
+    () => verifyCompanyGuards(ci, guards.replace('  workflow_call:\n', '')),
+    /Company Guards/,
+  );
+  const mismatchedPin = guards.replace(/ci-ref: [a-f0-9]{40}/, `ci-ref: ${'0'.repeat(40)}`);
+  assert.notEqual(mismatchedPin, guards, 'negative control must change the guard pin');
+  assert.throws(() => verifyCompanyGuards(ci, mismatchedPin), /Company Guards/);
+  assert.throws(
+    () =>
+      verifyCompanyGuards(
+        ci,
+        guards.replace('    uses: JovieInc/ci/', '    if: false\n    uses: JovieInc/ci/'),
+      ),
+    /Company Guards/,
+  );
 });
 
 test('deliberate red: quoted branch patterns are rejected', () => {

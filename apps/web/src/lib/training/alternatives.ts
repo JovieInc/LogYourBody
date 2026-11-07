@@ -5,6 +5,7 @@ import {
   latestFeedbackPerSession,
 } from './engine';
 import type { TrainingFeedback } from './types';
+import { evaluateMovementPain } from './pain-policy';
 
 export type AlternativeReport = {
   /** Exact catalog variant provoking non-pain back/trunk fatigue. */
@@ -91,7 +92,11 @@ export function hasRepeatedVariantResponse(
 }
 
 export function hasSelectionSymptoms(item: TrainingFeedback): boolean {
-  return (item.jointPain !== undefined && item.jointPain > 0) || Boolean(item.symptomFlags?.length);
+  return (
+    !evaluateMovementPain(item).swapAllowed ||
+    (item.jointPain !== undefined && item.jointPain > 0) ||
+    Boolean(item.symptomFlags?.length)
+  );
 }
 
 function adverseVariantResponse(item: TrainingFeedback): boolean {
