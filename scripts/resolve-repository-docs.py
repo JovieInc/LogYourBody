@@ -451,7 +451,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             # Refuse inputs changed during verification before staging dependency artifacts.
             if (git_bytes(root, "ls-files", "--stage", "-z") != verified_index
                     or git_bytes(root, "diff", "--name-only", "--",
-                                 *[name for name in inputs if name != "pnpm-lock.yaml"])):
+                                 *[name for name in inputs if name != "pnpm-lock.yaml" or verify_lockfile or not modes])):
                 raise ValueError("dependency inputs changed during verification; stage reviewed inputs and retry")
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
             resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])

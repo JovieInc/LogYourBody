@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `d4ab884e38455b2dce38b0a41218f15a9416105588a04779623d4386f2058222`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `5d87cac18621150114c73a18ccf298e8952b16c3ff61ead7a2c8760d4e79c009`)
 
 ### `apps/web/package.json`: engines
 
@@ -151,7 +151,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "tailwind-merge": "^3.7.0",
   "tailwindcss-animate": "^1.0.7",
   "vaul": "^1.1.2",
-  "ws": "8.21.0",
+  "ws": "8.22.1",
   "zod": "^4.6.7"
 }
 ```
@@ -174,7 +174,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@types/node": "^20.19.43",
   "@types/react": "^19.3.0",
   "@types/react-dom": "^19.3.0",
-  "@types/ws": "8.18.1",
+  "@types/ws": "8.18.2",
   "autoprefixer": "^10.6.2",
   "dotenv": "^17.4.2",
   "eslint": "^9.39.5",

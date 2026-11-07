@@ -6500,5 +6500,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-frozen-lockfile-drift",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1755",
+    "correction": "PR #1755, fix-red-1423773703 occurrence 53: merge origin/main without rebasing and preserve the ws 8.22.1 and @types/ws 8.18.2 update. Detect Changes and parity reject the stale generated source map, causing CI Summary to fail. Extend and use the existing dependency-repair machine in this PR.",
+    "mechanization": "Extend the existing repair helper to reject lockfile drift during frozen-only verification in both dependency modes. Two real-Git negative controls fail before the guard and pass afterward, proving rollback, successful retries and idempotence; all 42 dependency cases pass through the existing required pre-commit-lint test entrypoint. Use the extended --verify-lockfile helper to verify the unchanged bot lockfile and regenerate the source map. Preserve frozen installs and every CI gate. The harness owns push and PR edits and must include exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing helper owns dependency verification and artifact staging. Treating the lockfile as a reviewed input whenever no regeneration is required prevents changed resolutions from receiving a successful frozen-verification result."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "or verify_lockfile or not modes"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   }
 ]
