@@ -235,7 +235,7 @@ enum LaunchJourney {
         ))
     }
 
-    private static func conflicts(_ readings: [Reading]) -> Bool {
+    static func conflicts(_ readings: [Reading]) -> Bool {
         var seen: [Date: Double] = [:]
         for reading in readings {
             if let prior = seen[reading.date], prior != reading.value { return true }
@@ -244,13 +244,13 @@ enum LaunchJourney {
         return false
     }
 
-    private static func stale(_ readings: [Reading], now: Date, window: TimeInterval?) -> Bool {
+    static func stale(_ readings: [Reading], now: Date, window: TimeInterval?) -> Bool {
         guard let latest = readings.map(\.date).max() else { return false }
         guard let window else { return true }
         return SignalFreshness(measuredAt: latest, now: now, window: window, isUsable: true) != .fresh
     }
 
-    private static func maintenanceCovers(_ outcome: DatedOutcome, now: Date) -> Bool {
+    static func maintenanceCovers(_ outcome: DatedOutcome, now: Date) -> Bool {
         let today = day(now)
         return outcome.constraints.maintenance.contains { $0.start <= today && today <= $0.end }
     }
@@ -294,18 +294,32 @@ struct HealthMemoryClaim: Equatable {
 }
 
 struct HealthMemoryStore {
+    /// Partition fields. A read matches every field, so dropping one allows a cross read.
+    static let isolationKeyFields = ["userId", "productId"]
+    /// Result code when the safety check cannot run. That result has no memory payload.
+    static let failClosedCode = "safetyUnavailable"
+
     private(set) var claims: [HealthMemoryClaim] = []
 
     enum Retrieval: Equatable {
         case records([HealthMemoryClaim])
         case safetyUnavailable
         case isolated
+
+        var code: String {
+            switch self {
+            case .records: return "records"
+            case .safetyUnavailable: return HealthMemoryStore.failClosedCode
+            case .isolated: return "isolated"
+            }
+        }
     }
 
     @discardableResult
-    mutating func remember(_ claim: HealthMemoryClaim) -> Bool {
+    mutating func remember(_ claim: HealthMemoryClaim, safetyAvailable: Bool) -> Bool {
+        guard safetyAvailable else { return false }
         let text = claim.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !claim.userId.isEmpty, claim.productId == LaunchJourney.productId, !text.isEmpty else { return false }
+        guard Self.complete(userId: claim.userId, productId: claim.productId), !text.isEmpty else { return false }
         claims.append(HealthMemoryClaim(
             userId: claim.userId, productId: claim.productId, text: text,
             provenance: claim.provenance, recordedAt: claim.recordedAt
@@ -315,11 +329,29 @@ struct HealthMemoryStore {
 
     func retrieve(userId: String, productId: String, safetyAvailable: Bool) -> Retrieval {
         guard safetyAvailable else { return .safetyUnavailable }
-        guard !userId.isEmpty, productId == LaunchJourney.productId else { return .isolated }
-        return .records(claims.filter { $0.userId == userId && $0.productId == productId })
+        guard Self.complete(userId: userId, productId: productId) else { return .isolated }
+        return .records(claims.filter { Self.matches($0, userId: userId, productId: productId) })
     }
 
     mutating func clearUser(_ userId: String) {
         claims.removeAll { $0.userId == userId }
+    }
+
+    private static func fields(userId: String, productId: String) -> [String: String] {
+        ["userId": userId, "productId": productId]
+    }
+
+    private static func complete(userId: String, productId: String) -> Bool {
+        let values = fields(userId: userId, productId: productId)
+        return isolationKeyFields.allSatisfy { !(values[$0] ?? "").isEmpty }
+    }
+
+    private static func matches(_ claim: HealthMemoryClaim, userId: String, productId: String) -> Bool {
+        let stored = fields(userId: claim.userId, productId: claim.productId)
+        let requested = fields(userId: userId, productId: productId)
+        return isolationKeyFields.allSatisfy { field in
+            guard let left = stored[field], let right = requested[field] else { return false }
+            return left == right
+        }
     }
 }
