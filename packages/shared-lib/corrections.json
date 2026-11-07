@@ -6482,5 +6482,23 @@
     },
     "level": "static",
     "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "offline-ui-fixtures-ignore-live-network-callbacks",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42382426948/job/128432993283",
+    "correction": "PR #1706 / LYB-318, fix-red-5df69c1e5f occurrence 29: Launch Quality failed at LogYourBodyUITests+DatedTimeline.swift:85 because the offline retry action became Record a fresh measurement. Main advanced during repair and PR #1679 supplied the same shared fixture/network callback fix; keep that implementation and the original Retry sync assertion.",
+    "mechanization": "Merge main without rebasing, use the reviewed-project digest and correction-classifier resolvers to retain both parents, and extend the existing required launch-quality-evidence source guard. Require the shared offline pin before authenticated fixture publication, callback registration before monitor startup, and the complete offline status/pending-count reset. A negative control removing only the fixture syncStatus reset fails the extended guard; restored source passes. Preserve the inherited queued/repeated callback and ordinary transition native tests. The combined resolver exceeded 500 lines, so move its unchanged dependency rollback context into its existing manifest_union sibling and retain the required pin and dependency failure/retry tests. Native compilation, execution and coverage remain for macOS CI. The harness owns pushing and PR edits and must replace earlier machine declarations with exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared sync fixture can own a persistent DEBUG-only offline override at the network-update boundary, preventing live runner connectivity and already-queued callbacks from replacing fixture state for all callers by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/RealtimeSyncManager.swift",
+      "anchor": "guard !usesOfflineUITestFixture else { return }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
