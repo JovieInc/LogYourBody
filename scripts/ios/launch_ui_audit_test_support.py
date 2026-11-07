@@ -108,3 +108,66 @@ class LaunchUIAuditTests(unittest.TestCase):
         result, output = self.run_audit()
         self.assertEqual(result, 1)
         self.assertIn(check, "\n".join(path.read_text() for path in output.glob("*.json")))
+
+
+class TimelineAndTypingAuditTests(LaunchUIAuditTests):
+    """Cases extracted so the behavior module stays within the 500-line ratchet."""
+
+    def test_timeline_position_uses_the_injected_calendar_day(self):
+        calculator = self.app / "Helpers/TimelineCalculator.swift"
+        original = calculator.read_text()
+        self.assertIn("now: Date = Date()", original)
+        self.assertIn("if point.date >= thirtyDaysAgo {", original)
+        tests = self.root / "apps/ios/LogYourBodyTests/TimelineCalculatorTests.swift"
+        tests.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / "apps/ios/LogYourBodyTests/TimelineCalculatorTests.swift", tests)
+        self.assertEqual(self.run_audit()[0], 0)
+
+        tests.write_text("let date = now.addingTimeInterval(-daysAgo * 24 * 60 * 60)\n")
+        self.assert_rejected("timeline.elapsed_day_offset")
+        self.assert_rejected("timeline.fallback_hour_regression")
+
+        tests.unlink()
+        calculator.write_text(original.replace(
+            "if point.date >= thirtyDaysAgo {",
+            "if point.date >= thirtyDaysAgo {\n            let now = Date()",
+            1,
+        ))
+        self.assert_rejected("timeline.injected_calendar_day")
+
+        calculator.write_text(original.replace("now: Date = Date(),\n        ", "", 1))
+        self.assert_rejected("timeline.injected_calendar_day")
+
+    def test_character_typing_regains_focus_and_nested_launch_tests_get_time(self):
+        ui = self.root / "apps/ios/LogYourBodyUITests"
+        ui.mkdir(parents=True)
+        shutil.copyfile(ROOT / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift", ui / "LogYourBodyUITests.swift")
+        shutil.copyfile(
+            ROOT / "apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift", ui / "ChaosMonkeyUITests.swift"
+        )
+        self.assertEqual(self.run_audit()[0], 0)
+
+        chat = ui / "LogYourBodyUITests.swift"
+        original = chat.read_text()
+        focus = (
+            '.matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch\n'
+            "                    if !focused.exists {\n"
+            "                        if prefix.isEmpty {\n"
+            "                            composer.tap()\n"
+            "                        } else {\n"
+            "                            composer.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()\n"
+            "                        }\n"
+            "                        guard focused.waitForExistence(timeout: 2) else { break }\n"
+            "                    }\n"
+            "                    "
+        )
+        self.assertIn(focus, original)
+        chat.write_text(original.replace(focus, "", 1))
+        self.assert_rejected("uitest.character_type_keyboard_focus")
+
+        chat.write_text(original.replace(
+            "        executionTimeAllowance = 180\n        let app = XCUIApplication()\n        launch(\n",
+            "        let app = XCUIApplication()\n        launch(\n",
+            1,
+        ))
+        self.assert_rejected("uitest.nested_launch_time_allowance")

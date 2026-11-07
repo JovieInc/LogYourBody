@@ -6309,5 +6309,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-f8dba15025",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42377960797",
+    "correction": "PR #1698 / LYB-338, fix-red-f8dba15025 occurrence 2: Company Guards rejects unbaselined scripts/ios/test_launch_ui_regression_audit.py at 516 lines. CI Summary fails after Company Guards blocks downstream jobs. Merge origin/main without rebasing and retain the Apple Distribution renewal fix.",
+    "mechanization": "Reuse the existing required Company Guards size ratchet. Move the timeline-day and character-typing behavior cases into launch_ui_audit_test_support.py and load that module from the behavior runner so later cases stay out of the 500-line suite file. Retain every behavior case and every size allowance. The harness owns push and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Source extraction repairs the present file sizes but cannot prevent future authored source growth. The existing required company-wide size ratchet already rejects that class of regression."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing pinned Company Guards workflow rejects unbaselined files over 500 lines and growth beyond an existing allowance; CI Summary already requires it to pass."
+      }
+    },
+    "guard": {
+      "path": ".github/workflows/company-guards.yml",
+      "anchor": "uses: JovieInc/ci/.github/workflows/company-guards.yml@"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   }
 ]
