@@ -6518,5 +6518,23 @@
     },
     "level": "codebase",
     "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "dependency-repair-hidden-lockfile-drift",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1757",
+    "correction": "PR #1757, fix-red-1423773703 occurrence 54: merge origin/main without rebasing and preserve the @radix-ui/react-label 2.1.17 update. Detect Changes and parity reject the stale generated source map, causing CI Summary to fail. Frozen verification must also reject lockfile rewrites that assume-unchanged and skip-worktree hide from git diff.",
+    "mechanization": "Extend the existing dependency repair helper to compare filtered worktree hashes after frozen verification, including assume-unchanged and skip-worktree lockfile rewrites. Four real-Git regressions fail before the comparison and pass afterward, proving refusal, restored artifacts, retry and idempotence for both repair modes. The existing required pre-commit suite runs them with the prior drift cases. Use the extended --verify-lockfile helper to verify the merged bot lockfile and regenerate the source map. Preserve frozen installs and every CI gate. The harness owns push and PR edits and must include exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The repair helper already owns dependency verification and artifact rollback. Comparing the filtered worktree hash with the index catches hidden lockfile rewrites before a projection is staged, without relaxing frozen installs."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "assume-unchanged bits cannot hide lockfile edits"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

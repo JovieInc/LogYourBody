@@ -91,8 +91,9 @@ Both dependency repair modes refuse index or manifest edits made while pnpm is
 verifying inputs. They preserve those edits and restore the original generated
 artifacts; stage the reviewed inputs and retry the same command.
 Frozen verification also refuses lockfile changes before regenerating or staging
-the source map. Only a confirmed outdated lockfile permits refresh mode to write
-new resolutions; retrying after a refusal uses the original reviewed artifacts.
+the source map. Filtered worktree hashes reject assume-unchanged and skip-worktree
+edits that a diff listing omits. Only a confirmed outdated lockfile permits refresh
+mode to write new resolutions; retrying after a refusal uses the original reviewed artifacts.
 If resolution, frozen verification, projection generation or Git staging fails,
 the helper restores the original lockfile and projection bytes (or absence) so
 the same command can be retried without manual cleanup. Another writer's index
