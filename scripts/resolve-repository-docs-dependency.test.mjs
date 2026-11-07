@@ -45,6 +45,124 @@ function fixture(t, input, state) {
 }
 
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
+  test(`dependency repair ${mode} refuses lockfile drift during frozen verification`, (t) => {
+    const f = fixture(t, '.npmrc', 'staged');
+    const index = f.git('ls-files', '--stage');
+    const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+    writeFileSync(join(f.root, 'bin/corepack'), `#!/usr/bin/env python3
+from pathlib import Path
+marker = Path('changed-once')
+if not marker.exists():
+    Path('pnpm-lock.yaml').write_text('unverified resolution\\n')
+    marker.touch()
+`, { mode: 0o755 });
+    const result = f.resolve(mode);
+    assert.notEqual(result.status, 0, 'a successful verifier cannot authorize changed lockfile bytes');
+    assert.match(result.stderr, /dependency inputs changed during verification/);
+    assert.equal(f.git('ls-files', '--stage'), index);
+    for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+      assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
+      assert.deepEqual(Buffer.from(f.git('show', `:${name}`)), outputs[i]);
+    }
+    const retry = f.resolve(mode);
+    assert.equal(retry.status, 0, retry.stderr);
+    assert.deepEqual(readFileSync(join(f.root, 'pnpm-lock.yaml')), outputs[0]);
+    assert.equal(f.git('show', ':SOURCES.md'), readFileSync(join(f.root, 'SOURCES.md'), 'utf8'));
+    const repairedIndex = f.git('ls-files', '--stage');
+    assert.equal(f.resolve(mode).status, 0, 'reviewed frozen verification remains idempotent');
+    assert.equal(f.git('ls-files', '--stage'), repairedIndex);
+  });
+  for (const state of ['staged', 'unstaged']) {
+    test(`dependency repair ${mode} refuses ${state} manifest changes during verification`, (t) => {
+      const f = fixture(t, '.npmrc', 'staged');
+      const beforeIndex = f.git('ls-files', '--stage');
+      const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+      writeFileSync(join(f.root, 'bin/corepack'), `#!/usr/bin/env python3
+import subprocess
+from pathlib import Path
+marker = Path('changed-once')
+if not marker.exists():
+    Path('package.json').write_text('{"dependencies":{"example":"2.0.0"}}\\n')
+    ${state === 'staged' ? "subprocess.run(['git', 'add', 'package.json'], check=True)" : '# Leave the concurrent edit unstaged.'}
+    marker.touch()
+`, { mode: 0o755 });
+      const result = f.resolve(mode);
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /dependency inputs changed during verification/);
+      assert.equal(readFileSync(join(f.root, 'package.json'), 'utf8'), '{"dependencies":{"example":"2.0.0"}}\n');
+      assert.equal(f.git('show', ':package.json'), state === 'staged'
+        ? '{"dependencies":{"example":"2.0.0"}}\n'
+        : '{"dependencies":{"example":"1.0.0"}}\n');
+      assert.equal(f.git('show', ':.npmrc'), 'local input\n');
+      if (state === 'unstaged') assert.equal(f.git('ls-files', '--stage'), beforeIndex);
+      for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+        assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
+        assert.deepEqual(Buffer.from(f.git('show', `:${name}`)), outputs[i]);
+      }
+      f.git('add', 'package.json');
+      const retry = f.resolve(mode);
+      assert.equal(retry.status, 0, retry.stderr);
+      assert.match(f.git('show', ':SOURCES.md'), /"example": "2\.0\.0"/);
+      const repairedIndex = f.git('ls-files', '--stage');
+      assert.equal(f.resolve(mode).status, 0, 'repair remains idempotent after reviewing the concurrent change');
+      assert.equal(f.git('ls-files', '--stage'), repairedIndex);
+    });
+  }
+  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch', 'apps/local-only/package.json']) {
+    test(`dependency repair ${mode} refuses ignored ${input} before invoking pnpm`, (t) => {
+      const f = fixture(t, input, 'untracked');
+      writeFileSync(join(f.root, '.gitignore'), `${input}\nnode_modules/\n`);
+      f.git('add', '.gitignore');
+      mkdirSync(join(f.root, 'node_modules/example'), { recursive: true });
+      writeFileSync(join(f.root, 'node_modules/example/.npmrc'), 'vendor config\n');
+      writeFileSync(join(f.root, 'node_modules/example/package.json'), '{"name":"vendor"}\n');
+      const index = f.git('ls-files', '--stage');
+      const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+      const result = f.resolve(mode);
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /ignored dependency inputs:/);
+      assert.ok(result.stderr.includes(input), result.stderr);
+      assert.equal(result.stderr.includes('node_modules/'), false, result.stderr);
+      assert.equal(existsSync(join(f.root, 'pnpm-calls')), false);
+      assert.equal(f.git('ls-files', '--stage'), index);
+      assert.equal(readFileSync(f.path, 'utf8'), 'local input\n');
+      for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+        assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
+      }
+      unlinkSync(f.path);
+      const retry = f.resolve(mode);
+      assert.equal(retry.status, 0, retry.stderr);
+      const repairedIndex = f.git('ls-files', '--stage');
+      assert.equal(f.resolve(mode).status, 0, 'repair stays idempotent with ignored vendor config');
+      assert.equal(f.git('ls-files', '--stage'), repairedIndex);
+    });
+  }
+  test(`dependency repair ${mode} requires staged projection configuration before invoking pnpm`, (t) => {
+    const f = fixture(t, '.npmrc', 'staged');
+    const configPath = join(f.root, 'repository-docs.json');
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    config.repository = 'reviewed/dependency-update';
+    writeFileSync(configPath, JSON.stringify(config));
+    const index = f.git('ls-files', '--stage');
+    const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+    const result = f.resolve(mode);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /unstaged dependency edits: repository-docs\.json/);
+    assert.equal(existsSync(join(f.root, 'pnpm-calls')), false);
+    assert.equal(f.git('ls-files', '--stage'), index);
+    assert.deepEqual(JSON.parse(readFileSync(configPath, 'utf8')), config);
+    for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+      assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
+    }
+    f.git('add', 'repository-docs.json');
+    const retry = f.resolve(mode);
+    assert.equal(retry.status, 0, retry.stderr);
+    assert.match(f.git('show', ':SOURCES.md'), /Repository: `reviewed\/dependency-update`/);
+    assert.deepEqual(readFileSync(join(f.root, 'pnpm-lock.yaml')), outputs[0]);
+    const repairedIndex = f.git('ls-files', '--stage');
+    assert.equal(f.resolve(mode).status, 0, 'repair with reviewed configuration stays idempotent');
+    assert.equal(f.git('ls-files', '--stage'), repairedIndex);
+  });
   for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch']) {
     test(`dependency repair ${mode} refuses indexed symlink ${input} before invoking pnpm`, (t) => {
       const f = fixture(t, input, 'staged');

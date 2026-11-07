@@ -6,32 +6,21 @@ import json
 import re
 import subprocess
 import tempfile
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack
 from pathlib import Path
 
 import repository_docs
-
-
-@contextmanager
-def restore_dependency_artifacts_on_failure(root, output):
-    paths = [repository_docs.local(root, name) for name in ("pnpm-lock.yaml", output)]
-    originals = {path: path.read_bytes() if path.exists() else None for path in paths}
-    try:
-        yield
-    except (ValueError, OSError, subprocess.CalledProcessError):
-        # Failed dependency repairs restore both artifacts, including staging failures.
-        for path, original in originals.items():
-            if original is None:
-                path.unlink(missing_ok=True)
-            else:
-                path.write_bytes(original)
-        raise
+from manifest_union import restore_dependency_artifacts_on_failure
 
 
 def staged_bytes(root, name):
-    return subprocess.run(
+    source = subprocess.run(
         ["git", "show", ":" + name], cwd=root, check=True, capture_output=True,
     ).stdout
+    # A clean projection must not conceal unresolved markers in its staged inputs.
+    if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", source):
+        raise ValueError("resolve staged conflict markers first: " + name)
+    return source
 
 
 def merge_sections(root, name):
@@ -91,6 +80,12 @@ def union_manifests(root):
     # A conflicted correction ledger stays for its own resolver.
     from manifest_union import apply_manifest_union
     apply_manifest_union(root)
+
+
+def union_project(root):
+    """Stage insertion-only Xcode membership. Never derive the diagnostic digest."""
+    from pbx_union import apply_project_union
+    apply_project_union(root)
 
 
 def resolve_staged(root, extra_outputs=()):
@@ -161,8 +156,35 @@ def git_bytes(root, *args):
     ).stdout
 
 
+def _ours_pin_conflict(text):
+    """Return the branch side when every conflict hunk is one project-pin line."""
+    lines, out, index, saw = text.splitlines(keepends=True), [], 0, False
+    while index < len(lines):
+        line = lines[index]
+        if line[:1] != "<" or not re.match(r"^<{2,}(?: |\r?$)", line):
+            if re.match(r"^(?:\|{2,}|={2,}|>{2,})(?: |\r?$)", line):
+                raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+            out.append(line)
+            index += 1
+            continue
+        saw, index, ours = True, index + 1, None
+        for end in "=>":
+            chunk = []
+            while index < len(lines) and not re.match(rf"^{end}{{2,}}(?: |\r?$)", lines[index]):
+                chunk.append(lines[index])
+                index += 1
+            if index >= len(lines) or len(chunk) != 1 or not DIAGNOSTIC_PIN.fullmatch(chunk[0].rstrip("\r\n")):
+                raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+            ours = chunk[0] if end == "=" else ours
+            index += 1
+        out.append(ours)
+    if not saw:
+        raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+    return "".join(out)
+
+
 def conflicted_diagnostic_template(root):
-    """Return one parent workflow when every stage differs only by the project pin."""
+    """Return the branch workflow when incoming differs only by the project pin."""
     entries = [
         entry for entry in git_bytes(
             root, "ls-files", "--unmerged", "-z", "--", DIAGNOSTIC_WORKFLOW,
@@ -184,7 +206,11 @@ def conflicted_diagnostic_template(root):
         if count != 1:
             raise ValueError("diagnostic workflow conflict is not limited to the project pin")
         texts.append((text, masked))
-    if len({masked for _text, masked in texts}) != 1:
+    # Keep branch edits when incoming changed only this project pin.
+    if len({item[1] for item in texts}) != 1 and (
+        texts[0][1] != texts[2][1]
+        or _ours_pin_conflict(repository_docs.local(root, DIAGNOSTIC_WORKFLOW).read_text()) != texts[1][0]
+    ):
         raise ValueError("diagnostic workflow conflict is not limited to the project pin")
     return texts[1][0]
 
@@ -215,15 +241,25 @@ def assert_merged_project_keeps_parent_files(root, project):
 
     base_ids = set(PBX_MEMBER.findall(blob(f"{base_rev}:{DIAGNOSTIC_PROJECT}")))
     added = set()
+    parent_sources = []
     for parent in ("HEAD", "MERGE_HEAD"):
-        added.update(set(PBX_MEMBER.findall(blob(f"{parent}:{DIAGNOSTIC_PROJECT}"))) - base_ids)
+        source = blob(f"{parent}:{DIAGNOSTIC_PROJECT}")
+        parent_sources.append(source)
+        added.update(set(PBX_MEMBER.findall(source)) - base_ids)
     try:
-        merged_ids = set(PBX_MEMBER.findall(project.decode()))
+        merged = project.decode()
+        merged_ids = set(PBX_MEMBER.findall(merged))
     except UnicodeDecodeError as error:
         raise ValueError("diagnostic project is not text") from error
     missing = sorted(added - merged_ids)
     if missing:
         raise ValueError("merged project dropped a parent file: " + ", ".join(missing))
+    # Declarations alone cannot prove that group and build-phase references survived.
+    for identifier in sorted(added):
+        token = re.compile(r"\b" + re.escape(identifier) + r"\b")
+        expected = max(len(token.findall(source)) for source in parent_sources)
+        if len(token.findall(merged)) < expected:
+            raise ValueError("merged project dropped a parent file reference: " + identifier)
 
 
 def reviewed_conflicted_pin(root, expected):
@@ -352,9 +388,10 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
     with ExitStack() as rollback:
         if refresh_lockfile or verify_lockfile:
             # Pnpm hooks, workspace npmrc files and patches also affect dependency resolution.
+            # Projection configuration must be staged before dependency verification.
             inputs = ["package.json", "**/package.json", "pnpm-workspace.yaml",
                       "pnpm-lock.yaml", ".npmrc", "**/.npmrc", ".pnpmfile.cjs",
-                      "**/.pnpmfile.cjs", "patches/**", output]
+                      "**/.pnpmfile.cjs", "patches/**", "repository-docs.json", output]
             dirty = subprocess.run(
                 ["git", "diff", "--name-only", "--", *inputs],
                 cwd=root, check=True, capture_output=True, text=True,
@@ -368,6 +405,17 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             ).stdout.strip("\0")
             if untracked:
                 raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
+            # Ignored hooks, npmrc files and patches are still local-only resolver inputs.
+            # Ignored workspace manifests are still local-only resolver inputs.
+            ignored = subprocess.run(
+                ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
+                 ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
+                 "package.json", "**/package.json",
+                 ":(glob,exclude)**/node_modules/**"],
+                cwd=root, check=True, capture_output=True, text=True,
+            ).stdout.strip("\0")
+            if ignored:
+                raise ValueError("ignored dependency inputs: " + ignored.replace("\0", ", "))
             # Dependency resolution inputs must be regular indexed files, never symlinks.
             for entry in git_bytes(root, "ls-files", "--stage", "-z", "--", *inputs).split(b"\0"):
                 if entry and entry.split(b" ", 1)[0] not in {b"100644", b"100755"}:
@@ -378,6 +426,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             if errors and errors != ["source projection stale: " + output]:
                 raise ValueError("; ".join(errors))
             rollback.enter_context(restore_dependency_artifacts_on_failure(root, output))
+            verified_index = git_bytes(root, "ls-files", "--stage", "-z")
             # Verify valid bot lockfiles without re-resolving unrelated dependencies.
             modes = [["--frozen-lockfile", "--offline"]]
             # Explicit repair only: normal commit hooks and CI retain frozen installs.
@@ -399,6 +448,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                     ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
                     cwd=root, check=True,
                 )
+            # Refuse inputs changed during verification before staging dependency artifacts.
+            if (git_bytes(root, "ls-files", "--stage", "-z") != verified_index
+                    or git_bytes(root, "diff", "--name-only", "--",
+                                 *[name for name in inputs if name != "pnpm-lock.yaml" or verify_lockfile or not modes])):
+                raise ValueError("dependency inputs changed during verification; stage reviewed inputs and retry")
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
             resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
             return
@@ -424,10 +478,13 @@ def main():
     mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
+    mode.add_argument("--union-project", action="store_true", help="union additive Xcode file membership from both parents and stage the project")
     args = parser.parse_args()
     try:
         if args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
+        elif args.union_project:
+            union_project(args.root)
         elif args.union_manifests:
             union_manifests(args.root)
             resolve(args.root)
