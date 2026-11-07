@@ -96,6 +96,33 @@ test('unresolved main integration cannot invoke lint', (t) => {
   assert.throws(() => lintArguments(cwd), /unmerged|Cannot snapshot/);
 });
 
+test('merge commits run the staged source-map repair', (t) => {
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const hook = fs.readFileSync(path.join(repoRoot, '.husky/pre-merge-commit'), 'utf8');
+  assert.match(hook, /Merge commits run the staged source-map repair/);
+  assert.match(hook, /\. "\$\(dirname "\$0"\)\/pre-commit"/);
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lyb-merge-hook-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const hooks = path.join(dir, '.husky');
+  fs.mkdirSync(hooks);
+  fs.writeFileSync(path.join(hooks, 'pre-merge-commit'), hook);
+  const mark = path.join(dir, 'mark');
+
+  // Detect Changes runs before installation: exercise the tracked hook without generated shims.
+  for (const status of [0, 23]) {
+    fs.writeFileSync(path.join(hooks, 'pre-commit'), `echo repaired > "$HUSKY_MARK"\nexit ${status}\n`);
+    const result = spawnSync('sh', [path.join(hooks, 'pre-merge-commit')], {
+      cwd: dir,
+      env: { ...env, HUSKY_MARK: mark },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, status, result.stderr);
+    assert.equal(fs.readFileSync(mark, 'utf8').trim(), 'repaired');
+    fs.unlinkSync(mark);
+  }
+});
+
 test('lint failure propagates to the hook entrypoint', (t) => {
   const cwd = fixture(t);
   fs.mkdirSync(path.join(cwd, 'bin'));

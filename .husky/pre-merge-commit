@@ -1,0 +1,4 @@
+# Merge commits run the staged source-map repair.
+# Git invokes this hook instead of pre-commit. Husky exits 0 when this file is
+# absent, which skips that repair and can commit a clean but stale source map.
+. "$(dirname "$0")/pre-commit"
