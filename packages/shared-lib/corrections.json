@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "launch-copy-merge-duplicate-constants",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1688",
+    "correction": "PR #1688 / LYB-288, fix-red-95726c4f82 occurrence 24: merge origin/main without rebasing and preserve health-memory user/product isolation and fail-closed reads and writes. The LaunchJourney conflict must retain the canonical LaunchPromiseCopy table instead of restoring parallel legacy constants. Tently reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing required shared-lib launch-copy guard to reject repeated approved literals across launch sources. Replay the actual three legacy constants from the PR parent: the previous nine-case guard passes, the extended guard fails, and all thirteen cases pass after restoring the resolved source. Preserve main-side copy references and all branch-side health-memory changes. Existing Turbo inputs already include the Swift sources and this test. The harness owns pushing and PR-body updates and must include exactly one line: Machine: built packages/shared-lib/src/launch-promise-copy.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The app already has a single canonical copy table. Runtime code cannot prevent a later source merge from restoring obsolete declarations alongside it."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required source-contract suite can reject duplicated approved literals after any merge, with the actual legacy constants as a failing regression."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-promise-copy.test.ts",
+      "anchor": "rejects approved copy duplicated by a merge outside the canonical table"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "dependabot-workspace-release-age-resolution",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41420896425",
     "correction": "LYB-357: the weekly multi-directory Dependabot job reports 38 update_not_possible errors. Run 41420896425 shows all 38 are ERR_PNPM_NO_MATURE_MATCHING_VERSION for the implicitly resolved Rollup peer, not duplicate-PR errors. The workspace member also triggers npm probes without the root package-manager pin.",
