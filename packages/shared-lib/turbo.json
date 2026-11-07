@@ -51,6 +51,8 @@
         "$TURBO_ROOT$/.github/workflows/dependabot-auto-merge.yml",
         "$TURBO_ROOT$/.github/dependabot.yml",
         "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/apps/web/package.json",
+        "$TURBO_ROOT$/packages/jovie-ui/package.json",
         "$TURBO_ROOT$/pnpm-workspace.yaml",
         "$TURBO_ROOT$/apps/ios/fastlane/Fastfile",
         "$TURBO_ROOT$/apps/ios/fastlane/Fastfile.release",
