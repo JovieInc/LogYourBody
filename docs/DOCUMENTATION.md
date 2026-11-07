@@ -90,6 +90,9 @@ If resolution, frozen verification, projection generation or Git staging fails,
 the helper restores the original lockfile and projection bytes (or absence) so
 the same command can be retried without manual cleanup. Another writer's index
 lock and unrelated edits remain untouched.
+If dependency inputs are staged while pnpm runs, repair refuses before staging
+either artifact, restores their original bytes, and retains the other writer's
+staged edits for a retry against the current index.
 It then stages the lockfile and source map, refusing unresolved source conflicts,
 unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift. It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.

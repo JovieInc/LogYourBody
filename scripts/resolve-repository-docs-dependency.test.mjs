@@ -45,6 +45,33 @@ function fixture(t, input, state) {
 }
 
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
+  test(`dependency repair ${mode} refuses inputs changed during pnpm and remains retryable`, (t) => {
+    const f = fixture(t, '.npmrc', 'staged');
+    const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+    const incoming = '{"dependencies":{"example":"2.0.0"}}\n';
+    writeFileSync(join(f.root, 'bin/corepack'), `#!/usr/bin/env python3
+import subprocess
+from pathlib import Path
+Path('pnpm-calls').write_text('called\\n')
+Path('pnpm-lock.yaml').write_text('new resolution\\n')
+Path('package.json').write_text(${JSON.stringify(incoming)})
+subprocess.run(['git', 'add', 'package.json'], check=True)
+`, { mode: 0o755 });
+    const result = f.resolve(mode);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /dependency inputs changed during repair/);
+    assert.equal(f.git('show', ':package.json'), incoming, 'retain the other writer\'s staged edit');
+    assert.equal(readFileSync(join(f.root, 'package.json'), 'utf8'), incoming);
+    assert.equal(f.git('show', ':pnpm-lock.yaml'), outputs[0].toString());
+    assert.equal(f.git('show', ':SOURCES.md'), outputs[1].toString());
+    for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+      assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
+    }
+    writeFileSync(join(f.root, 'bin/corepack'), '#!/bin/sh\necho "$*" >> pnpm-calls\n', { mode: 0o755 });
+    const retry = f.resolve(mode);
+    assert.equal(retry.status, 0, retry.stderr);
+    assert.match(f.git('show', ':SOURCES.md'), /"example": "2\.0\.0"/);
+  });
   test(`dependency repair ${mode} requires staged projection configuration before invoking pnpm`, (t) => {
     const f = fixture(t, '.npmrc', 'staged');
     const configPath = join(f.root, 'repository-docs.json');
