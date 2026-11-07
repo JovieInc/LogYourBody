@@ -303,6 +303,35 @@ def _preserved(base, ours, theirs, merged, path):
             _preserved(base[key], ours[key], theirs[key], merged[key], path + (str(key),))
 
 
+def dependency_verification_drift(root, inputs, verified_index, include_lockfile):
+    """Compare filtered worktree hashes so assume-unchanged bits cannot hide lockfile edits."""
+    root = str(Path(root).resolve())
+    stage = subprocess.run(
+        ["git", "ls-files", "--stage", "-z"],
+        cwd=root, check=True, capture_output=True,
+    ).stdout
+    if stage != verified_index:
+        return True
+    listed = subprocess.run(
+        ["git", "ls-files", "--stage", "-z", "--", *inputs],
+        cwd=root, check=True, capture_output=True,
+    ).stdout
+    for entry in listed.split(b"\0"):
+        if not entry:
+            continue
+        meta, name = entry.split(b"\t", 1)
+        if name == b"pnpm-lock.yaml" and not include_lockfile:
+            continue
+        index_hash = meta.split(b" ")[1]
+        hashed = subprocess.run(
+            ["git", "hash-object", f"--path={name.decode()}", "--", name.decode()],
+            cwd=root, capture_output=True,
+        )
+        if hashed.returncode or hashed.stdout.split()[:1] != [index_hash]:
+            return True
+    return False
+
+
 def assert_auto_merged_parent_inputs(root):
     """An auto-merged manifest must keep every parent test input."""
     root = Path(root).resolve()
