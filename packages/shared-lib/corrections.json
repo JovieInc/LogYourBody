@@ -1,18 +1,18 @@
 [
   {
-    "fingerprint": "reviewed-audit-pin-follows-explicit-digest",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
-    "correction": "PR #1746 / LYB-343, fix-red-d96bbbfa0f occurrence 5: Mac Runner Routing Tests rejected the dated-recovery launch audit because REVIEWED_AUDIT_SHA256 stayed at the previous digest after launch-quality-audit.sh selected each recovery case on its own. Merge origin/main without rebasing and keep goal-relative stats.",
-    "mechanization": "Extend the existing diagnostic pin resolver so one explicit reviewed audit digest replaces the workflow pin and every current routing-test copy, refusing a mismatched digest, unstaged audit bytes, or a workflow move that leaves the routing tests behind. Historical fixture digests stay. Two real-Git regressions fail on the previous resolver and pass after the extension. Use that command for the reviewed digest 2b9b36774845a7e67864c40bc8d3f2f5e2900de149e42a1b5aff38298024526d. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "fingerprint": "dependency-repair-staged-projection-configuration",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1724",
+    "correction": "PR #1724, fix-red-1423773703 occurrence 48: the Autoprefixer 10.6.2 bump left the generated source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must use reviewed projection configuration before invoking pnpm, as well as rendering staged source bytes.",
+    "mechanization": "Extend both dependency repair modes to include repository-docs.json in their existing staged-input preflight. Two real-Git regressions fail before the change and pass afterward, proving refusal before pnpm with artifacts and index preserved, successful retry with staged configuration, the correct repository in the generated map, unchanged bot resolutions and idempotence. The existing required Detect Changes pre-commit suite imports the regressions. Use --verify-lockfile for this merged dependency update, retaining frozen installation and parity gates. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
     "classification": {
       "codebase": {
         "feasible": true,
-        "rationale": "The existing pin resolver owns this trust boundary and can move every current audit pin from one reviewed digest, so a later repair cannot update the workflow and leave a routing-test copy behind."
+        "rationale": "The existing dependency helper owns input validation, frozen verification and staged source-map generation. Including its projection configuration in preflight prevents unreviewed configuration from changing parity checks and output selection before pnpm executes."
       }
     },
     "guard": {
       "path": "scripts/resolve-repository-docs.py",
-      "anchor": "Only an explicit reviewed audit digest may update every current pin."
+      "anchor": "Projection configuration must be staged before dependency verification."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -6016,6 +6016,24 @@
     "guard": {
       "path": "scripts/resolve-repository-docs.py",
       "anchor": "Dependency resolution inputs must be regular indexed files, never symlinks."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "reviewed-audit-pin-follows-explicit-digest",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
+    "correction": "PR #1746 / LYB-343, fix-red-d96bbbfa0f occurrence 5: Mac Runner Routing Tests rejected the dated-recovery launch audit because REVIEWED_AUDIT_SHA256 stayed at the previous digest after launch-quality-audit.sh selected each recovery case on its own. Merge origin/main without rebasing and keep goal-relative stats.",
+    "mechanization": "Extend the existing diagnostic pin resolver so one explicit reviewed audit digest replaces the workflow pin and every current routing-test copy, refusing a mismatched digest, unstaged audit bytes, or a workflow move that leaves the routing tests behind. Historical fixture digests stay. Two real-Git regressions fail on the previous resolver and pass after the extension. Use that command for the reviewed digest 2b9b36774845a7e67864c40bc8d3f2f5e2900de149e42a1b5aff38298024526d. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing pin resolver owns this trust boundary and can move every current audit pin from one reviewed digest, so a later repair cannot update the workflow and leave a routing-test copy behind."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Only an explicit reviewed audit digest may update every current pin."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
