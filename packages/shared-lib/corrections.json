@@ -6139,5 +6139,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "pr1698-conflict-repair-fix-red-1a39536f40",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1698",
+    "correction": "LYB-338 repair, fix-red-1a39536f40 occurrence 9 in 14 days: merge origin/main first without rebasing, resolve conflicts, inspect the failed JavaScript/TypeScript logs, and retain the signing renewal intent. The harness owns push and PR edits.",
+    "mechanization": "Use the existing correction-ledger merge driver and staged source-map resolver for the main merge. Preserve newer PR commit 72cd87bbceba6de37cd0158459c4e7530cca2d0d, which extends the required launch audit machine with token-based brace scanning and a deterministic trace-event regression. Apply that machine to this instance: all 43 behavior cases and all 12 signing identity cases pass; the previous scanner fails the unchanged event budget with 200059 events. Keep the 30-second timeout and every existing gate. The harness must replace the PR machine line with exactly: Machine: built scripts/ios/launch_ui_home_interaction_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared scanner bounds coverage work by structural tokens instead of source characters for every launch audit run. Its required semantic tests and deterministic trace-event budget prevent recurrence without changing a timeout or introducing a second repair controller."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "_BRACE_TOKEN.finditer(text, open_brace)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
