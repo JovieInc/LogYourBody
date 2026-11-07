@@ -24,7 +24,6 @@ XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNIN
 TEST_TIMEOUTS_ENABLED="${TEST_TIMEOUTS_ENABLED:-YES}"
 DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE="${DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE:-90}"
 MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-180}"
-# Hosted startup can take ~10m; retain the bounded, non-retried command timeout.
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
 BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}" # Bound the one cold build independently of XCTest execution.
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
@@ -59,6 +58,7 @@ git -C "$ROOT_DIR" diff HEAD --binary > "$ARTIFACT_DIR/source-working-tree.patch
 if [[ "$AUDIT_MODE" == full ]]; then
   # Finish validator shell fixtures before simulator boot competes for host resources.
   python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
+  python3 "$ROOT_DIR/scripts/ios/test_xcodebuild_command_timeout.py"
   bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
 fi
 
@@ -73,7 +73,11 @@ fi
 run_with_timeout() {
   local timeout_seconds="$1"
   shift
-
+  if [[ -n "${XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS:-}" ]]; then
+    python3 -B "$ROOT_DIR/scripts/ios/xcodebuild-command-timeout.py" \
+      --timeout-seconds "$timeout_seconds" --grace-seconds "$XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS" -- "$@"
+    return $?
+  fi
   if [[ -n "$TIMEOUT_BIN" ]]; then
     "$TIMEOUT_BIN" --kill-after=30s "${timeout_seconds}s" "$@"
     return $?
@@ -134,10 +138,7 @@ is_simulator_infra_failure() {
     "$log_file"
 }
 
-# Diagnostic only (never fails the audit): every hosted test invocation spends
-# 6-10 min launching the test runner before its first test. Record what the
-# simulator and host are doing in that window so the dominant phase can be
-# fixed instead of bounded. Writes <label>.launch-probe/ next to the bundle.
+# Record host and simulator activity while the test runner launches.
 LQ_LAUNCH_PROBE="${LQ_LAUNCH_PROBE:-true}"
 LAUNCH_PROBE_PIDS=()
 
@@ -225,6 +226,7 @@ run_xcodebuild_test() {
     )
 
     set +e
+    XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS="${XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS:-180}" \
     run_with_timeout \
       "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS" \
       "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
@@ -572,8 +574,7 @@ python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --scheme "$SCHEME" --only-testing LogYourBodyTests \
   > "$ARTIFACT_DIR/launch-quality-unit-tests.ratchet.json"
 
-# Keep one UI runner launch: run 38320479871 paid 340-537s per invocation.
-# Select separate XCTest cases so each retains its execution budget and receipt.
+# One UI xcodebuild launch; separate launches overran the step, and each XCTest case keeps its own budget.
 LAUNCH_QUALITY_UI_TESTS=(
   "HomeV2TimelineIntegrationUITests/testPhotoHoldScrubsBothDirectionsThenAnotherHoldRestoresTap"
   "HomeV2TimelineIntegrationUITests/testPhotoScrubResetsWhenNavigatingToTheMenuAndBack"
@@ -630,8 +631,7 @@ for test_id in "${LAUNCH_QUALITY_UI_TESTS[@]}" "${CHAOS_REGRESSIONS[@]}"; do
 done
 UI_RESULT_BUNDLE="$ARTIFACT_DIR/launch-quality-ui.xcresult"
 UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")
-# Budget the full dated-state matrix; per-test timeouts and the 52m step stay fixed.
-UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1800}"
+UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1800}" # dated-state matrix; per-test and 52m caps stay
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_xcodebuild_test \
   "launch-quality-ui" \
   "$UI_RESULT_BUNDLE" \
@@ -663,7 +663,7 @@ fi
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
   printf -- '- Build strategy: one `build-for-testing`, the general unit target (StoreKit lifecycle tests run in the required dedicated job), then one UI invocation covering inherited surface cases, two canvas cases, and twelve bounded chaos regressions with simulator parallelism disabled\n'
   printf -- '- Required native coverage: biometric policy, SettingsRow, chaos action accounting, and executed MesocycleCanvas app/view lines. Canvas captures cover reduced motion, replay/readback, and undo.\n'
-  printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
+  printf -- '- Build timeout: `%ss`; test hang cap: `%ss`; finalization grace: `%ss`\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS" "${XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS:-180}"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"
 

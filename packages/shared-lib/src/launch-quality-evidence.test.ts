@@ -158,12 +158,19 @@ it('pins shared offline UI fixtures before late network callbacks can replace th
   const fixture = app.split('private func applyPaidMVPUITestFixtureIfNeeded()')[1];
   expect(fixture).toContain('realtimeSyncManager.applyOfflineUITestFixture()');
   expect(fixture).not.toContain('realtimeSyncManager.isOnline = false');
+  expect(fixture).toContain('authManager.currentUser = User(');
+  expect(fixture.indexOf('realtimeSyncManager.applyOfflineUITestFixture()')).toBeLessThan(
+    fixture.indexOf('authManager.currentUser = User('),
+  );
   const callback = monitor.split('networkMonitor.pathUpdateHandler =')[1]?.split('// MARK:')[0];
   expect(callback).toContain('self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)');
   expect(callback).not.toContain('self.isOnline =');
+  expect(monitor.indexOf('networkMonitor.pathUpdateHandler =')).toBeLessThan(
+    monitor.indexOf('networkMonitor.start(queue: queue)'),
+  );
   const pin = manager.split('func applyOfflineUITestFixture()')[1]?.split('#endif')[0];
   expect(pin).toMatch(
-    /usesOfflineUITestFixture = true[\s\S]*networkMonitor.cancel\(\)[\s\S]*isOnline = false/,
+    /usesOfflineUITestFixture = true[\s\S]*networkMonitor.cancel\(\)[\s\S]*isOnline = false\s*syncStatus = \.offline\s*pendingSyncCount = 0/,
   );
   const update = manager.split('func handleNetworkPathUpdate(isOnline: Bool)')[1];
   expect(update).toMatch(

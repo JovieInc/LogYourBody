@@ -8,8 +8,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { env, resolver } from './resolve-repository-docs.test.mjs';
 
-const DIAGNOSTIC_PROJECT = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj';
-const DIAGNOSTIC_WORKFLOW = '.github/workflows/ios-ui-diagnostics.yml';
+export const DIAGNOSTIC_PROJECT = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj';
+export const DIAGNOSTIC_WORKFLOW = '.github/workflows/ios-ui-diagnostics.yml';
 
 function pinWorkflow(digest, note = 'kept', auditDigest = undefined) {
   const audit = auditDigest === undefined
@@ -18,7 +18,7 @@ function pinWorkflow(digest, note = 'kept', auditDigest = undefined) {
   return `jobs:\n  pins:\n    run: echo ok\n    env:\n      # ${note}\n${audit}            '${DIAGNOSTIC_PROJECT}': '${digest}',\n`;
 }
 
-function pinFixture(t, { baseAudit } = {}) {
+export function pinFixture(t, { baseAudit } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'lyb-diagnostic-pin-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
@@ -58,7 +58,7 @@ function pinFixture(t, { baseAudit } = {}) {
   return { root, git, output, generate, commit, writeProject };
 }
 
-function mergePinFixture(f) {
+export function mergePinFixture(f) {
   const merge = spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: f.root, env, encoding: 'utf8' });
   assert.equal(merge.status, 1, merge.stderr);
 }
@@ -213,7 +213,7 @@ test('reviewed project digest still refuses non-pin edits when the audit pin mat
   assert.equal(f.f.git('ls-files', '--stage'), index);
 });
 
-function projectMember(id, name) {
+export function projectMember(id, name) {
   return `\t\t${id} /* ${name} */ = {isa = PBXFileReference; path = ${name}; };\n`;
 }
 

@@ -99,13 +99,14 @@ jobs:
 
           # Intentionally unavailable until the FINAL composed audit and this
           # exact policy hunk are independently reviewed. Never a caller input.
-          REVIEWED_AUDIT_SHA256 = '2b9b36774845a7e67864c40bc8d3f2f5e2900de149e42a1b5aff38298024526d'
+          REVIEWED_AUDIT_SHA256 = 'd3387bbc1a6414776fa7c7ccd8af1c2b6cbe9e06d27fa20e9f33070e727eb67c'
           DEPENDENCIES = {
+              'scripts/ios/xcodebuild-command-timeout.py': '207fc46111a1d86ec3df2e2f60716d9924d27639e1d2920683049b6b93595fea',
               'scripts/ios/bootstrap-local-config.sh': 'aad028c0eff7f9d2a043711a8735963dc66b9bd664f11bf98b7ada67a60ab8db',
               'scripts/ios/resolve-simulator-destination.sh': 'f5b31c0a92c181a5cb025c42d6090e142bc2a2394fa05b5f58e1badd6f2693bc',
               'apps/ios/Scripts/import-joviekit.mjs': '35555f9ad251a0976a0bd0ee4ebf4293a4b8634ea61e60db254e53b9c196aa4b',
               'apps/ios/Vendor/JovieKit.source.json': 'aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2',
-              'apps/ios/LogYourBody.xcodeproj/project.pbxproj': '3a2a2d8598c2b8ad0f792f723fa3c1c34ef423cf8aef384ba24cf7db4f4d57e2',
+              'apps/ios/LogYourBody.xcodeproj/project.pbxproj': '1941147472c7bfe3eb4dbe5ed159edf670c192a9e642e2e441eb95dc824cdf69',
               'apps/ios/LogYourBody.xcodeproj/xcshareddata/xcschemes/LogYourBody.xcscheme': 'f8bd5d22beb90e7a04360b0a6c68d19bddc2a6ae5b076ac347f087540c870d64',
               'apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved': '7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138',
           }

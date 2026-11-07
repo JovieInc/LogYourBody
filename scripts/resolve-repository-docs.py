@@ -6,26 +6,11 @@ import json
 import re
 import subprocess
 import tempfile
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack
 from pathlib import Path
 
 import repository_docs
-
-
-@contextmanager
-def restore_dependency_artifacts_on_failure(root, output):
-    paths = [repository_docs.local(root, name) for name in ("pnpm-lock.yaml", output)]
-    originals = {path: path.read_bytes() if path.exists() else None for path in paths}
-    try:
-        yield
-    except (ValueError, OSError, subprocess.CalledProcessError):
-        # Failed dependency repairs restore both artifacts, including staging failures.
-        for path, original in originals.items():
-            if original is None:
-                path.unlink(missing_ok=True)
-            else:
-                path.write_bytes(original)
-        raise
+from manifest_union import restore_dependency_artifacts_on_failure
 
 
 def staged_bytes(root, name):
@@ -97,6 +82,12 @@ def union_manifests(root):
     apply_manifest_union(root)
 
 
+def union_project(root):
+    """Stage insertion-only Xcode membership. Never derive the diagnostic digest."""
+    from pbx_union import apply_project_union
+    apply_project_union(root)
+
+
 def resolve_staged(root, extra_outputs=()):
     root = Path(root).resolve()
     # An auto-merged manifest must keep every parent test input.
@@ -165,8 +156,11 @@ def git_bytes(root, *args):
     ).stdout
 
 
-def conflicted_diagnostic_template(root):
-    """Return branch workflow text when stages differ only by the project and audit pins."""
+def conflicted_diagnostic_template(root, explicit_audit=None):
+    """Return branch workflow text for pin conflicts and one-sided dependency lines.
+
+    Keep branch edits when incoming changed only this project pin.
+    """
     entries = [
         entry for entry in git_bytes(
             root, "ls-files", "--unmerged", "-z", "--", DIAGNOSTIC_WORKFLOW,
@@ -184,7 +178,10 @@ def conflicted_diagnostic_template(root):
             raise ValueError("diagnostic pin repair refuses conflict markers in a parent")
         texts.append(text)
     from reviewed_audit_pin import conflicted_pin_template
-    return conflicted_pin_template(texts[0], texts[1], texts[2], DIAGNOSTIC_PIN)
+    worktree = repository_docs.local(root, DIAGNOSTIC_WORKFLOW).read_text()
+    return conflicted_pin_template(
+        texts[0], texts[1], texts[2], DIAGNOSTIC_PIN, explicit_audit, worktree,
+    )
 
 
 PBX_MEMBER = re.compile(
@@ -243,7 +240,7 @@ def assert_merged_project_keeps_parent_files(root, project):
             raise ValueError("merged project dropped a parent file reference: " + identifier)
 
 
-def reviewed_conflicted_pin(root, expected):
+def reviewed_conflicted_pin(root, expected, explicit_audit=None):
     if not re.fullmatch(r"[0-9a-f]{64}", expected):
         raise ValueError("reviewed project SHA-256 must be 64 lowercase hex characters")
     for name in (DIAGNOSTIC_PROJECT, DIAGNOSTIC_WORKFLOW):
@@ -259,7 +256,12 @@ def reviewed_conflicted_pin(root, expected):
     assert_merged_project_keeps_parent_files(root, project)
     if repository_docs.digest(project) != expected:
         raise ValueError("reviewed project SHA-256 does not match merged source")
-    template = conflicted_diagnostic_template(root)
+    routing = None
+    if explicit_audit is not None:
+        from reviewed_audit_pin import assert_staged_audit, conflicted_routing_text
+        assert_staged_audit(root, explicit_audit)
+        routing = conflicted_routing_text(root, explicit_audit)
+    template = conflicted_diagnostic_template(root, explicit_audit)
     # A conflicted diagnostic pin is replaced only by the reviewed project digest.
     # Only an explicit reviewed digest may update this trust boundary; never derive it here.
     updated, count = DIAGNOSTIC_PIN.subn(
@@ -267,27 +269,12 @@ def reviewed_conflicted_pin(root, expected):
     )
     if count != 1:
         raise ValueError("expected exactly one diagnostic project pin")
-    return DIAGNOSTIC_WORKFLOW, updated
+    return DIAGNOSTIC_WORKFLOW, updated, routing
 
 
 def stage_conflicted_diagnostic_pin(root, pin_update, output):
-    workflow, updated = pin_update
-    path = repository_docs.local(root, workflow)
-    original = path.read_bytes()
-    index = git_bytes(root, "ls-files", "--stage", "--", workflow)
-    try:
-        # Validate immutable imports before replacing the conflicted pin.
-        errors = repository_docs.run(root)
-        if errors and errors != ["source projection stale: " + output]:
-            raise ValueError("; ".join(errors))
-        path.write_bytes(updated.encode())
-        subprocess.run(["git", "add", "--", workflow], cwd=root, check=True)
-        resolve_staged(root)
-    except (ValueError, OSError, subprocess.CalledProcessError):
-        path.write_bytes(original)
-        subprocess.run(["git", "update-index", "--force-remove", "--", workflow], cwd=root, check=True)
-        subprocess.run(["git", "update-index", "--index-info"], cwd=root, input=index, check=True)
-        raise
+    from reviewed_audit_pin import stage_resolved_pins
+    stage_resolved_pins(root, pin_update, output, resolve_staged, git_bytes)
 
 
 def reviewed_project_pin(root, expected):
@@ -345,8 +332,13 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
     unresolved = sorted(set(conflicts) - {"", output, LEDGER})
     conflicted_pin = None
     if reviewed_project_sha256 is not None and DIAGNOSTIC_WORKFLOW in unresolved:
-        conflicted_pin = reviewed_conflicted_pin(root, reviewed_project_sha256)
-        unresolved = [name for name in unresolved if name != DIAGNOSTIC_WORKFLOW]
+        conflicted_pin = reviewed_conflicted_pin(
+            root, reviewed_project_sha256, reviewed_audit_sha256,
+        )
+        drop = {DIAGNOSTIC_WORKFLOW}
+        if conflicted_pin[2] is not None:
+            drop.add("scripts/tests/test_runner_routing.py")
+        unresolved = [name for name in unresolved if name not in drop]
     if unresolved:
         raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
     if conflicted_pin is not None:
@@ -467,14 +459,23 @@ def main():
     mode.add_argument("--staged", action="store_true", help="refresh from the Git index before commit")
     mode.add_argument("--refresh-lockfile", action="store_true", help="repair and verify the pnpm lockfile before refreshing docs")
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
-    mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
-    mode.add_argument("--reviewed-audit-sha256", help="refresh every current reviewed audit pin using an explicitly reviewed audit digest")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
+    mode.add_argument("--union-project", action="store_true", help="union additive Xcode file membership from both parents and stage the project")
+    parser.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
+    parser.add_argument("--reviewed-audit-sha256", help="refresh every current reviewed audit pin using an explicitly reviewed audit digest")
     args = parser.parse_args()
+    exclusive = any((
+        args.staged, args.refresh_lockfile, args.verify_lockfile, args.merge_sections,
+        args.union_manifests, args.union_project,
+    ))
+    if exclusive and (args.reviewed_project_sha256 or args.reviewed_audit_sha256):
+        parser.error("reviewed digests cannot be combined with another repair mode")
     try:
         if args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
+        elif args.union_project:
+            union_project(args.root)
         elif args.union_manifests:
             union_manifests(args.root)
             resolve(args.root)
