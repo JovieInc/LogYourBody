@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "preinstall-hook-guard-reads-generated-husky-files",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1721",
+    "correction": "PR #1721, fix-red-d5dac7802d occurrence 5: Detect Changes in run 42363093442 fails because the merge-hook guard copies ignored .husky/_/h before dependency installation; CI Summary consequently fails. Hook guards must run from tracked source without installed artifacts.",
+    "mechanization": "Extend the existing required pre-commit guard to execute the tracked merge entry directly in an install-free fixture and verify both successful repair delegation and downstream exit 23. A git-archive source checkout reproduces the original ENOENT; the repaired source-only suite passes without node_modules or generated Husky shims. Use the existing staged projection and ledger resolvers for the main merge and frozen lockfile verification for the preserved Statsig 3.33.7 bump. Retain CI checks and hook delegation. The harness owns push and PR-body changes and must include exactly one line: Machine: built scripts/pre-commit-lint.test.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The defect is in a pre-install test fixture, so product runtime logic cannot prevent its dependency on ignored generated files."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required hook test can execute the tracked entry in an install-free fixture and verify delegation and failure propagation before any dependency installation."
+      }
+    },
+    "guard": {
+      "path": "scripts/pre-commit-lint.test.mjs",
+      "anchor": "Detect Changes runs before installation: exercise the tracked hook without generated shims."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "dependency-repair-staged-projection-configuration",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1724",
     "correction": "PR #1724, fix-red-1423773703 occurrence 48: the Autoprefixer 10.6.2 bump left the generated source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must use reviewed projection configuration before invoking pnpm, as well as rendering staged source bytes.",
@@ -6024,7 +6046,7 @@
     "fingerprint": "merge-commit-skips-staged-source-map",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1721",
     "correction": "PR #1721, fix-red-1423773703 occurrence 48: the @statsig/js-client 3.33.7 bump left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, parity and CI Summary. Merging origin/main auto-merged the manifest and the generated map, and the merge commit skipped the staged source-map repair.",
-    "mechanization": "Extend the existing Husky merge entry so a merge commit runs the pre-commit staged source-map repair. The Husky shim exits successfully when that entry is absent, which skips the repair and can commit a clean but stale projection. The required pre-commit suite proves the shim skips without the entry and runs the repair when the entry delegates to pre-commit. Use that repair on this merged bump and retain frozen installation and parity gates. The harness owns push and PR-body updates and must add exactly one line: Machine: built .husky/pre-merge-commit.",
+    "mechanization": "Extend the existing Husky merge entry so a merge commit runs the pre-commit staged source-map repair. The Husky shim exits successfully when that entry is absent, which skips the repair and can commit a clean but stale projection. The required pre-commit suite executes the tracked merge entry without installed Husky files and proves it delegates to pre-commit while propagating failures. Use that repair on this merged bump and retain frozen installation and parity gates. The harness owns push and PR-body updates.",
     "classification": {
       "codebase": {
         "feasible": true,

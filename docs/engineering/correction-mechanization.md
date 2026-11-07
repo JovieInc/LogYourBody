@@ -124,6 +124,8 @@ the original projection bytes (or absence), so the same command remains retryabl
 Merge commits run that same repair through `.husky/pre-merge-commit`. Husky exits
 successfully when that file is missing and then skips pre-commit, so a clean
 auto-merge can commit a stale projection.
+The required hook guard executes the tracked merge entry without generated Husky
+files, checking repair delegation and failure propagation before installation.
 The shared readiness check also rejects newly added conflict markers in the index,
 including diff3 base markers, markers shorter than seven characters, and files
 marked binary by Git attributes, before

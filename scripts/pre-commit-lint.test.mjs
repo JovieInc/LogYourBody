@@ -105,32 +105,22 @@ test('merge commits run the staged source-map repair', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lyb-merge-hook-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const hooks = path.join(dir, '.husky');
-  fs.mkdirSync(path.join(hooks, '_'), { recursive: true });
-  fs.copyFileSync(path.join(repoRoot, '.husky/_/h'), path.join(hooks, '_/h'));
-  fs.copyFileSync(
-    path.join(repoRoot, '.husky/_/pre-merge-commit'),
-    path.join(hooks, '_/pre-merge-commit'),
-  );
+  fs.mkdirSync(hooks);
+  fs.writeFileSync(path.join(hooks, 'pre-merge-commit'), hook);
   const mark = path.join(dir, 'mark');
-  fs.writeFileSync(path.join(hooks, 'pre-commit'), 'echo repaired > "$HUSKY_MARK"\n');
-  const run = () =>
-    spawnSync('sh', [path.join(hooks, '_/pre-merge-commit')], {
-      env: { ...env, HUSKY: '1', HUSKY_MARK: mark },
+
+  // Detect Changes runs before installation: exercise the tracked hook without generated shims.
+  for (const status of [0, 23]) {
+    fs.writeFileSync(path.join(hooks, 'pre-commit'), `echo repaired > "$HUSKY_MARK"\nexit ${status}\n`);
+    const result = spawnSync('sh', [path.join(hooks, 'pre-merge-commit')], {
+      cwd: dir,
+      env: { ...env, HUSKY_MARK: mark },
       encoding: 'utf8',
     });
-
-  // The installed shim succeeds without a user merge hook and never reaches pre-commit.
-  const skipped = run();
-  assert.equal(skipped.status, 0, skipped.stderr);
-  assert.equal(fs.existsSync(mark), false);
-
-  fs.copyFileSync(
-    path.join(repoRoot, '.husky/pre-merge-commit'),
-    path.join(hooks, 'pre-merge-commit'),
-  );
-  const repaired = run();
-  assert.equal(repaired.status, 0, repaired.stderr);
-  assert.equal(fs.readFileSync(mark, 'utf8').trim(), 'repaired');
+    assert.equal(result.status, status, result.stderr);
+    assert.equal(fs.readFileSync(mark, 'utf8').trim(), 'repaired');
+    fs.unlinkSync(mark);
+  }
 });
 
 test('lint failure propagates to the hook entrypoint', (t) => {
