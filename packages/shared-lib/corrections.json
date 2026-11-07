@@ -6117,5 +6117,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "offline-ui-fixtures-ignore-live-network-callbacks",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42354637142/job/128350191401",
+    "correction": "PR #1679 / LYB-245, fix-red-5df69c1e5f occurrence 24: Launch Quality fails the dated timeline offline retry assertion because a live NWPathMonitor callback replaces the shared offline fixture state, showing Record a fresh measurement instead of Retry sync. CI Summary reflects that failure.",
+    "mechanization": "Extend the existing RealtimeSyncManager fixture setup to pin offline state before cancelling the monitor. Route network callbacks through one handler that rejects even callbacks already queued before the pin; every paid/dashboard/photo fixture uses the same setup. Register the callback before starting monitoring. Preserve the native retry assertion, copy, gates and release behavior. Add native regressions for queued and repeated path updates plus ordinary connectivity transitions. Extend the existing required shared-lib launch-evidence guard to require shared fixture wiring, the guarded callback and DEBUG-only override. The guard fails on the original source with the other 440 tests passing; native execution and coverage still require the real macOS runner. The harness owns push and PR edits and must use exactly one declaration: Machine: built apps/ios/LogYourBody/Services/RealtimeSyncManager.swift.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared sync fixture can own a persistent DEBUG-only offline override at the network-update boundary, preventing live runner connectivity and already-queued callbacks from replacing fixture state for all callers by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/RealtimeSyncManager.swift",
+      "anchor": "guard !usesOfflineUITestFixture else { return }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
