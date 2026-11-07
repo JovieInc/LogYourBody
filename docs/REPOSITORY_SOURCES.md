@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `320c50db6a6c92a7f2913472873561f08406e6bde5ecfef48099f849ab434b09`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `73a4ba48cde6d2d7b24a20abae084493fe066824eeb3c28f8b5d87ec15f31875`)
 
 ### `apps/web/package.json`: engines
 
@@ -115,7 +115,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@tanstack/react-query": "^5.104.5",
   "@types/react-syntax-highlighter": "^15.5.13",
   "@vercel/analytics": "^1.6.1",
-  "@vercel/speed-insights": "^1.3.1",
+  "@vercel/speed-insights": "^2.0.0",
   "ai": "^7.0.114",
   "class-variance-authority": "^0.7.1",
   "clsx": "^2.1.1",
