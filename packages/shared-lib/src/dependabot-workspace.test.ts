@@ -22,6 +22,7 @@ describe('Dependabot pnpm workspace updates (LYB-357)', () => {
     expect(updates).toHaveLength(1);
     expect(updates[0].directory).toBe('/');
     expect(updates[0].directories).toBeUndefined();
+    expect(updates[0].groups?.['react-runtime']).toEqual({ patterns: ['react', 'react-dom'] });
     expect(updates[0].schedule.interval).toBe('weekly');
     expect(updates[0]['open-pull-requests-limit']).toBeGreaterThan(0);
     expect(updates[0].cooldown).toEqual({
