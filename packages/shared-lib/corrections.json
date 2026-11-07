@@ -6103,5 +6103,23 @@
     },
     "level": "static",
     "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "launch-ui-audit-traced-brace-scanning",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42359690246/job/128365494479",
+    "correction": "PR #1698 / LYB-338, fix-red-1a39536f40 occurrence 8 in 14 days: merge origin/main without rebasing, then repair JavaScript/TypeScript. The traced launch UI behavior suite exceeds the retained 30-second subprocess timeout. Its Swift brace scanner emits millions of per-character line events while checking keyboard focus and nested scenario time allowances.",
+    "mechanization": "Extend the existing launch UI audit machine to scan braces, strings and comments as tokens while retaining its matching-brace and unclosed-input behavior. Extend its already-wired behavior support with semantic cases and a deterministic trace-event budget: the original scanner emits 200059 events against the unchanged limit of 100, and the token scanner passes. All original 41 cases remain; 43/43 pass under tracing. On this host traced execution drops from 25.763s to 15.867s, retaining the 30-second CI timeout. Use the existing ledger merge driver and staged source-map generator for the incoming main merge. Preserve the Apple Distribution renewal fix and every native gate. The harness owns push and PR edits and must replace the existing machine line with exactly one line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Token scanning replaces per-character Python execution in the shared audit parser, bounding coverage-tracing work by structural tokens for every future launch-audit run. The existing required behavior suite can enforce that property with counted trace events instead of a flaky wall-clock benchmark or a relaxed timeout."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "_BRACE_TOKEN.finditer(text, open_brace)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

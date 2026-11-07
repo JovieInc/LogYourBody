@@ -30,6 +30,42 @@ SPEC = importlib.util.spec_from_file_location(
 AUDIT = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = AUDIT
 SPEC.loader.exec_module(AUDIT)
+from launch_ui_home_interaction_audit import _balanced_end  # noqa: E402
+
+
+class BraceScannerTests(unittest.TestCase):
+    def test_brace_scanner_preserves_strings_comments_and_unclosed_input(self):
+        cases = [
+            ('prefix { nested { value } }', 7, ' suffix'),
+            (r'{ "escaped \" }" { value } }', 0, ' suffix'),
+            ('{ // } ignored\n /* { ignored } */ { value } }', 0, ' suffix'),
+            ('{ "unterminated }', 0, ''),
+            ('{ /* unterminated }', 0, ''),
+            ('{ // unterminated }', 0, ''),
+        ]
+        for source, start, suffix in cases:
+            with self.subTest(source=source):
+                self.assertEqual(_balanced_end(source + suffix, start), len(source) - 1)
+
+    def test_brace_scanner_traces_tokens_instead_of_source_characters(self):
+        # Keep coverage cost bounded without a wall-clock benchmark or a larger CI timeout.
+        source = '{' + ' ' * 20_000 + '"' + '}' * 20_000 + '" /* { */ // }\n}'
+        events = 0
+
+        def count_lines(frame, event, _argument):
+            nonlocal events
+            if event == 'line' and frame.f_code is _balanced_end.__code__:
+                events += 1
+            return count_lines
+
+        previous = sys.gettrace()
+        try:
+            sys.settrace(count_lines)
+            end = _balanced_end(source, 0)
+        finally:
+            sys.settrace(previous)
+        self.assertEqual(end, len(source) - 1)
+        self.assertLess(events, 100, 'Brace scanning must trace tokens, not source characters')
 
 
 class LaunchUIAuditTests(unittest.TestCase):
