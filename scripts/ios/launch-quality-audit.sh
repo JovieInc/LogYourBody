@@ -578,12 +578,8 @@ python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --scheme "$SCHEME" --only-testing LogYourBodyTests \
   > "$ARTIFACT_DIR/launch-quality-unit-tests.ratchet.json"
 
-# Every UI check runs in ONE xcodebuild invocation. On hosted macOS each
-# test-without-building invocation pays 3-6 min launching the UI test runner
-# before its first test (xcresult action log, run 38320479871: runner launch
-# 340-537s per invocation). Three separate UI invocations plus the unit target
-# overran the 40-minute step with every test passing. Same tests, same exact
-# evidence checks, one runner launch.
+# Keep one UI invocation: hosted runner startup costs 340-537s per launch
+# (run 38320479871); three launches overran the 40-minute step with all tests passing.
 LAUNCH_QUALITY_UI_TESTS=(
   "HomeV2TimelineIntegrationUITests/testPhotoHoldScrubsBothDirectionsThenAnotherHoldRestoresTap"
   "HomeV2TimelineIntegrationUITests/testPhotoScrubResetsWhenNavigatingToTheMenuAndBack"
@@ -598,6 +594,10 @@ LAUNCH_QUALITY_UI_TESTS=(
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces"
+  "LogYourBodyUITests/testDatedOutcomeFirstLaunchCancelBackAndManualBaseline"
+  "LogYourBodyUITests/testDatedOutcomeGateOffKeepsExistingFirstRun"
+  "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn"
+  "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation"
   "LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail"
   "OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal"
   "MesocycleCanvasUITests/testReducedMotionUsesStackedDayCards"

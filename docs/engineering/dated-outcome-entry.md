@@ -65,10 +65,14 @@ immutable fixtures, certification scripts and CI gates are unchanged.
 ## Tests and receipts
 
 New methods live in the existing `DatedOutcomeStoreTests`, `LaunchJourneyTests`
-and `LogYourBodyUITests` targets. Unit selects the service tests. The existing
-launch-quality selector `testLaunchQualityGateCapturesOnboardingFixedCTA()` also
-runs the new first-launch/cancel/back/date-edit/manual-baseline and gate-off
-flows. The UI fixtures are interaction scaffolding, not installed-build proof.
+and `LogYourBodyUITests` targets. Unit selects the service tests. Launch Quality
+selects the first-launch/cancel/back/date-edit/manual-baseline, gate-off,
+timeline manual baseline and offline retry/account-isolation cases independently.
+Each has its own XCTest timeout and required passing execution receipt in the
+same runner invocation. Calling these cases from the screenshot cases caused
+run 42366774177 to exhaust the shared 120-second test allowance. The existing
+shared-lib launch-quality evidence guard rejects nested XCTest calls and lost
+dated-outcome selectors. The UI fixtures are interaction scaffolding, not installed-build proof.
 Same-owner SQLite relaunch is covered by the existing real journal reopen test;
 the UI fixture deliberately uses a different account on every app launch.
 

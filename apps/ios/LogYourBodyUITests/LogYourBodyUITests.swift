@@ -1895,8 +1895,6 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_settings"].exists)
         openSettingsFromPhotoTimelineMenu(in: app)
         app.terminate()
-        try testDatedTimelineManualBaselineAndInterruptedPhotoReturn()
-        try testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()
     }
 
     func testLaunchQualityGateCapturesBodyScoreShareSheet() throws {
@@ -2030,8 +2028,6 @@ final class LogYourBodyUITests: XCTestCase {
 
         try assertAndCaptureOnboardingFixedCTA(in: app)
         app.terminate()
-        try testDatedOutcomeFirstLaunchCancelBackAndManualBaseline()
-        try testDatedOutcomeGateOffKeepsExistingFirstRun()
     }
 
     func testLaunchQualityGateCapturesOnboardingFirstPhotoCTA() throws {

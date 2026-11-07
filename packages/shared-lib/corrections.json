@@ -6193,5 +6193,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-341-independent-launch-quality-scenarios",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42366774177/job/128386585308",
+    "correction": "PR #1748 / LYB-341, fix-red-5df69c1e5f occurrence 28: merge origin/main without rebasing and repair the native launch gate. testLaunchQualityGateCapturesTimelineSurfaces invokes two additional XCTest scenarios and exceeds its 120-second execution allowance during the final account-isolation relaunch. The first-launch screenshot case also invokes two dated-outcome tests inside its own timeout.",
+    "mechanization": "Extend the existing required shared-lib launch-quality evidence guard to reject nested XCTest scenario calls across native UI test sources and require independent dated-outcome selectors. Prove the guard rejects all four existing nested calls before repairing them. Select those same four cases independently in the existing single UI runner invocation; the shared selector loop requires their exact passing XCTest evidence. Retain every scenario, assertion, timeout, coverage floor and existing selector. Resolve the main merge with the existing reviewed-project fingerprint and correction-ledger resolvers. Linux source and shell checks do not establish exact-head native execution; that remains with the macOS required gate. The harness owns push and PR edits and must retain exactly one PR-body line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Product runtime cannot prevent future XCTest source edits from nesting independently discovered scenarios under one timeout. The repair changes test selection without altering product behavior."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib suite can reject nested native XCTest calls and omitted direct scenario selectors before spending simulator time."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "qualifies native scenarios independently instead of sharing another XCTest case budget"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
