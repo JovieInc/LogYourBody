@@ -53,3 +53,11 @@ def check_timeline_gestures(root: Path, hud_path: Path, hud: str, violations: li
             check="timeline.edge_swipe_excludes_header", file=str(hud_path.relative_to(root)), line=1,
             detail="Attach the edge swipe to the content below the header, with its hit shape before any padding.",
         ))
+
+
+def contribute(root: Path, app_dir: Path, violations: list, violation_cls, _line_number) -> None:
+    """Run header and edge swipe checks from the one-pass Swift snapshot."""
+    from launch_ui_timeline_audit import text_for
+
+    hud_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
+    check_timeline_gestures(root, hud_path, text_for(hud_path), violations, violation_cls)

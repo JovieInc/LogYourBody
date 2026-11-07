@@ -109,6 +109,9 @@ start a second PR owner.
 
 For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
 merges and classifies the correction ledger after other conflicts are resolved.
+`python3 scripts/resolve-repository-docs.py --union-manifests` keeps every parent
+test input while a diagnostic workflow pin conflict remains. The reviewed project
+digest resolver replaces that pin and then rebuilds the source map.
 Union generation and parent verification share guard snapshots within that command;
 each retry reads the index and guard sources afresh.
 The reviewed diagnostic project-pin resolver also retains each newly added parent
@@ -125,9 +128,25 @@ For a conflicted Xcode project whose parents only insert file membership, run
 It stages those insertions from both parents and refuses an edit or deletion of
 an existing line. Review the staged project, then pass its digest to
 `--reviewed-project-sha256`. The union never derives that digest.
+The same command verifies an automatically merged, stage-zero project against
+the immutable additive parent union without changing files or the index. It
+refuses a different staged result or unstaged project edits.
+The pin resolver retains independent workflow edits from either parent when
+the other changed only the project pin, verifying that the working conflict
+contains only that pin and matches the retained parent outside it.
 Repair a conflicted source projection first with
 `python3 scripts/resolve-repository-docs.py --staged`. If staging fails, it restores
 the original projection bytes (or absence), so the same command remains retryable.
+Index snapshots admit only regular stage-zero registry, entry-point, fingerprint
+and imported-source files, including executable files. Symlink blobs fail before
+the projection or index changes, even when the worktree contains regular bytes.
+When the merged `project.pbxproj` is already stage zero and the diagnostic workflow
+conflicts only on its project pin, pass the reviewed digest of that staged project:
+`python3 scripts/resolve-repository-docs.py --reviewed-project-sha256 <digest>`.
+The command writes that pin, rebuilds a conflicted source projection from the index,
+and leaves the correction ledger untouched. It refuses any wider workflow conflict,
+a digest that does not match the staged project, a dirty project, and a hand-edited
+workflow. It never derives the digest. Resolve the ledger afterwards.
 The shared readiness check also rejects newly added conflict markers in the index,
 including diff3 base markers, markers shorter than seven characters, and files
 marked binary by Git attributes, before

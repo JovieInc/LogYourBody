@@ -20,6 +20,8 @@ MANIFESTS = (
 )
 # The correction ledger has its own resolver and must not deadlock manifest union.
 LEDGER = "packages/shared-lib/corrections.json"
+# A conflicted diagnostic project pin stays for the reviewed digest resolver.
+DIAGNOSTIC_PIN_WORKFLOW = ".github/workflows/ios-ui-diagnostics.yml"
 UNION_REFUSAL = "additive manifest union keeps every parent test input"
 
 
@@ -107,7 +109,7 @@ def _subsequence(needle, haystack):
     return position == len(needle)
 
 
-def union_strings(base, ours, theirs):
+def _union_strings_exact(base, ours, theirs):
     # Preserved repeated inputs, such as a workflow listed twice, stay in branch order.
     for sequence in (ours, theirs):
         if not _subsequence(base, sequence):
@@ -126,6 +128,26 @@ def union_strings(base, ours, theirs):
     if set(result) != set(ours) | set(theirs):
         raise ValueError(UNION_REFUSAL)
     return result
+
+
+def union_strings(base, ours, theirs):
+    try:
+        return _union_strings_exact(base, ours, theirs)
+    except ValueError:
+        # A parent may replace enumerated inputs with one new glob that matches them.
+        globs = [
+            token for token in (*ours, *theirs)
+            if token not in base and _replacement_glob(token)
+        ]
+        covered = [
+            item for item in (*base, *ours, *theirs)
+            if any(_covered_by_glob(glob, item) for glob in globs)
+        ]
+        if not globs or not covered:
+            raise ValueError(UNION_REFUSAL) from None
+        return _union_strings_exact(
+            *[_strip_replaced(list(sequence), globs) for sequence in (base, ours, theirs)]
+        )
 
 
 def union_json(base, ours, theirs, path=(), union_arrays=False):
@@ -225,7 +247,7 @@ def apply_manifest_union(root):
             cwd=root, check=True, capture_output=True,
         ).stdout.decode().split("\0") if name
     }
-    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER})
+    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER, DIAGNOSTIC_PIN_WORKFLOW})
     if unrelated:
         raise ValueError("manifest union refuses unrelated conflicts: " + ", ".join(unrelated))
     planned = []
@@ -272,14 +294,60 @@ def _blob(root, spec):
         raise ValueError(UNION_REFUSAL + ": manifest is not text") from exc
 
 
+def _replacement_glob(token):
+    if token.count("*") != 1 or any(char in token for char in "?[]"):
+        return None
+    prefix, suffix = token.split("*", 1)
+    if not prefix or not suffix:
+        return None
+    return prefix, suffix
+
+
+def _covered_by_glob(token, item):
+    # A new glob does not cover itself or another pattern.
+    if item == token or "*" in item or "?" in item:
+        return False
+    parts = _replacement_glob(token)
+    if parts is None:
+        return False
+    prefix, suffix = parts
+    return item.startswith(prefix) and item.endswith(suffix) and len(item) >= len(prefix) + len(suffix)
+
+
+def _strip_replaced(sequence, globs):
+    return [item for item in sequence if not any(_covered_by_glob(glob, item) for glob in globs)]
+
+
+def _matches_union(expected, ours, theirs, merged):
+    return (
+        Counter(merged) == Counter(expected)
+        and _subsequence(ours, merged)
+        and _subsequence(theirs, merged)
+    )
+
+
 def _require_parent_inputs(base, ours, theirs, merged, path):
-    expected = union_strings(list(base), list(ours), list(theirs))
-    if (
-        Counter(merged) != Counter(expected)
-        or not _subsequence(list(ours), list(merged))
-        or not _subsequence(list(theirs), list(merged))
-    ):
-        location = ".".join(path) or "manifest"
+    location = ".".join(path) or "manifest"
+    base, ours, theirs, merged = list(base), list(ours), list(theirs), list(merged)
+    try:
+        expected = _union_strings_exact(base, ours, theirs)
+    except ValueError:
+        # A parent may replace enumerated inputs with one new glob that matches them.
+        globs = [
+            token for token in ours + theirs
+            if token not in base and token in merged and _replacement_glob(token)
+        ]
+        if not globs:
+            raise ValueError(UNION_REFUSAL + ": auto-merged " + location) from None
+        stripped = [_strip_replaced(seq, globs) for seq in (base, ours, theirs, merged)]
+        try:
+            expected = _union_strings_exact(*stripped[:3])
+        except ValueError:
+            raise ValueError(UNION_REFUSAL + ": auto-merged " + location) from None
+        if not _matches_union(expected, *stripped[1:]):
+            raise ValueError(UNION_REFUSAL + ": auto-merged " + location)
+        return
+    if not _matches_union(expected, ours, theirs, merged):
         raise ValueError(UNION_REFUSAL + ": auto-merged " + location)
 
 

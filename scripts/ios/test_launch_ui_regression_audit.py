@@ -34,7 +34,11 @@ sys.modules[SPEC.name] = AUDIT
 SPEC.loader.exec_module(AUDIT)
 
 
-class StatsCardCompositionTests(unittest.TestCase):
+from test_launch_ui_home_interaction import CheckSiblingDiscoveryTests, HomeInteractionAuditTests
+from launch_ui_timeline_day import check_timeline_calendar_day
+
+
+class StatsCardCompositionTests(HomeInteractionAuditTests, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._swift_template = tempfile.TemporaryDirectory()
@@ -100,18 +104,32 @@ class StatsCardCompositionTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertIn(check, "\n".join(path.read_text() for path in output.glob("*.json")))
 
+    def test_audit_reads_each_swift_file_once(self):
+        reads = []
+        original = Path.read_text
+
+        def counted(path, *args, **kwargs):
+            if path.suffix == ".swift":
+                reads.append(path)
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", counted):
+            self.assertEqual(self.run_audit()[0], 0)
+        self.assertGreater(len(reads), 0)
+        self.assertEqual(len(reads), len(set(reads)))
+
     def test_empty_timeline_keeps_its_photo_button_accessible(self):
         findings = []
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual(findings, [])
         self.replace("Services/DatedTimelineUI.swift", ".accessibilityElement(children: .contain)", "")
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
 
     def test_empty_timeline_requires_the_photo_action_identifier(self):
         self.replace("Services/DatedTimelineUI.swift", '"launch_timeline_add_photo"', '"wrong_photo_action"')
         findings = []
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
 
     def test_geometry_requires_typed_nonfinite_arguments_in_every_native_tree(self):
@@ -252,6 +270,22 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                      'LineMark(x: .value("Observation date", date)')
         self.assert_rejected("dashboard.observation_plot")
 
+    def test_observation_chart_cannot_take_the_card_tap(self):
+        self.replace(
+            "DesignSystem/Organisms/MetricSummaryCard.swift",
+            ".accessibilityHidden(true)\n        .allowsHitTesting(false)",
+            ".accessibilityHidden(true)",
+        )
+        self.assert_rejected("dashboard.observation_chart_ignores_hits")
+
+    def test_card_tap_still_opens_detail_when_the_list_drag_takes_the_touch(self):
+        self.replace(
+            "DesignSystem/Organisms/MetricSummaryCard.swift",
+            "button.highPriorityGesture(TapGesture().onEnded { action.handler() })",
+            "button",
+        )
+        self.assert_rejected("dashboard.card_tap_opens_detail")
+
     def test_single_timestamp_cannot_establish_no_change(self):
         self.replace("Helpers/DashboardMetricFormatting.swift",
                      "if requiresComparison && first.date == last.date { return nil }", "")
@@ -387,31 +421,6 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
             count, 500, "extract a sibling before the company size guard",
         )
         self.assertNotIn("def check_timeline_gestures", Path(AUDIT.__file__).read_text())
-
-    def test_every_size_ratchet_sibling_loads_or_the_audit_fails_closed(self):
-        loaded = [
-            AUDIT._load_sibling(module_name, filename, export)
-            for module_name, filename, export in AUDIT._AUDIT_SIBLINGS
-        ]
-        self.assertEqual(
-            [item[0] for item in AUDIT._AUDIT_SIBLINGS],
-            [
-                "launch_ui_timeline_day",
-                "launch_ui_opacity_audit",
-                "launch_ui_timeline_gesture_audit",
-                "launch_ui_regression_report",
-            ],
-        )
-        for export in loaded:
-            self.assertTrue(callable(export))
-        with self.assertRaises(RuntimeError) as missing_file:
-            AUDIT._load_sibling("missing_sibling", "missing_launch_ui_sibling.py", "missing")
-        self.assertIn("Cannot load launch UI audit sibling", str(missing_file.exception))
-        with self.assertRaises(RuntimeError) as missing_export:
-            AUDIT._load_sibling(
-                "launch_ui_timeline_day", "launch_ui_timeline_day.py", "not_an_export",
-            )
-        self.assertIn("Cannot load launch UI audit sibling", str(missing_export.exception))
 
     def test_optional_cgfloat_opacity_must_be_explicit_double(self):
         policy = self.app / "Services/PersonMaskPolicy.swift"

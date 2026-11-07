@@ -166,6 +166,9 @@ extension DashboardViewLiquid {
         } message: {
             Text("Your entry is still saved. Try Undo again.")
         }
+        .task(id: authManager.currentUser?.id) {
+            await refreshWeeklyPhotoProvenanceIfNeeded()
+        }
     }
 
     private var isComposerLoggingPrototypeEnabled: Bool {

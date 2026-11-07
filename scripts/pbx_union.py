@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Union a conflicted Xcode project when both parents only insert lines."""
+"""Union or verify an Xcode project when both parents only insert lines."""
 
 import difflib
 import re
@@ -95,6 +95,27 @@ def apply_project_union(root):
     path = root / PROJECT
     if any(parent.is_symlink() for parent in (path, *path.parents) if parent != root.parent):
         raise ValueError(REFUSAL + ": refuses symlinks")
+    if not _git(root, "ls-files", "--unmerged", "--", PROJECT).stdout:
+        # Verify auto-merged projects against the same immutable additive parent union.
+        entries = _git(root, "ls-files", "--stage", "-z", "--", PROJECT).stdout.strip(b"\0").split(b"\0")
+        metadata = entries[0].split(b"\t", 1)[0].split()
+        if len(entries) != 1 or len(metadata) != 3 or metadata[0] not in {b"100644", b"100755"} or metadata[2] != b"0":
+            raise ValueError(REFUSAL + ": requires a regular stage-zero project")
+        base = _git(root, "merge-base", "--all", "HEAD", "MERGE_HEAD").stdout.decode().splitlines()
+        if len(base) != 1:
+            raise ValueError(REFUSAL + ": requires one immutable merge base")
+        parents = [
+            _git(root, "show", f"{rev}:{PROJECT}").stdout.decode()
+            for rev in (base[0], "HEAD", "MERGE_HEAD")
+        ]
+        expected = union_project_text(*parents).encode()
+        staged = _git(root, "show", ":" + PROJECT).stdout
+        if staged != expected:
+            raise ValueError(REFUSAL + ": staged project differs from additive parent union")
+        if path.read_bytes() != staged:
+            raise ValueError(REFUSAL + ": unstaged project edits")
+        print("repository-docs: verified additive project union")
+        return
     merged = union_project_text(*_stages(root))
     original = path.read_bytes() if path.exists() else None
     index = _git(root, "ls-files", "--stage", "--", PROJECT).stdout
@@ -113,3 +134,59 @@ def apply_project_union(root):
         raise
     # The reviewed diagnostic digest stays an explicit later input.
     print("repository-docs: staged additive project union")
+
+
+PBX_PLACEMENT = re.compile(r"(?m)^\t\t\t\t([A-Za-z0-9]+) /\* .*? \*/,")
+
+
+def _project_membership(text):
+    return set(MEMBER.findall(text)), set(PBX_PLACEMENT.findall(text))
+
+
+def assert_merged_project_keeps_parent_files(root, project):
+    """A merged diagnostic project must keep every parent file membership."""
+    # A parent group or build-phase entry must remain even when its definition survived.
+    if subprocess.run(
+        ["git", "rev-parse", "--verify", "MERGE_HEAD"], cwd=root, capture_output=True,
+    ).returncode:
+        raise ValueError("diagnostic pin repair requires an active merge")
+    base_rev = subprocess.run(
+        ["git", "merge-base", "HEAD", "MERGE_HEAD"],
+        cwd=root, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+    def blob(spec):
+        try:
+            return _git(root, "show", spec).stdout.decode()
+        except subprocess.CalledProcessError as error:
+            raise ValueError("diagnostic pin repair cannot read " + spec) from error
+        except UnicodeDecodeError as error:
+            raise ValueError("diagnostic project is not text: " + spec) from error
+
+    base_defs, base_rows = _project_membership(blob(f"{base_rev}:{PROJECT}"))
+    added_defs, added_rows, parent_sources = set(), set(), []
+    for parent in ("HEAD", "MERGE_HEAD"):
+        source = blob(f"{parent}:{PROJECT}")
+        parent_sources.append(source)
+        defs, rows = _project_membership(source)
+        added_defs.update(defs - base_defs)
+        added_rows.update(rows - base_rows)
+    try:
+        merged = project.decode()
+        merged_defs, merged_rows = _project_membership(merged)
+    except UnicodeDecodeError as error:
+        raise ValueError("diagnostic project is not text") from error
+    missing = sorted((added_defs - merged_defs) | (added_rows - merged_rows))
+    references = [
+        identifier for identifier in sorted(added_defs)
+        if len(re.findall(r"\b" + re.escape(identifier) + r"\b", merged))
+        < max(len(re.findall(r"\b" + re.escape(identifier) + r"\b", source)) for source in parent_sources)
+    ]
+    # Placement rows and reference counts both survive a merged diagnostic project.
+    if missing or references:
+        detail = []
+        if missing:
+            detail.append("merged project dropped a parent file: " + ", ".join(missing))
+        if references:
+            detail.append("merged project dropped a parent file reference: " + ", ".join(references))
+        raise ValueError("; ".join(detail))

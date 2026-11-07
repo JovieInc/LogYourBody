@@ -10,6 +10,7 @@ extension RealtimeSyncManager {
         networkMonitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor [weak self] in
                 self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)
+                self?.applyNetworkPathStatus(path.status)
             }
         }
         networkMonitor.start(queue: queue)

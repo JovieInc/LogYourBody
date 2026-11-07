@@ -7,6 +7,10 @@ import UIKit
 import PhotosUI
 
 struct CameraView: View {
+    var hasPreviousPhoto = false
+    var previousPhotoURL: String?
+    var onCaptureStarted: (String) -> Void = { _ in }
+    var onCaptureContext: (String, String) -> Void = { _, _ in }
     let onImageCaptured: (UIImage) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -17,8 +21,14 @@ struct CameraView: View {
     @State private var libraryItem: PhotosPickerItem?
     @State private var reviewImage: UIImage?
     @State private var timerSeconds = 0
+    @State private var showsGuidance = true
+    @State private var mirrorIsOn = true
+    @State private var ghostImage: UIImage?
 
     private let poses = ["Front", "Side", "Back"]
+    private var guidance: WeeklyPhotoCheckInPolicy.Guidance {
+        WeeklyPhotoCheckInPolicy.guidance(hasPreviousPhoto: hasPreviousPhoto, guideEnabled: showsGuidance)
+    }
 
     #if DEBUG
     private var usesFixture: Bool {
@@ -54,6 +64,10 @@ struct CameraView: View {
                 await MainActor.run { reviewImage = image }
             }
         }
+        .task(id: previousPhotoURL) {
+            guard let previousPhotoURL else { return }
+            ghostImage = await ImageCacheService.shared.loadImage(from: previousPhotoURL)
+        }
         .onAppear {
             #if DEBUG
             if usesFixture { reviewImage = makeFixturePhoto() }
@@ -67,18 +81,23 @@ struct CameraView: View {
             cameraHeader(title: "Take photo")
             ZStack {
                 LinearGradient(colors: [Color(white: 0.12), Color(white: 0.025)], startPoint: .top, endPoint: .bottom)
-                ghostPhoto
-                PoseGuide()
+                if guidance.showsPreviousOutline {
+                    ghostPhoto
+                    PoseGuide()
+                }
                 VStack {
                     Spacer()
-                    Text("Same spot, same light, every time")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(.black.opacity(0.55), in: Capsule())
-                        .accessibilityIdentifier("progress_photo_camera_tip")
-                        .padding(.bottom, 16)
+                    if showsGuidance {
+                        Text("\(guidance.distanceCue) \(guidance.poseCue)")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(.black.opacity(0.55), in: Capsule())
+                            .accessibilityIdentifier("progress_photo_camera_tip")
+                            .padding(.bottom, 16)
+                    }
                 }
             }
             .aspectRatio(4.0 / 5.0, contentMode: .fit)
@@ -94,13 +113,18 @@ struct CameraView: View {
     private var captureBar: some View {
         VStack(spacing: 16) {
             HStack {
-                Button("Library") { showsLibrary = true }
+                Button("Library") {
+                    onCaptureStarted("library")
+                    showsLibrary = true
+                }
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.78))
                     .frame(width: 76)
                     .accessibilityLabel("Choose from Library")
                     .accessibilityIdentifier("progress_photo_camera_library")
-                Button { showsSystemCamera = true } label: {
+                Button {
+                    showsSystemCamera = true
+                } label: {
                     Circle()
                         .fill(.white)
                         .frame(width: 76, height: 76)
@@ -137,6 +161,24 @@ struct CameraView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(.white.opacity(0.12), in: Capsule())
+                    Button(showsGuidance ? "Hide guidance" : "Show guidance") {
+                        showsGuidance.toggle()
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.white.opacity(0.12), in: Capsule())
+                    .accessibilityIdentifier("progress_photo_camera_guidance_toggle")
+                    Button(mirrorIsOn ? "Mirrored" : "Original") {
+                        mirrorIsOn.toggle()
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.white.opacity(0.12), in: Capsule())
+                    .accessibilityIdentifier("progress_photo_camera_mirror_toggle")
                 }
                 .accessibilityIdentifier("progress_photo_camera_settings_panel")
             }
@@ -170,6 +212,8 @@ struct CameraView: View {
                 .foregroundStyle(.white.opacity(0.68))
                 .accessibilityIdentifier("progress_photo_review_retake")
             Button {
+                let viewpoint = selectedPose.lowercased()
+                onCaptureContext(viewpoint, mirrorIsOn ? "mirrored" : "original")
                 onImageCaptured(image)
                 dismiss()
             } label: {
@@ -209,10 +253,21 @@ struct CameraView: View {
     }
 
     private var ghostPhoto: some View {
-        Image(systemName: "person.fill")
-            .font(.system(size: 220))
-            .foregroundStyle(.white.opacity(0.08))
-            .accessibilityHidden(true)
+        Group {
+            if let ghostImage {
+                Image(uiImage: ghostImage)
+                    .resizable()
+                    .scaledToFit()
+                    .opacity(0.28)
+                    .accessibilityLabel("Outline of the previous photo")
+            } else {
+                Image(systemName: "person.fill")
+                    .font(.system(size: 220))
+                    .foregroundStyle(.white.opacity(0.08))
+            }
+        }
+        .accessibilityIdentifier("progress_photo_camera_previous_outline")
+        .accessibilityHidden(ghostImage == nil)
     }
 
     #if DEBUG
