@@ -1,18 +1,36 @@
 [
   {
-    "fingerprint": "merge-commit-skips-staged-source-map",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1721",
-    "correction": "PR #1721, fix-red-1423773703 occurrence 48: the @statsig/js-client 3.33.7 bump left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, parity and CI Summary. Merging origin/main auto-merged the manifest and the generated map, and the merge commit skipped the staged source-map repair.",
-    "mechanization": "Extend the existing Husky merge entry so a merge commit runs the pre-commit staged source-map repair. The Husky shim exits successfully when that entry is absent, which skips the repair and can commit a clean but stale projection. The required pre-commit suite proves the shim skips without the entry and runs the repair when the entry delegates to pre-commit. Use that repair on this merged bump and retain frozen installation and parity gates. The harness owns push and PR-body updates and must add exactly one line: Machine: built .husky/pre-merge-commit.",
+    "fingerprint": "dependency-repair-staged-projection-configuration",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1724",
+    "correction": "PR #1724, fix-red-1423773703 occurrence 48: the Autoprefixer 10.6.2 bump left the generated source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must use reviewed projection configuration before invoking pnpm, as well as rendering staged source bytes.",
+    "mechanization": "Extend both dependency repair modes to include repository-docs.json in their existing staged-input preflight. Two real-Git regressions fail before the change and pass afterward, proving refusal before pnpm with artifacts and index preserved, successful retry with staged configuration, the correct repository in the generated map, unchanged bot resolutions and idempotence. The existing required Detect Changes pre-commit suite imports the regressions. Use --verify-lockfile for this merged dependency update, retaining frozen installation and parity gates. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
     "classification": {
       "codebase": {
         "feasible": true,
-        "rationale": "The merge hook can run the existing staged source-map repair before a merge commit is created, so a clean auto-merge cannot keep a stale projection."
+        "rationale": "The existing dependency helper owns input validation, frozen verification and staged source-map generation. Including its projection configuration in preflight prevents unreviewed configuration from changing parity checks and output selection before pnpm executes."
       }
     },
     "guard": {
-      "path": ".husky/pre-merge-commit",
-      "anchor": "Merge commits run the staged source-map repair."
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Projection configuration must be staged before dependency verification."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependabot-react-runtime-version-pair",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1723",
+    "correction": "PR #1723, fix-red-1423773703 occurrence 48: merge origin/main without rebasing, repair stale source parity and preserve the React DOM 19.3.1 update. The installed React 19.3.0 / React DOM 19.3.1 pair throws Incompatible React versions during server rendering.",
+    "mechanization": "Extend the existing root Dependabot update machine with a React runtime group, then align React and React DOM at 19.3.1. Extend required shared-lib dependency tests to enforce the group, equal manifest ranges and actual server-rendered HTML from the installed web pair. All four regressions fail before the repair, including identity of the web and linked UI React runtime. Align the UI workspace peer resolutions without narrowing its supported peer ranges. Include the web and UI manifests in shared-lib Turbo test inputs. Use the existing pinned dependency repair helper to preserve main resolutions and refresh the generated source map. The harness owns pushing and PR updates and must put exactly one line in the PR body: Machine: built .github/dependabot.yml.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency updater can propose React and React DOM together by construction. Required manifest and installed server-render checks catch partial or incompatible updates, including manually edited lockfiles, without relaxing frozen installs or existing update cooldowns."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/dependency-security.test.ts",
+      "anchor": "renders HTML with the installed web React and React DOM pair"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -5980,6 +5998,42 @@
     "guard": {
       "path": "scripts/correction-classifier.mjs",
       "anchor": "merge ledger changed during validation; retry from the current ledger"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-refuses-indexed-symlinks",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1719",
+    "correction": "PR #1719, fix-red-1423773703 occurrence 48: merge origin/main without rebasing and repair the Prettier 3.9.10 update. Detect Changes and parity reject the stale source projection, causing CI Summary to fail. Extend the existing dependency-repair machine and use it for this instance. Local root pnpm test also exposed an unrelated false privacy failure: the broad 93 sentinel matched a forwarded timestamp ending in .993Z.",
+    "mechanization": "Extend both dependency-repair modes to refuse indexed symlinks in resolution inputs before invoking pnpm. Six real-Git regressions accepted external hook, npmrc and patch targets before the fix and refuse them afterward, preserving artifacts, index and external bytes. Two executable-file controls and eighteen existing dependency cases remain passing. The existing required Detect Changes pre-commit suite imports these tests. Use the extended --verify-lockfile mode on the merged update, then retain frozen installation and source parity checks. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py. Pin the customer-voice privacy test clock to its existing AT fixture, assert the forwarded timestamp, and restore real timers in finally; retain the complete stored-row health-sentinel and no-logging assertions.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing artifact repair helper owns the pnpm invocation and can reject indexed symlinks before external or mutable target bytes enter dependency resolution, preventing unreviewed resolution inputs by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Dependency resolution inputs must be regular indexed files, never symlinks."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-commit-skips-staged-source-map",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1721",
+    "correction": "PR #1721, fix-red-1423773703 occurrence 48: the @statsig/js-client 3.33.7 bump left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, parity and CI Summary. Merging origin/main auto-merged the manifest and the generated map, and the merge commit skipped the staged source-map repair.",
+    "mechanization": "Extend the existing Husky merge entry so a merge commit runs the pre-commit staged source-map repair. The Husky shim exits successfully when that entry is absent, which skips the repair and can commit a clean but stale projection. The required pre-commit suite proves the shim skips without the entry and runs the repair when the entry delegates to pre-commit. Use that repair on this merged bump and retain frozen installation and parity gates. The harness owns push and PR-body updates and must add exactly one line: Machine: built .husky/pre-merge-commit.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The merge hook can run the existing staged source-map repair before a merge commit is created, so a clean auto-merge cannot keep a stale projection."
+      }
+    },
+    "guard": {
+      "path": ".husky/pre-merge-commit",
+      "anchor": "Merge commits run the staged source-map repair."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
