@@ -16,6 +16,7 @@ def function_body(text: str, name: str, next_name: str) -> str:
 def contribute(root: Path, app_dir: Path, violations: list, violation, _line_number) -> None:
     check(root, app_dir, violations, function_body, violation)
     check_person_mask_executor(root, app_dir, violations, violation)
+    check_logout_alert(root, violations, violation)
 
 
 def check_person_mask_executor(root: Path, app_dir: Path, violations: list, violation) -> None:
@@ -74,4 +75,40 @@ def check(root: Path, app_dir: Path, violations: list, function_body, violation)
             file=str(ui_tests.relative_to(root)),
             line=1,
             detail="Refocus the composer when the keyboard drops before each synthetic character.",
+        ))
+
+
+def check_logout_alert(root: Path, violations: list, violation) -> None:
+    """Duplicate accessibility wrappers must resolve to one physical alert action."""
+    path = root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
+    if not path.is_file():
+        return
+    text = path.read_text()
+    helper = function_body(text, "hittableLogoutAction", "testProfileEditorProvidesAnEscapeRoute")
+    journey = function_body(text, "testProfileLogoutSignsOutFromPushedDetail", "hittableLogoutAction")
+    required = (
+        "alert.buttons.matching(identifier: identifier)",
+        "$0.label == label && $0.isEnabled && $0.isHittable",
+        "reduce(into: [XCUIElement]())",
+        "!unique.contains(where: { $0.frame == action.frame })",
+        "unique.append(action)",
+        "interactiveActions().count == 1",
+        "actions.count == 1 ? actions.first : nil",
+    )
+    outcomes = (
+        'identifier: "settings_logout_cancel", label: "Cancel"',
+        "cancelLogout.tap()",
+        "XCTAssertTrue(logoutConfirmation.waitForNonExistence(timeout: 5))",
+        "XCTAssertTrue(logoutButton.exists)",
+        'XCTAssertFalse(app.buttons["continueWithAppleButton"].exists)',
+        'identifier: "settings_logout_confirm", label: "Log Out"',
+        "confirmLogout.tap()",
+        'XCTAssertTrue(app.buttons["continueWithAppleButton"].waitForExistence(timeout: 8))',
+    )
+    if (any(token not in helper for token in required)
+            or "descendants(matching: .button)" in helper
+            or any(token not in journey for token in outcomes)):
+        violations.append(violation(
+            check="logout.alert_action_identity", file=str(path.relative_to(root)), line=1,
+            detail="Collapse identical alert action frames, reject distinct matches, and verify Cancel and Log Out outcomes.",
         ))

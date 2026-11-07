@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "native-alert-action-deduplicates-accessibility-frames",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41419361700/job/125191583472",
+    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 7: merge origin/main first, then repair Launch Quality without weakening gates. The only failing native test is testProfileLogoutSignsOutFromPushedDetail. Its alert hierarchy exposes wrapper and child Buttons with the same action identifier, label and frame, while the descendant-based leaf predicate rejects the available Cancel action. Tently separately reports an AI-provider outage (060e9fa1-fb43-4178-95f3-9e6d424a3e3e).",
+    "mechanization": "Keep alert-scoped identifier, label, enabled and hittable admission, then collapse only identical physical frames before requiring exactly one action. Preserve the five-second wait, Cancel/session assertions and actual Log Out outcome. Extend the existing launch UI audit with mutations rejecting unscoped matching, missing admission, missing frame deduplication, ambiguous selection and missing outcomes. The audit fails against the original helper and passes with the repair. Extract existing interaction mutation cases into an imported mixin so the suite remains under 500 lines, and include that sibling in the existing Turbo test inputs. Update the historical guard anchor to the replacement identity check. Native XCTest execution remains unverified on this Linux host. The harness owns push and PR updates and must retain exactly one line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing native action selector can model one physical action by its alert scope, semantic identity, interactivity and exact frame. Deduplicating accessibility wrappers at that boundary prevents false ambiguity by construction while physically distinct actions still fail closed."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "!unique.contains(where: { $0.frame == action.frame })"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependabot-workspace-release-age-resolution",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41420896425",
     "correction": "LYB-357: the weekly multi-directory Dependabot job reports 38 update_not_possible errors. Run 41420896425 shows all 38 are ERR_PNPM_NO_MATURE_MATCHING_VERSION for the implicitly resolved Rollup peer, not duplicate-PR errors. The workspace member also triggers npm probes without the root package-manager pin.",
@@ -5095,7 +5113,7 @@
     },
     "guard": {
       "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
-      "anchor": "&& !$0.descendants(matching: .button).matching(identifier: identifier).firstMatch.exists"
+      "anchor": "!unique.contains(where: { $0.frame == action.frame })"
     },
     "level": "codebase",
     "ruleId": "code-prevention"

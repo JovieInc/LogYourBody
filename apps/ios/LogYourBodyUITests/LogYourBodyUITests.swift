@@ -726,7 +726,7 @@ final class LogYourBodyUITests: XCTestCase {
         logoutButton.tap()
 
         // Native alerts can expose both a wrapper button and its action button.
-        // Require one hittable leaf inside this alert, never a background button.
+        // Require one distinct action frame inside this alert.
         XCTAssertTrue(logoutConfirmation.waitForExistence(timeout: 5), app.debugDescription)
         let cancelLogout = try hittableLogoutAction(
             in: logoutConfirmation, identifier: "settings_logout_cancel", label: "Cancel"
@@ -751,7 +751,10 @@ final class LogYourBodyUITests: XCTestCase {
         func interactiveActions() -> [XCUIElement] {
             candidates.allElementsBoundByIndex.filter {
                 $0.label == label && $0.isEnabled && $0.isHittable
-                    && !$0.descendants(matching: .button).matching(identifier: identifier).firstMatch.exists
+            }.reduce(into: [XCUIElement]()) { unique, action in
+                if !unique.contains(where: { $0.frame == action.frame }) {
+                    unique.append(action)
+                }
             }
         }
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in

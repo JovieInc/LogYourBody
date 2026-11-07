@@ -55,6 +55,7 @@ it('checks Stats composition, card styling and provenance dismissal through the 
     '$TURBO_ROOT$/scripts/ios/launch_ui_*.py',
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-report.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
+    '$TURBO_ROOT$/scripts/ios/test_launch_ui_home_interaction.py',
     '$TURBO_ROOT$/apps/ios/LogYourBodyWidget/**/*.swift',
     '$TURBO_ROOT$/apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift',
   ]) {

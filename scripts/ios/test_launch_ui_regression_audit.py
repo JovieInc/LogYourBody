@@ -34,7 +34,11 @@ sys.modules[SPEC.name] = AUDIT
 SPEC.loader.exec_module(AUDIT)
 
 
-class StatsCardCompositionTests(unittest.TestCase):
+from test_launch_ui_home_interaction import HomeInteractionAuditTests
+from launch_ui_timeline_day import check_timeline_calendar_day
+
+
+class StatsCardCompositionTests(HomeInteractionAuditTests, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._swift_template = tempfile.TemporaryDirectory()
@@ -102,16 +106,16 @@ class StatsCardCompositionTests(unittest.TestCase):
 
     def test_empty_timeline_keeps_its_photo_button_accessible(self):
         findings = []
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual(findings, [])
         self.replace("Services/DatedTimelineUI.swift", ".accessibilityElement(children: .contain)", "")
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
 
     def test_empty_timeline_requires_the_photo_action_identifier(self):
         self.replace("Services/DatedTimelineUI.swift", '"launch_timeline_add_photo"', '"wrong_photo_action"')
         findings = []
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
 
     def test_geometry_requires_typed_nonfinite_arguments_in_every_native_tree(self):
@@ -419,49 +423,6 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
 
         calculator.write_text(original.replace("now: Date = Date(),\n        ", "", 1))
         self.assert_rejected("timeline.injected_calendar_day")
-
-    def test_weekly_prompt_cannot_precede_the_provenance_chip(self):
-        path = self.app / "Views/HomeV2/HomeV2Surface.swift"
-        source = path.read_text()
-        prompt = (
-            "            if let weeklyPhotoPrompt {\n"
-            "                WeeklyPhotoCheckInPrompt(prompt: weeklyPhotoPrompt, onAdd: onAddWeeklyPhoto)\n"
-            "            }\n"
-        )
-        self.assertEqual(source.count(prompt), 1)
-        self.assertEqual(self.run_audit()[0], 0)
-        moved = source.replace(prompt, "", 1).replace(
-            "                    photoNumberBlock\n",
-            prompt + "                    photoNumberBlock\n",
-            1,
-        )
-        path.write_text(moved)
-        self.assert_rejected("home.provenance_chip_precedes_weekly_prompt")
-
-    def test_synthetic_character_entry_refocuses_a_dropped_keyboard(self):
-        destination = self.root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(ROOT / destination.relative_to(self.root), destination)
-        self.assertEqual(self.run_audit()[0], 0)
-        source = destination.read_text()
-        self.assertIn("if !keyboard.exists {", source)
-        destination.write_text(source.replace("if !keyboard.exists {\n", "if false {\n", 1))
-        self.assert_rejected("chat.synthetic_typing_refocuses")
-
-    def test_person_segmentation_cannot_block_the_swift_cooperative_pool(self):
-        path = self.app / "Services/BackgroundRemovalService.swift"
-        original = path.read_text()
-        self.assertEqual(self.run_audit()[0], 0)
-        for before, after in [
-            ("segmentationQueue.async {", "Task.detached(priority: .userInitiated) {"),
-            ("segmentationQueue.async {", "segmentationQueue.sync {"),
-            ("qos: .userInitiated)", "qos: .userInitiated, attributes: .concurrent)"),
-        ]:
-            with self.subTest(before=before, after=after):
-                self.assertIn(before, original)
-                path.write_text(original.replace(before, after, 1))
-                self.assert_rejected("photo.segmentation_dispatch_executor")
-        path.write_text(original)
 
 
 class CheckSiblingDiscoveryTests(unittest.TestCase):
