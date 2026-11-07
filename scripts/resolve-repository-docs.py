@@ -29,9 +29,13 @@ def restore_dependency_artifacts_on_failure(root, output):
 
 
 def staged_bytes(root, name):
-    return subprocess.run(
+    source = subprocess.run(
         ["git", "show", ":" + name], cwd=root, check=True, capture_output=True,
     ).stdout
+    # A clean projection must not conceal unresolved markers in its staged inputs.
+    if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", source):
+        raise ValueError("resolve staged conflict markers first: " + name)
+    return source
 
 
 def merge_sections(root, name):
@@ -215,15 +219,25 @@ def assert_merged_project_keeps_parent_files(root, project):
 
     base_ids = set(PBX_MEMBER.findall(blob(f"{base_rev}:{DIAGNOSTIC_PROJECT}")))
     added = set()
+    parent_sources = []
     for parent in ("HEAD", "MERGE_HEAD"):
-        added.update(set(PBX_MEMBER.findall(blob(f"{parent}:{DIAGNOSTIC_PROJECT}"))) - base_ids)
+        source = blob(f"{parent}:{DIAGNOSTIC_PROJECT}")
+        parent_sources.append(source)
+        added.update(set(PBX_MEMBER.findall(source)) - base_ids)
     try:
-        merged_ids = set(PBX_MEMBER.findall(project.decode()))
+        merged = project.decode()
+        merged_ids = set(PBX_MEMBER.findall(merged))
     except UnicodeDecodeError as error:
         raise ValueError("diagnostic project is not text") from error
     missing = sorted(added - merged_ids)
     if missing:
         raise ValueError("merged project dropped a parent file: " + ", ".join(missing))
+    # Declarations alone cannot prove that group and build-phase references survived.
+    for identifier in sorted(added):
+        token = re.compile(r"\b" + re.escape(identifier) + r"\b")
+        expected = max(len(token.findall(source)) for source in parent_sources)
+        if len(token.findall(merged)) < expected:
+            raise ValueError("merged project dropped a parent file reference: " + identifier)
 
 
 def reviewed_conflicted_pin(root, expected):

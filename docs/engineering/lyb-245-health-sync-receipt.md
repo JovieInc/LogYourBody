@@ -1,0 +1,350 @@
+# Apple Health sync caption and weight receipt (LYB-245)
+
+Decision: implement the issue's supplied default under its explicit “ships if
+unanswered” instruction. This records default adoption, not a separate claim of
+Tim's visual approval. LYB-171 owns real-device and TestFlight evidence.
+
+On Home V2, a neutral caption sits immediately below the hero's FFMI/weight
+summary and above Steps. It uses `HomeV2Tokens` typography, spacing and colors,
+and `JovieTokens` hit targets and subtle motion duration.
+
+| State model value | Caption                          |
+| ----------------- | -------------------------------- |
+| checking          | Checking Apple Health…           |
+| updated           | Updated from Apple Health, 9:41  |
+| unavailable       | Apple Health update unavailable  |
+| permissionNeeded  | Apple Health access needed       |
+| offline           | Offline · showing saved readings |
+
+The updated timestamp comes from `HealthSyncStateReducer.lastSuccessfulSync`,
+not the cloud sync clock. Time follows the device's locale and time zone,
+including AM/PM where appropriate. A missing timestamp omits the clock.
+Permission state stays passive; rendering it never requests access or retries.
+
+The inline receipt directly below the caption reads
+“New weight from Apple Health · Mar 3, 9:41 · 82.4 kg”. It uses the measurement's
+date/time and the selected kg/lb unit. It disappears six seconds after the
+arrival is observed, or immediately on tap. The transition is a subtle opacity
+change; Reduce Motion disables animation. There is no push notification.
+
+Tapping opens a native Recent readings sheet with up to 20 Apple Health weight
+readings. A late-arriving reading outside the latest 20 is included first while
+its receipt is active. The caption remains tappable after the receipt disappears,
+so the destination is accessible without a timed interaction. The sheet offers
+Edit, Exclude, and Undo last change through the existing
+`MetricCorrectionService`; it never writes to Apple Health or deletes the source
+reading. Undo is retained for the last successful change in this dashboard
+session. Failed saves retain that undo receipt and show an inline error.
+
+The new surface is behind `health_sync_receipt_v1`, evaluated through the
+analytics platform port and off when unassigned. Edit/exclude also respect the
+existing `imported_metric_corrections` gate. Enable both gates for staff
+acceptance. Undo remains available if the correction gate is disabled after a
+successful change, matching the service's contract.
+
+Collection filtering, sorting, identity comparison and provenance parsing run
+in `HealthReadingObserver`, away from the main actor. Initial cached history,
+duplicates, foreign accounts, invalid/missing weights, excluded readings and
+manual corrections do not create receipts. Identity includes the Health sample
+ID and original measurement, so a new sample can replace a legacy daily row.
+Whole-second import timestamps are respected. A repeated publication never
+extends the receipt lifetime. Account lifetime changes clear visible data,
+pending undo, errors and the receipt; stale preparations and save results cannot
+repopulate the UI.
+
+`HealthSyncPresentationTests` is included in the existing native test target
+and is not skipped by the Unit test plan. It freezes copy for every state,
+checks kg/lb and measurement-time formatting, and attaches native render
+snapshots for all five states with/without the receipt at 320-point width in
+regular and accessibility text sizes. These are xcresult image attachments,
+not pixel-golden comparisons; the repository has no pixel snapshot framework.
+Behavior cases cover arrival eligibility, duplicate suppression, legacy row
+replacement, same-value sample identity, account changes, the six-second timer,
+tap dismissal, save failure and undo.
+
+Local verification used Node 22.23.2 and Corepack's pinned pnpm 10.34.1:
+
+- `corepack pnpm lint` and `corepack pnpm typecheck` passed.
+- `corepack pnpm test` passed with child-process execution available. The first
+  sandboxed run failed on `spawnSync EPERM` in existing process-based tests.
+- `pnpm product:check` passed with pinned pnpm and child-process execution
+  available.
+- `node scripts/ios/swift-arch/guard.mjs`,
+  `python3 scripts/ios/test_training_rest_project.py`, and
+  `node scripts/check-vendor-boundaries.js` passed.
+- Scoped `swiftlint lint --strict --no-cache --config apps/ios/.swiftlint.yml`
+  passed. This Linux SwiftLint skips five SourceKit-dependent rules.
+- Swift 6.0.3 parsed the seven changed Swift files successfully. The date/time
+  format style was also executed with the fixed snapshot locale and time zone.
+- A supplemental Swift typecheck of the presentation store and real sync
+  reducer passed with temporary stubs for platform/domain dependencies. This
+  does not validate the native app integration.
+
+Xcode is unavailable on this host. The native Unit run, render snapshot review
+and native coverage remain unverified and must pass on the repository's real
+native runner before rollout. No TestFlight or release evidence is claimed.
+
+GBrain query, write to `logyourbody-lyb-245-health-sync-receipt`, and readback of
+that slug all failed to connect to `127.0.0.1:7801`. Neither remote persistence
+nor readback was verified; this document retains the decision locally.
+
+## PR #1679 repair handoff
+
+Mission: preserve LYB-245 while making the branch mergeable through existing gates.
+Audience: the lanes harness and repository reviewers.
+
+Merged `origin/main` at `f42e131c133d00c8250945602abd68cbe10afc8a`
+without rebasing, in merge commit `b97f83c69`. The only conflict was the correction
+ledger. Retained all 282 parent receipts, including their correction and
+mechanization text, and explicitly aligned the shared `fix-red-95726c4f82`
+annotations to the incoming codebase classifier guard. Recorded occurrence 5 as
+receipt 283. The sync-state copy, receipt placement, feature gates and native
+behavior tests are preserved.
+
+Extended `scripts/correction-classifier.mjs` to snapshot the working ledger and
+recheck its bytes alongside the index and both parents before writing, staging
+or returning success. Three new concurrency controls fail against the previous
+classifier, while its nine original concurrency cases pass. All 71 classifier
+cases pass after the change with the unchanged 100% line, branch and function
+coverage gates. The existing required shared-lib suite executes these cases.
+Replayed the exact PR/main parents in a temporary local clone and used the
+extended `--check-merge` command on the reviewed staged union with all 283
+receipts. Both-parent correction coverage passed at 195/195 mechanized rules.
+
+Verification on Node 22.23.2 and pinned pnpm 10.34.1:
+
+- `corepack pnpm lint`, `corepack pnpm typecheck`, `corepack pnpm test`, and
+  `corepack pnpm product:check` passed. The web suite passed 175 suites and 1,694
+  tests; shared-lib passed 56 Vitest files and 335 tests plus its Node suites.
+- The full classifier command passed: `node --test --experimental-test-coverage --test-coverage-include=scripts/correction-classifier.mjs --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 scripts/correction-classifier.test.mjs scripts/correction-classifier-concurrency.test.mjs`.
+- `python3 scripts/repository_docs.py`,
+  `node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main`,
+  `node scripts/ios/swift-arch/guard.mjs`,
+  `node scripts/check-vendor-boundaries.js`, and
+  `python3 scripts/ios/test_training_rest_project.py` passed.
+- `corepack pnpm lint:swift` reported zero violations in 531 files. This Linux
+  toolchain skips five SourceKit-dependent rules. Xcode execution, native render
+  review and native coverage remain unverified and require the real native runner.
+
+The first sandboxed concurrency run stalled in Git's batch reader; a bounded
+host-process rerun supplied the three failing controls and subsequent green
+results. The web build changed only an unrelated generated marketing capture
+timestamp; restored that artifact to its committed bytes.
+
+Tently check `124779536021` reports an unreachable AI provider and no code finding.
+`gh run view 41283330678 --log-failed` reports that Actions CI is still running;
+Tently is external and its check ID returns Actions 404. A harness push must rerun
+that review. No check or gate was bypassed.
+
+The harness owns pushing and PR edits. Put exactly one machine declaration in the
+PR body: `Machine: built scripts/correction-classifier.mjs`.
+Intent-eval: n/a - mechanical merge repair and developer-tool concurrency guard.
+The initial sandboxed GBrain query could not reach `127.0.0.1:7801`. Host-process
+access succeeded: write and matching-content readback of
+`logyourbody-pr1679-merge-repair-occurrence-5` verified brain persistence. Its
+optional repository write-through mirror was skipped with `repo_not_found`.
+
+## Read-only Reduce Motion repair (fix-red-cc900b961c, occurrence 2)
+
+Mission: make the snapshot test compile and catch this source mistake before a native build.
+Audience: the lanes harness and repository reviewers.
+
+Fetched `origin/main` at `f42e131c133d00c8250945602abd68cbe10afc8a`.
+`git merge --no-edit origin/main` reported “Already up to date”; no rebase or
+additional merge commit was needed. Main does not contain the LYB-245 implementation.
+
+`gh run view 41285773987 --repo JovieInc/LogYourBody --log-failed` identifies
+the compile failure at `HealthSyncPresentationTests.swift:59`: SwiftUI exposes
+`accessibilityReduceMotion` as a read-only environment value. Disable snapshot
+animations through `.transaction { $0.disablesAnimations = true }` instead.
+All state, text-size and receipt snapshot combinations remain in the native test.
+
+Extended the existing shared-lib Reduce Motion guard to scan unit-test and
+UI-test sources alongside app sources. Before the Swift fix, the required
+`corepack pnpm test --filter=@logyourbody/shared-lib` command failed only on
+`HealthSyncPresentationTests.swift`; the other 336 tests passed. After the fix,
+`corepack pnpm lint`, `corepack pnpm typecheck`, and `corepack pnpm test` passed.
+The changed shared-lib suite executed all 56 Vitest files and 337 tests, followed
+by 122 Node tests; unchanged Turbo tasks reused their cache.
+
+Scoped SwiftLint reported zero violations in the changed Swift file; its five
+SourceKit-dependent rules are unavailable on this Linux host. The Swift architecture
+ratchet, vendor-boundary check, repository source parity, correction coverage
+(196/196 mechanized rules), and exact-base correction ratchets passed. The first
+sandboxed correction-coverage attempt failed with `spawnSync git EPERM`; the host
+rerun passed. Xcode build, native execution, render review and coverage remain
+unverified and require the harness's real native CI runner.
+
+Tently check `124786645463` reports an unreachable AI provider, with no code finding.
+The harness must rerun that check and native CI after pushing; no gate was changed.
+For this repair, use this single PR-body machine declaration:
+`Machine: built packages/shared-lib/src/swiftui-environment-writes.test.ts`.
+Intent-eval: n/a - snapshot build repair and developer source guard; no user-facing output changed.
+
+GBrain write and matching-content readback of
+`logyourbody-pr1679-readonly-reduce-motion-repair` succeeded through host access
+after the initial sandbox query failed and the first host query timed out.
+Its optional repository mirror was skipped with `repo_not_found`.
+
+## Offline fixture repair (fix-red-5df69c1e5f, occurrence 24)
+
+Mission: preserve LYB-245 and make the offline retry test independent of runner connectivity.
+Audience: the lanes harness and repository reviewers.
+
+Read failed logs with
+`gh run view 42354637142 --repo JovieInc/LogYourBody --log-failed`.
+Launch Quality failed `LogYourBodyUITests+DatedTimeline.swift:85`: the action was
+“Record a fresh measurement” instead of “Retry sync”. CI Summary reflected that
+failure. The shared paid/dashboard/photo fixture set sync offline once, but a
+later `NWPathMonitor` callback could replace it with the runner's online state.
+
+Extended the existing `RealtimeSyncManager` fixture setup with a DEBUG-only
+offline pin, set before cancelling monitoring. Network callbacks use one handler
+that rejects updates while pinned, including callbacks queued before cancellation.
+The existing shared fixture uses that setup for every caller. The handler is now
+registered before monitoring starts. Release connectivity transitions retain their
+existing logic. Sync captions, receipt placement, gates and the retry assertion
+are preserved; no files or tests became obsolete.
+
+The existing native sync-helper suite now tests an enqueued path update, repeated
+online/offline callbacks and sync retries, plus normal connectivity transitions
+without the pin. The required shared-lib launch-evidence guard checks shared
+fixture wiring, callback protection and release exclusion. Before the repair,
+that guard failed while the other 440 tests passed. After the repair, all 441
+passed; the final main integration adds four passing launch-copy cases.
+
+The initial `git merge --no-edit origin/main` reported up to date at
+`2d7a52e67`. Main advanced during validation. Merged
+`6cab4491970edb844c0e40ab71dffa8e71ed7914` without rebasing, using
+`node scripts/correction-classifier.mjs --resolve-merge . --stage` for the only
+conflict. Both-parent verification retained all 314 correction receipts, with
+224/224 mechanized rules and unchanged correction-ratchet allowances.
+
+Final verification used Node 22.23.2 and pinned pnpm 10.34.1:
+
+- Root `pnpm lint`, `pnpm typecheck` and `pnpm test` passed. The final test run
+  completed all eight Turbo tasks, including 177 web suites / 1,772 tests,
+  68 shared-lib Vitest files / 445 tests and its 141 Node tests.
+- Root `pnpm lint:swift` found zero violations in 557 files. This Linux SwiftLint
+  cannot run its five SourceKit-dependent rules.
+- `node scripts/ios/swift-arch/guard.mjs`,
+  `node scripts/check-vendor-boundaries.js`, `python3 scripts/repository_docs.py`,
+  and `python3 scripts/ios/launch-ui-regression-audit.py --artifact-dir /tmp/pr1679-final-launch-audit`
+  passed. Correction coverage checked both immutable merge parents; correction
+  ratchets used the full incoming main SHA, and `--check-merge .` verified staging.
+
+Initial sandbox attempts could not spawn Git subprocesses or write SwiftLint's
+cache; host-access reruns passed. `xcodebuild -version` returned command not found.
+Native compilation, the new XCTest cases, the original timeline UI test and
+native coverage remain unverified until the harness reruns the real macOS gate.
+
+GBrain write and matching-content readback succeeded for
+`logyourbody-pr1679-offline-fixture-network-race`; its optional repository mirror
+was skipped with `repo_not_found`. The harness owns pushing and PR edits. Use
+exactly one current machine declaration in the PR body:
+
+`Machine: built apps/ios/LogYourBody/Services/RealtimeSyncManager.swift`
+
+Intent-eval: n/a - deterministic fixture repair and developer guards; no user-facing output changed.
+
+## Pre-write index repair (fix-red-e3b0c44298, occurrence 83)
+
+Mission: merge current main without rebasing, keep the Apple Health sync caption and weight receipt, and stop a stale ledger resolution from succeeding.
+Audience: the lanes harness and repository reviewers.
+
+Merged `origin/main` at `07a2b8705551581f8d9f56c79742a82c0d05ca2c` into `d801899d599b6ec584593bdc48779ba54749329e`. The conflicts were the correction ledger and the customer-voice privacy test. The dependency-repair script auto-merged with both the parent-reference guard and the incoming indexed-symlink refusal. Prettier 3.9.10 and its lockfile came from main. The privacy test keeps the fixed `.000Z` and `.935Z` clocks and the whole stored-record assertion; main's single `AT` clock would drop the `.935Z` case and the existing receipt anchor.
+
+The extended classifier resolved the ledger with `--resolve-merge . --stage`. The union kept every parent receipt: 314 from this branch and 305 from main, 315 combined, then one new receipt for 316. Sync-state copy, receipt placement, gates and native tests are unchanged.
+
+The pre-write path sampled the index and discarded that read, so an index or `HEAD` change during the sample still returned success. The same command now compares the index, both parents and the working ledger after the sample and before replacement. Four real-Git controls, unstaged and staged for both the index and `HEAD`, returned success before the comparison and refuse afterward, preserving the other writer and retrying cleanly. The existing 18 concurrency cases still pass. The covered classifier command passed 77 tests at 100% line, branch and function coverage.
+
+Verification on this host:
+
+- `node scripts/correction-classifier.mjs --check-merge .` verified the staged union against both parents.
+- Correction coverage against `d801899d599b6ec584593bdc48779ba54749329e` and `07a2b8705551581f8d9f56c79742a82c0d05ca2c` passed at 226/226 mechanized rules.
+- `node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref 07a2b8705551581f8d9f56c79742a82c0d05ca2c` passed, retaining 9 existing public-copy findings.
+- `node --test` on the repository-doc resolver, pin, dependency and pre-commit suites passed 151 tests. `python3 scripts/repository_docs.py` reported source parity.
+- `pnpm exec jest --coverage=false --watchman=false --runInBand src/lib/customer-voice/customer-voice.test.ts` from `apps/web` passed 24 tests, including both fixed clocks. Corepack pnpm 10.34.1 built `@jovieinc/product-registry` first so Jest could load its package entry. The system pnpm 9.15.4 cannot satisfy the repo engine.
+
+Xcode is not installed here. Native compilation, snapshot review and coverage remain for the real macOS runner. No gate was weakened or skipped.
+
+The harness owns pushing and PR edits. Use exactly one machine line:
+
+`Machine: built scripts/correction-classifier.mjs`
+
+Intent-eval: n/a - merge repair and developer-tool guard; no user-facing output changed.
+
+## Diagnostic pin repair (fix-red-e3b0c44298, occurrence 86)
+
+Mission: merge current main without rebasing and keep the Apple Health sync caption and weight receipt.
+Audience: the lanes harness and repository reviewers.
+
+Merged `origin/main` at `d2932bfd559b100e1ada2101cf929eae9ee7dc7a` into `25dcfa222ca0965c371b5fe6f9331b0c3ae952f1`. The conflicts were the diagnostic project pin in `.github/workflows/ios-ui-diagnostics.yml`, the same project hash in `docs/REPOSITORY_SOURCES.md`, and `packages/shared-lib/corrections.json`. The merged Xcode project keeps the health-sync files and main's body-visualization files, including their group and build-phase references. The lockfile matches main.
+
+Reviewed project digest `32ba6bed96cfe7688f5d1aa97dade69bb600e3cd725d865f08b2c13db9f47151`. `python3 scripts/resolve-repository-docs.py --reviewed-project-sha256` with that digest replaced the pin and regenerated the source map. `node scripts/correction-classifier.mjs --resolve-merge . --stage` unioned the ledger: 316 branch receipts and 312 main receipts, 323 combined, with no dropped receipt. Sync-state copy, receipt placement, gates and native tests are unchanged. The existing machines covered this conflict shape, so this repair does not add another guard.
+
+Verification on this host:
+
+- `node scripts/correction-classifier.mjs --check-merge .` verified the staged union against both parents.
+- Correction coverage against `25dcfa222ca0965c371b5fe6f9331b0c3ae952f1` and `d2932bfd559b100e1ada2101cf929eae9ee7dc7a` passed at 233/233 mechanized rules.
+- `node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref d2932bfd559b100e1ada2101cf929eae9ee7dc7a` passed, retaining 9 existing public-copy findings.
+- `python3 scripts/repository_docs.py` reported source parity.
+- `node --test` on the repository-doc resolver, pin, dependency, manifest, classifier, concurrency and pre-commit suites passed 263 tests.
+- `python3 scripts/ios/test_training_rest_project.py` passed. `node scripts/ios/swift-arch/guard.mjs` reported 540 baselined violations and none new. `node scripts/check-vendor-boundaries.js` passed.
+
+Xcode is not installed here. Native compilation, snapshot review and coverage remain for the real macOS runner. No gate was weakened or skipped.
+
+The harness owns pushing and PR edits. Use exactly one machine line:
+
+`Machine: built scripts/resolve-repository-docs.py`
+
+Intent-eval: n/a - merge repair through the existing pin and ledger machines; no user-facing output changed.
+
+## Repeated ledger merge guard, 2026-11-07
+
+Mission: resolve the recurring conflict and protect receipts across later repairs.
+Audience: the lanes harness and repository reviewers.
+
+Merged `origin/main` at `7e85a8b1530a7c91757e61f5f9f59253e1538c46` into
+`c4d28836dd48647653a771dcb4b04ae022f19ab6`, without rebasing. Only the correction
+ledger conflicted. The existing classifier's `--resolve-merge . --stage` retained
+all 324 parent receipts; the guard receipt brings the total to 325. The iOS and
+workflow bytes match the prior PR head. Main's dependency changes and repair
+checks are retained. No files became obsolete.
+
+Extended the classifier's existing required regression matrix with three successive
+conflicted merges. Each round checks the exact staged union and rejects omitted
+branch and earliest-main receipts without mutation. Restoring the union passes;
+all six seeded omissions fail. This exercises the machine already extended in this
+PR, including fresh merge evidence on each invocation. No parallel repair tool was added.
+
+Verification used Node 22.23.2 and pnpm 10.34.1:
+
+- `pnpm install --frozen-lockfile --prefer-offline`, `pnpm lint`, `pnpm typecheck`,
+  `pnpm test`, and `pnpm product:check` passed. All eight Turbo test tasks passed;
+  web ran 177 suites / 1,772 tests, and shared-lib ran 68 Vitest files / 448 tests
+  plus 141 Node tests. The classifier retained 100% line, branch and function coverage.
+- `node --test scripts/pre-commit-lint.test.mjs` passed 83 cases, including all
+  repository-doc resolver modes and main's dependency-verification regressions.
+- `pnpm lint:swift` passed with zero violations in 562 files; this Linux
+  SwiftLint cannot run its SourceKit-dependent rules.
+- `python3 scripts/ios/test_training_rest_project.py`,
+  `node scripts/ios/swift-arch/guard.mjs`, `node scripts/check-vendor-boundaries.js`,
+  `python3 scripts/repository_docs.py`, and `git diff --cached --check` passed.
+- Correction coverage against both full parent SHAs passed at 235/235 mechanized
+  rules. `correction-ratchet.mjs --base-ref` used the incoming full SHA and retained
+  the nine existing claims findings. `resolve-repository-docs.py --staged` and
+  `correction-classifier.mjs --check-merge .` verified the actual staged merge.
+
+GitHub reported no failed checks or Actions runs on the starting head, so there
+were no failed run logs to retrieve. The sandboxed Git fixture run stalled and was
+terminated; the host-access test run passed. `xcodebuild -version` returned command
+not found. Native compilation, execution, snapshot review and coverage remain for
+the required macOS runner. No gate was changed. The local repair branch is
+`fix/pr1679-conflict-20261107t1330`; the harness owns pushing and PR edits.
+
+The harness must put exactly one current machine line in the PR body:
+
+`Machine: built scripts/correction-classifier.mjs`
+
+Intent-eval: n/a - mechanical merge repair and developer regression guard; no user-facing output changed.
