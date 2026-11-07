@@ -5965,5 +5965,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-merge-driver",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1698#repair-ledger-merge-driver",
+    "correction": "PR #1698 / LYB-338, fix-red-e3b0c44298 occurrence 79: merge origin/main without rebasing. The only conflict is the correction ledger, because both parents appended different receipts. Failing checks: none. Repeated conflict-only repairs must union that ledger during git merge instead of editing it by hand.",
+    "mechanization": "Extend the existing correction classifier with a correction-ledger merge driver that classifies the same parent union as --resolve-merge and leaves divergent receipt edits unmerged. The required shared-lib suite proves the built-in merge conflicts, the configured driver keeps both parents, and a divergent edit returns a conflict without rewriting the current file. Install the driver from the existing Codex bootstrap when the checkout is a Git repository. Use that driver for this merge. The harness owns push and PR-body edits and must replace the current machine line with exactly one line: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Git invokes the existing classifier as the ledger merge driver, so additive receipt conflicts keep both parents and divergent edits stay conflicted without a manual JSON edit."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "correction ledger merge driver unions both parents"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

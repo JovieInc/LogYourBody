@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   copyFileSync,
   mkdirSync,
@@ -13,7 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
-import { bootstrap } from './codex-setup.mjs';
+import { bootstrap, installCorrectionLedgerMergeDriver } from './codex-setup.mjs';
 
 function fixture(t, behavior = '') {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'jovie-codex-')));
@@ -39,6 +39,23 @@ exit "\${INSTALL_STATUS:-0}"
   );
   return { root, env: { PATH: `${join(root, 'bin')}:/usr/bin:/bin` } };
 }
+
+test('installs the correction ledger merge driver in a git checkout', (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'jovie-codex-driver-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const options = {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  assert.equal(installCorrectionLedgerMergeDriver(root, options.env), false);
+  execFileSync('git', ['init'], options);
+  assert.equal(installCorrectionLedgerMergeDriver(root, options.env), true);
+  assert.equal(
+    execFileSync('git', ['config', '--local', '--get', 'merge.correction-ledger.driver'], options).trim(),
+    'node scripts/correction-classifier.mjs --merge-driver %O %A %B',
+  );
+});
 
 test('installs frozen dependencies in the repository without touching environment or lockfiles', (t) => {
   const { root, env } = fixture(t);
