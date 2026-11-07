@@ -6702,5 +6702,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-simctl-terminate-stays-bounded",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42413512859",
+    "correction": "PR #1746 / LYB-343, fix-red-5df69c1e5f occurrence 29: Launch Quality run 42413512859 timed out the 52-minute step while MesocycleCanvasUITests was starting. simctl terminate blocked for 7 minutes on the cold simulator before the build, after every selected case that ran had passed. Keep goal-relative stats, every recovery assertion, the 52-minute step, and the per-test allowances.",
+    "mechanization": "Extend the existing launch-quality timeout helper so each pre-build and pre-test simctl terminate dies at 20 seconds instead of waiting on cold CoreSimulator. The required evidence test runs the previous direct xcrun cleanup and the current function: the old cleanup records two raw terminates and no cap, and the current function records two 20-second caps and both bundle ids even when terminate returns 124. The shell stays at its 670-line company size cap. Native execution remains unverified on this Linux host. The harness owns push and PR-body updates and must add exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Launch-quality cleanup owns every simctl terminate before build and test. Routing those calls through the existing timeout helper makes a cold CoreSimulator hang die at 20 seconds, so the last canvas and onboarding cases still fit in the 52-minute step."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "A cold simctl terminate cannot consume the launch-quality step."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

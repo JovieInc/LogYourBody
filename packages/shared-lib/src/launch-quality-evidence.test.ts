@@ -257,6 +257,58 @@ it('rejects incomplete XCTest proof through the launch gate validator with execu
   }
 }, 90_000);
 
+function terminateCleanupReceipt(body: string) {
+  const directory = mkdtempSync(`${tmpdir()}/lyb-simctl-terminate-`);
+  try {
+    const script = `${directory}/cleanup.sh`;
+    writeFileSync(
+      script,
+      `set -euo pipefail
+run_with_timeout() {
+  printf '%s\\n' "$1" >> "$RECEIPT/caps"
+  printf '%s\\n' "$6" >> "$RECEIPT/bundles"
+  return 124
+}
+xcrun() {
+  printf '%s\\n' "$4" >> "$RECEIPT/raw"
+}
+${body}
+cleanup_booted_simulator_apps
+`,
+    );
+    execFileSync('/bin/bash', [script], {
+      env: { PATH: '/usr/bin:/bin', RECEIPT: directory },
+      encoding: 'utf8',
+    });
+    const lines = (name: string) => {
+      try {
+        return readFileSync(`${directory}/${name}`, 'utf8').trim().split('\n').filter(Boolean);
+      } catch {
+        return [];
+      }
+    };
+    return { caps: lines('caps'), bundles: lines('bundles'), raw: lines('raw') };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+// A cold simctl terminate cannot consume the launch-quality step.
+it('bounds cold simctl terminate so the launch-quality step can finish its last UI cases', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const source = readFileSync(`${root}/scripts/ios/launch-quality-audit.sh`, 'utf8');
+  const start = source.indexOf('cleanup_booted_simulator_apps() {');
+  const end = source.indexOf('\n}\n', start);
+  const body = source.slice(start, end + 2);
+  const unbounded = `cleanup_booted_simulator_apps() {
+  xcrun simctl terminate booted com.logyourbody.app >/dev/null 2>&1 || true
+  xcrun simctl terminate booted com.logyourbody.app.xctrunner >/dev/null 2>&1 || true
+}`;
+  const bundles = ['com.logyourbody.app', 'com.logyourbody.app.xctrunner'];
+  expect(terminateCleanupReceipt(unbounded)).toEqual({ caps: [], bundles: [], raw: bundles });
+  expect(terminateCleanupReceipt(body)).toEqual({ caps: ['20', '20'], bundles, raw: [] });
+});
+
 it('propagates evidence assertion failures and nonzero exits despite passing suite markers', () => {
   const directory = mkdtempSync(`${tmpdir()}/lyb-evidence-failure-`);
   try {

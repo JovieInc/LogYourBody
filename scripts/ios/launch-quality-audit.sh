@@ -121,15 +121,15 @@ COMMON_XCODEBUILD_ARGS=(
 )
 
 cleanup_booted_simulator_apps() {
-  xcrun simctl terminate booted com.logyourbody.app >/dev/null 2>&1 || true
-  xcrun simctl terminate booted com.logyourbody.app.xctrunner >/dev/null 2>&1 || true
+  # Cold CoreSimulator can block terminate for minutes before the app exists.
+  run_with_timeout "${SIMCTL_TERMINATE_TIMEOUT_SECONDS:-20}" xcrun simctl terminate booted com.logyourbody.app >/dev/null 2>&1 || true
+  run_with_timeout "${SIMCTL_TERMINATE_TIMEOUT_SECONDS:-20}" xcrun simctl terminate booted com.logyourbody.app.xctrunner >/dev/null 2>&1 || true
 }
 
 is_simulator_infra_failure() {
   local log_file="$1"
 
-  # Retry only runner startup failures before XCTest begins. A test timeout's
-  # generic restart message is not proof of a launch failure (PR #1555).
+  # Retry only pre-XCTest launch failures. A timeout restart line is not one (PR #1555).
   if grep -Eq 'Test (Case|Suite) .* started|exceeded execution time allowance' "$log_file"; then
     return 1
   fi
