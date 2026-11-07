@@ -63,3 +63,17 @@ checks supplement editorial review; they are not semantic medical certification.
 This metadata-only slice adds no visible behavior or new rollout path. Native
 cards, personal tag storage, exercise selection changes and real-device
 TestFlight evidence remain outside LYB-255 and with their existing owners.
+
+## Unknown measures (LYB-296)
+
+`loadExerciseVariantRecord` reads the same library. Targeted muscle, torso
+support, and the ROM/setup caveat stay `unknown` when a pre-existing exercise
+omits variant metadata. Editable load/tolerance tags do the same for tolerance,
+fatigue, and ROM. Those three missing measures are the sentinel `unknown`, never
+`0`. Body position and equipment continue to come from the existing
+`bodyPosition` and `requires` fields.
+
+The metadata schema rejects a record that stores objective spinal load or a
+numeric stimulus-to-fatigue score, including under the tolerance tags. It still
+does not rank exercises, estimate axial load, or add a score field. Check-in
+observations and the training engine are unchanged.
