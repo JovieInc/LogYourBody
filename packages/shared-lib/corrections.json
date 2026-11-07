@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-verification-created-inputs",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1752",
+    "correction": "PR #1752, fix-red-1423773703 occurrence 49: the Vitest 5.1.0 bump in the root and shared-lib manifests left the generated source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must reject a workspace manifest created while pnpm is verifying inputs.",
+    "mechanization": "Extend both existing dependency repair modes to repeat the untracked and ignored input preflight after pnpm verification and before staging. Two real-Git regressions fail while the previous helper regenerates the projection and pass after the refusal, preserving the index, lockfile, projection and created manifest, then succeed on retry and stay idempotent. The existing required Detect Changes pre-commit suite runs them. Merge origin/main without rebasing and use the extended --verify-lockfile helper so the valid Vitest 5.1.0 lockfile is checked frozen and offline before the source map is staged. Frozen installation and parity gates stay intact. The harness owns pushing and PR updates and must put exactly one line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dependency repair helper already owns the preflight, frozen verification and artifact rollback. Repeating that preflight after pnpm stops a manifest created during verification from being treated as a reviewed input."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Untracked dependency inputs created during verification stay out of the repair."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-ignored-resolver-inputs",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1729",
     "correction": "PR #1729, fix-red-1423773703 occurrence 48: the Statsig 3.33.7 manifest bump retained the 3.33.5 lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Recurring dependency repairs must not depend on ignored local resolver configuration, hooks or patches.",
