@@ -89,7 +89,12 @@ the helper restores the original lockfile and projection bytes (or absence) so
 the same command can be retried without manual cleanup. Another writer's index
 lock and unrelated edits remain untouched.
 It then stages the lockfile and source map, refusing unresolved source conflicts,
-unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift. It requires registry
+unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift.
+During an active merge whose only remaining conflicts are `package.json` files, `--refresh-lockfile`
+unions those manifests from the three Git stages before touching the lockfile. An added dependency
+is kept, a one-sided specifier change is kept, and a same-operator patch or minor bump keeps the
+higher range. Incompatible ranges and every other conflict stay unresolved, and pnpm is not started.
+It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.
 Both dependency modes check pnpm hooks (`.pnpmfile.cjs`), workspace `.npmrc`
 files and `patches/` as dependency inputs. Stage reviewed changes to these files

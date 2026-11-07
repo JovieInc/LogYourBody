@@ -323,6 +323,15 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
     if reviewed_project_sha256 is not None and DIAGNOSTIC_WORKFLOW in unresolved:
         conflicted_pin = reviewed_conflicted_pin(root, reviewed_project_sha256)
         unresolved = [name for name in unresolved if name != DIAGNOSTIC_WORKFLOW]
+    manifests = [
+        name for name in unresolved
+        if name == "package.json" or name.endswith("/package.json")
+    ]
+    # Union a clean dependency manifest before lockfile repair. Other conflicts still fail closed.
+    if refresh_lockfile and manifests and set(unresolved) <= set(manifests):
+        from dependency_manifest_union import merge_conflicted_dependency_manifests
+        merge_conflicted_dependency_manifests(root)
+        unresolved = [name for name in unresolved if name not in manifests]
     if unresolved:
         raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
     if conflicted_pin is not None:

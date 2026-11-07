@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1720",
+    "correction": "PR #1720 (fix-red-1423773703): The turbo 2.11.10 bump left the source projection stale, failing Detect Changes, parity and CI Summary. Merging main also conflicted package.json because Rollup was added beside the turbo range. Repeated dependency repairs must union that manifest and refresh parity together.",
+    "mechanization": "Extend --refresh-lockfile so an active merge whose only conflicts are package.json files unions dependency maps from the three stages before the existing frozen probe. Additions and one-sided specifier changes are kept; a same-operator patch or minor bump keeps the higher range. Incompatible ranges and every other conflict stay unresolved and pnpm is not started. The new real-Git regressions in the existing required pre-commit suite fail on the previous refusal and pass after the extension, including index restoration, idempotence and the unchanged verify-lockfile refusal. Use the extended helper for this turbo bump while retaining frozen-install and parity gates. The union lives in scripts/dependency_manifest_union.py so the resolver stays within the 500-line ratchet. Machine: built scripts/resolve-repository-docs.py. The harness retains push and PR-body ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "launch-copy-merge-duplicate-constants",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1688",
     "correction": "PR #1688 / LYB-288, fix-red-95726c4f82 occurrence 24: merge origin/main without rebasing and preserve health-memory user/product isolation and fail-closed reads and writes. The LaunchJourney conflict must retain the canonical LaunchPromiseCopy table instead of restoring parallel legacy constants. Tently reports an AI-provider outage without code findings.",
