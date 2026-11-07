@@ -65,7 +65,9 @@ stage the source inputs, then run the same `--staged` command before the ledger
 resolver. Pre-commit uses that order so a conflicted projection cannot make the
 ledger check fail closed before the projection is rebuilt. It rebuilds only the
 conflicted projection from stage-zero inputs and leaves unrelated conflicts
-untouched. A conflicted input still fails without changing the projection or
+untouched. `--union-manifests` also unions additive launch-audit sibling
+registrations in the parent audit, its Python expectation, and the shared-lib
+input list; any other conflict in those files still refuses the merge. A conflicted input still fails without changing the projection or
 index; ordinary unstaged projection edits remain protected.
 
 For dependency bumps with an already updated lockfile, run
@@ -86,6 +88,9 @@ repair first verifies the existing lockfile offline with pinned Corepack pnpm.
 Only a confirmed manifest mismatch (`ERR_PNPM_OUTDATED_LOCKFILE`) triggers
 regeneration without lifecycle scripts and a second frozen offline check.
 Valid lockfiles keep their resolutions; other installation failures stop repair.
+Both dependency repair modes refuse index or manifest edits made while pnpm is
+verifying inputs. They preserve those edits and restore the original generated
+artifacts; stage the reviewed inputs and retry the same command.
 If resolution, frozen verification, projection generation or Git staging fails,
 the helper restores the original lockfile and projection bytes (or absence) so
 the same command can be retried without manual cleanup. Another writer's index
@@ -93,6 +98,8 @@ lock and unrelated edits remain untouched.
 It then stages the lockfile and source map, refusing unresolved source conflicts,
 unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift. It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.
+Both dependency modes also refuse ignored npmrc files, pnpm hooks and patches;
+configuration inside installed `node_modules` is excluded from this preflight.
 Both dependency modes check pnpm hooks (`.pnpmfile.cjs`), workspace `.npmrc`
 files and `patches/` as dependency inputs. Stage reviewed changes to these files
 before repair; local edits remain untouched when the preflight refuses them.

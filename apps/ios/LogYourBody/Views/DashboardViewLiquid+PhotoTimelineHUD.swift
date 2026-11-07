@@ -74,6 +74,9 @@ extension DashboardViewLiquid {
 
             photoTimelineHomeContent
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? 0 : .infinity)
+                // The edge swipe lives on the content, below the header. A
+                // high-priority drag that shares the menu button's edge drops
+                // the Open Menu tap before the sidebar can present.
                 .overlay(alignment: .leading) {
                     Color.clear
                         .frame(width: 20)

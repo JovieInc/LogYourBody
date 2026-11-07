@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-ignored-resolver-inputs",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1729",
+    "correction": "PR #1729, fix-red-1423773703 occurrence 48: the Statsig 3.33.7 manifest bump retained the 3.33.5 lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Recurring dependency repairs must not depend on ignored local resolver configuration, hooks or patches.",
+    "mechanization": "Extend both existing dependency repair modes to reject ignored npmrc files, pnpm hooks and patches before invoking pnpm, excluding installed node_modules configuration. Six real-Git negative controls fail against the prior helper; the required Detect Changes pre-commit suite verifies refusal with unchanged artifacts and index, preserved local inputs, successful retry and idempotence. Resolve exactly Statsig 3.33.7, retain unrelated main lockfile resolutions, then use the extended --refresh-lockfile helper for frozen verification and staged source parity. All frozen-install and parity gates remain intact. The harness owns pushing and PR updates and must include exactly one line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency repair helper owns resolver input preflight. Rejecting ignored local resolver files prevents Git ignore rules from allowing machine-specific inputs into the committed dependency repair."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Ignored hooks, npmrc files and patches are still local-only resolver inputs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-staged-projection-configuration",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1724",
     "correction": "PR #1724, fix-red-1423773703 occurrence 48: the Autoprefixer 10.6.2 bump left the generated source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must use reviewed projection configuration before invoking pnpm, as well as rendering staged source bytes.",
@@ -6021,6 +6039,104 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "merge-repair-preserves-splitter-capabilities",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1703",
+    "correction": "PR #1703 / LYB-315, fix-red-cc900b961c occurrence 7: merge origin/main without rebasing, retain both splitter repair modes and every parent correction receipt. CI run 41387854302 passed visualization unit and timeline interaction cases but failed two ChaosEdgeCase tests at app.launch with background-assertion timeouts. Tently check 125092554407 reports an AI-provider outage with no source findings.",
+    "mechanization": "Extend the existing size-ratchet machine by routing incoming declaration extraction through the retained raw-string-aware Swift parser and preserving its public extraction entrypoint and guard anchor. Normalize leading separator newlines when extracting a whole type. Extend the existing required iOS Static Audits suite with a real CLI sequence that extracts a raw-string-bearing type and then rehomes an XCTestCase helper into its independent fixture superclass. This regression fails against both immutable merge parents and passes on the composed machine; all 17 splitter tests pass. Use the extended machine on the merged tree with --check. Resolve the diagnostic pin and source map with the existing reviewed-project resolver, and merge/classify the correction ledger with the existing classifier, retaining both parents. Preserve the no-retry-after-XCTest-start policy and all selectors, coverage floors and assertions. Native execution on the new head remains required on macOS; the provider outage requires a successful hosted review. The harness owns pushes and PR edits. Retain exactly one PR-body line: Machine: built scripts/ios/split_size_ratchet.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Sharing one parser composes both current repair modes, but product or tool code cannot prevent a future one-sided conflict resolution from removing either CLI mode."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required iOS Static Audits job executes the splitter behavior suite. One real CLI regression requires both extraction and independent XCTest fixture rehoming after every future merge."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_split_size_ratchet.py",
+      "anchor": "test_cli_preserves_extraction_and_fixture_rehoming_after_a_merge"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "merged-swift-splitter-keeps-namesake-and-fixture",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1703",
+    "correction": "PR #1703 / LYB-315, fix-red-95726c4f82 occurrence 22: merge origin/main without rebasing and retain both parents' size-guard capabilities, native cleanup paths and resolver tests. The incoming namesake splitter rejects an XCTestCase extension because its sibling path collides with the suite filename. Tently reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing size-ratchet splitter to combine namesake preservation with the branch's XCTest fixture rehoming and raw-string parser. Keep Swift splitting in a sibling module below 500 lines while retaining the incoming size, baseline, argument-order and default-reference checks. The real-file regression fails against the incoming splitter with a path collision and passes after the combined splitter preserves the suite, fixture state and raw string. Retain every parent test in the required static audit and use --check on this merged tree. Resolve the project pin/source map and correction ledger with the existing resolvers. The harness owns push and PR-body updates; retain exactly one line: Machine: built scripts/ios/split_size_ratchet.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Rehome the XCTest extension before selecting namesake sibling paths so the generator cannot produce a colliding suite path or leave its helpers in a cross-file extension."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/split_swift_types.py",
+      "anchor": "text = rehome_extensions_in_source(text)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-audit-parent-size-ratchet",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1703",
+    "correction": "PR #1703 / LYB-315, fix-red-95726c4f82 occurrence 20: merge origin/main without rebasing. Both parents changed project.pbxproj, so the diagnostic pin and generated source map conflict on different fingerprints. Keeping both parents' launch-audit edits also grows the parent past the company 500-line ratchet. Tently reports an AI-provider outage without code findings; do not bypass that gate.",
+    "mechanization": "Resolve the pin-only workflow conflict with the existing reviewed-project digest resolver, which rebuilds the source map from the merged index and ignores unstaged bytes. Move header and edge swipe checks into a launch-audit sibling so the parent stays within 500 lines. Extend the existing required shared-lib audit test to reject a parent over that limit and a dropped gesture sibling. The oversized inlined parent fails that assertion; the extracted audit passes. Do not bypass Tently. The harness owns push and PR-body updates and must replace any earlier machine declaration with exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Loading the gesture checks from a sibling removes them from this parent, but the loader cannot stop a later edit from inlining those checks and growing the parent past 500 lines."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib launch audit test reads the parent source, so a merge that leaves it over 500 lines or drops the gesture sibling fails before the audit runs."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-ui-regression-audit.test.ts",
+      "anchor": "The parent audit stays within the company 500-line ratchet."
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "timeline-edge-swipe-excludes-menu",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41354175812",
+    "correction": "PR #1703 / LYB-315, fix-red-cc900b961c occurrence 5: Launch Quality run 41354175812 fails testPhotoScrubResetsWhenNavigatingToTheMenuAndBack because a single Open Menu tap leaves home_v2_sidebar_scrim absent. The root edge high-priority drag included header padding and shared the menu button's leading edge, so the button action never presented the sidebar. Tently reports an AI-provider outage and stays unchanged.",
+    "mechanization": "Move the existing edge high-priority drag from the root overlay onto the home content below the header, with its hit shape before any padding. Extend the existing launch UI regression audit with timeline.edge_swipe_excludes_header. The behavior regression rejects the old parent overlay and padding before the gesture, and passes on the content-only overlay. The existing required shared-lib suite runs that audit. Launch Quality keeps the three-tap and title-swipe assertions. Native execution remains unverified on this Linux host. Do not bypass Tently. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Attaching the edge swipe only to the content below the header excludes the menu button hit region by construction. The hit shape is applied before any padding, so the drag cannot cover the header while the title swipe and sidebar assertions stay in place."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "timeline.edge_swipe_excludes_header"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-verification-input-drift",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1731",
+    "correction": "PR #1731, fix-red-1423773703 occurrence 48: the Statsig Node Core 0.24.0 manifest-only bump left the workspace lockfile and generated source map stale, failing frozen installation, Detect Changes, parity and CI Summary. Repeated dependency repairs must retain the same reviewed inputs through verification and artifact staging.",
+    "mechanization": "Extend the existing dependency repair helper to refuse index or manifest changes made while pnpm verifies dependencies, restoring generated artifacts without overwriting the concurrent manifest edit. Four real-Git regressions in the existing required Detect Changes suite fail before the guard and pass afterward across refresh/verify modes and staged/unstaged edits, including successful reviewed retries and idempotence. Merge origin/main first, then use --refresh-lockfile to repair this manifest-only bump and regenerate source parity. Preserve all frozen-install and parity gates. The harness retains push and PR-body ownership and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing helper owns verification and staging of both derived dependency artifacts. Comparing the index and dependency inputs after pnpm returns prevents a concurrent unverified manifest from being committed with a previously verified lockfile."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Refuse inputs changed during verification before staging dependency artifacts."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "signing-renewal-pr-launch-quality-repair",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41339803046",
     "correction": "PR #1698 / LYB-338, fix-red-cc900b961c occurrence 7: merge origin/main without rebasing and repair CI Summary and Launch Quality. The failed native run loses composer focus, intercepts Open Menu taps with the root edge overlay, and times out probing duplicate logout descendants. Tently reports an AI-provider outage (reference 2510f0ec-3c38-4211-98c2-86e31c7f5d6b), without a source finding.",
@@ -6172,6 +6288,24 @@
     "guard": {
       "path": "scripts/ios/launch_ui_home_interaction_audit.py",
       "anchor": "_BRACE_TOKEN.finditer(text, open_brace)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-audit-sibling-registration-union",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1698",
+    "correction": "LYB-338 repair, fix-red-e3b0c44298 occurrence 86 in 14 days: merging origin/main conflicts when both parents add a launch-audit sibling. Signing renewal must keep creating an Apple Distribution certificate, and both sibling checks must survive.",
+    "mechanization": "Extend manifest union to keep every parent launch-audit sibling export, expected name, and shared-lib input string, then regenerate the source projection. Non-additive hunks still refuse without staging. Use --union-manifests on this merge after keeping the timeline edge-swipe comment and the recorded edge-swipe mutations. The parent audit stays within 500 lines. 44 behavior cases, 12 signing-identity cases, and the shared-lib launch-audit test pass. The harness owns push and PR edits and must set exactly one PR body line: Machine: built scripts/manifest_union.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing manifest union already unions additive turbo inputs during a merge. Extending it to the launch-audit sibling lists removes the recurring hand merge without a second resolver."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "Additive launch-audit sibling registrations keep every parent export."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
