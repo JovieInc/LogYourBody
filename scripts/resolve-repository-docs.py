@@ -387,9 +387,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                     cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 )
                 print(probe.stdout, end="", flush=True)
-                # Refresh only a confirmed manifest mismatch; other failures remain blockers.
+                # Refresh only confirmed manifest or override mismatches; other failures remain blockers.
                 if probe.returncode:
-                    if "ERR_PNPM_OUTDATED_LOCKFILE" not in probe.stdout:
+                    if not any(code in probe.stdout for code in (
+                        "ERR_PNPM_OUTDATED_LOCKFILE", "ERR_PNPM_LOCKFILE_CONFIG_MISMATCH",
+                    )):
                         probe.check_returncode()
                     modes.insert(0, ["--no-frozen-lockfile"])
                 else:

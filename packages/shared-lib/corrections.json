@@ -6001,5 +6001,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-overrides-cannot-mask-direct-bumps",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1728",
+    "correction": "PR #1728, fix-red-1423773703 occurrence 48: merge origin/main without rebasing and repair the PostCSS 8.5.32 dependency update. Detect Changes and parity reject the stale source projection, causing CI Summary to fail. A broad workspace override also masks the direct web bump and leaves PostCSS 8.5.30 resolved.",
+    "mechanization": "Extend the existing --refresh-lockfile helper to regenerate after pnpm confirms an override-configuration mismatch, then retain frozen offline verification. Eight error/mode regressions cover both repairable mismatches and refusal of authentication or broken-lockfile errors; the configuration-mismatch repair case fails before the extension. Extend the existing required shared-lib dependency-resolution guard to compare overridden direct semver dependencies with their requested ranges, plus PostCSS override, locked-copy and installed web/Next/Tailwind checks. The unrepaired graph fails six cases, including apps/web postcss 8.5.30 not satisfying ^8.5.32. Align both PostCSS overrides and use the extended helper for this repair. Existing Detect Changes tests import the helper regression suite. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper owns dependency artifact generation and can handle a confirmed override mismatch while preserving frozen verification and refusing unrelated failures by construction. The existing dependency-resolution tests additionally prevent workspace overrides from silently defeating direct dependency bumps."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "ERR_PNPM_OUTDATED_LOCKFILE\", \"ERR_PNPM_LOCKFILE_CONFIG_MISMATCH"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
