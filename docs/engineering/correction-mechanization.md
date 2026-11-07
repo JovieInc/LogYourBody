@@ -164,3 +164,6 @@ current merge. Concurrent ledger edits are preserved and cannot be overwritten
 by a resolution computed from earlier bytes.
 They also recheck `HEAD` and `MERGE_HEAD` before writing or returning success;
 changed parents invalidate the review even when the index is unchanged.
+The pre-write boundary samples the index, then repeats the index, parent and
+ledger comparison before replacement. A writer that lands during that sample
+cannot authorize the write, staging or a successful verdict.

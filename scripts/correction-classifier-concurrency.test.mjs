@@ -8,8 +8,8 @@ import { classifyLedger, runClassifier } from './correction-classifier.mjs';
 
 const commands = [['--resolve-merge'], ['--resolve-merge', '--stage'], ['--check-merge']];
 for (const [args, target] of commands.flatMap((args) =>
-  ['index', 'HEAD', 'MERGE_HEAD', 'ledger', 'ledger-write']
-    .filter((target) => args[0] !== '--check-merge' || target !== 'ledger-write')
+  ['index', 'HEAD', 'MERGE_HEAD', 'ledger', 'ledger-write', 'index-write', 'HEAD-write']
+    .filter((target) => args[0] !== '--check-merge' || !target.endsWith('-write'))
     .map((target) => [args, target]),
 )) {
   test(`${args.join(' ')} refuses a changed ${target} and safely retries`, (t) => {
@@ -51,18 +51,26 @@ for (const [args, target] of commands.flatMap((args) =>
       assert.equal(runClassifier(['--resolve-merge', root, '--stage'], quiet), 0);
     }
     const original = readFileSync(ledger, 'utf8');
-    const parent = ['index', 'ledger', 'ledger-write'].includes(target)
+    const writeTarget = target.endsWith('-write') ? target.slice(0, -'-write'.length) : target;
+    const parent = ['index', 'ledger'].includes(writeTarget)
       ? null
-      : git('rev-parse', target).trim();
+      : git('rev-parse', writeTarget).trim();
     const replacement = parent && git('rev-parse', `${parent}^`).trim();
     const setParent = (value) => {
-      if (target === 'MERGE_HEAD') {
+      if (writeTarget === 'MERGE_HEAD') {
         // MERGE_HEAD is a pseudoref; recent Git refuses update-ref writes to it.
-        writeFileSync(resolve(root, git('rev-parse', '--git-path', target).trim()), `${value}\n`);
+        writeFileSync(
+          resolve(root, git('rev-parse', '--git-path', writeTarget).trim()),
+          `${value}\n`,
+        );
       } else {
-        git('update-ref', target, value);
+        git('update-ref', writeTarget, value);
       }
-      assert.equal(git('rev-parse', target).trim(), value, 'the parent mutation must take effect');
+      assert.equal(
+        git('rev-parse', writeTarget).trim(),
+        value,
+        'the parent mutation must take effect',
+      );
     };
     let changedIndex;
     let indexReads = 0;
@@ -80,16 +88,16 @@ for (const [args, target] of commands.flatMap((args) =>
       (program, argv, options) => {
         const output = execFileSync(program, argv, options);
         if (argv.includes('ls-files')) indexReads += 1;
-        const ledgerRead = target === 'ledger' ? 2 : target === 'ledger-write' ? 3 : null;
+        const ledgerRead = target === 'ledger' ? 2 : target.endsWith('-write') ? 3 : null;
         if (
           argv.includes('ls-files') &&
           changedIndex === undefined &&
           (ledgerRead === null || indexReads === ledgerRead)
         ) {
-          if (target === 'index') {
+          if (writeTarget === 'index') {
             writeFileSync(join(root, 'concurrent.txt'), 'another writer\n');
             git('add', 'concurrent.txt');
-          } else if (target === 'ledger' || target === 'ledger-write') {
+          } else if (writeTarget === 'ledger') {
             // Edit after the snapshot read, without changing staged bytes or parents.
             writeFileSync(ledger, concurrentLedger);
           } else {
@@ -105,15 +113,15 @@ for (const [args, target] of commands.flatMap((args) =>
     assert.equal(status, 1, 'changed merge evidence cannot receive a successful verdict');
     assert.match(
       diagnostic,
-      target === 'index'
+      writeTarget === 'index'
         ? /merge index changed during validation/
-        : target === 'ledger' || target === 'ledger-write'
+        : writeTarget === 'ledger'
           ? /merge ledger changed during validation/
           : /merge parents changed during validation/,
     );
     assert.equal(
       readFileSync(ledger, 'utf8'),
-      target === 'ledger' || target === 'ledger-write' ? concurrentLedger : original,
+      writeTarget === 'ledger' ? concurrentLedger : original,
       'refusal preserves the ledger, including another writer’s edits',
     );
     assert.equal(
@@ -122,12 +130,12 @@ for (const [args, target] of commands.flatMap((args) =>
       'refusal preserves the other writer',
     );
     if (parent) {
-      assert.equal(git('rev-parse', target).trim(), replacement, 'refusal preserves the writer');
+      assert.equal(git('rev-parse', writeTarget).trim(), replacement, 'refusal preserves the writer');
       setParent(parent);
     }
-    if (target === 'ledger' || target === 'ledger-write') writeFileSync(ledger, original);
+    if (writeTarget === 'ledger') writeFileSync(ledger, original);
     assert.equal(runClassifier(command, quiet), 0, 'retry validates current merge evidence');
     assert.deepEqual(JSON.parse(readFileSync(ledger, 'utf8')), [rows[2], rows[0], rows[1]]);
-    if (target === 'index') assert.equal(git('show', ':0:concurrent.txt'), 'another writer\n');
+    if (writeTarget === 'index') assert.equal(git('show', ':0:concurrent.txt'), 'another writer\n');
   });
 }

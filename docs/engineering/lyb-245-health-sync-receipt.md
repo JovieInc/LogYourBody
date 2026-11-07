@@ -246,3 +246,30 @@ exactly one current machine declaration in the PR body:
 `Machine: built apps/ios/LogYourBody/Services/RealtimeSyncManager.swift`
 
 Intent-eval: n/a - deterministic fixture repair and developer guards; no user-facing output changed.
+
+## Pre-write index repair (fix-red-e3b0c44298, occurrence 83)
+
+Mission: merge current main without rebasing, keep the Apple Health sync caption and weight receipt, and stop a stale ledger resolution from succeeding.
+Audience: the lanes harness and repository reviewers.
+
+Merged `origin/main` at `07a2b8705551581f8d9f56c79742a82c0d05ca2c` into `d801899d599b6ec584593bdc48779ba54749329e`. The conflicts were the correction ledger and the customer-voice privacy test. The dependency-repair script auto-merged with both the parent-reference guard and the incoming indexed-symlink refusal. Prettier 3.9.10 and its lockfile came from main. The privacy test keeps the fixed `.000Z` and `.935Z` clocks and the whole stored-record assertion; main's single `AT` clock would drop the `.935Z` case and the existing receipt anchor.
+
+The extended classifier resolved the ledger with `--resolve-merge . --stage`. The union kept every parent receipt: 314 from this branch and 305 from main, 315 combined, then one new receipt for 316. Sync-state copy, receipt placement, gates and native tests are unchanged.
+
+The pre-write path sampled the index and discarded that read, so an index or `HEAD` change during the sample still returned success. The same command now compares the index, both parents and the working ledger after the sample and before replacement. Four real-Git controls, unstaged and staged for both the index and `HEAD`, returned success before the comparison and refuse afterward, preserving the other writer and retrying cleanly. The existing 18 concurrency cases still pass. The covered classifier command passed 77 tests at 100% line, branch and function coverage.
+
+Verification on this host:
+
+- `node scripts/correction-classifier.mjs --check-merge .` verified the staged union against both parents.
+- Correction coverage against `d801899d599b6ec584593bdc48779ba54749329e` and `07a2b8705551581f8d9f56c79742a82c0d05ca2c` passed at 226/226 mechanized rules.
+- `node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref 07a2b8705551581f8d9f56c79742a82c0d05ca2c` passed, retaining 9 existing public-copy findings.
+- `node --test` on the repository-doc resolver, pin, dependency and pre-commit suites passed 151 tests. `python3 scripts/repository_docs.py` reported source parity.
+- `pnpm exec jest --coverage=false --watchman=false --runInBand src/lib/customer-voice/customer-voice.test.ts` from `apps/web` passed 24 tests, including both fixed clocks. Corepack pnpm 10.34.1 built `@jovieinc/product-registry` first so Jest could load its package entry. The system pnpm 9.15.4 cannot satisfy the repo engine.
+
+Xcode is not installed here. Native compilation, snapshot review and coverage remain for the real macOS runner. No gate was weakened or skipped.
+
+The harness owns pushing and PR edits. Use exactly one machine line:
+
+`Machine: built scripts/correction-classifier.mjs`
+
+Intent-eval: n/a - merge repair and developer-tool guard; no user-facing output changed.

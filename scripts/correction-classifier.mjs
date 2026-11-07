@@ -357,8 +357,10 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
         stageResolution = () => git('add', '--', LEDGER_PATH);
       }
       assertMergeUnchanged();
-      // Recheck the working ledger immediately before replacing it.
+      // Sample the index so the pre-write comparison observes a concurrent writer.
+      // The sample itself is not a verdict: a writer can land while it is read.
       readIndex();
+      assertMergeUnchanged();
     } else {
       path = args[0] ?? resolve(ROOT, LEDGER_PATH);
       const receipts = JSON.parse(readFileSync(path, 'utf8'));
@@ -370,6 +372,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
     }
     const original = readFileSync(path, 'utf8');
     if (resolvingMerge) {
+      // Recheck the working ledger immediately before replacing it.
       assert.equal(
         original,
         working,
