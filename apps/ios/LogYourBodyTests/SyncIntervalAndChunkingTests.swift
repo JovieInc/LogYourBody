@@ -11,6 +11,31 @@ import UIKit
 @testable import LogYourBody
 
 final class SyncIntervalAndChunkingTests: XCTestCase {
+    @MainActor
+    func testOfflineFixtureNeverStartsLiveNetworkMonitoringOrSync() {
+        let sync = RealtimeSyncManager(
+            coreDataManager: .shared, authManager: .shared, productAPIClient: .shared
+        )
+        defer { sync.networkMonitor.cancel() }
+        sync.setupNetworkMonitoring(arguments: [HomeV2SystemStatePolicy.offlineFixtureArgument])
+        XCTAssertFalse(sync.isOnline)
+        XCTAssertEqual(sync.syncStatus, .offline)
+        XCTAssertNil(sync.networkMonitor.pathUpdateHandler)
+        sync.syncAll()
+        XCTAssertFalse(sync.isSyncing)
+        XCTAssertEqual(sync.syncStatus, .offline)
+    }
+
+    @MainActor
+    func testOrdinaryLaunchStillStartsLiveNetworkMonitoring() {
+        let sync = RealtimeSyncManager(
+            coreDataManager: .shared, authManager: .shared, productAPIClient: .shared
+        )
+        defer { sync.networkMonitor.cancel() }
+        sync.setupNetworkMonitoring(arguments: [])
+        XCTAssertNotNil(sync.networkMonitor.pathUpdateHandler)
+    }
+
     // MARK: - BatterySyncIntervalPolicy
 
     func testChargingOrFullSyncsAggressivelyRegardlessOfLevel() {

@@ -7,16 +7,7 @@ import UIKit
 
 final class LogYourBodyUITests: XCTestCase {
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
     func testSignedOutAppleIsTheOnlyAuthAction() throws {
@@ -747,18 +738,20 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     private func hittableLogoutAction(in alert: XCUIElement, identifier: String, label: String) throws -> XCUIElement {
-        let candidates = alert.buttons.matching(identifier: identifier)
-        func interactiveActions() -> [XCUIElement] {
-            candidates.allElementsBoundByIndex.filter {
-                $0.label == label && $0.isEnabled && $0.isHittable
-                    && !$0.descendants(matching: .button).matching(identifier: identifier).firstMatch.exists
-            }
+        let interactive = alert.buttons.matching(identifier: identifier).allElementsBoundByIndex.filter {
+            $0.label == label && $0.isEnabled && $0.isHittable
         }
-        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            interactiveActions().count == 1
-        }, object: nil)
-        let result = XCTWaiter.wait(for: [ready], timeout: 5)
-        let controls = alert.buttons.allElementsBoundByIndex.map {
+        // Nested alert buttons share one frame. Count child buttons once so a
+        // missing descendant cannot retry until the waiter expires.
+        // XCUIElementQuery exposes count and has no isEmpty.
+        var seen = Set<String>()
+        // swiftlint:disable:next empty_count empty_count_check
+        let leaves = interactive.filter { $0.children(matching: .button).count == 0 }.filter { action in
+            let frame = action.frame
+            let key = "\(frame.minX),\(frame.minY),\(frame.width),\(frame.height)"
+            return seen.insert(key).inserted
+        }
+        let controls = interactive.map {
             "\($0.identifier)=\($0.label) enabled=\($0.isEnabled) hittable=\($0.isHittable) frame=\($0.frame)"
         }
         XCTContext.runActivity(named: "Logout action \(identifier): \(controls)") { activity in
@@ -766,9 +759,7 @@ final class LogYourBodyUITests: XCTestCase {
             attachment.lifetime = .keepAlways
             activity.add(attachment)
         }
-        XCTAssertEqual(result, .completed, alert.debugDescription)
-        let actions = interactiveActions()
-        return try XCTUnwrap(actions.count == 1 ? actions.first : nil, alert.debugDescription)
+        return try XCTUnwrap(leaves.count == 1 ? leaves.first : nil, alert.debugDescription)
     }
 
     func testProfileEditorProvidesAnEscapeRoute() throws {
@@ -1877,6 +1868,10 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     func testLaunchQualityGateCapturesTimelineSurfaces() throws {
+        // XCTest rounds the 90s default up to 2 minutes. This case also runs
+        // the dated-timeline scenarios. That kill landed inside typeText and
+        // then terminate hung. 180s is the audit maximum.
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         launch(
             app,
@@ -3528,7 +3523,19 @@ final class LogYourBodyUITests: XCTestCase {
                 let addition = syntheticQuestionInsertion(current: current, question: question)
                 var prefix = current
                 // Acknowledge each prefix while the simulator keyboard connects.
+                // Run 42354066867 kept "S" and then lost keyboard focus before "y".
                 for character in addition {
+                    let focused = app.descendants(matching: composer.elementType)
+                        .matching(identifier: composer.identifier)
+                        .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
+                    if !focused.exists {
+                        if prefix.isEmpty {
+                            composer.tap()
+                        } else {
+                            composer.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+                        }
+                        guard focused.waitForExistence(timeout: 2) else { break }
+                    }
                     composer.typeText(String(character))
                     if String(character) == XCUIKeyboardKey.delete.rawValue {
                         prefix = String(prefix.dropLast())
@@ -4363,7 +4370,7 @@ final class LogYourBodyUITests: XCTestCase {
         ]
         app.forwardActualXCTestContext()
         app.launch()
-        app.tap()
+        app.activateSystemAlertMonitor()
 
         let start = app.buttons["body_score_onboarding_start_button"]
         XCTAssertTrue(start.waitForExistence(timeout: 15))
@@ -4479,7 +4486,7 @@ final class LogYourBodyUITests: XCTestCase {
         ]
         app.forwardActualXCTestContext()
         app.launch()
-        app.tap()
+        app.activateSystemAlertMonitor()
 
         let start = app.buttons["body_score_onboarding_start_button"]
         XCTAssertTrue(start.waitForExistence(timeout: 15))

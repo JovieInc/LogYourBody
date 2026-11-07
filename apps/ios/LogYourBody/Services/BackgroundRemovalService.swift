@@ -8,6 +8,9 @@ import CoreImage
 import UIKit
 class BackgroundRemovalService {
     static let shared = BackgroundRemovalService()
+    private let segmentationQueue = DispatchQueue(
+        label: "com.logyourbody.person-segmentation", qos: .userInitiated
+    )
     private init() {}
 
     enum BackgroundRemovalError: LocalizedError {
@@ -40,17 +43,23 @@ class BackgroundRemovalService {
     /// Person mask from Vision. `perform` either throws or fills `results`, so
     /// there is no completion handler and nothing that can be resumed twice
     /// (the simulator trap that BackgroundRemovalServiceTests used to document).
+    /// Vision waits on its own workers. Serialize requests on a dispatch queue
+    /// so those waits never occupy Swift's cooperative task workers.
     func personMask(for cgImage: CGImage, quality: Float) async throws -> CVPixelBuffer {
-        try await Task.detached(priority: .userInitiated) {
-            let request = VNGeneratePersonSegmentationRequest()
-            request.qualityLevel = quality > 0.8 ? .accurate : .balanced
-            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-            try handler.perform([request])
-            guard let result = request.results?.first else {
-                throw BackgroundRemovalError.noPersonFound
+        try await withCheckedThrowingContinuation { continuation in
+            segmentationQueue.async {
+                continuation.resume(with: Result {
+                    let request = VNGeneratePersonSegmentationRequest()
+                    request.qualityLevel = quality > 0.8 ? .accurate : .balanced
+                    let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+                    try handler.perform([request])
+                    guard let result = request.results?.first else {
+                        throw BackgroundRemovalError.noPersonFound
+                    }
+                    return result.pixelBuffer
+                })
             }
-            return result.pixelBuffer
-        }.value
+        }
     }
 
     /// Copies the Vision mask into a value grid so the buffer is not retained.

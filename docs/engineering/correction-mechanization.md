@@ -107,7 +107,14 @@ apply. When the lanes harness owns pushing and PR creation, hand it the commits
 and validation evidence. Do not enable the retired Codex Auto-Fix workflow or
 start a second PR owner.
 
-For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
+For merge repairs, `packages/shared-lib/corrections.json` uses the
+`correction-ledger` merge driver. `scripts/codex-setup.mjs` installs
+`merge.correction-ledger.driver` as
+`node scripts/correction-classifier.mjs --merge-driver %O %A %B`.
+That command classifies the same parent union as `--resolve-merge`: incoming
+receipt order, then branch-only receipts. Divergent edits of one receipt stay
+conflicted. A checkout without the driver keeps Git's text merge.
+`node scripts/correction-classifier.mjs --resolve-merge . --stage`
 merges and classifies the correction ledger after other conflicts are resolved.
 Union generation and parent verification share guard snapshots within that command;
 each retry reads the index and guard sources afresh.

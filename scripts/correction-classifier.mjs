@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   assertLedgerMergeReady,
@@ -187,9 +187,80 @@ function readGitSources(root, objects, execute, regularGuards) {
   );
 }
 
+export const CORRECTION_LEDGER_MERGE_DRIVER =
+  'node scripts/correction-classifier.mjs --merge-driver %O %A %B';
+
+function repositoryRoot(file, execute) {
+  const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] };
+  try {
+    // Git may park the driver inputs beside the ledger or in a temporary directory.
+    return execute('git', ['-C', dirname(resolve(file)), 'rev-parse', '--show-toplevel'], options).trim();
+  } catch {
+    return execute('git', ['rev-parse', '--show-toplevel'], options).trim();
+  }
+}
+
 // Keep the repair command reusable without starting Node or exiting its caller.
 export function runClassifier(args, logger = console, execute = execFileSync) {
   try {
+    if (args[0] === '--merge-driver') {
+      assert.ok(
+        args.length === 4 && args.slice(1).every((arg) => !arg.startsWith('-')),
+        `usage: node scripts/correction-classifier.mjs ${CORRECTION_LEDGER_MERGE_DRIVER.slice(
+          'node scripts/correction-classifier.mjs '.length,
+        )}`,
+      );
+      const [ancestorPath, currentPath, otherPath] = args.slice(1);
+      const root = repositoryRoot(currentPath, execute);
+      const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
+      const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] };
+      // The merge driver runs before Git writes MERGE_HEAD. The incoming commit is
+      // exposed as GITHEAD_<sha> for the merge message.
+      const revisions = new Set(['HEAD']);
+      try {
+        revisions.add(execute('git', ['-C', root, 'rev-parse', 'MERGE_HEAD'], options).trim());
+      } catch {
+        // Fall through to the incoming commit named in the environment.
+      }
+      for (const key of Object.keys(process.env)) {
+        const incoming = /^GITHEAD_([0-9a-f]{40,64})$/iu.exec(key);
+        if (incoming) revisions.add(incoming[1]);
+      }
+      const guards = new Map();
+      const readGuard = (guardPath) => {
+        if (guards.has(guardPath)) return guards.get(guardPath);
+        const chunks = [];
+        for (const revision of revisions) {
+          try {
+            chunks.push(
+              execute('git', ['-C', root, 'show', `${revision}:${guardPath}`], options),
+            );
+          } catch {
+            // A one-sided guard does not exist in that parent.
+          }
+        }
+        try {
+          chunks.push(readSource(guardPath, { root }));
+        } catch {
+          // The in-progress merge may not have checked this guard out yet.
+        }
+        const source = chunks.join('\n');
+        guards.set(guardPath, source);
+        return source;
+      };
+      // Keep incoming order, then append branch-only receipts. Same contract as --resolve-merge.
+      const merged = classifyLedger(
+        mergeCorrectionLedgers(
+          readJson(ancestorPath),
+          readJson(otherPath),
+          readJson(currentPath),
+          readGuard,
+        ),
+      );
+      writeFileSync(currentPath, `${JSON.stringify(merged, null, 2)}\n`);
+      logger.log(`correction ledger merge driver unions both parents: ${merged.length}`);
+      return 0;
+    }
     const resolvingMerge = args[0] === '--resolve-merge';
     const checkingMerge = args[0] === '--check-merge';
     const stagingMerge = resolvingMerge && args[2] === '--stage';
@@ -199,7 +270,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
         : (args.length <= 1 ||
             (args.length === 3 && args[1] === '--merge' && !args[2].startsWith('-'))) &&
             !args[0]?.startsWith('-'),
-      'usage: node scripts/correction-classifier.mjs [ledger.json [--merge other.json]] | --resolve-merge repository [--stage] | --check-merge repository',
+      `usage: node scripts/correction-classifier.mjs [ledger.json [--merge other.json]] | --resolve-merge repository [--stage] | --check-merge repository | ${CORRECTION_LEDGER_MERGE_DRIVER}`,
     );
     let path;
     let result;
