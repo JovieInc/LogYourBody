@@ -89,6 +89,8 @@ Valid lockfiles keep their resolutions; other installation failures stop repair.
 Both dependency repair modes refuse index or manifest edits made while pnpm is
 verifying inputs. They preserve those edits and restore the original generated
 artifacts; stage the reviewed inputs and retry the same command.
+Untracked or ignored dependency inputs created while pnpm is running also fail
+the repair and restore those generated artifacts.
 If resolution, frozen verification, projection generation or Git staging fails,
 the helper restores the original lockfile and projection bytes (or absence) so
 the same command can be retried without manual cleanup. Another writer's index

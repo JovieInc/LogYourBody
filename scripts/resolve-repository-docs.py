@@ -161,6 +161,26 @@ def git_bytes(root, *args):
     ).stdout
 
 
+def refuse_local_dependency_inputs(root, inputs):
+    """Reject manifests, hooks and patches that are not reviewed index files."""
+    # Local-only manifests must not enter a lockfile destined for CI.
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z", "--", *inputs],
+        cwd=root, check=True, capture_output=True, text=True,
+    ).stdout.strip("\0")
+    if untracked:
+        raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
+    # Ignored hooks, npmrc files and patches are still local-only resolver inputs.
+    ignored = subprocess.run(
+        ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
+         ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
+         ":(glob,exclude)**/node_modules/**"],
+        cwd=root, check=True, capture_output=True, text=True,
+    ).stdout.strip("\0")
+    if ignored:
+        raise ValueError("ignored dependency inputs: " + ignored.replace("\0", ", "))
+
+
 def conflicted_diagnostic_template(root):
     """Return one parent workflow when every stage differs only by the project pin."""
     entries = [
@@ -362,22 +382,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             ).stdout.strip()
             if dirty:
                 raise ValueError("unstaged dependency edits: " + dirty.replace("\n", ", "))
-            # Local-only manifests must not enter a lockfile destined for CI.
-            untracked = subprocess.run(
-                ["git", "ls-files", "--others", "--exclude-standard", "-z", "--", *inputs],
-                cwd=root, check=True, capture_output=True, text=True,
-            ).stdout.strip("\0")
-            if untracked:
-                raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
-            # Ignored hooks, npmrc files and patches are still local-only resolver inputs.
-            ignored = subprocess.run(
-                ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
-                 ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
-                 ":(glob,exclude)**/node_modules/**"],
-                cwd=root, check=True, capture_output=True, text=True,
-            ).stdout.strip("\0")
-            if ignored:
-                raise ValueError("ignored dependency inputs: " + ignored.replace("\0", ", "))
+            refuse_local_dependency_inputs(root, inputs)
             # Dependency resolution inputs must be regular indexed files, never symlinks.
             for entry in git_bytes(root, "ls-files", "--stage", "-z", "--", *inputs).split(b"\0"):
                 if entry and entry.split(b" ", 1)[0] not in {b"100644", b"100755"}:
@@ -415,6 +420,8 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                     or git_bytes(root, "diff", "--name-only", "--",
                                  *[name for name in inputs if name != "pnpm-lock.yaml"])):
                 raise ValueError("dependency inputs changed during verification; stage reviewed inputs and retry")
+            # Untracked dependency inputs created during verification stay out of the repair.
+            refuse_local_dependency_inputs(root, inputs)
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
             resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
             return
