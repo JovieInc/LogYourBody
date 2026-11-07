@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-mutating-failed-probe",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1718",
+    "correction": "PR #1718, fix-red-1a39536f40 occurrence 9: merge origin/main without rebasing and repair JavaScript/TypeScript and CI Summary. Run 42360649182 failed because the customer-voice privacy sentinel matched a real forwarded timestamp; main already fixes that test with a pinned clock. Preserve the dependency update and extend the existing repair machine in the same PR.",
+    "mechanization": "Retain this PR's frozen-lockfile byte-preservation guard and extend its existing required Detect Changes regression matrix to cover a failed probe reporting ERR_PNPM_OUTDATED_LOCKFILE after rewriting or deleting the lockfile. Both cases must stop before non-frozen regeneration, restore the original lockfile and projection, and preserve the index. All eight mutation cases fail against the origin/main helper and pass with this PR's guard. Merge main to import its existing privacy-test fix, preserve its React runtime resolutions, and use --verify-lockfile on the repaired update. The harness owns push and PR edits and must include exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency repair helper owns the frozen probe and can reject changed lockfile bytes before a failed probe authorizes regeneration. This prevents unreviewed resolution changes by construction while keeping every frozen-install and source-parity gate."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "frozen verification changed pnpm-lock.yaml"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependabot-react-runtime-version-pair",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1723",
     "correction": "PR #1723, fix-red-1423773703 occurrence 48: merge origin/main without rebasing, repair stale source parity and preserve the React DOM 19.3.1 update. The installed React 19.3.0 / React DOM 19.3.1 pair throws Incompatible React versions during server rendering.",
