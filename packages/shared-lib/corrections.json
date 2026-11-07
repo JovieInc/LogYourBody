@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "launch-quality-uitest-offline-pin",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42367688278/job/128389322850",
+    "correction": "PR #1715 / LYB-295, fix-red-5df69c1e5f occurrence 28: Launch Quality run 42367688278 failed testLaunchQualityGateCapturesTimelineSurfaces because the next action was Record a fresh measurement instead of Retry sync. The UI fixture pins sync offline, then a satisfied simulator path clears that pin before the dated outcome is saved.",
+    "mechanization": "Extend the existing launch UI regression audit with a sibling that rejects a path update assigning isOnline from path status, a pin decision that stays online, and a UI fixture that does not call the pin. The dated-timeline fixture keeps using the paid HUD fixture, which now pins offline before any later path update. The new behavior cases fail on each of those three originals and pass on the repaired sources. The existing required shared-lib suite executes the audit. No selector, timeout, retry, evidence, or coverage gate changes. Native execution remains required on macOS CI. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing path handler can keep a UI-test offline pin by construction, so a satisfied simulator path cannot replace Retry sync with the online stale-measurement action."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_offline_pin_audit.py",
+      "anchor": "A satisfied path must not clear a UI-test offline pin."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-ignored-resolver-inputs",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1729",
     "correction": "PR #1729, fix-red-1423773703 occurrence 48: the Statsig 3.33.7 manifest bump retained the 3.33.5 lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Recurring dependency repairs must not depend on ignored local resolver configuration, hooks or patches.",

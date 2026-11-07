@@ -23,6 +23,19 @@ class RealtimeSyncManager: ObservableObject {
     @Published var unsyncedGlp1Count = 0
     @Published var unsyncedDexaCount = 0
     @Published var isOnline = true
+    /// UI-test fixtures pin offline so a satisfied simulator path cannot change the next action.
+    var pinsOfflineForUITestFixture = false
+
+    static func online(after status: NWPath.Status, pinnedOffline: Bool) -> Bool {
+        if pinnedOffline { return false }
+        return status == .satisfied
+    }
+
+    func pinOfflineForUITestFixture() {
+        pinsOfflineForUITestFixture = true
+        isOnline = false
+    }
+
     @Published var realtimeConnected = false
     @Published var error: String?
 

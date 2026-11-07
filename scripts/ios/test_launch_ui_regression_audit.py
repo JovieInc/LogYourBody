@@ -399,6 +399,7 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 "launch_ui_timeline_day",
                 "launch_ui_opacity_audit",
                 "launch_ui_timeline_gesture_audit",
+                "launch_ui_offline_pin_audit",
                 "launch_ui_regression_report",
             ],
         )
@@ -412,6 +413,30 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 "launch_ui_timeline_day", "launch_ui_timeline_day.py", "not_an_export",
             )
         self.assertIn("Cannot load launch UI audit sibling", str(missing_export.exception))
+
+    def test_satisfied_path_cannot_clear_a_ui_test_offline_pin(self):
+        sync = self.app / "Services/RealtimeSyncManager+Part01.swift"
+        manager = self.app / "Services/RealtimeSyncManager.swift"
+        app = self.app / "LogYourBodyApp.swift"
+        originals = {path: path.read_text() for path in (sync, manager, app)}
+
+        def checks():
+            texts = {path: path.read_text() for path in originals}
+            found = []
+            AUDIT.check_ui_test_offline_pin(self.root, [], found, texts)
+            return [item.check for item in found]
+
+        self.assertEqual(checks(), [])
+        cases = (
+            (sync, "Self.online(after: path.status, pinnedOffline: self.pinsOfflineForUITestFixture)", "path.status == .satisfied"),
+            (manager, "if pinnedOffline { return false }", "if pinnedOffline { return status == .satisfied }"),
+            (app, "pinOfflineForUITestFixture()", "isOnline = false"),
+        )
+        for path, before, after in cases:
+            with self.subTest(path=path.name):
+                path.write_text(originals[path].replace(before, after, 1))
+                self.assertEqual(checks(), ["sync.ui_test_offline_pin"])
+                path.write_text(originals[path])
 
     def test_optional_cgfloat_opacity_must_be_explicit_double(self):
         policy = self.app / "Services/PersonMaskPolicy.swift"
