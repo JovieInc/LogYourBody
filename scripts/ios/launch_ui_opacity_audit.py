@@ -77,8 +77,12 @@ def check_optional_cgfloat_opacity(
     """SwiftUI opacity accepts CGFloat, but not CGFloat? from optional chaining."""
     names: set[str] = set()
     candidates: list[tuple[Path, str]] = []
-    for path in paths:
-        text = texts[path] if texts is not None else path.read_text(errors="replace")
+    pairs = (
+        texts.items()
+        if texts is not None
+        else ((path, path.read_text(errors="replace")) for path in paths)
+    )
+    for path, text in pairs:
         if "CGFloat" in text:
             for match in _CGFLOAT_BINDING.finditer(text):
                 names.add(next(group for group in match.groups() if group))
@@ -102,10 +106,10 @@ def check_optional_cgfloat_opacity(
 
 
 def contribute(root, _app_dir, violations, _violation, _line_number) -> None:
-    """Run the opacity check from the discovered sibling list."""
-    paths = sorted(
-        path
-        for directory in ("LogYourBody", "LogYourBodyTests", "LogYourBodyUITests", "LogYourBodyWidget")
-        for path in (root / "apps" / "ios" / directory).rglob("*.swift")
-    )
-    check_optional_cgfloat_opacity(root, paths, violations)
+    """Run the opacity check from the one-pass Swift snapshot."""
+    import launch_ui_timeline_audit as sources
+
+    texts = sources.SWIFT_SOURCES
+    if texts is None:
+        texts = sources.begin_swift_sources(root)
+    check_optional_cgfloat_opacity(root, list(texts), violations, texts)

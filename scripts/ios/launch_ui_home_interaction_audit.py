@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
+from launch_ui_timeline_audit import text_for
+
 
 def function_body(text: str, name: str, next_name: str) -> str:
     if f"func {name}" not in text or f"func {next_name}" not in text:
@@ -23,7 +25,7 @@ def contribute(root: Path, app_dir: Path, violations: list, violation, _line_num
 def check_person_mask_executor(root: Path, app_dir: Path, violations: list, violation) -> None:
     """Blocking Vision segmentation must leave the Swift cooperative pool available."""
     path = app_dir / "Services/BackgroundRemovalService.swift"
-    text = path.read_text()
+    text = text_for(path)
     body = text.split("func personMask(", 1)[-1].split("func personMaskGrid(", 1)[0]
     queue = re.search(
         r"segmentationQueue\s*:\s*DispatchQueue\s*=\s*DispatchQueue\(([^)]*)\)", text
@@ -41,7 +43,7 @@ def check_person_mask_executor(root: Path, app_dir: Path, violations: list, viol
 def check(root: Path, app_dir: Path, violations: list, function_body, violation) -> None:
     """The provenance chip stays above the weekly prompt, and typed characters refocus."""
     surface = app_dir / "Views/HomeV2/HomeV2Surface.swift"
-    text = surface.read_text(errors="replace")
+    text = text_for(surface)
     body = text.split("var body: some View {", 1)[-1].split("private var systemBanner", 1)[0]
     numbers = text.split("private var photoNumberBlock: some View {", 1)[-1].split(
         "private var ffmiSummary", 1
@@ -63,7 +65,7 @@ def check(root: Path, app_dir: Path, violations: list, function_body, violation)
     if not ui_tests.is_file():
         return
     loop = function_body(
-        ui_tests.read_text(errors="replace"),
+        text_for(ui_tests),
         "submitSyntheticChatQuestion",
         "enteredSyntheticQuestion",
     )
@@ -84,7 +86,7 @@ def check_logout_alert(root: Path, violations: list, violation) -> None:
     path = root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
     if not path.is_file():
         return
-    text = path.read_text()
+    text = text_for(path)
     helper = function_body(text, "hittableLogoutAction", "testProfileEditorProvidesAnEscapeRoute")
     journey = function_body(text, "testProfileLogoutSignsOutFromPushedDetail", "hittableLogoutAction")
     required = (
@@ -122,14 +124,14 @@ def check_ui_test_offline_fixture(root: Path, violations: list, violation) -> No
     monitor = root / "apps/ios/LogYourBody/Services/RealtimeSyncManager+Part01.swift"
     if not app.is_file() or not sync.is_file() or not monitor.is_file():
         return
-    fixture = app.read_text().split("func applyPaidMVPUITestFixtureIfNeeded", 1)[-1].split(
+    fixture = text_for(app).split("func applyPaidMVPUITestFixtureIfNeeded", 1)[-1].split(
         "func writeHomeV2FixturePhoto", 1
     )[0]
-    policy = sync.read_text().split("func argumentsForceUITestOffline", 1)[-1].split(
+    policy = text_for(sync).split("func argumentsForceUITestOffline", 1)[-1].split(
         "func applyNetworkPathStatus", 1
     )[0]
-    applicator = sync.read_text().split("func applyNetworkPathStatus", 1)[-1]
-    handler = monitor.read_text().split("func setupNetworkMonitoring", 1)[-1].split(
+    applicator = text_for(sync).split("func applyNetworkPathStatus", 1)[-1]
+    handler = text_for(monitor).split("func setupNetworkMonitoring", 1)[-1].split(
         "func setupAuthListener", 1
     )[0]
     required = (

@@ -3,6 +3,8 @@
 import re
 from pathlib import Path
 
+from launch_ui_timeline_audit import text_for
+
 
 def function_body(text: str, name: str, next_name: str) -> str:
     if f"func {name}" not in text or f"func {next_name}" not in text:
@@ -15,7 +17,7 @@ def check_timeline_calendar_day(root: Path, violations: list, violation_cls, lin
     """Timeline positions follow the injected calendar day, not elapsed 86400-second offsets."""
     timeline = root / "apps/ios/LogYourBody/Services/DatedTimelineUI.swift"
     if timeline.is_file():
-        source = timeline.read_text(errors="replace")
+        source = text_for(timeline)
         empty = source.split("var datedTimelineEmptyState:", 1)[-1].split("func openDatedTimelineEditor", 1)[0]
         if not re.search(
             r'\.accessibilityElement\(children: \.contain\)\s*'
@@ -29,7 +31,7 @@ def check_timeline_calendar_day(root: Path, violations: list, violation_cls, lin
     calculator = root / "apps/ios/LogYourBody/Helpers/TimelineCalculator.swift"
     if not calculator.is_file():
         return
-    text = calculator.read_text(errors="replace")
+    text = text_for(calculator)
     points_body = function_body(text, "calculateTimelinePoints", "calculateWeightedPositions")
     weighted_body = function_body(text, "calculateWeightedPositions", "formatLabel")
     detail = "Timeline day distance must use the injected now and calendar, not a fresh clock."
@@ -51,7 +53,7 @@ def check_timeline_calendar_day(root: Path, violations: list, violation_cls, lin
     tests = root / "apps/ios/LogYourBodyTests/TimelineCalculatorTests.swift"
     if not tests.is_file():
         return
-    test_text = tests.read_text(errors="replace")
+    test_text = text_for(tests)
     relative = str(tests.relative_to(root))
     if "addingTimeInterval(-daysAgo * 24 * 60 * 60)" in test_text:
         violations.append(violation_cls(

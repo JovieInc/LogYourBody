@@ -104,6 +104,20 @@ class StatsCardCompositionTests(HomeInteractionAuditTests, unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertIn(check, "\n".join(path.read_text() for path in output.glob("*.json")))
 
+    def test_audit_reads_each_swift_file_once(self):
+        reads = []
+        original = Path.read_text
+
+        def counted(path, *args, **kwargs):
+            if path.suffix == ".swift":
+                reads.append(path)
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", counted):
+            self.assertEqual(self.run_audit()[0], 0)
+        self.assertGreater(len(reads), 0)
+        self.assertEqual(len(reads), len(set(reads)))
+
     def test_empty_timeline_keeps_its_photo_button_accessible(self):
         findings = []
         check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)

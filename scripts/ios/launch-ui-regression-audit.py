@@ -15,6 +15,8 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
+import launch_ui_timeline_audit as swift_sources
+
 
 def _load_sibling(module_name: str, filename: str, directory: Path | str | None = None):
     """Load an extracted audit sibling. A missing module or export fails closed."""
@@ -89,7 +91,7 @@ def add_pattern_violations(
     violations: list[AuditViolation],
 ) -> None:
     for path in paths:
-        text = path.read_text(errors="replace")
+        text = swift_sources.text_for(path)
         for match in pattern.finditer(text):
             violations.append(
                 AuditViolation(
@@ -110,7 +112,7 @@ def require_token(
     detail: str,
     violations: list[AuditViolation],
 ) -> None:
-    text = path.read_text(errors="replace")
+    text = swift_sources.text_for(path)
     if token in text:
         return
     violations.append(
@@ -132,7 +134,7 @@ def require_one_of_tokens(
     detail: str,
     violations: list[AuditViolation],
 ) -> None:
-    text = path.read_text(errors="replace")
+    text = swift_sources.text_for(path)
     if any(token in text for token in tokens):
         return
     violations.append(
@@ -153,31 +155,10 @@ def main() -> int:
 
     root = args.root.resolve()
     app_dir = root / "apps/ios/LogYourBody"
-    app_swift_files = sorted(app_dir.rglob("*.swift"))
+    swift_sources.begin_swift_sources(root)
     violations: list[AuditViolation] = []
-
-    add_pattern_violations(
-        root=root,
-        paths=sorted(path for directory in (
-            "LogYourBody", "LogYourBodyTests", "LogYourBodyUITests", "LogYourBodyWidget"
-        ) for path in (root / "apps/ios" / directory).rglob("*.swift")),
-        pattern=re.compile(
-            r"\b(?:CGPoint|CGSize|CGRect|CGVector|CGAffineTransform)\s*\("
-            r"[^()]*?\b\w+\s*:\s*[+-]?\s*\.(?:infinity|nan)\b"
-        ),
-        check="swift.explicit_geometry_nonfinite",
-        detail="Qualify non-finite geometry arguments with CGFloat or Double to avoid ambiguous overloads.",
-        violations=violations,
-    )
-
-    add_pattern_violations(
-        root=root,
-        paths=app_swift_files,
-        pattern=re.compile(r"Spacer\s*\(\s*minLength:\s*(?:1[2-9]\d|[2-9]\d{2,})"),
-        check="overscroll.no_large_fake_bottom_spacers",
-        detail="Use real bottom padding or safe-area insets instead of fake ScrollView content.",
-        violations=violations,
-    )
+    # Delegated one-pass scan retains check="swift.explicit_geometry_nonfinite",
+    swift_sources.scan_tree_patterns(root, violations, AuditViolation, line_number)
 
     require_token(
         root=root,
@@ -185,15 +166,6 @@ def main() -> int:
         token=".scrollBounceBehavior(.basedOnSize, axes: .vertical)",
         check="onboarding.fixed_cta_size_based_bounce",
         detail="Onboarding fixed-CTA ScrollViews must disable empty vertical over-scroll when content fits.",
-        violations=violations,
-    )
-
-    add_pattern_violations(
-        root=root,
-        paths=app_swift_files,
-        pattern=re.compile(r"photo_timeline_hud_stats_button"),
-        check="timeline.no_bottom_stats_card",
-        detail="Stats must stay in top navigation or swipe navigation, not a bottom switch card.",
         violations=violations,
     )
 
@@ -231,7 +203,7 @@ def main() -> int:
                   check="launch.gated_directive",
                   detail="The deadline journey must be opt-in through its feature gate.",
                   violations=violations)
-    directive = launch_ui.read_text().split("var launchJourneyDirective: some View {", 1)[-1].split(
+    directive = swift_sources.text_for(launch_ui).split("var launchJourneyDirective: some View {", 1)[-1].split(
         "var launchJourneyOutcomeEditor:", 1
     )[0]
     if ".sheet(isPresented: $showsLaunchOutcomeEditor)" not in directive:
@@ -312,7 +284,7 @@ def main() -> int:
         )
 
     card_path = app_dir / "DesignSystem/Organisms/MetricSummaryCard.swift"
-    card_source = card_path.read_text()
+    card_source = swift_sources.text_for(card_path)
     observation_chart = card_source.split("private func observationChart", 1)[-1].split("private func legacyChart", 1)[0]
     if ("PointMark(x: .value(\"Observation date\", date)" not in observation_chart
             or re.search(r"\b(?:LineMark|AreaMark)\s*\(|\.interpolationMethod", observation_chart)):
@@ -340,7 +312,7 @@ def main() -> int:
 
     # Identified chart containers must not overwrite their interactive plot's identity.
     detail_path = app_dir / "Components/FullMetricChartView+Part01.swift"
-    detail_source = detail_path.read_text()
+    detail_source = swift_sources.text_for(detail_path)
     chart_card = detail_source.split("var chartCard: some View {", 1)[-1].split("@ViewBuilder", 1)[0]
     if not re.search(
         r'\.accessibilityElement\(children:\s*\.contain\)\s*'
@@ -448,7 +420,7 @@ def main() -> int:
 
     # Header navigation drags must not own either button's touch region.
     hud_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
-    hud = hud_path.read_text()
+    hud = swift_sources.text_for(hud_path)
     header_call = hud.split("photoTimelineRootNavigation\n", 1)[-1].split("photoTimelineHomeContent\n", 1)[0]
     header = hud.split("private var photoTimelineRootNavigation: some View {", 1)[-1].split(
         "private var photoTimelineSwipe:", 1
@@ -465,7 +437,7 @@ def main() -> int:
         ))
 
     checkin_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
-    checkin_card = checkin_path.read_text().split("var hudGlp1WeeklyCheckIn:", 1)[-1].split(
+    checkin_card = swift_sources.text_for(checkin_path).split("var hudGlp1WeeklyCheckIn:", 1)[-1].split(
         "var isPhaseInsightEnabled:", 1
     )[0]
     if not re.search(
@@ -490,6 +462,7 @@ def main() -> int:
             print(f"- {violation.check}: {violation.file}:{violation.line} {violation.detail}")
     else:
         print("Launch UI regression audit passed.")
+    swift_sources.end_swift_sources()
     return 1 if violations else 0
 
 
