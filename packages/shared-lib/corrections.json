@@ -6041,5 +6041,23 @@
     },
     "level": "codebase",
     "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "lyb-341-offline-timeline-fixture-state",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42356980231/job/128357381749",
+    "correction": "PR #1748 / LYB-341, fix-red-5df69c1e5f occurrence 26: merge origin/main without rebasing and repair the native launch gate. testLaunchQualityGateCapturesTimelineSurfaces fails in the dated-timeline offline retry scenario because a late satisfied network path replaces the fixture offline state, showing Record a fresh measurement instead of Retry sync.",
+    "mechanization": "Extend the shared offline fixture setup to cancel its network monitor and pin offline state in DEBUG. Route every monitor callback through the existing sync manager transition so queued callbacks cannot overwrite fixture state. Extend the required shared-lib launch-quality evidence guard; its new regression fails against the original setup and passes after the repair. Add native cases for queued and repeated path callbacks, explicit retry, and normal offline-to-online transitions. Native XCTest execution requires the macOS runner and is not claimed by Linux source checks. Preserve the existing UI assertion, account-isolation coverage, production connection transitions and all gates. Resolve the ledger union with the existing classifier. The harness owns push and PR edits and must add exactly one PR-body line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared fixture owns sync network state. A DEBUG-only pin checked at the callback transition prevents every late network update from changing fixture connectivity by construction, while release builds retain ordinary transitions."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/RealtimeSyncManager.swift",
+      "anchor": "guard !usesOfflineUITestFixture else { return }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
