@@ -186,4 +186,18 @@ extension DashboardViewLiquid {
             }
         }
     }
+
+    /// The analytics fixture opens Stats. Publishing the account must not send it back to Timeline.
+    static func pageAfterAccountChange(
+        _ arguments: [String] = ProcessInfo.processInfo.arguments
+    ) -> PhotoTimelineRootPage {
+        #if DEBUG
+        if arguments.contains("-lybUITestPhotoTimelineAnalyticsFixture") {
+            return .analytics
+        }
+        #else
+        _ = arguments
+        #endif
+        return .timeline
+    }
 }

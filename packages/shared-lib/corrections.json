@@ -6193,5 +6193,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dated-stats-fixture-survives-path-and-account",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42381056124",
+    "correction": "PR #1746 / LYB-343, fix-red-5df69c1e5f occurrence 29: Launch Quality run 42381056124 failed testDatedStatsManualMeasurementDateEditExpiryAndAccountReturn because dated_stats_offline never appeared. The paid UI fixture forces offline, then a satisfied path can mark the app online, and account publication can leave the analytics fixture. Keep goal-relative stats and every recovery assertion. The generic red-check fingerprint keeps its existing shell-fixture guard.",
+    "mechanization": "Keep paid UI fixtures offline when the path is satisfied, and keep the analytics fixture on Stats when the account session is published. Extend the existing launch UI regression audit with dated_stats.offline_survives_path and dated_stats.analytics_survives_account. Those behavior cases fail on the direct path assignment, a raw path return, a dropped photo-timeline fixture, the timeline reset, and a dropped analytics return, then pass on the repaired sources. The existing required shared-lib suite runs that audit. Launch Quality keeps the manual measurement, expiry, and account-return assertions. Native execution remains unverified on this Linux host. Do not bypass Tently. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The path decision and the account-page decision now honor the fixture arguments that forced offline and Stats, so a later path update or account publication cannot hide dated_stats_offline. The existing launch UI audit rejects both regressions before native CI."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "dated_stats.fixture_survives_path_and_account"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

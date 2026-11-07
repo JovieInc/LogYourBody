@@ -399,6 +399,7 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 "launch_ui_timeline_day",
                 "launch_ui_opacity_audit",
                 "launch_ui_timeline_gesture_audit",
+                "launch_ui_dated_stats_audit",
                 "launch_ui_regression_report",
             ],
         )
@@ -460,6 +461,30 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
 
         calculator.write_text(original.replace("now: Date = Date(),\n        ", "", 1))
         self.assert_rejected("timeline.injected_calendar_day")
+
+    def test_dated_stats_fixture_survives_path_and_account_change(self):
+        self.assertEqual(self.run_audit()[0], 0)
+        cases = [
+            ("Services/RealtimeSyncManager+Part01.swift",
+             "self.isOnline = Self.online(path.status == .satisfied)",
+             "self.isOnline = path.status == .satisfied", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "return !fixtureForcesOffline",
+             "return pathSatisfied", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", '"-lybUITestPhotoTimelineHUDFixture"',
+             '"-not-an-offline-fixture"', "dated_stats.offline_survives_path"),
+            ("Views/DashboardViewLiquid.swift",
+             "selectedPhotoTimelineRootPage = Self.pageAfterAccountChange()",
+             "selectedPhotoTimelineRootPage = .timeline", "dated_stats.analytics_survives_account"),
+            ("Services/DatedTimelineUI.swift", "return .analytics", "return .timeline",
+             "dated_stats.analytics_survives_account"),
+        ]
+        for relative, before, after, check in cases:
+            with self.subTest(before=before):
+                path = self.app / relative
+                source = path.read_text()
+                path.write_text(source.replace(before, after, 1))
+                self.assert_rejected(check)
+                path.write_text(source)
 
 
 def run_behavior_suite(suite):

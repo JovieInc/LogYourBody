@@ -14,7 +14,7 @@ extension RealtimeSyncManager {
                 guard let self = self else { return }
 
                 let wasOffline = !self.isOnline
-                self.isOnline = path.status == .satisfied
+                self.isOnline = Self.online(path.status == .satisfied)
 
                 if self.isOnline {
                     self.syncStatus = .idle

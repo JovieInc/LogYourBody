@@ -311,7 +311,7 @@ struct DashboardViewLiquid: View {
                 homeV2TimelineSelection = nil
                 isMetricDetailActive = false
                 isStatsDestinationActive = false
-                selectedPhotoTimelineRootPage = .timeline
+                selectedPhotoTimelineRootPage = Self.pageAfterAccountChange()
                 isHomeV2MetricProvenancePresented = false
                 metricCacheRefreshTask?.cancel()
                 metricCacheBuildID = UUID()

@@ -38,12 +38,14 @@ _AUDIT_SIBLINGS = (
     ("launch_ui_timeline_day", "launch_ui_timeline_day.py", "check_timeline_calendar_day"),
     ("launch_ui_opacity_audit", "launch_ui_opacity_audit.py", "check_optional_cgfloat_opacity"),
     ("launch_ui_timeline_gesture_audit", "launch_ui_timeline_gesture_audit.py", "check_timeline_gestures"),
+    ("launch_ui_dated_stats_audit", "launch_ui_dated_stats_audit.py", "check_dated_stats_fixture"),
     ("launch_ui_regression_report", "launch-ui-regression-report.py", "write_outputs"),
 )
 (
     check_timeline_calendar_day,
     check_optional_cgfloat_opacity,
     check_timeline_gestures,
+    check_dated_stats_fixture,
     write_outputs,
 ) = [_load_sibling(*sibling) for sibling in _AUDIT_SIBLINGS]
 
@@ -450,6 +452,8 @@ def main() -> int:
     # Header navigation drags must not own either button's touch region.
     # timeline.edge_swipe_excludes_header stays on the content below the header.
     check_timeline_gestures(root, hud_path, texts[hud_path], violations, AuditViolation)
+    # dated_stats.fixture_survives_path_and_account
+    check_dated_stats_fixture(root, texts, violations, AuditViolation)
 
     checkin_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift"
     checkin_card = texts[checkin_path].split("var hudGlp1WeeklyCheckIn:", 1)[-1].split(
