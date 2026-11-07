@@ -45,6 +45,37 @@ function fixture(t, input, state) {
 }
 
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
+  test(`dependency repair ${mode} refuses lockfile changes while rendering source parity`, (t) => {
+    const f = fixture(t, '.npmrc', 'staged');
+    const gitBinary = execFileSync('which', ['git'], { env, encoding: 'utf8' }).trim();
+    const index = f.git('ls-files', '--stage');
+    const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+    writeFileSync(join(f.root, 'bin/git'), `#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+result = subprocess.run([${JSON.stringify(gitBinary)}, *sys.argv[1:]])
+marker = Path('changed-once')
+if sys.argv[1:] == ['show', ':package.json'] and not marker.exists():
+    Path('pnpm-lock.yaml').write_text('unverified resolution\\n')
+    marker.touch()
+sys.exit(result.returncode)
+`, { mode: 0o755 });
+    const result = f.resolve(mode);
+    assert.notEqual(result.status, 0, 'rendering must not authorize an unverified lockfile');
+    assert.match(result.stderr, /lockfile changed during projection generation/);
+    assert.equal(f.git('ls-files', '--stage'), index);
+    for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+      assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
+      assert.deepEqual(Buffer.from(f.git('show', `:${name}`)), outputs[i]);
+    }
+    const retry = f.resolve(mode);
+    assert.equal(retry.status, 0, retry.stderr);
+    assert.deepEqual(readFileSync(join(f.root, 'pnpm-lock.yaml')), outputs[0]);
+    assert.equal(f.git('show', ':SOURCES.md'), readFileSync(join(f.root, 'SOURCES.md'), 'utf8'));
+    const repairedIndex = f.git('ls-files', '--stage');
+    assert.equal(f.resolve(mode).status, 0, 'repair stays idempotent after restoring the verified lockfile');
+    assert.equal(f.git('ls-files', '--stage'), repairedIndex);
+  });
   test(`dependency repair ${mode} refuses index changes while rendering source parity`, (t) => {
     const f = fixture(t, '.npmrc', 'staged');
     const gitBinary = execFileSync('which', ['git'], { env, encoding: 'utf8' }).trim();

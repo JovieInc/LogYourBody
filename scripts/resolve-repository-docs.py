@@ -88,7 +88,7 @@ def union_project(root):
     apply_project_union(root)
 
 
-def resolve_staged(root, extra_outputs=(), expected_index=None):
+def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfile=None):
     root = Path(root).resolve()
     source_index = expected_index if expected_index is not None else git_bytes(root, "ls-files", "--stage", "-z")
     # An auto-merged manifest must keep every parent test input.
@@ -132,6 +132,8 @@ def resolve_staged(root, extra_outputs=(), expected_index=None):
     # Refuse a source index changed while rendering instead of staging stale parity.
     if git_bytes(root, "ls-files", "--stage", "-z") != source_index:
         raise ValueError("source index changed during projection generation; review staged inputs and retry")
+    if expected_lockfile is not None and (root / "pnpm-lock.yaml").read_bytes() != expected_lockfile:
+        raise ValueError("lockfile changed during projection generation; review dependency inputs and retry")
     output.parent.mkdir(parents=True, exist_ok=True)
     original = output.read_bytes() if output.exists() else None
     try:
@@ -450,7 +452,8 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                                  *[name for name in inputs if name != "pnpm-lock.yaml" or verify_lockfile or not modes])):
                 raise ValueError("dependency inputs changed during verification; stage reviewed inputs and retry")
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
-            resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [], expected_index=verified_index)
+            resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [], expected_index=verified_index,
+                           expected_lockfile=(root / "pnpm-lock.yaml").read_bytes())
             return
         if pin_update:
             repository_docs.local(root, pin_update[0]).write_text(pin_update[1])
