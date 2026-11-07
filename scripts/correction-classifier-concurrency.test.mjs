@@ -217,7 +217,7 @@ test('merge driver unions additive receipts from parent snapshots', () => {
   );
 });
 
-test('configured git merge unions the correction ledger and keeps divergent edits conflicted', (t) => {
+test('configured git merge unions consecutive correction ledgers and keeps divergent edits conflicted', (t) => {
   const root = mkdtempSync(join(tmpdir(), 'lyb-classifier-driver-merge-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const options = {
@@ -231,7 +231,7 @@ test('configured git merge unions the correction ledger and keeps divergent edit
   mkdirSync(join(root, 'packages/shared-lib'), { recursive: true });
   const rows = classifyLedger(
     JSON.parse(readFileSync(new URL('./fixtures/correction-classifier.json', import.meta.url))),
-  ).slice(0, 3);
+  ).slice(0, 4);
   const shared = { ...rows[1], guard: rows[0].guard };
   const writeLedger = (entries) => writeFileSync(ledger, `${JSON.stringify(entries, null, 2)}\n`);
   writeFileSync(join(root, rows[0].guard.path), rows[0].guard.anchor);
@@ -270,6 +270,27 @@ test('configured git merge unions the correction ledger and keeps divergent edit
   assert.deepEqual(
     JSON.parse(readFileSync(ledger, 'utf8')).map(({ fingerprint }) => fingerprint),
     [rows[2].fingerprint, rows[0].fingerprint, shared.fingerprint],
+  );
+  assert.equal(git('diff', '--name-only', '--diff-filter=U'), '');
+  git('commit', '-m', 'test: first automatic ledger merge');
+  git('switch', 'right');
+  writeFileSync(join(root, rows[3].guard.path), rows[3].guard.anchor);
+  writeLedger([rows[2], rows[0], rows[3]]);
+  git('add', '--', 'packages/shared-lib/corrections.json', rows[3].guard.path);
+  git('commit', '-m', 'test: next main receipt');
+  git('switch', 'left');
+  git('config', '--unset', 'merge.correction-ledger.driver');
+  assert.equal(
+    spawnSync('git', ['merge', '--no-commit', 'right'], options).status,
+    1,
+    'the next main append must conflict without the machine',
+  );
+  git('merge', '--abort');
+  git('config', 'merge.correction-ledger.driver', `node ${script} --merge-driver %O %A %B`);
+  assert.equal(spawnSync('git', ['merge', '--no-commit', 'right'], options).status, 0);
+  assert.deepEqual(
+    JSON.parse(readFileSync(ledger, 'utf8')).map(({ fingerprint }) => fingerprint),
+    [rows[2].fingerprint, rows[0].fingerprint, rows[3].fingerprint, shared.fingerprint],
   );
   assert.equal(git('diff', '--name-only', '--diff-filter=U'), '');
   git('merge', '--abort');
