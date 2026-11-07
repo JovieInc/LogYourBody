@@ -402,6 +402,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             if errors and errors != ["source projection stale: " + output]:
                 raise ValueError("; ".join(errors))
             rollback.enter_context(restore_dependency_artifacts_on_failure(root, output))
+            verified_index = git_bytes(root, "ls-files", "--stage", "-z")
             # Verify valid bot lockfiles without re-resolving unrelated dependencies.
             modes = [["--frozen-lockfile", "--offline"]]
             # Explicit repair only: normal commit hooks and CI retain frozen installs.
@@ -423,6 +424,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                     ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
                     cwd=root, check=True,
                 )
+            # Refuse inputs changed during verification before staging dependency artifacts.
+            if (git_bytes(root, "ls-files", "--stage", "-z") != verified_index
+                    or git_bytes(root, "diff", "--name-only", "--",
+                                 *[name for name in inputs if name != "pnpm-lock.yaml"])):
+                raise ValueError("dependency inputs changed during verification; stage reviewed inputs and retry")
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
             resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
             return

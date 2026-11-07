@@ -299,3 +299,52 @@ The harness owns pushing and PR edits. Use exactly one machine line:
 `Machine: built scripts/resolve-repository-docs.py`
 
 Intent-eval: n/a - merge repair through the existing pin and ledger machines; no user-facing output changed.
+
+## Repeated ledger merge guard, 2026-11-07
+
+Mission: resolve the recurring conflict and protect receipts across later repairs.
+Audience: the lanes harness and repository reviewers.
+
+Merged `origin/main` at `7e85a8b1530a7c91757e61f5f9f59253e1538c46` into
+`c4d28836dd48647653a771dcb4b04ae022f19ab6`, without rebasing. Only the correction
+ledger conflicted. The existing classifier's `--resolve-merge . --stage` retained
+all 324 parent receipts; the guard receipt brings the total to 325. The iOS and
+workflow bytes match the prior PR head. Main's dependency changes and repair
+checks are retained. No files became obsolete.
+
+Extended the classifier's existing required regression matrix with three successive
+conflicted merges. Each round checks the exact staged union and rejects omitted
+branch and earliest-main receipts without mutation. Restoring the union passes;
+all six seeded omissions fail. This exercises the machine already extended in this
+PR, including fresh merge evidence on each invocation. No parallel repair tool was added.
+
+Verification used Node 22.23.2 and pnpm 10.34.1:
+
+- `pnpm install --frozen-lockfile --prefer-offline`, `pnpm lint`, `pnpm typecheck`,
+  `pnpm test`, and `pnpm product:check` passed. All eight Turbo test tasks passed;
+  web ran 177 suites / 1,772 tests, and shared-lib ran 68 Vitest files / 448 tests
+  plus 141 Node tests. The classifier retained 100% line, branch and function coverage.
+- `node --test scripts/pre-commit-lint.test.mjs` passed 83 cases, including all
+  repository-doc resolver modes and main's dependency-verification regressions.
+- `pnpm lint:swift` passed with zero violations in 562 files; this Linux
+  SwiftLint cannot run its SourceKit-dependent rules.
+- `python3 scripts/ios/test_training_rest_project.py`,
+  `node scripts/ios/swift-arch/guard.mjs`, `node scripts/check-vendor-boundaries.js`,
+  `python3 scripts/repository_docs.py`, and `git diff --cached --check` passed.
+- Correction coverage against both full parent SHAs passed at 235/235 mechanized
+  rules. `correction-ratchet.mjs --base-ref` used the incoming full SHA and retained
+  the nine existing claims findings. `resolve-repository-docs.py --staged` and
+  `correction-classifier.mjs --check-merge .` verified the actual staged merge.
+
+GitHub reported no failed checks or Actions runs on the starting head, so there
+were no failed run logs to retrieve. The sandboxed Git fixture run stalled and was
+terminated; the host-access test run passed. `xcodebuild -version` returned command
+not found. Native compilation, execution, snapshot review and coverage remain for
+the required macOS runner. No gate was changed. The local repair branch is
+`fix/pr1679-conflict-20261107t1330`; the harness owns pushing and PR edits.
+
+The harness must put exactly one current machine line in the PR body:
+
+`Machine: built scripts/correction-classifier.mjs`
+
+Intent-eval: n/a - mechanical merge repair and developer regression guard; no user-facing output changed.

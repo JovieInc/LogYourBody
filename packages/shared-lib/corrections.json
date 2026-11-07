@@ -6119,6 +6119,24 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "dependency-repair-verification-input-drift",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1731",
+    "correction": "PR #1731, fix-red-1423773703 occurrence 48: the Statsig Node Core 0.24.0 manifest-only bump left the workspace lockfile and generated source map stale, failing frozen installation, Detect Changes, parity and CI Summary. Repeated dependency repairs must retain the same reviewed inputs through verification and artifact staging.",
+    "mechanization": "Extend the existing dependency repair helper to refuse index or manifest changes made while pnpm verifies dependencies, restoring generated artifacts without overwriting the concurrent manifest edit. Four real-Git regressions in the existing required Detect Changes suite fail before the guard and pass afterward across refresh/verify modes and staged/unstaged edits, including successful reviewed retries and idempotence. Merge origin/main first, then use --refresh-lockfile to repair this manifest-only bump and regenerate source parity. Preserve all frozen-install and parity gates. The harness retains push and PR-body ownership and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing helper owns verification and staging of both derived dependency artifacts. Comparing the index and dependency inputs after pnpm returns prevents a concurrent unverified manifest from being committed with a previously verified lockfile."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Refuse inputs changed during verification before staging dependency artifacts."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "merge-ledger-prewrite-preserves-concurrent-edits",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1679#repair-prewrite-ledger",
     "correction": "PR #1679 / LYB-245, fix-red-e3b0c44298 occurrence 81: merge origin/main without rebasing and retain the Apple Health sync receipt, the concerning-pain policy, and both parents' correction receipts. A working-ledger edit that lands after validation and before replacement must not be overwritten.",
@@ -6327,5 +6345,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "repeated-ledger-merges-retain-earlier-receipts",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679",
+    "correction": "PR #1679 / LYB-245, fix-red-e3b0c44298 occurrence 86: merge origin/main without rebasing and resolve the recurring correction-ledger conflict through the existing machine. Later repairs must retain earlier branch and main receipts as both sides add evidence.",
+    "mechanization": "Extend the existing required classifier regression matrix with three successive real-Git conflicted merges using the same resolver. Compare the exact staged union on every round, seed a missing branch receipt and a missing earliest-main receipt, require refusal without mutation, then restore the union and verify the staged retry before committing the fixture merge. All six known-bad omissions fail; the complete unions pass. Use --resolve-merge . --stage for this actual conflict and --check-merge . for both-parent verification. The classifier was already extended in this PR; this guard protects its repeated use. The harness owns pushing and PR edits and must retain exactly one machine declaration: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The existing resolver prevents receipt loss when invoked, but application code cannot prevent a future one-sided source merge or establish that the developer tool remains correct across successive merges."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required shared-lib test task can exercise successive real-Git merge states and reject exact staged unions that lose earlier receipts, including six explicit negative controls."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier-concurrency.test.mjs",
+      "anchor": "repeated main merges retain every earlier receipt and reject one-sided resolutions"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

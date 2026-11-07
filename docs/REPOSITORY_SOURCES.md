@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `4e389dafce909850cd56b8e9d81fcd2f9faeb06e484ff0c1a05d267484bfb7a3`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `320c50db6a6c92a7f2913472873561f08406e6bde5ecfef48099f849ab434b09`)
 
 ### `apps/web/package.json`: engines
 
@@ -109,7 +109,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-visually-hidden": "^1.2.13",
   "@sentry/nextjs": "^11.9.0",
   "@statsig/js-client": "^3.33.7",
-  "@statsig/statsig-node-core": "0.23.1",
+  "@statsig/statsig-node-core": "0.24.0",
   "@tailwindcss/postcss": "^4.3.3",
   "@tailwindcss/typography": "^0.5.20",
   "@tanstack/react-query": "^5.104.5",
