@@ -5,37 +5,24 @@ import re
 _CHARACTER_LOOP = re.compile(r"for\s+(?P<name>[A-Za-z_]\w*)\s+in\s+[^{\n]+\{")
 _NESTED_TEST_CALL = re.compile(r"\b(test[A-Z]\w*)\s*\(")
 _TEST_FUNC = re.compile(r"\bfunc\s+(test[A-Za-z0-9_]+)\s*\(")
+_BRACE_TOKEN = re.compile(
+    r'"(?:\\[\s\S]|[^"\\])*(?:"|\\?\Z)|//[^\n]*(?:\n|\Z)|/\*[\s\S]*?(?:\*/|\Z)|[{}]'
+)
 
 
 def _balanced_end(text, open_brace):
     """Index of the brace matching open_brace, skipping strings and comments."""
     depth = 0
-    index = open_brace
-    limit = len(text)
-    while index < limit:
-        char = text[index]
-        if char == '"':
-            index += 1
-            while index < limit and text[index] != '"':
-                index += 2 if text[index] == "\\" else 1
-            index += 1
-            continue
-        if char == "/" and index + 1 < limit and text[index + 1] == "/":
-            newline = text.find("\n", index)
-            index = limit if newline < 0 else newline + 1
-            continue
-        if char == "/" and index + 1 < limit and text[index + 1] == "*":
-            comment = text.find("*/", index + 2)
-            index = limit if comment < 0 else comment + 2
-            continue
-        if char == "{":
+    # Trace structural tokens, not every source character, on the coverage path.
+    for match in _BRACE_TOKEN.finditer(text, open_brace):
+        token = match.group()
+        if token == "{":
             depth += 1
-        elif char == "}":
+        elif token == "}":
             depth -= 1
             if depth == 0:
-                return index
-        index += 1
-    return limit - 1
+                return match.start()
+    return len(text) - 1
 
 
 def check_character_type_keyboard_focus(root, violations, violation):

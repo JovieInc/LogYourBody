@@ -10,7 +10,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from launch_ui_audit_test_support import AUDIT, ROOT, LaunchUIAuditTests  # noqa: E402
+from launch_ui_audit_test_support import AUDIT, ROOT, BraceScannerTests, LaunchUIAuditTests  # noqa: E402
 
 
 class StatsCardCompositionTests(LaunchUIAuditTests):
