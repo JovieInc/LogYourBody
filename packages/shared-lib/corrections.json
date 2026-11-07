@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-concurrent-staged-inputs",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1730",
+    "correction": "PR #1730, fix-red-1423773703 occurrence 48: merge origin/main without rebasing and repair the Collapsible 1.2.1 manifest's missing lockfile and stale source projection. Recurring dependency repair must retain a consistent reviewed dependency snapshot while pnpm runs.",
+    "mechanization": "Extend the existing dependency helper to compare indexed dependency inputs before and after pnpm, refusing changed inputs before staging either artifact. Both real-Git regression cases failed before the extension and pass afterward, proving artifact rollback, retention of the other writer's staged manifest and successful retry. The existing required Detect Changes pre-commit suite imports these cases. Use --refresh-lockfile to repair this dependency update while retaining frozen install and parity gates. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing helper owns frozen dependency verification and source-map staging. Comparing its indexed inputs across pnpm execution prevents it from accepting a lockfile verified against a different staged dependency snapshot, while its existing rollback preserves retryability."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Never pair a verified lockfile with inputs staged while pnpm was running."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-staged-projection-configuration",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1724",
     "correction": "PR #1724, fix-red-1423773703 occurrence 48: the Autoprefixer 10.6.2 bump left the generated source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must use reviewed projection configuration before invoking pnpm, as well as rendering staged source bytes.",

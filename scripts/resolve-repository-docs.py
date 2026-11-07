@@ -370,7 +370,8 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             if untracked:
                 raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
             # Dependency resolution inputs must be regular indexed files, never symlinks.
-            for entry in git_bytes(root, "ls-files", "--stage", "-z", "--", *inputs).split(b"\0"):
+            dependency_index = git_bytes(root, "ls-files", "--stage", "-z", "--", *inputs)
+            for entry in dependency_index.split(b"\0"):
                 if entry and entry.split(b" ", 1)[0] not in {b"100644", b"100755"}:
                     name = entry.split(b"\t", 1)[1].decode()
                     raise ValueError("dependency input must be a regular indexed file: " + name)
@@ -400,6 +401,9 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                     ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
                     cwd=root, check=True,
                 )
+            # Never pair a verified lockfile with inputs staged while pnpm was running.
+            if git_bytes(root, "ls-files", "--stage", "-z", "--", *inputs) != dependency_index:
+                raise ValueError("dependency inputs changed during repair; retry against the current index")
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
             resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
             return
