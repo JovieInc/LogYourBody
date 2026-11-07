@@ -2,6 +2,7 @@
 # a pin more than 72h behind the newest canon/guard commit fails this check.
 name: Company Guards
 on:
+  workflow_call:
   pull_request:
   push:
     branches: [main]
