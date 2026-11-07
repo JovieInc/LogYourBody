@@ -273,3 +273,29 @@ The harness owns pushing and PR edits. Use exactly one machine line:
 `Machine: built scripts/correction-classifier.mjs`
 
 Intent-eval: n/a - merge repair and developer-tool guard; no user-facing output changed.
+
+## Diagnostic pin repair (fix-red-e3b0c44298, occurrence 86)
+
+Mission: merge current main without rebasing and keep the Apple Health sync caption and weight receipt.
+Audience: the lanes harness and repository reviewers.
+
+Merged `origin/main` at `d2932bfd559b100e1ada2101cf929eae9ee7dc7a` into `25dcfa222ca0965c371b5fe6f9331b0c3ae952f1`. The conflicts were the diagnostic project pin in `.github/workflows/ios-ui-diagnostics.yml`, the same project hash in `docs/REPOSITORY_SOURCES.md`, and `packages/shared-lib/corrections.json`. The merged Xcode project keeps the health-sync files and main's body-visualization files, including their group and build-phase references. The lockfile matches main.
+
+Reviewed project digest `32ba6bed96cfe7688f5d1aa97dade69bb600e3cd725d865f08b2c13db9f47151`. `python3 scripts/resolve-repository-docs.py --reviewed-project-sha256` with that digest replaced the pin and regenerated the source map. `node scripts/correction-classifier.mjs --resolve-merge . --stage` unioned the ledger: 316 branch receipts and 312 main receipts, 323 combined, with no dropped receipt. Sync-state copy, receipt placement, gates and native tests are unchanged. The existing machines covered this conflict shape, so this repair does not add another guard.
+
+Verification on this host:
+
+- `node scripts/correction-classifier.mjs --check-merge .` verified the staged union against both parents.
+- Correction coverage against `25dcfa222ca0965c371b5fe6f9331b0c3ae952f1` and `d2932bfd559b100e1ada2101cf929eae9ee7dc7a` passed at 233/233 mechanized rules.
+- `node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref d2932bfd559b100e1ada2101cf929eae9ee7dc7a` passed, retaining 9 existing public-copy findings.
+- `python3 scripts/repository_docs.py` reported source parity.
+- `node --test` on the repository-doc resolver, pin, dependency, manifest, classifier, concurrency and pre-commit suites passed 263 tests.
+- `python3 scripts/ios/test_training_rest_project.py` passed. `node scripts/ios/swift-arch/guard.mjs` reported 540 baselined violations and none new. `node scripts/check-vendor-boundaries.js` passed.
+
+Xcode is not installed here. Native compilation, snapshot review and coverage remain for the real macOS runner. No gate was weakened or skipped.
+
+The harness owns pushing and PR edits. Use exactly one machine line:
+
+`Machine: built scripts/resolve-repository-docs.py`
+
+Intent-eval: n/a - merge repair through the existing pin and ledger machines; no user-facing output changed.

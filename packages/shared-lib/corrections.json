@@ -1,5 +1,59 @@
 [
   {
+    "fingerprint": "dependency-repair-ignored-resolver-inputs",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1729",
+    "correction": "PR #1729, fix-red-1423773703 occurrence 48: the Statsig 3.33.7 manifest bump retained the 3.33.5 lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Recurring dependency repairs must not depend on ignored local resolver configuration, hooks or patches.",
+    "mechanization": "Extend both existing dependency repair modes to reject ignored npmrc files, pnpm hooks and patches before invoking pnpm, excluding installed node_modules configuration. Six real-Git negative controls fail against the prior helper; the required Detect Changes pre-commit suite verifies refusal with unchanged artifacts and index, preserved local inputs, successful retry and idempotence. Resolve exactly Statsig 3.33.7, retain unrelated main lockfile resolutions, then use the extended --refresh-lockfile helper for frozen verification and staged source parity. All frozen-install and parity gates remain intact. The harness owns pushing and PR updates and must include exactly one line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency repair helper owns resolver input preflight. Rejecting ignored local resolver files prevents Git ignore rules from allowing machine-specific inputs into the committed dependency repair."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Ignored hooks, npmrc files and patches are still local-only resolver inputs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-staged-projection-configuration",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1724",
+    "correction": "PR #1724, fix-red-1423773703 occurrence 48: the Autoprefixer 10.6.2 bump left the generated source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must use reviewed projection configuration before invoking pnpm, as well as rendering staged source bytes.",
+    "mechanization": "Extend both dependency repair modes to include repository-docs.json in their existing staged-input preflight. Two real-Git regressions fail before the change and pass afterward, proving refusal before pnpm with artifacts and index preserved, successful retry with staged configuration, the correct repository in the generated map, unchanged bot resolutions and idempotence. The existing required Detect Changes pre-commit suite imports the regressions. Use --verify-lockfile for this merged dependency update, retaining frozen installation and parity gates. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency helper owns input validation, frozen verification and staged source-map generation. Including its projection configuration in preflight prevents unreviewed configuration from changing parity checks and output selection before pnpm executes."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Projection configuration must be staged before dependency verification."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependabot-react-runtime-version-pair",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1723",
+    "correction": "PR #1723, fix-red-1423773703 occurrence 48: merge origin/main without rebasing, repair stale source parity and preserve the React DOM 19.3.1 update. The installed React 19.3.0 / React DOM 19.3.1 pair throws Incompatible React versions during server rendering.",
+    "mechanization": "Extend the existing root Dependabot update machine with a React runtime group, then align React and React DOM at 19.3.1. Extend required shared-lib dependency tests to enforce the group, equal manifest ranges and actual server-rendered HTML from the installed web pair. All four regressions fail before the repair, including identity of the web and linked UI React runtime. Align the UI workspace peer resolutions without narrowing its supported peer ranges. Include the web and UI manifests in shared-lib Turbo test inputs. Use the existing pinned dependency repair helper to preserve main resolutions and refresh the generated source map. The harness owns pushing and PR updates and must put exactly one line in the PR body: Machine: built .github/dependabot.yml.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency updater can propose React and React DOM together by construction. Required manifest and installed server-render checks catch partial or incompatible updates, including manually edited lockfiles, without relaxing frozen installs or existing update cooldowns."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/dependency-security.test.ts",
+      "anchor": "renders HTML with the installed web React and React DOM pair"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "launch-copy-merge-duplicate-constants",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1688",
     "correction": "PR #1688 / LYB-288, fix-red-95726c4f82 occurrence 24: merge origin/main without rebasing and preserve health-memory user/product isolation and fail-closed reads and writes. The LaunchJourney conflict must retain the canonical LaunchPromiseCopy table instead of restoring parallel legacy constants. Tently reports an AI-provider outage without code findings.",
@@ -5980,6 +6034,86 @@
     "guard": {
       "path": "scripts/resolve-repository-docs.py",
       "anchor": "Dependency resolution inputs must be regular indexed files, never symlinks."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-repair-preserves-splitter-capabilities",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1703",
+    "correction": "PR #1703 / LYB-315, fix-red-cc900b961c occurrence 7: merge origin/main without rebasing, retain both splitter repair modes and every parent correction receipt. CI run 41387854302 passed visualization unit and timeline interaction cases but failed two ChaosEdgeCase tests at app.launch with background-assertion timeouts. Tently check 125092554407 reports an AI-provider outage with no source findings.",
+    "mechanization": "Extend the existing size-ratchet machine by routing incoming declaration extraction through the retained raw-string-aware Swift parser and preserving its public extraction entrypoint and guard anchor. Normalize leading separator newlines when extracting a whole type. Extend the existing required iOS Static Audits suite with a real CLI sequence that extracts a raw-string-bearing type and then rehomes an XCTestCase helper into its independent fixture superclass. This regression fails against both immutable merge parents and passes on the composed machine; all 17 splitter tests pass. Use the extended machine on the merged tree with --check. Resolve the diagnostic pin and source map with the existing reviewed-project resolver, and merge/classify the correction ledger with the existing classifier, retaining both parents. Preserve the no-retry-after-XCTest-start policy and all selectors, coverage floors and assertions. Native execution on the new head remains required on macOS; the provider outage requires a successful hosted review. The harness owns pushes and PR edits. Retain exactly one PR-body line: Machine: built scripts/ios/split_size_ratchet.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Sharing one parser composes both current repair modes, but product or tool code cannot prevent a future one-sided conflict resolution from removing either CLI mode."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required iOS Static Audits job executes the splitter behavior suite. One real CLI regression requires both extraction and independent XCTest fixture rehoming after every future merge."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_split_size_ratchet.py",
+      "anchor": "test_cli_preserves_extraction_and_fixture_rehoming_after_a_merge"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "merged-swift-splitter-keeps-namesake-and-fixture",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1703",
+    "correction": "PR #1703 / LYB-315, fix-red-95726c4f82 occurrence 22: merge origin/main without rebasing and retain both parents' size-guard capabilities, native cleanup paths and resolver tests. The incoming namesake splitter rejects an XCTestCase extension because its sibling path collides with the suite filename. Tently reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing size-ratchet splitter to combine namesake preservation with the branch's XCTest fixture rehoming and raw-string parser. Keep Swift splitting in a sibling module below 500 lines while retaining the incoming size, baseline, argument-order and default-reference checks. The real-file regression fails against the incoming splitter with a path collision and passes after the combined splitter preserves the suite, fixture state and raw string. Retain every parent test in the required static audit and use --check on this merged tree. Resolve the project pin/source map and correction ledger with the existing resolvers. The harness owns push and PR-body updates; retain exactly one line: Machine: built scripts/ios/split_size_ratchet.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Rehome the XCTest extension before selecting namesake sibling paths so the generator cannot produce a colliding suite path or leave its helpers in a cross-file extension."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/split_swift_types.py",
+      "anchor": "text = rehome_extensions_in_source(text)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-audit-parent-size-ratchet",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1703",
+    "correction": "PR #1703 / LYB-315, fix-red-95726c4f82 occurrence 20: merge origin/main without rebasing. Both parents changed project.pbxproj, so the diagnostic pin and generated source map conflict on different fingerprints. Keeping both parents' launch-audit edits also grows the parent past the company 500-line ratchet. Tently reports an AI-provider outage without code findings; do not bypass that gate.",
+    "mechanization": "Resolve the pin-only workflow conflict with the existing reviewed-project digest resolver, which rebuilds the source map from the merged index and ignores unstaged bytes. Move header and edge swipe checks into a launch-audit sibling so the parent stays within 500 lines. Extend the existing required shared-lib audit test to reject a parent over that limit and a dropped gesture sibling. The oversized inlined parent fails that assertion; the extracted audit passes. Do not bypass Tently. The harness owns push and PR-body updates and must replace any earlier machine declaration with exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Loading the gesture checks from a sibling removes them from this parent, but the loader cannot stop a later edit from inlining those checks and growing the parent past 500 lines."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib launch audit test reads the parent source, so a merge that leaves it over 500 lines or drops the gesture sibling fails before the audit runs."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-ui-regression-audit.test.ts",
+      "anchor": "The parent audit stays within the company 500-line ratchet."
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "timeline-edge-swipe-excludes-menu",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41354175812",
+    "correction": "PR #1703 / LYB-315, fix-red-cc900b961c occurrence 5: Launch Quality run 41354175812 fails testPhotoScrubResetsWhenNavigatingToTheMenuAndBack because a single Open Menu tap leaves home_v2_sidebar_scrim absent. The root edge high-priority drag included header padding and shared the menu button's leading edge, so the button action never presented the sidebar. Tently reports an AI-provider outage and stays unchanged.",
+    "mechanization": "Move the existing edge high-priority drag from the root overlay onto the home content below the header, with its hit shape before any padding. Extend the existing launch UI regression audit with timeline.edge_swipe_excludes_header. The behavior regression rejects the old parent overlay and padding before the gesture, and passes on the content-only overlay. The existing required shared-lib suite runs that audit. Launch Quality keeps the three-tap and title-swipe assertions. Native execution remains unverified on this Linux host. Do not bypass Tently. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Attaching the edge swipe only to the content below the header excludes the menu button hit region by construction. The hit shape is applied before any padding, so the drag cannot cover the header while the title swipe and sidebar assertions stay in place."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "timeline.edge_swipe_excludes_header"
     },
     "level": "codebase",
     "ruleId": "code-prevention"

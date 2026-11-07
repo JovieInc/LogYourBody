@@ -74,6 +74,8 @@ existing lockfile with pinned Corepack pnpm (frozen, offline, lockfile-only,
 lifecycle scripts disabled) before regenerating and staging only the source map.
 It retains the refusal of unstaged dependency/output edits and pinned-source drift
 without re-resolving unrelated dependencies.
+Both dependency modes also require staged `repository-docs.json` changes before
+invoking pnpm, keeping parity checks and output selection on reviewed configuration.
 Both dependency modes render the source map from the Git index, preserving
 unrelated unstaged source edits without fingerprinting them. Refresh mode stages
 the lockfile and projection together; verify mode stages only the projection.
@@ -91,6 +93,8 @@ lock and unrelated edits remain untouched.
 It then stages the lockfile and source map, refusing unresolved source conflicts,
 unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift. It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.
+Both dependency modes also refuse ignored npmrc files, pnpm hooks and patches;
+configuration inside installed `node_modules` is excluded from this preflight.
 Both dependency modes check pnpm hooks (`.pnpmfile.cjs`), workspace `.npmrc`
 files and `patches/` as dependency inputs. Stage reviewed changes to these files
 before repair; local edits remain untouched when the preflight refuses them.
