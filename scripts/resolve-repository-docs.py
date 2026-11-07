@@ -370,9 +370,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             if untracked:
                 raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
             # Ignored hooks, npmrc files and patches are still local-only resolver inputs.
+            # Ignored workspace manifests are still local-only resolver inputs.
             ignored = subprocess.run(
                 ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
                  ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
+                 "package.json", "**/package.json",
                  ":(glob,exclude)**/node_modules/**"],
                 cwd=root, check=True, capture_output=True, text=True,
             ).stdout.strip("\0")

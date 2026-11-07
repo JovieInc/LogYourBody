@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-ignores-workspace-manifests",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1736",
+    "correction": "PR #1736, fix-red-1423773703 occurrence 48: merge origin/main without rebasing and repair the Radix radio-group 1.5.1 update. Detect Changes and parity reject the stale source projection, causing CI Summary to fail. Ignored workspace package.json manifests still bypass the dependency-repair preflight and can enter a lockfile destined for CI.",
+    "mechanization": "Extend the ignored-input preflight in both dependency repair modes to reject ignored workspace package.json manifests while still excluding installed node_modules package.json files. Two real-Git regressions fail before the extension and pass afterward, preserving artifacts, index, local manifests and vendor package.json files, then retry and stay idempotent. The existing required Detect Changes pre-commit suite imports these tests. Use the extended --verify-lockfile helper on the merged 1.5.1 lockfile and regenerate source parity. Retain frozen installation and parity gates. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dependency repair helper owns resolver input preflight. Rejecting ignored workspace manifests before pnpm runs prevents a gitignored package.json from changing the lockfile committed for CI."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Ignored workspace manifests are still local-only resolver inputs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-ignored-resolver-inputs",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1729",
     "correction": "PR #1729, fix-red-1423773703 occurrence 48: the Statsig 3.33.7 manifest bump retained the 3.33.5 lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Recurring dependency repairs must not depend on ignored local resolver configuration, hooks or patches.",
