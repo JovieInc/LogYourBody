@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -76,6 +76,39 @@ else:
 }
 
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
+  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch']) {
+    test(`dependency repair ${mode} refuses indexed symlink ${input} before invoking pnpm`, (t) => {
+      const f = fixture(t, input, 'staged');
+      const external = mkdtempSync(join(tmpdir(), 'lyb-external-dependency-'));
+      t.after(() => rmSync(external, { recursive: true, force: true }));
+      const target = join(external, 'input');
+      writeFileSync(target, 'unreviewed external input\n');
+      unlinkSync(f.path);
+      symlinkSync(target, f.path);
+      f.git('add', input);
+      const index = f.git('ls-files', '--stage');
+      const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+      const result = f.resolve(mode);
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /dependency input must be a regular indexed file:/);
+      assert.ok(result.stderr.includes(input), result.stderr);
+      assert.equal(existsSync(join(f.root, 'pnpm-calls')), false);
+      assert.equal(f.git('ls-files', '--stage'), index);
+      assert.equal(readFileSync(target, 'utf8'), 'unreviewed external input\n');
+      for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+        assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
+      }
+    });
+  }
+  test(`dependency repair ${mode} accepts an executable indexed hook`, (t) => {
+    const f = fixture(t, '.pnpmfile.cjs', 'staged');
+    chmodSync(f.path, 0o755);
+    f.git('add', '.pnpmfile.cjs');
+    const result = f.resolve(mode);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(f.git('ls-files', '--stage', '.pnpmfile.cjs'), /^100755 /);
+    assert.match(readFileSync(join(f.root, 'pnpm-calls'), 'utf8'), /--frozen-lockfile --offline/);
+  });
   for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch']) {
     for (const state of ['untracked', 'unstaged']) {
       test(`dependency repair ${mode} refuses ${state} ${input} before invoking pnpm`, (t) => {

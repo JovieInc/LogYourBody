@@ -378,6 +378,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             ).stdout.strip("\0")
             if untracked:
                 raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
+            # Dependency resolution inputs must be regular indexed files, never symlinks.
+            for entry in git_bytes(root, "ls-files", "--stage", "-z", "--", *inputs).split(b"\0"):
+                if entry and entry.split(b" ", 1)[0] not in {b"100644", b"100755"}:
+                    name = entry.split(b"\t", 1)[1].decode()
+                    raise ValueError("dependency input must be a regular indexed file: " + name)
             # Refuse pinned-source drift before invoking the dependency resolver.
             errors = repository_docs.run(root)
             if errors and errors != ["source projection stale: " + output]:
