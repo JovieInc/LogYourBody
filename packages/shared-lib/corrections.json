@@ -5965,5 +5965,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-preserves-frozen-lockfile-bytes",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1718",
+    "correction": "PR #1718, fix-red-1423773703 occurrence 48: merge origin/main without rebasing and repair the collapsible dependency update. Detect Changes and parity reject a stale source map, causing CI Summary to fail. Extend the existing dependency repair machine and preserve the reviewed lockfile resolutions.",
+    "mechanization": "Extend the existing resolver to reject any lockfile byte change or deletion during frozen verification in both dependency repair modes, including the initial refresh probe and verification after regeneration. The existing rollback restores the original lockfile and source map before returning failure, without staging changed artifacts. Six real-Git negative controls fail against the prior helper and pass with this guard; all 60 cases in the existing Detect Changes pre-commit test entrypoint pass. Use the extended --verify-lockfile mode on this dependency update and retain the source parity gate. The harness owns push and PR-body edits and must include exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency repair helper owns frozen verification and artifact staging. Comparing lockfile bytes around every frozen invocation prevents a successful command from silently changing reviewed resolutions or staging an unverified source projection."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "frozen verification changed pnpm-lock.yaml"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

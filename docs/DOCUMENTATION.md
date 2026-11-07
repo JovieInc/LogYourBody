@@ -77,6 +77,9 @@ without re-resolving unrelated dependencies.
 Both dependency modes render the source map from the Git index, preserving
 unrelated unstaged source edits without fingerprinting them. Refresh mode stages
 the lockfile and projection together; verify mode stages only the projection.
+Both modes reject frozen verification that rewrites or deletes the lockfile,
+restoring the original lockfile and projection before returning an error.
+A requested refresh may change resolutions only during its non-frozen step.
 
 For dependency PRs, stage the reviewed manifests and run
 `python3 scripts/resolve-repository-docs.py --refresh-lockfile`. This explicit
