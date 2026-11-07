@@ -23,8 +23,9 @@ struct BodyPhotoRetryButton: View {
 }
 
 /// Loads the photo, shows it dimmed immediately, then swaps in the plate once
-/// it is rendered. The image is cropped to the stage before display so nothing
-/// overflows the frame: the layout, the clip and the accessibility frame agree.
+/// it is rendered. The stage crop runs once per photo and size. A layout pass
+/// only displays that image, so the frame, the clip and the accessibility
+/// frame stay in agreement without redrawing the source bitmap.
 struct SubjectPlateView: View {
     let urlString: String
     let size: CGSize
@@ -42,9 +43,9 @@ struct SubjectPlateView: View {
             HomeV2Tokens.Colors.shell
 
             if let plate {
-                stagePhoto(plate)
+                framed(plate, fills: false)
             } else if let original {
-                stagePhoto(original)
+                framed(original, fills: true)
                     .overlay(Color.black.opacity(0.35))
             }
 
@@ -54,35 +55,75 @@ struct SubjectPlateView: View {
                     .padding(HomeV2Tokens.Space.tight)
             }
         }
-        .frame(width: size.width, height: size.height)
-        .task(id: urlString) { await load() }
+        .frame(width: safeSize.width, height: safeSize.height)
+        .clipped()
+        .task(id: loadToken) { await load() }
     }
 
-    private func stagePhoto(_ image: UIImage) -> some View {
-        let rendered: UIImage
-        if let drawingRegistration {
-            rendered = AspectFillCropper.crop(image, to: size, registration: drawingRegistration)
-        } else if stageSized {
-            rendered = image
+    /// A prepared plate already matches the stage. The dimmed source only fills
+    /// the frame visually until that one crop is stored.
+    @ViewBuilder
+    private func framed(_ image: UIImage, fills: Bool) -> some View {
+        if fills {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: safeSize.width, height: safeSize.height)
+                .clipped()
         } else {
-            rendered = AspectFillCropper.crop(image, to: size, anchor: focus)
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(width: safeSize.width, height: safeSize.height)
+                .clipped()
         }
-        return Image(uiImage: rendered)
-            .resizable()
-            .scaledToFit()
-            .frame(width: size.width, height: size.height)
+    }
+
+    private var loadToken: String {
+        // Quantize so a presenting sheet's intermediate widths share one crop.
+        let quantum: CGFloat = 16
+        let width = size.width.isFinite ? Int((size.width / quantum).rounded()) : 0
+        let height = size.height.isFinite ? Int((size.height / quantum).rounded()) : 0
+        let registration = drawingRegistration.map { registration in
+            [
+                registration.translation.x, registration.translation.y,
+                registration.rotation, registration.scale
+            ].map { String(format: "%.3f", $0) }.joined(separator: ",")
+        } ?? ""
+        return "\(urlString)|\(width)x\(height)|\(registration)"
+    }
+
+    private var safeSize: CGSize {
+        guard size.width.isFinite, size.height.isFinite, size.width > 0, size.height > 0 else {
+            return .zero
+        }
+        return size
+    }
+
+    /// Geometry readers can propose a non-finite or enormous size while a sheet
+    /// is presenting. Refuse that crop instead of allocating a bitmap for it.
+    private var canCropToStage: Bool {
+        safeSize.width > 0 && safeSize.height > 0 && safeSize.width <= 2_048 && safeSize.height <= 2_048
     }
 
     private func load() async {
+        // A GeometryReader reports several sizes while a sheet presents. Wait
+        // so only the settled size segments and crops, and a cached scrub
+        // frame is never delayed.
+        if !preparedOnly {
+            try? await Task.sleep(for: .milliseconds(80))
+            guard !Task.isCancelled else { return }
+        }
+        guard canCropToStage else { return }
         if preparedOnly {
-            plate = SubjectPlateStore.shared.scrubImage(for: urlString, target: size)
+            plate = SubjectPlateStore.shared.scrubImage(for: urlString, target: safeSize)
             focus = SubjectPlateStore.shared.cachedFocus(for: urlString)
             stageSized = plate != nil
             showsRetry = false
             return
         }
         if preparesStageDerivative,
-           let prepared = SubjectPlateStore.shared.scrubImage(for: urlString, target: size) {
+           let prepared = SubjectPlateStore.shared.scrubImage(for: urlString, target: safeSize) {
             plate = prepared
             stageSized = true
             showsRetry = retryVisible
@@ -97,16 +138,32 @@ struct SubjectPlateView: View {
         original = image
 
         if focus == nil {
-            focus = await SubjectPlateStore.shared.focus(for: urlString, image: image)
+            let anchor = await SubjectPlateStore.shared.focus(for: urlString, image: image)
             guard !Task.isCancelled else { return }
+            focus = anchor
+        }
+
+        if let drawingRegistration {
+            let shared = await SubjectPlateStore.shared.plate(for: urlString, image: image)
+            guard !Task.isCancelled, canCropToStage else { return }
+            plate = AspectFillCropper.crop(shared ?? image, to: safeSize, registration: drawingRegistration)
+            stageSized = true
+            showsRetry = false
+            return
         }
 
         if preparesStageDerivative {
-            plate = await SubjectPlateStore.shared.prepare(urlString: urlString, image: image, target: size)
+            let prepared = await SubjectPlateStore.shared.prepare(
+                urlString: urlString, image: image, target: safeSize
+            )
+            guard !Task.isCancelled else { return }
+            plate = prepared
             stageSized = plate != nil
         } else {
-            plate = await SubjectPlateStore.shared.plate(for: urlString, image: image)
-            stageSized = false
+            let shared = await SubjectPlateStore.shared.plate(for: urlString, image: image)
+            guard !Task.isCancelled, canCropToStage else { return }
+            plate = AspectFillCropper.crop(shared ?? image, to: safeSize, anchor: focus)
+            stageSized = true
         }
         showsRetry = preparesStageDerivative && retryVisible
     }
