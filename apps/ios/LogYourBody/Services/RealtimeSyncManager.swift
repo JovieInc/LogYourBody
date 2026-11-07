@@ -34,6 +34,38 @@ class RealtimeSyncManager: ObservableObject {
     let analyticsService: AnalyticsService
     let networkMonitor: NWPathMonitor
 
+    #if DEBUG
+    private var usesOfflineUITestFixture = false
+
+    func applyOfflineUITestFixture() {
+        usesOfflineUITestFixture = true
+        networkMonitor.cancel()
+        isOnline = false
+        syncStatus = .offline
+        pendingSyncCount = 0
+    }
+    #endif
+
+    func handleNetworkPathUpdate(isOnline: Bool) {
+        // A queued path callback can outlive monitor cancellation.
+        if Self.argumentsForceUITestOffline(ProcessInfo.processInfo.arguments) {
+            applyNetworkPathStatus(.unsatisfied)
+            return
+        }
+        #if DEBUG
+        guard !usesOfflineUITestFixture else { return }
+        #endif
+        let wasOffline = !self.isOnline
+        self.isOnline = isOnline
+        if isOnline {
+            syncStatus = .idle
+            if wasOffline { syncAll() }
+        } else {
+            syncStatus = .offline
+            disconnectRealtime()
+        }
+    }
+
     var syncTimer: Timer?
     var cancellables = Set<AnyCancellable>()
     var syncQueue = DispatchQueue(label: "com.logyourbody.sync", qos: .background)
@@ -146,6 +178,9 @@ class RealtimeSyncManager: ObservableObject {
         _ status: NWPath.Status,
         arguments: [String] = ProcessInfo.processInfo.arguments
     ) {
+        #if DEBUG
+        if usesOfflineUITestFixture { return }
+        #endif
         if Self.argumentsForceUITestOffline(arguments) {
             isOnline = false
             syncStatus = .offline

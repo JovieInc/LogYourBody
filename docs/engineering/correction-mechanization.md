@@ -114,6 +114,8 @@ test input while a diagnostic workflow pin conflict remains. The reviewed projec
 digest resolver replaces that pin and then rebuilds the source map.
 Union generation and parent verification share guard snapshots within that command;
 each retry reads the index and guard sources afresh.
+The reviewed diagnostic project-pin resolver also retains each newly added parent
+file's group and build-phase references; retaining a declaration alone is insufficient.
 For a documentation rewrite conflicting with incoming new sections, run
 `python3 scripts/resolve-repository-docs.py --merge-sections docs/path.md`.
 It prints a proposal from the three unmerged index stages, preserving the branch
@@ -165,11 +167,16 @@ cannot change the reviewed staged snapshot. Refusal preserves the ledger and ind
 Both resolution modes and staged verification refuse an index that changes during
 validation, before writing the ledger or returning success. Retry the same command
 against the current index; the refusal preserves the other writer's staged changes.
+
+The classifier also snapshots the working ledger and rechecks its bytes after
+validating the index and both merge parents, and again immediately before
+replacing the file. An edit during validation or in that pre-write window
+refuses resolution, staging and a successful verification verdict without
+overwriting the other writer. Review the working ledger and retry against the
+current merge. Concurrent ledger edits are preserved and cannot be overwritten
+by a resolution computed from earlier bytes.
 They also recheck `HEAD` and `MERGE_HEAD` before writing or returning success;
 changed parents invalidate the review even when the index is unchanged.
-Both resolver modes and staged verification also recheck the working ledger
-after validation. Concurrent ledger edits are preserved and require a fresh retry;
-they cannot be overwritten by a resolution computed from earlier bytes.
 The pre-write boundary samples the index, then repeats the index, parent and
 ledger comparison before replacement. A writer that lands during that sample
 cannot authorize the write, staging or a successful verdict.

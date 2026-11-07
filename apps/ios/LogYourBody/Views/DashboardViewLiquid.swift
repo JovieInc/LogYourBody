@@ -22,6 +22,8 @@ struct DashboardViewLiquid: View {
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @StateObject var viewModel = DashboardViewModel()
     @StateObject var globalTimelineStore = GlobalTimelineStore()
+    @State var healthSyncPresentation = HealthSyncPresentationStore()
+    @State var showsRecentHealthReadings = false
 
     // Core data / selection
     @State var selectedIndex: Int = 0
@@ -276,6 +278,7 @@ struct DashboardViewLiquid: View {
             }
 
         let withSyncAndState = withLifecycle
+            .onReceive(HealthSyncCoordinator.shared.$syncStatus, perform: healthSyncPresentation.updateSyncStatus)
             .onChange(of: realtimeSyncManager.syncStatus) { oldStatus, newStatus in
                 previousSyncStatus = oldStatus
                 handleSyncStatusChange(from: oldStatus, to: newStatus)
@@ -300,17 +303,14 @@ struct DashboardViewLiquid: View {
                 scheduleDashboardDerivedStateRefresh(rebuildDailyMetricsLookup: true)
                 scheduleMetricCacheRefresh()
             }
-            .onReceive(viewModel.$bodyMetrics) { metrics in
-                scheduleDatedTimelineRefresh(metrics: metrics)
-                reconcileHomeV2Timeline(with: metrics)
-                scheduleDashboardDerivedStateRefresh()
-                scheduleMetricCacheRefresh()
-            }
+            .onReceive(viewModel.$bodyMetrics, perform: handleDashboardBodyMetricsChange)
             .onChange(of: authManager.captureAccountSession()) { _, owner in
                 clearDatedTimelineContext()
                 scheduleDatedTimelineRefresh()
                 invalidateDashboardShareContext(currentOwner: owner)
                 homeV2EditingSession = nil
+                healthSyncPresentation.reset()
+                showsRecentHealthReadings = false
                 homeV2TimelineSelection = nil
                 isMetricDetailActive = false
                 isStatsDestinationActive = false
@@ -385,6 +385,7 @@ struct DashboardViewLiquid: View {
                         syncManager: realtimeSyncManager
                     )
                 }
+                .sheet(isPresented: $showsRecentHealthReadings) { homeV2RecentReadingsSheet }
         )
             .navigationDestination(isPresented: $isMetricDetailActive) {
                 fullMetricChartView
@@ -594,7 +595,7 @@ struct DashboardViewLiquid: View {
     }
 
     @MainActor
-    private func scheduleMetricCacheRefresh() {
+    func scheduleMetricCacheRefresh() {
         // Published values arrive before the model finishes updating its sorted
         // history. Coalesce that burst and snapshot only after the update completes.
         metricCacheBuildID = UUID()

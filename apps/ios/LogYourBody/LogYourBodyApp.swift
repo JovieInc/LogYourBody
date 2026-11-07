@@ -550,9 +550,7 @@ struct LogYourBodyApp: App {
         UserDefaults.standard.removeObject(forKey: Constants.goalWeightKey)
         OnboardingStateManager.shared.updateCompletionStatus(!usesBodyScoreOnboardingFixture)
 
-        realtimeSyncManager.isOnline = false
-        realtimeSyncManager.syncStatus = .offline
-        realtimeSyncManager.pendingSyncCount = 0
+        realtimeSyncManager.applyOfflineUITestFixture()
 
         // These data-only aliases exercise the ordinary Home policy without
         // the HomeV2 fixture arguments that force a particular rollout state.

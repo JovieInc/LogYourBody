@@ -124,13 +124,21 @@ def check_ui_test_offline_fixture(root: Path, violations: list, violation) -> No
     monitor = root / "apps/ios/LogYourBody/Services/RealtimeSyncManager+Part01.swift"
     if not app.is_file() or not sync.is_file() or not monitor.is_file():
         return
+    sync_text = text_for(sync)
     fixture = text_for(app).split("func applyPaidMVPUITestFixtureIfNeeded", 1)[-1].split(
         "func writeHomeV2FixturePhoto", 1
     )[0]
-    policy = text_for(sync).split("func argumentsForceUITestOffline", 1)[-1].split(
+    policy = sync_text.split("func argumentsForceUITestOffline", 1)[-1].split(
         "func applyNetworkPathStatus", 1
     )[0]
-    applicator = text_for(sync).split("func applyNetworkPathStatus", 1)[-1]
+    applicator = sync_text.split("func applyNetworkPathStatus", 1)[-1]
+    helper = ""
+    if "func applyOfflineUITestFixture" in sync_text:
+        helper = sync_text.split("func applyOfflineUITestFixture", 1)[1].split("#endif", 1)[0]
+    # A shared helper counts only when it still pins offline. A direct assignment does too.
+    offline_pinned = "isOnline = false" in fixture or (
+        "applyOfflineUITestFixture()" in fixture and "isOnline = false" in helper
+    )
     handler = text_for(monitor).split("func setupNetworkMonitoring", 1)[-1].split(
         "func setupAuthListener", 1
     )[0]
@@ -148,7 +156,7 @@ def check_ui_test_offline_fixture(root: Path, violations: list, violation) -> No
     assigned = applicator.find("isOnline = status ==")
     if (any(token not in fixture or token not in policy for token in required)
             or "argumentsForceUITestOffline(arguments)" not in fixture
-            or "isOnline = false" not in fixture
+            or not offline_pinned
             or held < 0 or assigned < 0 or "return" not in applicator[held:assigned]
             or "applyNetworkPathStatus(path.status)" not in handler
             or "isOnline = path.status" in handler):

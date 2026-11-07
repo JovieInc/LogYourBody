@@ -7,6 +7,87 @@ import test from 'node:test';
 import { classifyLedger, runClassifier } from './correction-classifier.mjs';
 
 const commands = [['--resolve-merge'], ['--resolve-merge', '--stage'], ['--check-merge']];
+
+test('repeated main merges retain every earlier receipt and reject one-sided resolutions', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-classifier-repeated-merge-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const options = {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 5_000,
+    env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  const git = (...args) => execFileSync('git', args, options);
+  const ledgerPath = 'packages/shared-lib/corrections.json';
+  const ledger = join(root, ledgerPath);
+  mkdirSync(join(root, 'packages/shared-lib'), { recursive: true });
+  const rows = classifyLedger(
+    JSON.parse(
+      readFileSync(new URL('./fixtures/correction-classifier.json', import.meta.url)),
+    ).slice(0, 3),
+  );
+  // Compact parent snapshots keep each repeated merge conflicted, independent of diff alignment.
+  const writeLedger = (rows) => writeFileSync(ledger, `${JSON.stringify(rows)}\n`);
+  for (const { guard } of rows) writeFileSync(join(root, guard.path), guard.anchor);
+  git('init', '--initial-branch=left');
+  git('config', 'user.name', 'Ledger fixture');
+  git('config', 'user.email', 'fixture@example.test');
+  writeLedger([rows[0]]);
+  git('add', '.');
+  git('commit', '-m', 'test: base receipt');
+  git('branch', 'right');
+  writeLedger([rows[1], rows[0]]);
+  git('commit', '-am', 'test: branch receipt');
+  const quiet = { log() {}, error: (message) => assert.fail(message) };
+  const incoming = [rows[0]];
+  const branch = [rows[1]];
+  for (let round = 1; round <= 3; round += 1) {
+    if (round > 1) {
+      branch.unshift({ ...rows[1], source: `${rows[1].source}#round-${round}` });
+      writeLedger([...branch, ...incoming]);
+      git('commit', '-am', `test: branch repair ${round}`);
+    }
+    git('switch', 'right');
+    incoming.unshift({ ...rows[2], source: `${rows[2].source}#round-${round}` });
+    writeLedger(incoming);
+    git('commit', '-am', `test: main receipt ${round}`);
+    git('switch', 'left');
+    assert.equal(spawnSync('git', ['merge', '--no-commit', 'right'], options).status, 1);
+    assert.equal(runClassifier(['--resolve-merge', root, '--stage'], quiet), 0);
+    const expected = [...incoming, ...branch];
+    assert.deepEqual(JSON.parse(git('show', `:0:${ledgerPath}`)), expected);
+    const resolved = readFileSync(ledger, 'utf8');
+    // A later merge must protect the branch receipt and the earliest main receipt.
+    for (const omitted of [rows[1], incoming.at(-2)]) {
+      writeLedger(expected.filter(({ source }) => source !== omitted.source));
+      git('add', ledgerPath);
+      const index = git('ls-files', '--stage', '-z');
+      const invalid = readFileSync(ledger, 'utf8');
+      let diagnostic = '';
+      assert.equal(
+        runClassifier(['--check-merge', root], {
+          log() {},
+          error: (message) => {
+            diagnostic = message;
+          },
+        }),
+        1,
+        `round ${round} must refuse the missing receipt ${omitted.source}`,
+      );
+      assert.match(diagnostic, /regression: removed (?:rule|receipt)/);
+      assert.equal(git('ls-files', '--stage', '-z'), index);
+      assert.equal(readFileSync(ledger, 'utf8'), invalid);
+    }
+    writeFileSync(ledger, resolved);
+    git('add', ledgerPath);
+    assert.equal(runClassifier(['--check-merge', root], quiet), 0);
+    assert.equal(runClassifier(['--resolve-merge', root, '--stage'], quiet), 0);
+    assert.deepEqual(JSON.parse(git('show', `:0:${ledgerPath}`)), expected);
+    git('commit', '-m', `test: integrate main ${round}`);
+  }
+});
+
 for (const [args, target] of commands.flatMap((args) =>
   ['index', 'HEAD', 'MERGE_HEAD', 'ledger', 'ledger-write', 'index-write', 'HEAD-write']
     .filter((target) => args[0] !== '--check-merge' || !target.endsWith('-write'))
@@ -130,7 +211,11 @@ for (const [args, target] of commands.flatMap((args) =>
       'refusal preserves the other writer',
     );
     if (parent) {
-      assert.equal(git('rev-parse', writeTarget).trim(), replacement, 'refusal preserves the writer');
+      assert.equal(
+        git('rev-parse', writeTarget).trim(),
+        replacement,
+        'refusal preserves the writer',
+      );
       setParent(parent);
     }
     if (writeTarget === 'ledger') writeFileSync(ledger, original);

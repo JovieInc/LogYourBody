@@ -19,7 +19,6 @@ def restore_dependency_artifacts_on_failure(root, output):
     try:
         yield
     except (ValueError, OSError, subprocess.CalledProcessError):
-        # Failed dependency repairs restore both artifacts, including staging failures.
         for path, original in originals.items():
             if original is None:
                 path.unlink(missing_ok=True)
@@ -39,9 +38,12 @@ def staged_bytes(root, name):
         raise ValueError("resolve source conflicts first: " + name)
     if metadata[0] not in {b"100644", b"100755"}:
         raise ValueError("source input must be a regular indexed file: " + name)
-    return subprocess.run(
+    source = subprocess.run(
         ["git", "show", ":" + name], cwd=root, check=True, capture_output=True,
     ).stdout
+    if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", source):
+        raise ValueError("resolve staged conflict markers first: " + name)
+    return source
 
 
 def merge_sections(root, name):
@@ -105,7 +107,6 @@ def union_manifests(root):
 
 def resolve_staged(root, extra_outputs=()):
     root = Path(root).resolve()
-    # An auto-merged manifest must keep every parent test input.
     from manifest_union import assert_auto_merged_parent_inputs
     assert_auto_merged_parent_inputs(root)
     registry = staged_bytes(root, "repository-docs.json")
@@ -124,7 +125,6 @@ def resolve_staged(root, extra_outputs=()):
         cwd=root, check=True, capture_output=True,
     ).stdout
     # Rebuild a conflicted projection from staged inputs before resolving unrelated ledgers.
-    # Every actual input must have stage zero; staged_bytes fails closed otherwise.
     # An unrelated ledger conflict must not deadlock the two existing merge resolvers.
     if (dirty and not conflicted) or (output.exists() and not tracked):
         raise ValueError("unstaged projection edits: " + config["output"])
@@ -202,8 +202,6 @@ def conflicted_diagnostic_template(root):
 PBX_MEMBER = re.compile(
     r"(?m)^\t\t([A-Za-z0-9]+) /\* .*? \*/ = \{isa = PBX(?:BuildFile|FileReference);"
 )
-# Group children and build-phase rows use the same id as the object definition.
-# Keeping the definition does not keep the row.
 PBX_PLACEMENT = re.compile(r"(?m)^\t\t\t\t([A-Za-z0-9]+) /\* .*? \*/,")
 
 
@@ -232,18 +230,32 @@ def assert_merged_project_keeps_parent_files(root, project):
             raise ValueError("diagnostic project is not text: " + spec) from error
 
     base_defs, base_rows = _project_membership(blob(f"{base_rev}:{DIAGNOSTIC_PROJECT}"))
-    added_defs, added_rows = set(), set()
+    added_defs, added_rows, parent_sources = set(), set(), []
     for parent in ("HEAD", "MERGE_HEAD"):
-        defs, rows = _project_membership(blob(f"{parent}:{DIAGNOSTIC_PROJECT}"))
+        source = blob(f"{parent}:{DIAGNOSTIC_PROJECT}")
+        parent_sources.append(source)
+        defs, rows = _project_membership(source)
         added_defs.update(defs - base_defs)
         added_rows.update(rows - base_rows)
     try:
-        merged_defs, merged_rows = _project_membership(project.decode())
+        merged = project.decode()
+        merged_defs, merged_rows = _project_membership(merged)
     except UnicodeDecodeError as error:
         raise ValueError("diagnostic project is not text") from error
     missing = sorted((added_defs - merged_defs) | (added_rows - merged_rows))
-    if missing:
-        raise ValueError("merged project dropped a parent file: " + ", ".join(missing))
+    references = [
+        identifier for identifier in sorted(added_defs)
+        if len(re.findall(r"\b" + re.escape(identifier) + r"\b", merged))
+        < max(len(re.findall(r"\b" + re.escape(identifier) + r"\b", source)) for source in parent_sources)
+    ]
+    # Placement rows and reference counts both survive a merged diagnostic project.
+    if missing or references:
+        detail = []
+        if missing:
+            detail.append("merged project dropped a parent file: " + ", ".join(missing))
+        if references:
+            detail.append("merged project dropped a parent file reference: " + ", ".join(references))
+        raise ValueError("; ".join(detail))
 
 
 def reviewed_conflicted_pin(root, expected):
@@ -278,7 +290,6 @@ def stage_conflicted_diagnostic_pin(root, pin_update, output):
     workflow, updated = pin_update
     path = repository_docs.local(root, workflow)
     original = path.read_bytes()
-    # Keep a hand-resolved workflow; index stages must not overwrite it.
     if (
         not re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", original)
         and original.decode() != updated
@@ -288,7 +299,6 @@ def stage_conflicted_diagnostic_pin(root, pin_update, output):
         )
     index = git_bytes(root, "ls-files", "--stage", "--", workflow)
     try:
-        # Validate immutable imports before replacing the conflicted pin.
         errors = repository_docs.run(root)
         if errors and errors != ["source projection stale: " + output]:
             raise ValueError("; ".join(errors))
@@ -358,8 +368,6 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
         stage_conflicted_diagnostic_pin(root, conflicted_pin, output)
         return
     # A conflicted source map is rebuilt from the merged index.
-    # Unstaged worktree bytes and either parent's projection cannot change fingerprints.
-    # The worktree registry still fails closed: import and path errors are not a stale map.
     if (
         not refresh_lockfile
         and not verify_lockfile
@@ -374,7 +382,6 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
     pin_update = None
     if reviewed_project_sha256 is not None:
         pin_update = reviewed_project_pin(root, reviewed_project_sha256)
-        # Validate immutable imports before changing either derived artifact.
         errors = repository_docs.run(root)
         if errors and errors != ["source projection stale: " + output]:
             raise ValueError("; ".join(errors))
@@ -391,7 +398,6 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             ).stdout.strip()
             if dirty:
                 raise ValueError("unstaged dependency edits: " + dirty.replace("\n", ", "))
-            # Local-only manifests must not enter a lockfile destined for CI.
             untracked = subprocess.run(
                 ["git", "ls-files", "--others", "--exclude-standard", "-z", "--", *inputs],
                 cwd=root, check=True, capture_output=True, text=True,
@@ -399,9 +405,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             if untracked:
                 raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
             # Ignored hooks, npmrc files and patches are still local-only resolver inputs.
+            # Ignored workspace manifests are still local-only resolver inputs.
             ignored = subprocess.run(
                 ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
                  ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
+                 "package.json", "**/package.json",
                  ":(glob,exclude)**/node_modules/**"],
                 cwd=root, check=True, capture_output=True, text=True,
             ).stdout.strip("\0")
@@ -412,13 +420,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                 if entry and entry.split(b" ", 1)[0] not in {b"100644", b"100755"}:
                     name = entry.split(b"\t", 1)[1].decode()
                     raise ValueError("dependency input must be a regular indexed file: " + name)
-            # Refuse pinned-source drift before invoking the dependency resolver.
             errors = repository_docs.run(root)
             if errors and errors != ["source projection stale: " + output]:
                 raise ValueError("; ".join(errors))
             rollback.enter_context(restore_dependency_artifacts_on_failure(root, output))
             verified_index = git_bytes(root, "ls-files", "--stage", "-z")
-            # Verify valid bot lockfiles without re-resolving unrelated dependencies.
             modes = [["--frozen-lockfile", "--offline"]]
             # Explicit repair only: normal commit hooks and CI retain frozen installs.
             if refresh_lockfile:
