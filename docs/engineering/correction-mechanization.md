@@ -154,3 +154,6 @@ validation, before writing the ledger or returning success. Retry the same comma
 against the current index; the refusal preserves the other writer's staged changes.
 They also recheck `HEAD` and `MERGE_HEAD` before writing or returning success;
 changed parents invalidate the review even when the index is unchanged.
+Both resolver modes and staged verification also recheck the working ledger
+after validation. Concurrent ledger edits are preserved and require a fresh retry;
+they cannot be overwritten by a resolution computed from earlier bytes.

@@ -74,6 +74,8 @@ existing lockfile with pinned Corepack pnpm (frozen, offline, lockfile-only,
 lifecycle scripts disabled) before regenerating and staging only the source map.
 It retains the refusal of unstaged dependency/output edits and pinned-source drift
 without re-resolving unrelated dependencies.
+Both dependency modes also require staged `repository-docs.json` changes before
+invoking pnpm, keeping parity checks and output selection on reviewed configuration.
 Both dependency modes render the source map from the Git index, preserving
 unrelated unstaged source edits without fingerprinting them. Refresh mode stages
 the lockfile and projection together; verify mode stages only the projection.
@@ -84,6 +86,9 @@ repair first verifies the existing lockfile offline with pinned Corepack pnpm.
 Only a confirmed manifest mismatch (`ERR_PNPM_OUTDATED_LOCKFILE`) triggers
 regeneration without lifecycle scripts and a second frozen offline check.
 Valid lockfiles keep their resolutions; other installation failures stop repair.
+Both dependency repair modes refuse index or manifest edits made while pnpm is
+verifying inputs. They preserve those edits and restore the original generated
+artifacts; stage the reviewed inputs and retry the same command.
 If resolution, frozen verification, projection generation or Git staging fails,
 the helper restores the original lockfile and projection bytes (or absence) so
 the same command can be retried without manual cleanup. Another writer's index
@@ -91,9 +96,13 @@ lock and unrelated edits remain untouched.
 It then stages the lockfile and source map, refusing unresolved source conflicts,
 unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift. It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.
+Both dependency modes also refuse ignored npmrc files, pnpm hooks and patches;
+configuration inside installed `node_modules` is excluded from this preflight.
 Both dependency modes check pnpm hooks (`.pnpmfile.cjs`), workspace `.npmrc`
 files and `patches/` as dependency inputs. Stage reviewed changes to these files
 before repair; local edits remain untouched when the preflight refuses them.
+Both modes refuse indexed symlinks before invoking pnpm; dependency inputs must
+be regular indexed files, including executable hooks.
 
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
