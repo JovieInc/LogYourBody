@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependabot-react-runtime-version-pair",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1723",
+    "correction": "PR #1723, fix-red-1423773703 occurrence 48: merge origin/main without rebasing, repair stale source parity and preserve the React DOM 19.3.1 update. The installed React 19.3.0 / React DOM 19.3.1 pair throws Incompatible React versions during server rendering.",
+    "mechanization": "Extend the existing root Dependabot update machine with a React runtime group, then align React and React DOM at 19.3.1. Extend required shared-lib dependency tests to enforce the group, equal manifest ranges and actual server-rendered HTML from the installed web pair. All four regressions fail before the repair, including identity of the web and linked UI React runtime. Align the UI workspace peer resolutions without narrowing its supported peer ranges. Include the web and UI manifests in shared-lib Turbo test inputs. Use the existing pinned dependency repair helper to preserve main resolutions and refresh the generated source map. The harness owns pushing and PR updates and must put exactly one line in the PR body: Machine: built .github/dependabot.yml.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency updater can propose React and React DOM together by construction. Required manifest and installed server-render checks catch partial or incompatible updates, including manually edited lockfiles, without relaxing frozen installs or existing update cooldowns."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/dependency-security.test.ts",
+      "anchor": "renders HTML with the installed web React and React DOM pair"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "launch-copy-merge-duplicate-constants",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1688",
     "correction": "PR #1688 / LYB-288, fix-red-95726c4f82 occurrence 24: merge origin/main without rebasing and preserve health-memory user/product isolation and fail-closed reads and writes. The LaunchJourney conflict must retain the canonical LaunchPromiseCopy table instead of restoring parallel legacy constants. Tently reports an AI-provider outage without code findings.",
