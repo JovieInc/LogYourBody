@@ -6,7 +6,7 @@ import json
 import re
 import subprocess
 import tempfile
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager, nullcontext
 from pathlib import Path
 
 import repository_docs
@@ -32,6 +32,16 @@ def staged_bytes(root, name):
     return subprocess.run(
         ["git", "show", ":" + name], cwd=root, check=True, capture_output=True,
     ).stdout
+
+
+@contextmanager
+def preserve_frozen_lockfile(root):
+    lockfile = repository_docs.local(root, "pnpm-lock.yaml")
+    original = lockfile.read_bytes()
+    yield
+    current = lockfile.read_bytes() if lockfile.exists() else None
+    if current != original:
+        raise ValueError("frozen verification changed pnpm-lock.yaml")
 
 
 def merge_sections(root, name):
@@ -377,10 +387,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             modes = [["--frozen-lockfile", "--offline"]]
             # Explicit repair only: normal commit hooks and CI retain frozen installs.
             if refresh_lockfile:
-                probe = subprocess.run(
-                    ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *modes[0]],
-                    cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                )
+                with preserve_frozen_lockfile(root):
+                    probe = subprocess.run(
+                        ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *modes[0]],
+                        cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                    )
                 print(probe.stdout, end="", flush=True)
                 # Refresh only a confirmed manifest mismatch; other failures remain blockers.
                 if probe.returncode:
@@ -390,10 +401,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                 else:
                     modes = []
             for mode in modes:
-                subprocess.run(
-                    ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
-                    cwd=root, check=True,
-                )
+                with preserve_frozen_lockfile(root) if "--frozen-lockfile" in mode else nullcontext():
+                    subprocess.run(
+                        ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
+                        cwd=root, check=True,
+                    )
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
             resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
             return

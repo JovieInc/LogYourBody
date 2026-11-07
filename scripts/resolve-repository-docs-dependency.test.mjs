@@ -44,6 +44,37 @@ function fixture(t, input, state) {
   return { root, git, path, resolve };
 }
 
+for (const scenario of ['verify', 'current', 'refresh']) {
+  for (const mutation of ['rewrite', 'delete']) {
+    test(`dependency repair refuses frozen lockfile ${mutation} after ${scenario}`, (t) => {
+      const f = fixture(t, '.pnpmfile.cjs', 'staged');
+      const index = f.git('ls-files', '--stage');
+      const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+      writeFileSync(join(f.root, 'bin/corepack'), `#!/usr/bin/env python3
+import sys
+from pathlib import Path
+lock = Path('pnpm-lock.yaml')
+if '--no-frozen-lockfile' in sys.argv:
+    lock.write_text('refreshed resolutions\\n')
+elif ${scenario === 'refresh' ? 'True' : 'False'} and lock.read_text() == 'reviewed lockfile\\n':
+    print('ERR_PNPM_OUTDATED_LOCKFILE')
+    sys.exit(1)
+elif ${mutation === 'delete' ? 'True' : 'False'}:
+    lock.unlink()
+else:
+    lock.write_text('unexpected frozen resolutions\\n')
+`, { mode: 0o755 });
+      const result = f.resolve(scenario === 'verify' ? '--verify-lockfile' : '--refresh-lockfile');
+      assert.notEqual(result.status, 0, 'a frozen lockfile mutation must fail closed');
+      assert.match(result.stderr, /frozen verification changed pnpm-lock\.yaml/);
+      assert.equal(f.git('ls-files', '--stage'), index);
+      for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+        assert.deepEqual(readFileSync(join(f.root, name)), outputs[i], 'failed repairs restore original artifacts');
+      }
+    });
+  }
+}
+
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
   for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch']) {
     for (const state of ['untracked', 'unstaged']) {
