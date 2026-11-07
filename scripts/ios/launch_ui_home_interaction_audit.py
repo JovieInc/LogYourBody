@@ -17,6 +17,7 @@ def contribute(root: Path, app_dir: Path, violations: list, violation, _line_num
     check(root, app_dir, violations, function_body, violation)
     check_person_mask_executor(root, app_dir, violations, violation)
     check_logout_alert(root, violations, violation)
+    check_ui_test_offline_fixture(root, violations, violation)
 
 
 def check_person_mask_executor(root: Path, app_dir: Path, violations: list, violation) -> None:
@@ -111,4 +112,47 @@ def check_logout_alert(root: Path, violations: list, violation) -> None:
         violations.append(violation(
             check="logout.alert_action_identity", file=str(path.relative_to(root)), line=1,
             detail="Collapse identical alert action frames, reject distinct matches, and verify Cancel and Log Out outcomes.",
+        ))
+
+
+def check_ui_test_offline_fixture(root: Path, violations: list, violation) -> None:
+    """A satisfied network path must not clear the UI-test offline fixture."""
+    app = root / "apps/ios/LogYourBody/LogYourBodyApp.swift"
+    sync = root / "apps/ios/LogYourBody/Services/RealtimeSyncManager.swift"
+    monitor = root / "apps/ios/LogYourBody/Services/RealtimeSyncManager+Part01.swift"
+    if not app.is_file() or not sync.is_file() or not monitor.is_file():
+        return
+    fixture = app.read_text().split("func applyPaidMVPUITestFixtureIfNeeded", 1)[-1].split(
+        "func writeHomeV2FixturePhoto", 1
+    )[0]
+    policy = sync.read_text().split("func argumentsForceUITestOffline", 1)[-1].split(
+        "func applyNetworkPathStatus", 1
+    )[0]
+    applicator = sync.read_text().split("func applyNetworkPathStatus", 1)[-1]
+    handler = monitor.read_text().split("func setupNetworkMonitoring", 1)[-1].split(
+        "func setupAuthListener", 1
+    )[0]
+    required = (
+        "-lybUITestPaidMVPFixture",
+        "-lybUITestWeightLoggerMVPFixture",
+        "-lybUITestPaywallFixture",
+        "-lybUITestPaywallPlansFixture",
+        "-lybUITestFullDashboardFixture",
+        "-lybUITestPhotoTimelineHUDFixture",
+        "-lybUITestBodyScoreOnboardingFixture",
+        "-lybUITestBodyScoreFirstPhotoFixture",
+    )
+    held = applicator.find("argumentsForceUITestOffline")
+    assigned = applicator.find("isOnline = status ==")
+    if (any(token not in fixture or token not in policy for token in required)
+            or "argumentsForceUITestOffline(arguments)" not in fixture
+            or "isOnline = false" not in fixture
+            or held < 0 or assigned < 0 or "return" not in applicator[held:assigned]
+            or "applyNetworkPathStatus(path.status)" not in handler
+            or "isOnline = path.status" in handler):
+        violations.append(violation(
+            check="sync.ui_test_offline_survives_path",
+            file=str(monitor.relative_to(root)),
+            line=1,
+            detail="A UI-test offline fixture must survive a satisfied network path.",
         ))

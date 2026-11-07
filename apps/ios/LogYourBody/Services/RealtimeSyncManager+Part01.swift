@@ -11,21 +11,7 @@ extension RealtimeSyncManager {
 
         networkMonitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor [weak self] in
-                guard let self = self else { return }
-
-                let wasOffline = !self.isOnline
-                self.isOnline = path.status == .satisfied
-
-                if self.isOnline {
-                    self.syncStatus = .idle
-                    if wasOffline {
-                        // Coming back online - sync immediately
-                        self.syncAll()
-                    }
-                } else {
-                    self.syncStatus = .offline
-                    self.disconnectRealtime()
-                }
+                self?.applyNetworkPathStatus(path.status)
             }
         }
     }

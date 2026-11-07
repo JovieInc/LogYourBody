@@ -71,3 +71,22 @@ class HomeInteractionAuditTests:
                                        + journey.replace(before, after, 1))
                 self.assert_rejected("logout.alert_action_identity")
         destination.write_text(source)
+
+    def test_ui_test_offline_fixture_survives_a_satisfied_path(self):
+        sync = self.app / "Services/RealtimeSyncManager.swift"
+        monitor = self.app / "Services/RealtimeSyncManager+Part01.swift"
+        original_sync = sync.read_text()
+        original_monitor = monitor.read_text()
+        self.assertEqual(self.run_audit()[0], 0)
+        cases = [
+            (sync, original_sync, '"-lybUITestPhotoTimelineHUDFixture",\n', ""),
+            (sync, original_sync, "disconnectRealtime()\n            return", "disconnectRealtime()"),
+            (monitor, original_monitor, "self?.applyNetworkPathStatus(path.status)",
+             "self?.isOnline = path.status == .satisfied"),
+        ]
+        for path, original, before, after in cases:
+            with self.subTest(before=before):
+                self.assertIn(before, original)
+                path.write_text(original.replace(before, after, 1))
+                self.assert_rejected("sync.ui_test_offline_survives_path")
+                path.write_text(original)

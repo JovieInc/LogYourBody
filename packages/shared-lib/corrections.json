@@ -6152,5 +6152,23 @@
     },
     "level": "static",
     "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "ui-test-offline-fixture-survives-path-update",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42351767035/job/128341499431",
+    "correction": "PR #1699 / LYB-312, fix-red-5df69c1e5f occurrence 23: Launch Quality run 42351767035 fails testLaunchQualityGateCapturesTimelineSurfaces. After saving the 2099-12-27 outcome, launch_next_action is Record a fresh measurement instead of Retry sync. The photo HUD fixture forces offline, then a satisfied NWPath update clears it, and a nil freshness window classifies the seeded readings as stale. CI Summary fails only because Launch Quality failed.",
+    "mechanization": "Keep every UI fixture that already forces offline on that path: applyNetworkPathStatus returns offline and disconnects before it can adopt a satisfied path or call syncAll. The dated-timeline fixture still sets offline at launch. Extend the existing launch UI audit so dropping the photo HUD marker, the early return, or the path delegation is rejected. Those mutations fail on the old handler and pass after the repair. The shared-lib suite executes the audit. Native XCTest remains unverified on this Linux host. origin/main is already merged as 2d7a52e67. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The path handler is the only writer that can clear the fixture offline flag. Returning before it adopts path status keeps Retry sync for the dated-timeline fixture by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "A UI-test offline fixture must survive a satisfied network path."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
