@@ -185,3 +185,64 @@ GBrain write and matching-content readback of
 `logyourbody-pr1679-readonly-reduce-motion-repair` succeeded through host access
 after the initial sandbox query failed and the first host query timed out.
 Its optional repository mirror was skipped with `repo_not_found`.
+
+## Offline fixture repair (fix-red-5df69c1e5f, occurrence 24)
+
+Mission: preserve LYB-245 and make the offline retry test independent of runner connectivity.
+Audience: the lanes harness and repository reviewers.
+
+Read failed logs with
+`gh run view 42354637142 --repo JovieInc/LogYourBody --log-failed`.
+Launch Quality failed `LogYourBodyUITests+DatedTimeline.swift:85`: the action was
+“Record a fresh measurement” instead of “Retry sync”. CI Summary reflected that
+failure. The shared paid/dashboard/photo fixture set sync offline once, but a
+later `NWPathMonitor` callback could replace it with the runner's online state.
+
+Extended the existing `RealtimeSyncManager` fixture setup with a DEBUG-only
+offline pin, set before cancelling monitoring. Network callbacks use one handler
+that rejects updates while pinned, including callbacks queued before cancellation.
+The existing shared fixture uses that setup for every caller. The handler is now
+registered before monitoring starts. Release connectivity transitions retain their
+existing logic. Sync captions, receipt placement, gates and the retry assertion
+are preserved; no files or tests became obsolete.
+
+The existing native sync-helper suite now tests an enqueued path update, repeated
+online/offline callbacks and sync retries, plus normal connectivity transitions
+without the pin. The required shared-lib launch-evidence guard checks shared
+fixture wiring, callback protection and release exclusion. Before the repair,
+that guard failed while the other 440 tests passed. After the repair, all 441
+passed; the final main integration adds four passing launch-copy cases.
+
+The initial `git merge --no-edit origin/main` reported up to date at
+`2d7a52e67`. Main advanced during validation. Merged
+`6cab4491970edb844c0e40ab71dffa8e71ed7914` without rebasing, using
+`node scripts/correction-classifier.mjs --resolve-merge . --stage` for the only
+conflict. Both-parent verification retained all 314 correction receipts, with
+224/224 mechanized rules and unchanged correction-ratchet allowances.
+
+Final verification used Node 22.23.2 and pinned pnpm 10.34.1:
+
+- Root `pnpm lint`, `pnpm typecheck` and `pnpm test` passed. The final test run
+  completed all eight Turbo tasks, including 177 web suites / 1,772 tests,
+  68 shared-lib Vitest files / 445 tests and its 141 Node tests.
+- Root `pnpm lint:swift` found zero violations in 557 files. This Linux SwiftLint
+  cannot run its five SourceKit-dependent rules.
+- `node scripts/ios/swift-arch/guard.mjs`,
+  `node scripts/check-vendor-boundaries.js`, `python3 scripts/repository_docs.py`,
+  and `python3 scripts/ios/launch-ui-regression-audit.py --artifact-dir /tmp/pr1679-final-launch-audit`
+  passed. Correction coverage checked both immutable merge parents; correction
+  ratchets used the full incoming main SHA, and `--check-merge .` verified staging.
+
+Initial sandbox attempts could not spawn Git subprocesses or write SwiftLint's
+cache; host-access reruns passed. `xcodebuild -version` returned command not found.
+Native compilation, the new XCTest cases, the original timeline UI test and
+native coverage remain unverified until the harness reruns the real macOS gate.
+
+GBrain write and matching-content readback succeeded for
+`logyourbody-pr1679-offline-fixture-network-race`; its optional repository mirror
+was skipped with `repo_not_found`. The harness owns pushing and PR edits. Use
+exactly one current machine declaration in the PR body:
+
+`Machine: built apps/ios/LogYourBody/Services/RealtimeSyncManager.swift`
+
+Intent-eval: n/a - deterministic fixture repair and developer guards; no user-facing output changed.
