@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-ignored-resolver-inputs",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1729",
+    "correction": "PR #1729, fix-red-1423773703 occurrence 48: the Statsig 3.33.7 manifest bump retained the 3.33.5 lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Recurring dependency repairs must not depend on ignored local resolver configuration, hooks or patches.",
+    "mechanization": "Extend both existing dependency repair modes to reject ignored npmrc files, pnpm hooks and patches before invoking pnpm, excluding installed node_modules configuration. Six real-Git negative controls fail against the prior helper; the required Detect Changes pre-commit suite verifies refusal with unchanged artifacts and index, preserved local inputs, successful retry and idempotence. Resolve exactly Statsig 3.33.7, retain unrelated main lockfile resolutions, then use the extended --refresh-lockfile helper for frozen verification and staged source parity. All frozen-install and parity gates remain intact. The harness owns pushing and PR updates and must include exactly one line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency repair helper owns resolver input preflight. Rejecting ignored local resolver files prevents Git ignore rules from allowing machine-specific inputs into the committed dependency repair."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Ignored hooks, npmrc files and patches are still local-only resolver inputs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-staged-projection-configuration",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1724",
     "correction": "PR #1724, fix-red-1423773703 occurrence 48: the Autoprefixer 10.6.2 bump left the generated source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must use reviewed projection configuration before invoking pnpm, as well as rendering staged source bytes.",
