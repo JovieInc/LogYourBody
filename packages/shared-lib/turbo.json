@@ -40,6 +40,7 @@
         "$TURBO_ROOT$/scripts/ios/launch_ui_home_interaction_audit.py",
         "$TURBO_ROOT$/scripts/ios/launch-ui-regression-report.py",
         "$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py",
+        "$TURBO_ROOT$/scripts/ios/launch_ui_audit_test_support.py",
         "$TURBO_ROOT$/apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift",
         "$TURBO_ROOT$/scripts/ios/launch-quality-evidence.py",
         "$TURBO_ROOT$/scripts/ios/test_launch_quality_evidence.py",

@@ -6063,5 +6063,27 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-f8dba15025",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42358391961",
+    "correction": "PR #1698 / LYB-338: Company Guards rejects LogYourBodyUITests.swift growing from its 4778-line baseline to 4781 lines and the unbaselined test_launch_ui_regression_audit.py reaching 535 lines. CI Summary fails after Company Guards blocks downstream jobs. Merge origin/main without rebasing and retain the Apple Distribution renewal fix.",
+    "mechanization": "Reuse the existing required Company Guards size ratchet, reproducing both exact failures before repair. Extract the unchanged Python source-copy fixture and audit helpers into launch_ui_audit_test_support.py, retain all 41 behavior cases, and include the helper in the existing shared-lib Turbo inputs and input regression. Remove unused generated XCTest setup comments and the empty teardown override while retaining every native test and assertion. Keep all size allowances and CI gates unchanged. The harness owns pushing and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Source extraction repairs the present file sizes but cannot prevent future authored source growth. The existing required company-wide size ratchet already rejects that class of regression."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing pinned Company Guards workflow rejects unbaselined files over 500 lines and growth beyond an existing allowance; CI Summary already requires it to pass."
+      }
+    },
+    "guard": {
+      "path": ".github/workflows/company-guards.yml",
+      "anchor": "uses: JovieInc/ci/.github/workflows/company-guards.yml@"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   }
 ]
