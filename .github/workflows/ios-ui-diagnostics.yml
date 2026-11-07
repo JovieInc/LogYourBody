@@ -99,8 +99,9 @@ jobs:
 
           # Intentionally unavailable until the FINAL composed audit and this
           # exact policy hunk are independently reviewed. Never a caller input.
-          REVIEWED_AUDIT_SHA256 = 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
+          REVIEWED_AUDIT_SHA256 = '242cf9e0bce6b33519d6721d2f59f4472ab4d26a6f71bb27e662e9b6b75b68f3'
           DEPENDENCIES = {
+              'scripts/ios/xcodebuild-command-timeout.py': '207fc46111a1d86ec3df2e2f60716d9924d27639e1d2920683049b6b93595fea',
               'scripts/ios/bootstrap-local-config.sh': 'aad028c0eff7f9d2a043711a8735963dc66b9bd664f11bf98b7ada67a60ab8db',
               'scripts/ios/resolve-simulator-destination.sh': 'f5b31c0a92c181a5cb025c42d6090e142bc2a2394fa05b5f58e1badd6f2693bc',
               'apps/ios/Scripts/import-joviekit.mjs': '35555f9ad251a0976a0bd0ee4ebf4293a4b8634ea61e60db254e53b9c196aa4b',

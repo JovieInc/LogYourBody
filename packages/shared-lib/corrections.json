@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "xcodebuild-finalization-grace",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42366173881/job/128385148002",
+    "correction": "PR #1706 / LYB-318, fix-red-5df69c1e5f occurrence 27: Launch Quality run 42366173881 passed all 29 selected UI tests in 1358s, then the 1500s hang cap killed xcodebuild during result-bundle finalization (exit 124). The same class of red check must not be repaired by raising the hang cap.",
+    "mechanization": "Extend the existing xcodebuild command deadline so a terminal XCTest result line may finish result-bundle finalization for at most 180 seconds past the original hang cap, and only when that result is observed inside the grace window. A run that never prints ** TEST EXECUTE SUCCEEDED ** or ** TEST EXECUTE FAILED ** still dies at the unchanged 1020s or 1500s cap. Early results do not add grace. Grace above 180 is refused before the command starts. The new behavior tests fail on the old single-deadline kill and pass after the split. Wire the watcher through run_with_timeout for every launch-quality test command, keep build-for-testing on the existing timeout, and pin the helper in the reviewed diagnostic tooling. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/xcodebuild-command-timeout.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing command deadline owns the xcodebuild test invocation, so it can tell a finished run from a hang and allow only bounded result-bundle finalization without raising the hang cap or skipping tests."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/xcodebuild-command-timeout.py",
+      "anchor": "A terminal XCTest result extends the deadline only until observed_at + grace."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-staged-projection-configuration",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1724",
     "correction": "PR #1724, fix-red-1423773703 occurrence 48: the Autoprefixer 10.6.2 bump left the generated source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must use reviewed projection configuration before invoking pnpm, as well as rendering staged source bytes.",
