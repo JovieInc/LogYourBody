@@ -681,7 +681,7 @@ private struct ChatMessage: Identifiable, Equatable {
     static let welcome = ChatMessage(
         id: "chat-welcome",
         role: .assistant,
-        text: "\(LaunchJourney.promiseHeadline) \(LaunchJourney.promiseExplanation)",
+        text: "\(LaunchPromiseCopy.headline) \(LaunchPromiseCopy.explanation)",
         clientMessageId: nil,
         replyToClientMessageId: nil,
         delivery: .complete

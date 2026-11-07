@@ -1,0 +1,14 @@
+{
+  "id": "LYB-277",
+  "parent": "LYB-107",
+  "kind": "program_revision_rationale_wording",
+  "status": "accepted",
+  "default": {
+    "source": "user_utterance",
+    "transformation": "verbatim",
+    "generatedCoachSentence": false,
+    "templateName": false,
+    "trademark": false
+  },
+  "boundaries": "Stored revision rationale only. Training-card presentation belongs to LYB-124; chat copy belongs to LYB-72."
+}

@@ -20,8 +20,8 @@ struct BodyScoreHookView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: LaunchJourney.promiseHeadline,
-            subtitle: LaunchJourney.promiseExplanation,
+            title: LaunchPromiseCopy.headline,
+            subtitle: LaunchPromiseCopy.explanation,
             showsBackButton: false,
             progress: viewModel.progress(for: .hook),
             screen: .bodyScoreIntro

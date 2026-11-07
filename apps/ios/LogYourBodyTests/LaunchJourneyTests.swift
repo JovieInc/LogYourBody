@@ -36,7 +36,7 @@ final class LaunchJourneyTests: XCTestCase {
         let empty = LaunchJourney.decide(LaunchJourney.Input(now: now))
         XCTAssertEqual(empty.state, .noData)
         XCTAssertEqual(empty.action.title, "Set an outcome and a date")
-        XCTAssertEqual(empty.action.detail, LaunchJourney.promiseExplanation)
+        XCTAssertEqual(empty.action.detail, LaunchPromiseCopy.explanation)
     }
 
     func testDatedOutcomeSurvivesAndEditRecomputes() {
@@ -124,11 +124,18 @@ final class LaunchJourneyTests: XCTestCase {
         XCTAssertEqual(LaunchJourney.hiddenSurfaceAction, "Back to coach")
     }
 
-    func testPromiseCopyStatesTheDate() {
-        XCTAssertTrue(LaunchJourney.promiseHeadline.contains("date"))
-        XCTAssertTrue(LaunchJourney.promiseExplanation.contains("date"))
-        XCTAssertTrue(LaunchJourney.promiseExplanation.contains("one next action"))
-        XCTAssertTrue(LaunchJourney.promiseFraming.contains("do not guarantee"))
+    func testPromiseCopyStatesTheDate() throws {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "lyb-launch-contract", withExtension: "json"))
+        let contract = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        let promise = try XCTUnwrap(contract?["promise"] as? [String: Any])
+        XCTAssertEqual(LaunchPromiseCopy.headline, try XCTUnwrap(promise["headline"] as? String))
+        XCTAssertEqual(LaunchPromiseCopy.explanation, try XCTUnwrap(promise["explanation"] as? String))
+        XCTAssertEqual(LaunchPromiseCopy.framing, "Dates guide the plan. They do not guarantee a result.")
+        XCTAssertEqual(HomeV2OnboardingCopy.signInTitle, LaunchPromiseCopy.headline)
+        XCTAssertEqual(HomeV2OnboardingCopy.signInBody, LaunchPromiseCopy.explanation)
+        for presentation in LaunchJourney.presentations(for: LaunchJourney.Input(now: now)) {
+            XCTAssertEqual(presentation.action.detail, LaunchPromiseCopy.explanation)
+        }
     }
 
     func testOfflineStaleAndConflictRecover() {
