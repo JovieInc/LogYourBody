@@ -1,0 +1,60 @@
+{
+  "id": "LYB-267",
+  "parent": "LYB-173",
+  "status": "accepted",
+  "recorded_on": "2026-11-01",
+  "approval_basis": "Recommended default adopted under LYB-267's ships-if-unanswered instruction. This records the authorized product default, not separate clinical approval or proof of individual safety.",
+  "question": "How many times or how long can a user postpone a suggested deload, and what does LYB say when it holds the line?",
+  "decision": "Allow one postponement of an optional engine-proposed deload by up to seven calendar days, with volume capped at the saved current level. A second request requires a short fatigue check-in before an engine review; it never grants another postponement automatically.",
+  "bounds": {
+    "maximum_postponements": 1,
+    "maximum_delay_calendar_days": 7,
+    "deadline_anchor": "The original proposed deload start date in the saved plan timezone, not the latest request date. Save the chosen date and deadline instant; retries, travel, rescheduling and regenerated proposals for the same unresolved recommendation cannot move them later.",
+    "count_scope": "One allowance per unresolved deload recommendation in the current block, persisted across sessions and devices. Rewording, dismissal, reinstall or a new proposal ID cannot reset it. Only an engine-recorded resolution closes the recommendation.",
+    "volume_cap": "Snapshot the current engine-authorized effective volume for affected sessions and muscles over the plan microcycle. Planned sets and frequency cannot exceed that snapshot; completed logs, missed work or a requested increase cannot raise the cap. Existing lower recovery limits still win, and postponement authorizes no load or effort escalation.",
+    "eligibility": "An explicit user request concerning an optional recovery proposal, with a current owned plan, recoverable volume snapshot and sufficient current non-conflicting feedback under existing engine policy. Dismissing a Home card is not a postponement request.",
+    "non_postponable": [
+      "pain_or_symptom_pause",
+      "reactive_recovery_reduction",
+      "planned_deload_boundary",
+      "coaching_ineligible"
+    ],
+    "safety_precedence": "Existing pain/symptom stops, reactive reductions, planned cycle boundaries and coaching eligibility always take precedence, including during an accepted postponement. Never restore a higher dose through this policy. Missing or stale evidence is not clearance.",
+    "second_request": "Require the existing short recovery check-in on fatigue/readiness, soreness, performance and pain/symptoms before an engine review. Reuse existing fields and thresholds. An unanswered, stale or conflicting check-in grants no extension. A completed check-in is input to the engine, not permission for a second postponement.",
+    "at_deadline": "The postponement expires at the saved start of the chosen deload date. Stop recommending continuation under the deferral. Offer review of the engine-issued deload; applying a plan change still requires the existing confirmation. Missing check-ins cannot silently extend the old plan or auto-accept a change.",
+    "review_outcome": "The engine may retain the deload proposal or existing stronger restriction, or explicitly withdraw the optional proposal if current evidence supports that under its existing policy. A still-supported proposal gets no second postponement. Retain the original decision and review observations; never reset the allowance merely because a check-in was submitted."
+  },
+  "receipts": {
+    "postponed": "Deload postponed to {date}; volume capped at current level.",
+    "check_in_required": "Before reviewing this deload again, check in on fatigue. Your deload date stays {date}; volume remains capped at the saved level.",
+    "limit_reached": "This deload has already been postponed once. Review the suggested deload before continuing with LYB's plan.",
+    "formatting": "Use the committed engine date in the user's locale, with a year when needed. The synthetic Mar 12 example is not a fixed deadline. Show the cap, before/after plan state, review time and next action in receipt details.",
+    "success_condition": "Show postponed only after the guarded plan decision and receipt are durably saved together. A failed save, stale head, offline request or preview is not a successful postponement. A duplicate request returns the same receipt without consuming another allowance.",
+    "safety_condition": "For a non-postponable restriction, retain the existing engine safety explanation and action instead of a postponement success line. A second request or expired window never clears that restriction.",
+    "claims": "Status and process wording only. No diagnosis, medical clearance, promise that waiting is safe, injury-prevention claim or promised recovery/performance benefit. Users may decline or stop without pressure; LYB controls its recommendations, not the user's choices.",
+    "distinct_from": "packages/shared-lib/decisions/home-coaching-card-wording.json#deload_deferral_explanation",
+    "distinction": "LYB-302 describes the engine finding insufficient support for a deload. LYB-267 describes the user's bounded postponement of a supported optional proposal; never substitute the LYB-302 sentence for that receipt."
+  },
+  "evidence": {
+    "doi": "10.1186/s40798-023-00633-0",
+    "pmid": "37730925",
+    "published_on": "2023-09-21",
+    "reviewed_on": "2026-11-01",
+    "scope": "Bell et al., Integrating Deloading into Strength and Physique Sports Training Programmes: An International Delphi Consensus Approach. Expert-coach consensus on deload design, not a controlled test of postponement safety.",
+    "uncertainty": "One postponement and seven days are the issue-authorized product bounds. This source does not establish that this delay is safe for a particular user. Retain the engine's actual observation references, provenance, freshness, confidence and opaque evidence IDs; do not invent an evidence ID or numeric fatigue threshold for this decision."
+  },
+  "engine_slice": {
+    "key": "deload_postponement",
+    "status": "ready_for_implementation",
+    "specification": "packages/shared-lib/decisions/deload-postponement.md#slice-deload-postponement",
+    "depends_on": ["LYB-267"],
+    "runtime_implemented": false
+  },
+  "boundaries": "Decision and one repository-local engine implementation slice only; the slice key is not a new Linear issue ID. Other declined plan changes get no blanket seven-day allowance. This record changes no runtime, gate, prescription, UI or API. Real-device TestFlight evidence stays with LYB-173.",
+  "standards": [
+    "docs/product/brand-ethos.md",
+    "docs/product/evidence-and-recommendation-standard.md",
+    "docs/engineering/training-cycle-lifecycle.md",
+    "docs/engineering/training-mutation-admission.md"
+  ]
+}
