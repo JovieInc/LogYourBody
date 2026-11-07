@@ -4,20 +4,23 @@ extension DashboardViewLiquid {
     func weeklyPhotoAttachSheet<Content: View>(on content: Content) -> some View {
         content
             .sheet(isPresented: $isProgressPhotoAttachPresented) {
-                ProgressPhotoAttachSheet(
-                    targetMetric: progressPhotoAttachTarget,
-                    fallbackDate: progressPhotoAttachFallbackDate,
-                    photoHistory: WeeklyPhotoCheckInPolicy.history(from: bodyMetrics),
-                    previousPhotoURL: weeklyPhotoOutlineURL,
-                    onComplete: {
-                        await handleProgressPhotoAttachComplete()
-                    },
-                    onCheckInSaved: { outcome in
-                        pendingWeeklyPhotoMoment = outcome.selectedMoment
-                        pendingWeeklyCompare = outcome.offersComparison && outcome.originalImageUsable
-                    }
-                )
-                .environmentObject(authManager)
+                if !isDatedTimelineEnabled || datedTimelineIsOwned {
+                    ProgressPhotoAttachSheet(
+                        targetMetric: progressPhotoAttachTarget,
+                        fallbackDate: progressPhotoAttachFallbackDate,
+                        photoHistory: WeeklyPhotoCheckInPolicy.history(from: bodyMetrics),
+                        previousPhotoURL: weeklyPhotoOutlineURL,
+                        onComplete: {
+                            await handleProgressPhotoAttachComplete()
+                        },
+                        onCheckInSaved: { outcome in
+                            pendingWeeklyPhotoMoment = outcome.selectedMoment
+                            pendingWeeklyCompare = outcome.offersComparison && outcome.originalImageUsable
+                        },
+                        presentationOwner: isDatedTimelineEnabled ? datedTimelineOwner : nil
+                    )
+                    .environmentObject(authManager)
+                }
             }
             .onChange(of: isProgressPhotoAttachPresented) { _, presented in
                 guard !presented else { return }
@@ -35,13 +38,6 @@ extension DashboardViewLiquid {
             }
     }
 
-    var progressPhotoAttachFallbackDate: Date {
-        if let progressPhotoAttachFallbackOverride {
-            return progressPhotoAttachFallbackOverride
-        }
-        return currentMetric?.date ?? globalTimelineStore.cursor?.date ?? activeTimelineBucket?.endDate ?? Date()
-    }
-
     /// The newest other diary photo, used only as an optional pose outline.
     var weeklyPhotoOutlineURL: String? {
         let excluded = progressPhotoAttachTarget?.id
@@ -53,6 +49,9 @@ extension DashboardViewLiquid {
 
     /// Weekly check-in attaches to today, even if the timeline is scrubbed elsewhere.
     func presentWeeklyPhotoCheckIn() {
+        if isDatedTimelineEnabled {
+            guard datedTimelineIsOwned else { return }
+        }
         progressPhotoAttachFallbackOverride = Date()
         progressPhotoAttachTarget = homeV2DisplayedTodayMetric()
         HapticManager.shared.selection()

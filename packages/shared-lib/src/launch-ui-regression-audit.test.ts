@@ -17,13 +17,15 @@ it('requires verified native text entry before testing draft preservation', () =
   const loop = typing.split('for character in text {')[1] ?? '';
   const [focus, readback] = loop.split('field.typeText(String(character))');
   expect(focus).toMatch(
-    /if !keyboard\.exists \{\s*field\.tap\(\)\s*guard keyboard\.waitForExistence\(timeout: 1\.5\) else \{ return false \}\s*\}/,
+    /if !focused\.exists \{\s*field\.tap\(\)\s*guard focused\.waitForExistence\(timeout: 1\.5\) else \{ return false \}\s*\}/,
   );
   expect(focus.match(/waitForExistence/g)).toHaveLength(1);
   expect(readback).toMatch(
     /expected\.append\(character\)\s*if field\.value as\? String == expected \{ continue \}\s*let entered = XCTNSPredicateExpectation/,
   );
   expect(readback).toContain('attachDiagnostics(app: app, name: "incomplete-native-text-entry")');
+  expect(typing).toContain('.matching(NSPredicate(format: "hasKeyboardFocus == true"))');
+  expect(typing).not.toContain('if !keyboard.exists');
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
   expect(turbo.tasks.test.inputs).toContain('$TURBO_ROOT$/apps/ios/LogYourBodyUITests/**/*.swift');
 

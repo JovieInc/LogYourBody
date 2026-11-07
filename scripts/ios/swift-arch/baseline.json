@@ -3,13 +3,8 @@
   "config": {
     "repo": "JovieInc/LogYourBody",
     "adr": "JovieInc/Jovie docs/architecture/swift-architecture-adr-2026-10-29.md",
-    "roots": [
-      "apps/ios/LogYourBody",
-      "apps/ios/LogYourBodyWidget"
-    ],
-    "projects": [
-      "apps/ios/LogYourBody.xcodeproj/project.pbxproj"
-    ],
+    "roots": ["apps/ios/LogYourBody", "apps/ios/LogYourBodyWidget"],
+    "projects": ["apps/ios/LogYourBody.xcodeproj/project.pbxproj"],
     "extraMainActorCalls": []
   },
   "counts": {
@@ -128,7 +123,6 @@
       "apps/ios/LogYourBody/Services/BodySpecAuthManager.swift": 2,
       "apps/ios/LogYourBody/Services/BodySpecDexaImporter.swift": 1,
       "apps/ios/LogYourBody/Services/CoreDataWorkoutReconciliationStore.swift": 2,
-      "apps/ios/LogYourBody/Services/DatedOutcomeStore.swift": 2,
       "apps/ios/LogYourBody/Services/PhotoUploadManager.swift": 2,
       "apps/ios/LogYourBody/Services/ProductAPIClient+DatedOutcome.swift": 3,
       "apps/ios/LogYourBody/Services/ProductAPIClient+Part01.swift": 11,

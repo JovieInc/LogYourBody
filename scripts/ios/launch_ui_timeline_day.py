@@ -13,6 +13,19 @@ def function_body(text: str, name: str, next_name: str) -> str:
 
 def check_timeline_calendar_day(root: Path, violations: list, violation_cls, line_number) -> None:
     """Timeline positions follow the injected calendar day, not elapsed 86400-second offsets."""
+    timeline = root / "apps/ios/LogYourBody/Services/DatedTimelineUI.swift"
+    if timeline.is_file():
+        source = timeline.read_text(errors="replace")
+        empty = source.split("var datedTimelineEmptyState:", 1)[-1].split("func openDatedTimelineEditor", 1)[0]
+        if not re.search(
+            r'\.accessibilityElement\(children: \.contain\)\s*'
+            r'\.accessibilityIdentifier\("launch_timeline_surface"\)', empty
+        ) or '.accessibilityIdentifier("launch_timeline_add_photo")' not in empty:
+            violations.append(violation_cls(
+                check="timeline.empty_photo_accessibility",
+                file=str(timeline.relative_to(root)), line=1,
+                detail="Group the empty timeline explicitly so its ID cannot replace the Add photo button ID.",
+            ))
     calculator = root / "apps/ios/LogYourBody/Helpers/TimelineCalculator.swift"
     if not calculator.is_file():
         return

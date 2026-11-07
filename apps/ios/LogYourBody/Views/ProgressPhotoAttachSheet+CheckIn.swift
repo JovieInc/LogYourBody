@@ -51,6 +51,7 @@ extension ProgressPhotoAttachSheet {
     }
 
     func loadSelectedPhoto(_ asset: AppPhotoAsset?) {
+        guard isPresentationCurrent else { return }
         let loadID = UUID()
         photoSelectionLoadID = loadID
 
@@ -78,6 +79,7 @@ extension ProgressPhotoAttachSheet {
     }
 
     func startCameraCapture() {
+        guard isPresentationCurrent else { return }
         #if DEBUG
         if usesProgressPhotoAttachFixture {
             isCameraPresented = true
@@ -129,6 +131,7 @@ extension ProgressPhotoAttachSheet {
     }
 
     func attachSelectedPhoto() {
+        guard isPresentationCurrent else { return }
         if isSuccess {
             dismiss()
             return

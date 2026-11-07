@@ -117,7 +117,6 @@
   "apps/web/src/lib/metrics/weight-lifecycle.test.ts": 581,
   "apps/web/src/lib/metrics/weight-lifecycle.ts": 686,
   "apps/web/src/lib/neon/native-product-records-adapter.ts": 515,
-  "apps/web/src/lib/training/catalog.ts": 854,
   "apps/web/src/lib/training/commands.ts": 1067,
   "apps/web/src/lib/training/delegated-revisions.test.ts": 605,
   "apps/web/src/lib/training/engine.test.ts": 728,
