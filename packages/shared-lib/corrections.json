@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-staged-projection-configuration",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1724",
+    "correction": "PR #1724, fix-red-1423773703 occurrence 48: the Autoprefixer 10.6.2 bump left the generated source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must use reviewed projection configuration before invoking pnpm, as well as rendering staged source bytes.",
+    "mechanization": "Extend both dependency repair modes to include repository-docs.json in their existing staged-input preflight. Two real-Git regressions fail before the change and pass afterward, proving refusal before pnpm with artifacts and index preserved, successful retry with staged configuration, the correct repository in the generated map, unchanged bot resolutions and idempotence. The existing required Detect Changes pre-commit suite imports the regressions. Use --verify-lockfile for this merged dependency update, retaining frozen installation and parity gates. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency helper owns input validation, frozen verification and staged source-map generation. Including its projection configuration in preflight prevents unreviewed configuration from changing parity checks and output selection before pnpm executes."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Projection configuration must be staged before dependency verification."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependabot-react-runtime-version-pair",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1723",
     "correction": "PR #1723, fix-red-1423773703 occurrence 48: merge origin/main without rebasing, repair stale source parity and preserve the React DOM 19.3.1 update. The installed React 19.3.0 / React DOM 19.3.1 pair throws Incompatible React versions during server rendering.",
