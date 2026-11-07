@@ -76,8 +76,8 @@ worsening or neurologic symptoms. It provides no diagnosis or guarantee.
 The accepted [LYB-257 pain-guidance decision](../product/exercise-swap-pain-guidance.md)
 records the exact replacement copy, any-pain trigger and explicit pain-gone
 requirement. Its created `exercise_swap_pain_guidance` UI/logic slice owns
-implementing that wording and resolution flow; this guide's existing runtime
-description does not establish that the follow-up is implemented.
+the remaining native presentation and resolution flow; this guide's runtime
+description does not establish that the full follow-up is implemented.
 
 ## Rollout and evidence
 
@@ -138,20 +138,40 @@ changing tests, thresholds or timeouts. GBrain query, write to
 `lyb-176-exercise-selection-integration`, and same-slug readback all failed with
 connection refused at `127.0.0.1:7801`; the durable write/readback gap remains.
 
+## Concerning-pain policy (LYB-298)
+
+`apps/web/src/lib/training/pain-policy.ts` owns `evaluateMovementPain` and the
+single `CONCERNING_PAIN_MESSAGE`. Explicit persistent pain, worsening pain or
+the existing neurologic symptom flag returns `pause_movement`, with no swap
+and no continued coaching on that movement. These are reported flags, never
+inferred from a pain score, fatigue, elapsed time or missing feedback. The
+policy has no exercise, setup, prescription or clearance output.
+
+Trunk fatigue alone, unreported feedback and joint pain without these flags
+return `continue_to_swap`: permission to proceed to the existing eligibility
+checks, not automatic approval. The selector's broader any-pain and concerning
+symptom exclusions and the separate session/deload holds remain effective.
+Selection and the approval component import the shared module rather than
+authoring medical copy. No LYB-114 fields, questionnaire or rollout switches
+change. Pain-resolution UI remains with the LYB-257 follow-up above.
+
 ## Approval presentation (LYB-300)
 
 `apps/web/src/components/training/ExerciseSwapApproval.tsx` is the UI-only review
 component for a completed selector result. It renders the two nullable selector
 slots without inspecting feedback, inventory, ROM, or eligibility. The caller
-supplies catalog display names, the existing `evaluateDeload` pain-policy result,
+supplies catalog display names and an `evaluateMovementPain` policy result (the
+existing `evaluateDeload` result remains supported for session-level holds),
 and any already-established constraint reason codes (`blocked_rom_or_clearance`,
 `missing_station`, `belt_does_not_clear_symptoms`). Both supported selector reasons
 explain that support may reduce trunk demand without implying zero spinal load.
 Trial reasons explicitly describe an exercise or setup to try; they do not claim
 an established response. The copy map must cover every engine reason at compile time.
 Constraint reasons explain withheld floor setups, hidden missing stations, and
-that a belt does not clear persistent symptoms. A `pause_session` result renders
-only the policy's exact explanation, even if candidates were also supplied.
+that a belt does not clear persistent symptoms. A `pause_movement` result or
+selector `symptom_safety` hold renders only the shared concerning-pain sentence,
+even if candidates were also supplied. An independent `pause_session` result
+still renders its policy explanation and withholds all swap controls.
 
 Choosing a radio option never changes the prescription. Only **Approve swap**
 calls `onApprove` with the exact selected variant ID. The host connects that

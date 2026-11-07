@@ -8,7 +8,9 @@ import { classifyLedger, runClassifier } from './correction-classifier.mjs';
 
 const commands = [['--resolve-merge'], ['--resolve-merge', '--stage'], ['--check-merge']];
 for (const [args, target] of commands.flatMap((args) =>
-  ['index', 'HEAD', 'MERGE_HEAD', 'ledger'].map((target) => [args, target]),
+  ['index', 'HEAD', 'MERGE_HEAD', 'ledger', 'ledger-write']
+    .filter((target) => args[0] !== '--check-merge' || target !== 'ledger-write')
+    .map((target) => [args, target]),
 )) {
   test(`${args.join(' ')} refuses a changed ${target} and safely retries`, (t) => {
     const root = mkdtempSync(join(tmpdir(), 'lyb-classifier-concurrency-'));
@@ -49,7 +51,9 @@ for (const [args, target] of commands.flatMap((args) =>
       assert.equal(runClassifier(['--resolve-merge', root, '--stage'], quiet), 0);
     }
     const original = readFileSync(ledger, 'utf8');
-    const parent = ['index', 'ledger'].includes(target) ? null : git('rev-parse', target).trim();
+    const parent = ['index', 'ledger', 'ledger-write'].includes(target)
+      ? null
+      : git('rev-parse', target).trim();
     const replacement = parent && git('rev-parse', `${parent}^`).trim();
     const setParent = (value) => {
       if (target === 'MERGE_HEAD') {
@@ -76,16 +80,17 @@ for (const [args, target] of commands.flatMap((args) =>
       (program, argv, options) => {
         const output = execFileSync(program, argv, options);
         if (argv.includes('ls-files')) indexReads += 1;
+        const ledgerRead = target === 'ledger' ? 2 : target === 'ledger-write' ? 3 : null;
         if (
           argv.includes('ls-files') &&
           changedIndex === undefined &&
-          (target !== 'ledger' || indexReads === 2)
+          (ledgerRead === null || indexReads === ledgerRead)
         ) {
           if (target === 'index') {
             writeFileSync(join(root, 'concurrent.txt'), 'another writer\n');
             git('add', 'concurrent.txt');
-          } else if (target === 'ledger') {
-            // Edit after the last index read, without changing either staged bytes or parents.
+          } else if (target === 'ledger' || target === 'ledger-write') {
+            // Edit after the snapshot read, without changing staged bytes or parents.
             writeFileSync(ledger, concurrentLedger);
           } else {
             // Parent refs can change without changing a single indexed byte.
@@ -102,13 +107,13 @@ for (const [args, target] of commands.flatMap((args) =>
       diagnostic,
       target === 'index'
         ? /merge index changed during validation/
-        : target === 'ledger'
+        : target === 'ledger' || target === 'ledger-write'
           ? /merge ledger changed during validation/
           : /merge parents changed during validation/,
     );
     assert.equal(
       readFileSync(ledger, 'utf8'),
-      target === 'ledger' ? concurrentLedger : original,
+      target === 'ledger' || target === 'ledger-write' ? concurrentLedger : original,
       'refusal preserves the ledger, including another writer’s edits',
     );
     assert.equal(
@@ -120,7 +125,7 @@ for (const [args, target] of commands.flatMap((args) =>
       assert.equal(git('rev-parse', target).trim(), replacement, 'refusal preserves the writer');
       setParent(parent);
     }
-    if (target === 'ledger') writeFileSync(ledger, original);
+    if (target === 'ledger' || target === 'ledger-write') writeFileSync(ledger, original);
     assert.equal(runClassifier(command, quiet), 0, 'retry validates current merge evidence');
     assert.deepEqual(JSON.parse(readFileSync(ledger, 'utf8')), [rows[2], rows[0], rows[1]]);
     if (target === 'index') assert.equal(git('show', ':0:concurrent.txt'), 'another writer\n');

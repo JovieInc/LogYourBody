@@ -156,8 +156,11 @@ validation, before writing the ledger or returning success. Retry the same comma
 against the current index; the refusal preserves the other writer's staged changes.
 
 The classifier also snapshots the working ledger and rechecks its bytes after
-validating the index and both merge parents. An edit during validation refuses
-resolution, staging and a successful verification verdict without overwriting
-the other writer. Review the working ledger and retry against the current merge.
+validating the index and both merge parents, and again immediately before
+replacing the file. An edit during validation or in that pre-write window
+refuses resolution, staging and a successful verification verdict without
+overwriting the other writer. Review the working ledger and retry against the
+current merge. Concurrent ledger edits are preserved and cannot be overwritten
+by a resolution computed from earlier bytes.
 They also recheck `HEAD` and `MERGE_HEAD` before writing or returning success;
 changed parents invalidate the review even when the index is unchanged.
