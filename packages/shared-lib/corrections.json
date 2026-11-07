@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "idle-chat-never-opens-voice-hardware",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41391664508",
+    "correction": "PR #1706 / LYB-318, fix-red-95726c4f82 occurrence 24: merge-group launch quality failed after chat collapse. The simulator log at 05:24:11 records CoreAudio Initialize: RPC timeout. Apparently deadlocked. Aborting now, then SIGABRT. Chat disappearance cancels an unused voice service, whose unconditional inputNode cleanup opens audio hardware. Tently reports a separate AI-provider outage, reference a9e22d1c-3058-4f4c-af85-c8b7994da4b7, with no source finding.",
+    "mechanization": "Extend the existing required launch UI regression suite to keep capture and playback resources deferred, create recognition only after permission, and require audio cleanup to be conditional on an existing request. Add both services to Turbo test inputs. The new guard fails against the previous eager resources and unconditional cleanup; it passes after the lifecycle fix. Add native idle-cancel, unused-finish and playback-recreation cases with injected resource factories; native execution remains for the real Mac runner. Use the existing split tool to extract playback without growing the company size baseline, and the reviewed project-pin resolver after adding source and test membership. The harness owns push and PR edits and must include exactly one line: Machine: built packages/shared-lib/src/launch-ui-regression-audit.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Deferred audio resources and request-owned cleanup prevent ordinary chat construction or dismissal from initializing capture or speech hardware, while actual recording retains its cleanup path."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/VoiceCaptureService.swift",
+      "anchor": "Never open audio hardware for cleanup."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependabot-workspace-release-age-resolution",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41420896425",
     "correction": "LYB-357: the weekly multi-directory Dependabot job reports 38 update_not_possible errors. Run 41420896425 shows all 38 are ERR_PNPM_NO_MATURE_MATCHING_VERSION for the implicitly resolved Rollup peer, not duplicate-PR errors. The workspace member also triggers npm probes without the root package-manager pin.",
