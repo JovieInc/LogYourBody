@@ -29,6 +29,13 @@ does not supply additional evidence.
 
 ## Boundary
 
-This records the claims boundary only; it does not implement or verify native
-behavior. Numerical evidence and fusion remain with JOV-6014. Import work in
-LYB-80, LYB-81, and LYB-171, and all other LYB-311 work remain outside this slice.
+This records the claims boundary only. Numerical evidence and fusion remain with
+JOV-6014. Import work in LYB-80, LYB-81, and LYB-171, and all other LYB-311 work
+remain outside this slice.
+
+## Implementation note (LYB-318, 2026-11-02)
+
+[Body-shape calibration](body-shape-calibration.md) keeps this boundary in the
+native wireframe and bucket avatar. The illustrative tier is the only promoted
+tier. Higher tiers stay closed, and a body-fat percentage does not select the
+picture.

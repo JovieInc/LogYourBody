@@ -65,6 +65,7 @@ git -C "$ROOT_DIR" diff HEAD --binary > "$ARTIFACT_DIR/source-working-tree.patch
 if [[ "$AUDIT_MODE" == full ]]; then
   # Finish validator shell fixtures before simulator boot competes for host resources.
   python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
+  python3 "$ROOT_DIR/scripts/ios/test_xcodebuild_command_timeout.py"
   bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
 fi
 
@@ -79,7 +80,13 @@ fi
 run_with_timeout() {
   local timeout_seconds="$1"
   shift
-
+  if [[ -n "${XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS:-}" ]]; then
+    python3 -B "$ROOT_DIR/scripts/ios/xcodebuild-command-timeout.py" \
+      --timeout-seconds "$timeout_seconds" \
+      --grace-seconds "$XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS" \
+      -- "$@"
+    return $?
+  fi
   if [[ -n "$TIMEOUT_BIN" ]]; then
     "$TIMEOUT_BIN" --kill-after=30s "${timeout_seconds}s" "$@"
     return $?
@@ -140,10 +147,7 @@ is_simulator_infra_failure() {
     "$log_file"
 }
 
-# Diagnostic only (never fails the audit): every hosted test invocation spends
-# 6-10 min launching the test runner before its first test. Record what the
-# simulator and host are doing in that window so the dominant phase can be
-# fixed instead of bounded. Writes <label>.launch-probe/ next to the bundle.
+# Record host and simulator activity while the test runner launches.
 LQ_LAUNCH_PROBE="${LQ_LAUNCH_PROBE:-true}"
 LAUNCH_PROBE_PIDS=()
 
@@ -231,6 +235,7 @@ run_xcodebuild_test() {
     )
 
     set +e
+    XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS="${XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS:-180}" \
     run_with_timeout \
       "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS" \
       "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
@@ -578,12 +583,7 @@ python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --scheme "$SCHEME" --only-testing LogYourBodyTests \
   > "$ARTIFACT_DIR/launch-quality-unit-tests.ratchet.json"
 
-# Every UI check runs in ONE xcodebuild invocation. On hosted macOS each
-# test-without-building invocation pays 3-6 min launching the UI test runner
-# before its first test (xcresult action log, run 38320479871: runner launch
-# 340-537s per invocation). Three separate UI invocations plus the unit target
-# overran the 40-minute step with every test passing. Same tests, same exact
-# evidence checks, one runner launch.
+# One UI xcodebuild invocation. Separate launches overran the step with every test passing.
 LAUNCH_QUALITY_UI_TESTS=(
   "HomeV2TimelineIntegrationUITests/testPhotoHoldScrubsBothDirectionsThenAnotherHoldRestoresTap"
   "HomeV2TimelineIntegrationUITests/testPhotoScrubResetsWhenNavigatingToTheMenuAndBack"
@@ -663,7 +663,7 @@ fi
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
   printf -- '- Build strategy: one `build-for-testing`, the general unit target (StoreKit lifecycle tests run in the required dedicated job), then one UI invocation covering inherited surface cases, two canvas cases, and twelve bounded chaos regressions with simulator parallelism disabled\n'
   printf -- '- Required native coverage: biometric policy, SettingsRow, chaos action accounting, and executed MesocycleCanvas app/view lines. Canvas captures cover reduced motion, replay/readback, and undo.\n'
-  printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
+  printf -- '- Build timeout: `%ss`; test hang cap: `%ss`; finalization grace: `%ss`\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS" "${XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS:-180}"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"
 

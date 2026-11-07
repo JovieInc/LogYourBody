@@ -6,26 +6,11 @@ import json
 import re
 import subprocess
 import tempfile
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack
 from pathlib import Path
 
 import repository_docs
-
-
-@contextmanager
-def restore_dependency_artifacts_on_failure(root, output):
-    paths = [repository_docs.local(root, name) for name in ("pnpm-lock.yaml", output)]
-    originals = {path: path.read_bytes() if path.exists() else None for path in paths}
-    try:
-        yield
-    except (ValueError, OSError, subprocess.CalledProcessError):
-        # Failed dependency repairs restore both artifacts, including staging failures.
-        for path, original in originals.items():
-            if original is None:
-                path.unlink(missing_ok=True)
-            else:
-                path.write_bytes(original)
-        raise
+from manifest_union import restore_dependency_artifacts_on_failure
 
 
 def staged_bytes(root, name):
@@ -97,6 +82,12 @@ def union_manifests(root):
     apply_manifest_union(root)
 
 
+def union_project(root):
+    """Stage insertion-only Xcode membership. Never derive the diagnostic digest."""
+    from pbx_union import apply_project_union
+    apply_project_union(root)
+
+
 def resolve_staged(root, extra_outputs=()):
     root = Path(root).resolve()
     # An auto-merged manifest must keep every parent test input.
@@ -165,8 +156,35 @@ def git_bytes(root, *args):
     ).stdout
 
 
+def _ours_pin_conflict(text):
+    """Return the branch side when every conflict hunk is one project-pin line."""
+    lines, out, index, saw = text.splitlines(keepends=True), [], 0, False
+    while index < len(lines):
+        line = lines[index]
+        if line[:1] != "<" or not re.match(r"^<{2,}(?: |\r?$)", line):
+            if re.match(r"^(?:\|{2,}|={2,}|>{2,})(?: |\r?$)", line):
+                raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+            out.append(line)
+            index += 1
+            continue
+        saw, index, ours = True, index + 1, None
+        for end in "=>":
+            chunk = []
+            while index < len(lines) and not re.match(rf"^{end}{{2,}}(?: |\r?$)", lines[index]):
+                chunk.append(lines[index])
+                index += 1
+            if index >= len(lines) or len(chunk) != 1 or not DIAGNOSTIC_PIN.fullmatch(chunk[0].rstrip("\r\n")):
+                raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+            ours = chunk[0] if end == "=" else ours
+            index += 1
+        out.append(ours)
+    if not saw:
+        raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+    return "".join(out)
+
+
 def conflicted_diagnostic_template(root):
-    """Return one parent workflow when every stage differs only by the project pin."""
+    """Return the branch workflow when incoming differs only by the project pin."""
     entries = [
         entry for entry in git_bytes(
             root, "ls-files", "--unmerged", "-z", "--", DIAGNOSTIC_WORKFLOW,
@@ -188,7 +206,11 @@ def conflicted_diagnostic_template(root):
         if count != 1:
             raise ValueError("diagnostic workflow conflict is not limited to the project pin")
         texts.append((text, masked))
-    if len({masked for _text, masked in texts}) != 1:
+    # Keep branch edits when incoming changed only this project pin.
+    if len({item[1] for item in texts}) != 1 and (
+        texts[0][1] != texts[2][1]
+        or _ours_pin_conflict(repository_docs.local(root, DIAGNOSTIC_WORKFLOW).read_text()) != texts[1][0]
+    ):
         raise ValueError("diagnostic workflow conflict is not limited to the project pin")
     return texts[1][0]
 
@@ -456,10 +478,13 @@ def main():
     mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
+    mode.add_argument("--union-project", action="store_true", help="union additive Xcode file membership from both parents and stage the project")
     args = parser.parse_args()
     try:
         if args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
+        elif args.union_project:
+            union_project(args.root)
         elif args.union_manifests:
             union_manifests(args.root)
             resolve(args.root)
