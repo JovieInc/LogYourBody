@@ -30,16 +30,18 @@ struct HomeV2SignInView: View {
     @State private var isLoading = false
     @State private var errorText: String?
     @State private var legalDocument: LegalDocumentView.LegalDocumentType?
+    @State private var datedOutcomeGateToken = UUID()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        _ = datedOutcomeGateToken
+        return VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 0)
 
             VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
                 Text(HomeV2OnboardingCopy.brand)
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, weight: .semibold, relativeTo: .subheadline)
                     .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                Text(HomeV2OnboardingCopy.signInTitle)
+                Text(LaunchPromiseCopy.nativeHeadline)
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.heroPhoto, weight: .bold, relativeTo: .largeTitle)
                     .kerning(-1)
                     .foregroundStyle(HomeV2Tokens.Colors.ink)
@@ -107,6 +109,9 @@ struct HomeV2SignInView: View {
             NavigationStack { LegalDocumentView(documentType: document) }
         }
         .onAppear { AppServicePorts.analyticsTracker.track(event: "login_view") }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            datedOutcomeGateToken = UUID()
+        }
     }
 
     private var legalLine: some View {

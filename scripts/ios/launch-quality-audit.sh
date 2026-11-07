@@ -24,10 +24,8 @@ XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNIN
 TEST_TIMEOUTS_ENABLED="${TEST_TIMEOUTS_ENABLED:-YES}"
 DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE="${DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE:-90}"
 MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-180}"
-# Passing hosted invocations took up to 672s (2026-10-12), and a cold first UI
-# invocation spent ~10m in xcodebuild startup before any test ran, so 720s
-# killed healthy runs. 1020s still stops a hung simulator well inside the step
-# budget. A command timeout is not retried; see is_simulator_infra_failure.
+# Passing hosted invocations took up to 672s (2026-10-12), and a cold first UI invocation spent ~10m in xcodebuild startup before any test ran, so 720s killed healthy runs.
+# 1020s still stops a hung simulator well inside the step budget. A command timeout is not retried; see is_simulator_infra_failure.
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
 # Bound the one cold build independently of XCTest execution. Run 40388372132
 # missed every Swift package cache and was still compiling test targets at 600s.
@@ -567,7 +565,9 @@ run_xcodebuild_test \
   -only-testing:LogYourBodyTests \
   -skip-testing:LogYourBodyTests/StoreKitPurchaseRestoreTests
 assert_xcresult_evidence \
-  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"
+  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}" \
+  --expected-test 'BackgroundRemovalServiceTests/testPersonMaskRunsOutsideCooperativeTasksAndReturnsTheMask()' \
+  --expected-test 'BackgroundRemovalServiceTests/testPersonMaskRunsOutsideCooperativeTasksAndPreservesTheError()'
 
 python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --coverage "$ARTIFACT_DIR/launch-quality-unit-tests.coverage.json" \
@@ -578,12 +578,8 @@ python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --scheme "$SCHEME" --only-testing LogYourBodyTests \
   > "$ARTIFACT_DIR/launch-quality-unit-tests.ratchet.json"
 
-# Every UI check runs in ONE xcodebuild invocation. On hosted macOS each
-# test-without-building invocation pays 3-6 min launching the UI test runner
-# before its first test (xcresult action log, run 38320479871: runner launch
-# 340-537s per invocation). Three separate UI invocations plus the unit target
-# overran the 40-minute step with every test passing. Same tests, same exact
-# evidence checks, one runner launch.
+# Keep one UI invocation: hosted runner startup costs 340-537s per launch
+# (run 38320479871); three launches overran the 40-minute step with all tests passing.
 LAUNCH_QUALITY_UI_TESTS=(
   "HomeV2TimelineIntegrationUITests/testPhotoHoldScrubsBothDirectionsThenAnotherHoldRestoresTap"
   "HomeV2TimelineIntegrationUITests/testPhotoScrubResetsWhenNavigatingToTheMenuAndBack"
@@ -598,6 +594,10 @@ LAUNCH_QUALITY_UI_TESTS=(
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces"
+  "LogYourBodyUITests/testDatedOutcomeFirstLaunchCancelBackAndManualBaseline"
+  "LogYourBodyUITests/testDatedOutcomeGateOffKeepsExistingFirstRun"
+  "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn"
+  "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation"
   "LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail"
   "OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal"
   "MesocycleCanvasUITests/testReducedMotionUsesStackedDayCards"

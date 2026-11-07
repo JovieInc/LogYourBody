@@ -8,7 +8,13 @@ import CoreImage
 import UIKit
 class BackgroundRemovalService {
     static let shared = BackgroundRemovalService()
-    private init() {}
+    private let makeMask: (CGImage, Float) throws -> CVPixelBuffer
+
+    private init() { makeMask = Self.visionMask }
+
+    init(makeMask: @escaping (CGImage, Float) throws -> CVPixelBuffer) {
+        self.makeMask = makeMask
+    }
 
     enum BackgroundRemovalError: LocalizedError {
         case noPersonFound
@@ -41,16 +47,24 @@ class BackgroundRemovalService {
     /// there is no completion handler and nothing that can be resumed twice
     /// (the simulator trap that BackgroundRemovalServiceTests used to document).
     func personMask(for cgImage: CGImage, quality: Float) async throws -> CVPixelBuffer {
-        try await Task.detached(priority: .userInitiated) {
-            let request = VNGeneratePersonSegmentationRequest()
-            request.qualityLevel = quality > 0.8 ? .accurate : .balanced
-            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-            try handler.perform([request])
-            guard let result = request.results?.first else {
-                throw BackgroundRemovalError.noPersonFound
+        // Vision waits synchronously for dependent dispatch work. Concurrent
+        // previews must not occupy Swift's cooperative pool while those jobs wait.
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(with: Result { try self.makeMask(cgImage, quality) })
             }
-            return result.pixelBuffer
-        }.value
+        }
+    }
+
+    private static func visionMask(for cgImage: CGImage, quality: Float) throws -> CVPixelBuffer {
+        let request = VNGeneratePersonSegmentationRequest()
+        request.qualityLevel = quality > 0.8 ? .accurate : .balanced
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        try handler.perform([request])
+        guard let result = request.results?.first else {
+            throw BackgroundRemovalError.noPersonFound
+        }
+        return result.pixelBuffer
     }
 
     /// Copies the Vision mask into a value grid so the buffer is not retained.

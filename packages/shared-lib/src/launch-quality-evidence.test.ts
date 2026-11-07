@@ -124,6 +124,65 @@ it('pins shared offline UI fixtures before late network callbacks can replace th
   expect(release).not.toMatch(/usesOfflineUITestFixture|applyOfflineUITestFixture/);
 });
 
+it('qualifies native scenarios independently instead of sharing another XCTest case budget', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const nestedCalls = (source: string) =>
+    [...source.matchAll(/^\s*(?:(?:try[!?]?|await)\s+)*(?:self\.)?(test\w+)\s*\(/gm)].map(
+      (match) => match[1],
+    );
+  expect(
+    nestedCalls(
+      '        try testNested()\n        testDirect()\n        try await self.testAsync()',
+    ),
+  ).toEqual(['testNested', 'testDirect', 'testAsync']);
+  expect(
+    nestedCalls('// try testComment()\nfunc testIndependent() {}\ntry assertSurface()'),
+  ).toEqual([]);
+  const sources = execFileSync('git', ['ls-files', '--', 'apps/ios/LogYourBodyUITests'], {
+    cwd: root,
+    encoding: 'utf8',
+  })
+    .trim()
+    .split('\n')
+    .filter((path) => path.endsWith('.swift'));
+  expect(sources.length).toBeGreaterThan(0);
+  const nested = sources.flatMap((path) =>
+    nestedCalls(readFileSync(`${root}/${path}`, 'utf8')).map((method) => `${path}: ${method}`),
+  );
+  expect(
+    nested,
+    'Select each scenario directly so XCTest owns its timeout and execution receipt',
+  ).toEqual([]);
+  const audit = readFileSync(`${root}/scripts/ios/launch-quality-audit.sh`, 'utf8');
+  const selection = audit.slice(
+    audit.indexOf('LAUNCH_QUALITY_UI_TESTS=('),
+    audit.indexOf('UI_RESULT_BUNDLE='),
+  );
+  const output = execFileSync(
+    '/bin/bash',
+    [
+      '-c',
+      'set -euo pipefail\n' +
+        selection +
+        '\nprintf "%s\\n" "${UI_SELECTORS[@]}" "${UI_EVIDENCE_ARGS[@]}"',
+    ],
+    { encoding: 'utf8', env: { PATH: '/usr/bin:/bin' } },
+  ).split('\n');
+  for (const method of [
+    'testDatedOutcomeFirstLaunchCancelBackAndManualBaseline',
+    'testDatedOutcomeGateOffKeepsExistingFirstRun',
+    'testDatedTimelineManualBaselineAndInterruptedPhotoReturn',
+    'testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation',
+  ]) {
+    expect(
+      output.filter(
+        (line) => line === `-only-testing:LogYourBodyUITests/LogYourBodyUITests/${method}`,
+      ),
+    ).toHaveLength(1);
+    expect(output.filter((line) => line === `LogYourBodyUITests/${method}()`)).toHaveLength(1);
+  }
+});
+
 it('rejects incomplete XCTest proof through the launch gate validator with executed line coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const coverage = mkdtempSync(`${tmpdir()}/lyb-evidence-coverage-`);

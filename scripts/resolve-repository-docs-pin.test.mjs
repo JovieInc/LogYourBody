@@ -10,6 +10,59 @@ import { env, resolver } from './resolve-repository-docs.test.mjs';
 
 const DIAGNOSTIC_PROJECT = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj';
 const DIAGNOSTIC_WORKFLOW = '.github/workflows/ios-ui-diagnostics.yml';
+const DIAGNOSTIC_AUDIT = 'scripts/ios/launch-quality-audit.sh';
+const DIAGNOSTIC_TESTS = 'scripts/tests/test_runner_routing.py';
+
+test('reviewed audit repair updates all pins together and rejects unreviewed inputs without writing', (t) => {
+  const f = pinFixture(t);
+  mkdirSync(join(f.root, 'scripts/ios'), { recursive: true });
+  mkdirSync(join(f.root, 'scripts/tests'), { recursive: true });
+  const previous = 'a'.repeat(64);
+  const audit = '# reviewed selectors\n';
+  const digest = createHash('sha256').update(audit).digest('hex');
+  const workflow = `            REVIEWED_AUDIT_SHA256 = '${previous}'\n# keep workflow policy\n`;
+  const tests = `    assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (\n        '${previous}'\n    )\n    expected = '${previous}'\n    assert module['REVIEWED_AUDIT_SHA256'] == expected\n    assert \"REVIEWED_AUDIT_SHA256 = '${previous}'\" in source\n# keep refusal fixtures\n`;
+  writeFileSync(join(f.root, DIAGNOSTIC_AUDIT), audit);
+  writeFileSync(join(f.root, DIAGNOSTIC_WORKFLOW), workflow);
+  writeFileSync(join(f.root, DIAGNOSTIC_TESTS), tests);
+  f.git('add', '-A');
+  const index = f.git('write-tree');
+  const run = (value) => spawnSync('python3', [resolver, '--root', f.root, '--reviewed-audit-sha256', value], { env, encoding: 'utf8' });
+  const unchanged = () => {
+    assert.equal(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW), 'utf8'), workflow);
+    assert.equal(f.git('write-tree'), index);
+  };
+  for (const value of ['marker-only', '0'.repeat(64)]) {
+    const refused = run(value);
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /reviewed audit SHA-256/);
+    unchanged();
+  }
+  writeFileSync(join(f.root, DIAGNOSTIC_AUDIT), `${audit}# unstaged\n`);
+  const dirty = run(digest);
+  assert.notEqual(dirty.status, 0);
+  assert.match(dirty.stderr, /stage reviewed audit repair inputs first/);
+  unchanged();
+  writeFileSync(join(f.root, DIAGNOSTIC_AUDIT), audit);
+  for (const bad of [tests.replace(previous, 'b'.repeat(64)), tests + tests]) {
+    writeFileSync(join(f.root, DIAGNOSTIC_TESTS), bad);
+    f.git('add', DIAGNOSTIC_TESTS);
+    const refused = run(digest);
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /regression pins must agree/);
+    assert.equal(readFileSync(join(f.root, DIAGNOSTIC_TESTS), 'utf8'), bad);
+    assert.equal(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW), 'utf8'), workflow);
+  }
+  writeFileSync(join(f.root, DIAGNOSTIC_TESTS), tests);
+  f.git('add', DIAGNOSTIC_TESTS);
+  const accepted = run(digest);
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.equal(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW), 'utf8'), workflow.replace(previous, digest));
+  assert.equal(readFileSync(join(f.root, DIAGNOSTIC_TESTS), 'utf8'), tests.replaceAll(previous, digest));
+  assert.equal(f.git('write-tree'), index, 'review and staging stay explicit');
+  f.git('add', '-A');
+  assert.equal(run(digest).status, 0, 'reviewed retry is idempotent');
+});
 
 function pinWorkflow(digest, note = 'kept') {
   return `jobs:\n  pins:\n    run: echo ok\n    env:\n      # ${note}\n            '${DIAGNOSTIC_PROJECT}': '${digest}',\n`;

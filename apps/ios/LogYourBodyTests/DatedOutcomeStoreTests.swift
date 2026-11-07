@@ -77,6 +77,147 @@ final class DatedOutcomeStoreTests: XCTestCase {
         XCTAssertTrue(try restored.pendingEdits().isEmpty)
     }
 
+    func testEditorSaveIsAtomicAndUnchangedSaveCreatesNoRequest() async throws {
+        let journal = store(context(try coordinator()))
+        let editor = DatedOutcomeEditorModel(store: journal, isCurrent: { true })
+        await editor.load()
+        let saved = await editor.save(value)
+        XCTAssertTrue(saved)
+        let reopened = DatedOutcomeEditorModel(store: journal, isCurrent: { true })
+        await reopened.load()
+        XCTAssertEqual(reopened.snapshot?.value, value)
+        XCTAssertTrue(reopened.hasPending)
+        let unchanged = await reopened.save(value)
+        XCTAssertTrue(unchanged)
+        XCTAssertEqual(emitted.count, 1)
+        var edit = value
+        edit.outcomeDate = "2027-07-01"
+        edit.constraints.travel = []
+        let changed = await reopened.save(edit)
+        XCTAssertTrue(changed)
+        XCTAssertEqual(try journal.pendingEdits().count, 2)
+        let count = try await journal.pendingCountForPresentation(isCurrent: { true })
+        XCTAssertEqual(count, 2)
+        XCTAssertEqual(try journal.load()?.value, edit)
+    }
+
+    func testRawEditorDraftPreservesConstraintsAndRejectsInvalidTextWithoutFallback() throws {
+        var draft = DatedOutcomeEditorDraft(
+            metric: value.outcome.metric, targetText: "20", dateText: value.outcomeDate,
+            constraints: value.constraints, sessionsText: "3", minutesText: "45"
+        )
+        XCTAssertEqual(draft.resolve(), value)
+        draft.dateText = "2027-02-30"
+        XCTAssertEqual(draft.resolve().outcomeDate, "2027-02-30")
+        XCTAssertThrowsError(try draft.resolve().validate())
+        draft.dateText = value.outcomeDate
+        draft.sessionsText = "invalid"
+        XCTAssertThrowsError(try draft.resolve().validate())
+        draft.sessionsText = ""
+        XCTAssertNil(draft.resolve().constraints.availability.sessionsPerWeek)
+        XCTAssertEqual(draft.resolve().constraints.travel, value.constraints.travel)
+        draft.targetText = "invalid"
+        XCTAssertThrowsError(try draft.resolve().validate())
+    }
+
+    func testEditorInvalidAndFailedSaveKeepOpeningRevisionForRetry() async throws {
+        let failing = FailingOutcomeContext(concurrencyType: .mainQueueConcurrencyType)
+        failing.persistentStoreCoordinator = try coordinator()
+        let journal = store(failing)
+        try journal.save(value)
+        let editor = DatedOutcomeEditorModel(store: journal, isCurrent: { true })
+        await editor.load()
+        let revision = editor.snapshot?.revision
+        var draft = value
+        draft.outcomeDate = "2027-02-30"
+        let invalid = await editor.save(draft)
+        XCTAssertFalse(invalid)
+        XCTAssertNotNil(editor.errorText)
+        draft.outcomeDate = "2027-05-01"
+        failing.failSave = true
+        let failed = await editor.save(draft)
+        XCTAssertFalse(failed)
+        XCTAssertEqual(editor.snapshot?.revision, revision)
+        XCTAssertEqual(emitted.count, 1)
+        failing.failSave = false
+        let retried = await editor.save(draft)
+        XCTAssertTrue(retried)
+        XCTAssertEqual(try journal.load()?.value, draft)
+        XCTAssertEqual(emitted.count, 2)
+    }
+
+    func testStaleEditorCannotReplaceNewerValueOrDuplicateItsPendingRequest() async throws {
+        let journal = store(context(try coordinator()))
+        try journal.save(value)
+        let editor = DatedOutcomeEditorModel(store: journal, isCurrent: { true })
+        await editor.load()
+        var newer = value
+        newer.outcomeDate = "2027-08-01"
+        let pending = try XCTUnwrap(journal.save(newer))
+        await editor.load()
+        XCTAssertEqual(editor.snapshot?.value, value, "A reappearing sheet keeps its opening revision")
+        let saved = await editor.save(value)
+        XCTAssertFalse(saved)
+        XCTAssertTrue(editor.hasLocalConflict)
+        XCTAssertEqual(editor.snapshot?.value, value, "The opening value must not be silently replaced")
+        await editor.reviewAccountValue { XCTFail("Local reconciliation needs no network"); return nil }
+        let reconciled = await editor.useAccountValue()
+        XCTAssertTrue(reconciled)
+        XCTAssertEqual(try journal.load()?.value, newer)
+        XCTAssertEqual(try journal.pendingEdits().last, pending)
+        XCTAssertEqual(emitted.count, 2)
+    }
+
+    func testConflictRetryKeepsIdentityAndExplicitReconciliationEmitsNoRequest() async throws {
+        let journal = store(context(try coordinator()))
+        let first = try XCTUnwrap(journal.save(value))
+        let remote = OutcomeRemoteFixture()
+        remote.conflicts = true
+        for _ in 0..<2 {
+            do {
+                try await journal.synchronize(remote: remote, token: "synthetic", isCurrent: { true })
+                XCTFail("A conflict must remain pending")
+            } catch { }
+        }
+        XCTAssertEqual(journal.syncIssue, .conflict)
+        XCTAssertEqual(remote.requests, [first, first])
+        let editor = DatedOutcomeEditorModel(store: journal, isCurrent: { true })
+        await editor.load()
+        var draft = value
+        draft.outcomeDate = "2028-01-01"
+        let blocked = await editor.save(draft)
+        XCTAssertFalse(blocked, "Saving cannot enqueue more writes onto a conflicting revision")
+        let account = DatedOutcomeSnapshot(revision: UUID(), value: draft)
+        await editor.reviewAccountValue { account }
+        XCTAssertEqual(try journal.load()?.value, value, "Review alone cannot discard the user's input")
+        let reconciled = await editor.useAccountValue()
+        XCTAssertTrue(reconciled)
+        XCTAssertEqual(try journal.load(), account)
+        XCTAssertTrue(try journal.pendingEdits().isEmpty)
+        XCTAssertEqual(emitted, [first])
+    }
+
+    func testEditorAndReconciliationCannotCrossAccountSessions() async throws {
+        let journal = store(context(try coordinator()))
+        try journal.save(value)
+        var current = true
+        let editor = DatedOutcomeEditorModel(store: journal, isCurrent: { current })
+        await editor.load()
+        await editor.reviewAccountValue { .init(revision: UUID(), value: self.value) }
+        owner = "owner-b"
+        current = false
+        XCTAssertFalse(editor.isPresentationCurrent, "A reused sheet must hide its opening account's snapshot")
+        let saved = await editor.save(value)
+        let reconciled = await editor.useAccountValue()
+        XCTAssertFalse(saved)
+        XCTAssertFalse(reconciled)
+        XCTAssertNil(try journal.load())
+        XCTAssertTrue(try journal.pendingEdits().isEmpty)
+        owner = "owner-a"
+        XCTAssertEqual(try journal.load()?.value, value)
+        XCTAssertEqual(emitted.count, 1)
+    }
+
     func testStalePresentationCannotSaveIntoAnotherAccount() async throws {
         let journal = store(context(try coordinator()))
         owner = "owner-b"
@@ -347,36 +488,5 @@ final class DatedOutcomeStoreTests: XCTestCase {
         let edit = DatedOutcomeEdit(requestId: UUID(), previousRevision: nil, value: value)
         let wire = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(edit)) as? [String: Any])
         XCTAssertTrue(wire["previousRevision"] is NSNull)
-    }
-}
-
-private final class FailingOutcomeContext: NSManagedObjectContext {
-    var failSave = false
-    override func save() throws {
-        if failSave { throw DatedOutcomeError.unavailable }
-        try super.save()
-    }
-}
-
-@MainActor
-private final class OutcomeRemoteFixture: DatedOutcomeRemote {
-    var requests: [DatedOutcomeEdit] = []
-    var latest: DatedOutcomeSnapshot?
-    var failNextSave = false
-    var onSave: (() -> Void)?
-    var reads = 0
-
-    func saveDatedOutcome(_ edit: DatedOutcomeEdit, token: String) async throws -> DatedOutcomeSnapshot {
-        requests.append(edit)
-        onSave?()
-        if failNextSave { failNextSave = false; throw DatedOutcomeError.unavailable }
-        let receipt = DatedOutcomeSnapshot(revision: edit.requestId, value: edit.value)
-        latest = receipt
-        return receipt
-    }
-
-    func fetchDatedOutcome(token: String) async throws -> DatedOutcomeSnapshot? {
-        reads += 1
-        return latest
     }
 }

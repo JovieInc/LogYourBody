@@ -79,9 +79,10 @@ class RealtimeSyncManager: ObservableObject {
         }
     )
 
-    var pendingDatedOutcomeCount: Int {
+    func pendingDatedOutcomeCount() async throws -> Int {
         guard AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: DatedOutcomeStore.featureGate) else { return 0 }
-        return (try? datedOutcomeStore.pendingEdits().count) ?? 0
+        guard let owner = authManager.captureAccountSession() else { throw DatedOutcomeError.unauthenticated }
+        return try await datedOutcomeStore.pendingCountForPresentation { self.authManager.ownsAccountSession(owner) }
     }
 
     // Battery optimization settings

@@ -54,21 +54,36 @@ struct LaunchHiddenSurfaceRecovery: View {
 }
 
 struct LaunchOutcomeEditor: View {
+    @Environment(\.dismiss) private var dismiss
     var existing: DatedOutcome?
     var errorText: String?
+    var isSaving = false
+    var includesDatedControls = false
     var onSave: (DatedOutcome) -> Void
 
     @State private var metric: DatedOutcome.Metric
     @State private var valueText: String
     @State private var dateText: String
+    @State private var constraints: DatedOutcome.Constraints
+    @State private var sessionsText: String
+    @State private var minutesText: String
+    @State private var isPreparingSave = false
 
-    init(existing: DatedOutcome?, errorText: String?, onSave: @escaping (DatedOutcome) -> Void) {
+    init(
+        existing: DatedOutcome?, errorText: String?, isSaving: Bool = false, includesDatedControls: Bool = false,
+        onSave: @escaping (DatedOutcome) -> Void
+    ) {
         self.existing = existing
         self.errorText = errorText
         self.onSave = onSave
+        self.isSaving = isSaving
+        self.includesDatedControls = includesDatedControls
         _metric = State(initialValue: existing?.outcome.metric ?? .weightKg)
         _valueText = State(initialValue: existing.map { String(existingValue($0)) } ?? "")
         _dateText = State(initialValue: existing?.outcomeDate ?? "")
+        _constraints = State(initialValue: existing?.constraints ?? .init())
+        _sessionsText = State(initialValue: existing?.constraints.availability.sessionsPerWeek.map(String.init) ?? "")
+        _minutesText = State(initialValue: existing?.constraints.availability.minutesPerSession.map(String.init) ?? "")
     }
 
     var body: some View {
@@ -83,50 +98,162 @@ struct LaunchOutcomeEditor: View {
                     .accessibilityIdentifier("launch_outcome_value")
                 TextField("Date (YYYY-MM-DD)", text: $dateText)
                     .accessibilityIdentifier("launch_outcome_date")
+                if includesDatedControls {
+                    Section("Availability (optional)") {
+                        TextField("Sessions per week", text: $sessionsText)
+                            .keyboardType(.numberPad)
+                        TextField("Minutes per session", text: $minutesText)
+                            .keyboardType(.numberPad)
+                    }
+                    intervalSection("Travel", intervals: $constraints.travel)
+                    intervalSection("Maintenance", intervals: $constraints.maintenance)
+                }
                 Text(LaunchPromiseCopy.framing)
                     .font(.footnote)
                 if let errorText {
                     Text(errorText)
                 }
             }
+            .disabled(isSaving || isPreparingSave)
             .navigationTitle("Outcome and date")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
+                        .disabled(isSaving || isPreparingSave)
                         .accessibilityIdentifier("launch_outcome_save")
                 }
+                if includesDatedControls {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                            .disabled(isSaving || isPreparingSave)
+                            .accessibilityIdentifier("launch_outcome_cancel")
+                    }
+                }
+            }
+        }
+        .interactiveDismissDisabled(isSaving || isPreparingSave)
+    }
+
+    private func intervalSection(_ title: String, intervals: Binding<[DatedOutcome.Interval]>) -> some View {
+        Section("\(title) (optional)") {
+            ForEach(intervals.wrappedValue.indices, id: \.self) { index in
+                VStack {
+                    TextField("Start (YYYY-MM-DD)", text: intervals[index].start)
+                    TextField("End (YYYY-MM-DD)", text: intervals[index].end)
+                }
+            }
+            .onDelete { intervals.wrappedValue.remove(atOffsets: $0) }
+            Button("Add \(title.lowercased()) interval") {
+                intervals.wrappedValue.append(.init(start: "", end: ""))
             }
         }
     }
 
     private func save() {
-        guard let value = Double(valueText), value.isFinite, value > 0 else {
-            onSave(invalidAttempt())
-            return
+        guard !isSaving, !isPreparingSave else { return }
+        let draft = DatedOutcomeEditorDraft(
+            metric: metric, targetText: valueText, dateText: dateText, constraints: constraints,
+            sessionsText: includesDatedControls ? sessionsText : nil,
+            minutesText: includesDatedControls ? minutesText : nil
+        )
+        isPreparingSave = true
+        Task {
+            let value = await Task.detached { draft.resolve() }.value
+            isPreparingSave = false
+            onSave(value)
         }
-        var outcome = existing ?? DatedOutcome(
-            outcome: .init(metric: metric, targetValue: value),
-            outcomeDate: dateText
-        )
-        outcome.outcome.metric = metric
-        outcome.outcome.targetValue = value
-        outcome.outcomeDate = dateText
-        onSave(outcome)
-    }
-
-    private func invalidAttempt() -> DatedOutcome {
-        var outcome = existing ?? DatedOutcome(
-            outcome: .init(metric: metric, targetValue: 0),
-            outcomeDate: dateText
-        )
-        outcome.outcomeDate = dateText
-        outcome.outcome.targetValue = Double(valueText) ?? .nan
-        return outcome
     }
 }
 
 private func existingValue(_ outcome: DatedOutcome) -> Double {
     outcome.outcome.targetValue
+}
+
+/// Shared contextual editor for first launch, timeline and settings. All journal
+/// work suspends on the store's private context; the opening session is frozen.
+struct DatedOutcomeEditorHost: View {
+    @Environment(\.dismiss) private var dismiss
+    let auth: AuthManager
+    let owner: AuthManager.ProfileSessionOwnership
+    var onSaved: () -> Void
+    @State private var model: DatedOutcomeEditorModel
+
+    init(store: DatedOutcomeStore, auth: AuthManager, owner: AuthManager.ProfileSessionOwnership, onSaved: @escaping () -> Void) {
+        self.auth = auth
+        self.owner = owner
+        self.onSaved = onSaved
+        _model = State(initialValue: DatedOutcomeEditorModel(store: store) { auth.ownsAccountSession(owner) })
+    }
+
+    var body: some View {
+        Group {
+            if auth.ownsAccountSession(owner), model.isPresentationCurrent {
+                if model.isLoaded {
+                    editor
+                } else {
+                    VStack(spacing: 16) {
+                        if let error = model.errorText {
+                            Text(error)
+                            Button("Retry") { Task { await model.load() } }
+                        } else {
+                            ProgressView()
+                        }
+                        Button("Cancel") { dismiss() }
+                            .accessibilityIdentifier("launch_outcome_cancel")
+                    }
+                }
+            } else {
+                Button("Close") { dismiss() }
+                    .accessibilityIdentifier("launch_outcome_cancel")
+            }
+        }
+        .task { await model.load() }
+    }
+
+    private var editor: some View {
+        VStack(spacing: 8) {
+            if model.store.syncIssue == .conflict || model.hasLocalConflict {
+                reconciliation
+            }
+            LaunchOutcomeEditor(
+                existing: model.snapshot?.value, errorText: model.errorText,
+                isSaving: model.isSaving, includesDatedControls: true
+            ) { value in
+                Task { if await model.save(value) { onSaved() } }
+            }
+        }
+    }
+
+    private var reconciliation: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("A different outcome has been saved. Your input is kept here.")
+                Button(model.hasLocalConflict ? "Review saved outcome" : "Review account outcome") {
+                    Task { await model.reviewAccountValue(fetch: fetchAccountValue) }
+                }
+                if let account = model.accountValue {
+                    Text("Saved target: \(account.value.outcome.targetValue.formatted()) · \(account.value.outcomeDate)")
+                    Button(model.hasLocalConflict ? "Use saved outcome and discard draft"
+                        : "Use account outcome and discard device edit") {
+                        Task { if await model.useAccountValue() { onSaved() } }
+                    }
+                    .disabled(model.isSaving)
+                }
+            }
+        }
+        .frame(maxHeight: 160)
+        .padding(.horizontal, JovieTokens.screenInset)
+    }
+
+    private func fetchAccountValue() async throws -> DatedOutcomeSnapshot? {
+        guard auth.ownsAccountSession(owner), let request = auth.captureRequestSession(),
+              let authorization = await auth.getAccessToken(for: request), auth.ownsAccountSession(owner) else {
+            throw DatedOutcomeError.unauthenticated
+        }
+        let value = try await ProductAPIClient.shared.fetchDatedOutcome(token: authorization.token)
+        guard auth.ownsAccountSession(owner) else { throw DatedOutcomeError.unauthenticated }
+        return value
+    }
 }
 
 extension DashboardViewLiquid {

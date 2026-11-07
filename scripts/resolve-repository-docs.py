@@ -454,6 +454,7 @@ def main():
     mode.add_argument("--refresh-lockfile", action="store_true", help="repair and verify the pnpm lockfile before refreshing docs")
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
     mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
+    mode.add_argument("--reviewed-audit-sha256", help="refresh diagnostic workflow and regression pins after reviewing the staged launch audit")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
     args = parser.parse_args()
@@ -465,6 +466,9 @@ def main():
             resolve(args.root)
         elif args.staged:
             resolve_staged(args.root)
+        elif args.reviewed_audit_sha256:
+            from diagnostic_audit_pin import refresh_reviewed_audit
+            refresh_reviewed_audit(args.root, args.reviewed_audit_sha256)
         else:
             resolve(args.root, args.refresh_lockfile, args.verify_lockfile, args.reviewed_project_sha256)
     except (ValueError, KeyError, TypeError, OSError, subprocess.CalledProcessError) as exc:

@@ -32,9 +32,18 @@ extension DashboardViewLiquid {
                         .font(.subheadline)
                         .accessibilityIdentifier("dated_timeline_outcome")
                 }
+                if snapshot.hasPendingOutcome {
+                    Text("Saved on this device. Waiting to sync.")
+                        .font(.footnote)
+                        .accessibilityIdentifier("dated_outcome_pending")
+                }
                 if datedTimelineLoadFailed {
                     Button("Retry sync") { scheduleDatedTimelineRefresh() }
                         .accessibilityIdentifier("dated_timeline_retry")
+                } else if realtimeSyncManager.datedOutcomeStore.syncIssue == .conflict {
+                    Button("Review account outcome") { openDatedTimelineEditor() }
+                } else if realtimeSyncManager.datedOutcomeStore.syncIssue == .retry {
+                    Button("Retry outcome sync") { realtimeSyncManager.syncAll() }
                 } else {
                     LaunchDirectiveCard(presentation: snapshot.presentation) {
                         performDatedTimelineAction()
@@ -50,21 +59,9 @@ extension DashboardViewLiquid {
         .padding(.horizontal, JovieTokens.screenInset)
         .sheet(isPresented: $showsDatedTimelineEditor) {
             if let owner = datedTimelineOwner, authManager.ownsAccountSession(owner) {
-                LaunchOutcomeEditor(existing: datedTimelineSnapshot?.outcome, errorText: launchOutcomeError) { outcome in
-                    Task {
-                        do {
-                            try await realtimeSyncManager.datedOutcomeStore.saveForPresentation(outcome) {
-                                authManager.ownsAccountSession(owner)
-                            }
-                            guard authManager.ownsAccountSession(owner) else { return }
-                            launchOutcomeError = nil
-                            showsDatedTimelineEditor = false
-                            scheduleDatedTimelineRefresh()
-                        } catch {
-                            guard authManager.ownsAccountSession(owner) else { return }
-                            launchOutcomeError = "That outcome could not be saved. Revise the date or value."
-                        }
-                    }
+                DatedOutcomeEditorHost(store: realtimeSyncManager.datedOutcomeStore, auth: authManager, owner: owner) {
+                    showsDatedTimelineEditor = false
+                    scheduleDatedTimelineRefresh()
                 }
             }
         }
@@ -145,12 +142,17 @@ extension DashboardViewLiquid {
                 let outcome = try await realtimeSyncManager.datedOutcomeStore.loadForPresentation {
                     authManager.ownsAccountSession(owner)
                 }
-                let snapshot = await datedTimelineProjector.project(
+                let pending = try await realtimeSyncManager.datedOutcomeStore.hasPendingForPresentation {
+                    authManager.ownsAccountSession(owner)
+                }
+                var snapshot = await datedTimelineProjector.project(
                     owner: owner.subject, metrics: metrics,
                     input: LaunchJourney.Input(
-                        now: Date(), outcome: outcome?.value, offline: offline
+                        now: Date(), outcome: outcome?.value, offline: offline,
+                        enforcesDatedOutcomeDecision: true
                     ), heightCm: height
                 )
+                snapshot.hasPendingOutcome = pending
                 guard !Task.isCancelled, datedTimelineRefreshID == request,
                       authManager.ownsAccountSession(owner) else { return }
                 datedTimelineSnapshot = snapshot

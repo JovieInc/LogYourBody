@@ -78,6 +78,14 @@ node --test packages/shared-lib/scripts/correction-ratchet.behavior.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
 
+After reviewing a launch-audit change, stage `scripts/ios/launch-quality-audit.sh`
+and run `python3 scripts/resolve-repository-docs.py --reviewed-audit-sha256 <reviewed-digest>`.
+The existing repair entrypoint updates the diagnostic workflow pin and all routing
+regression pins together. It refuses a digest that differs from the staged audit,
+unstaged inputs, symlinks, conflicts, and missing, duplicate or divergent pins.
+Review and stage its output explicitly; source-map regeneration remains in the
+normal pre-commit path. This command never grants trust from candidate bytes alone.
+
 Merge readiness inspects staged changes as text without external diff or text
 conversion drivers, so binary attributes and presentation filters cannot hide
 unresolved conflict markers.

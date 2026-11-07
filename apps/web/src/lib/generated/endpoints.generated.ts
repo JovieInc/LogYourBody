@@ -106,6 +106,15 @@ export const endpoints = {
   },
   allowlist: [
     {
+      value: 'https://linear.app/jovie/issue/LYB-273',
+      reason:
+        'Adopted native promise and outer rejection ceiling; not complete feasibility policy or a runtime endpoint.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-341',
+      reason: 'Native dated-outcome entry source and correction receipt; not a runtime endpoint.',
+    },
+    {
       value: 'https://app.bodyspec.com',
       reason:
         'LYB-246 public OpenAPI and Scalar docs for the BodySpec capability finding. Host only; not a new runtime endpoint.',
