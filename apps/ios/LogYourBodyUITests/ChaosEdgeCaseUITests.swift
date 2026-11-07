@@ -867,9 +867,8 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         app.launch()
         // XCTest only checks for an interruption (e.g. a fresh-install system
         // permission prompt) on a synthesized event, not a plain existence
-        // poll, so tap once to give the interruption monitor a chance to run
-        // before any waitForExistence-based navigation below.
-        app.tap()
+        // poll. Tap above the content so the monitor cannot open a metric detail.
+        app.activateSystemAlertMonitor()
         popToRootIfNeeded(in: app)
     }
 

@@ -79,6 +79,33 @@ def check_nested_launch_time_allowance(root, violations, violation):
             ))
 
 
+def check_launch_interruption_taps(root, violations, violation):
+    """Activating a monitor must not tap an arbitrary control at app center."""
+    ui = root / "apps/ios/LogYourBodyUITests"
+    helper_path = ui / "LogYourBodyUITestsLaunchTests.swift"
+    if helper_path.is_file():
+        helper = helper_path.read_text().split("func activateSystemAlertMonitor()", 1)[-1].split(
+            "func forwardActualXCTestContext()", 1
+        )[0]
+        if "coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.02)).tap()" not in helper:
+            violations.append(violation(
+                check="uitest.launch_interruption_tap", file=str(helper_path.relative_to(root)), line=1,
+                detail="The interruption monitor helper must tap the screen corner above content.",
+            ))
+    for path in sorted(ui.glob("*.swift")):
+        source = path.read_text(encoding="utf-8")
+        pattern = re.compile(
+            r"\b(?P<app>\w+)\.launch\(\)(?:\s|//[^\n]*\n|/\*[\s\S]*?\*/)*"
+            r"(?P=app)\.tap\(\)"
+        )
+        for match in pattern.finditer(source):
+            violations.append(violation(
+                check="uitest.launch_interruption_tap", file=str(path.relative_to(root)),
+                line=source.count("\n", 0, match.start()) + 1,
+                detail="Activate the interruption monitor with the screen-corner helper; an app-center tap can navigate away from the fixture.",
+            ))
+
+
 def check_home_interactions(root: Path, texts: dict, violations: list, violation) -> None:
     # Blocking Vision work must not exhaust Swift's cooperative worker pool.
     segmentation = root / "apps/ios/LogYourBody/Services/BackgroundRemovalService.swift"
@@ -153,6 +180,7 @@ def check_home_interactions(root: Path, texts: dict, violations: list, violation
 
     check_character_type_keyboard_focus(root, violations, violation)
     check_nested_launch_time_allowance(root, violations, violation)
+    check_launch_interruption_taps(root, violations, violation)
 
     ui_path = root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
     if not ui_path.is_file():

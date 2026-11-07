@@ -578,12 +578,7 @@ python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --scheme "$SCHEME" --only-testing LogYourBodyTests \
   > "$ARTIFACT_DIR/launch-quality-unit-tests.ratchet.json"
 
-# Every UI check runs in ONE xcodebuild invocation. On hosted macOS each
-# test-without-building invocation pays 3-6 min launching the UI test runner
-# before its first test (xcresult action log, run 38320479871: runner launch
-# 340-537s per invocation). Three separate UI invocations plus the unit target
-# overran the 40-minute step with every test passing. Same tests, same exact
-# evidence checks, one runner launch.
+# One UI invocation avoids repeated hosted runner startup (340-537s in run 38320479871).
 LAUNCH_QUALITY_UI_TESTS=(
   "HomeV2TimelineIntegrationUITests/testPhotoHoldScrubsBothDirectionsThenAnotherHoldRestoresTap"
   "HomeV2TimelineIntegrationUITests/testPhotoScrubResetsWhenNavigatingToTheMenuAndBack"
@@ -628,10 +623,14 @@ for test_id in "${LAUNCH_QUALITY_UI_TESTS[@]}" "${CHAOS_REGRESSIONS[@]}"; do
 done
 UI_RESULT_BUNDLE="$ARTIFACT_DIR/launch-quality-ui.xcresult"
 UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")
-# One runner launch (up to ~9 min hosted) plus all selected UI tests
-# replaces three separately bounded invocations, so its own bound is the
-# per-invocation limit plus the work the other two used to carry.
-UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1500}"
+# Use the remaining 52-minute audit deadline; reserve 60s for evidence export.
+# The fixed 1500s cutoff interrupted passing cases in run 42379798587.
+UI_REMAINING_SECONDS=$((52 * 60 - ($(date +%s) - AUDIT_STARTED_AT) - 60))
+((UI_REMAINING_SECONDS > 0)) || { echo "Launch quality audit budget exhausted" >&2; exit 124; }
+UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-$UI_REMAINING_SECONDS}"
+if ((UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS > UI_REMAINING_SECONDS)); then
+  UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_REMAINING_SECONDS"
+fi
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_xcodebuild_test \
   "launch-quality-ui" \
   "$UI_RESULT_BUNDLE" \
@@ -663,7 +662,7 @@ fi
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
   printf -- '- Build strategy: one `build-for-testing`, the general unit target (StoreKit lifecycle tests run in the required dedicated job), then one UI invocation covering inherited surface cases, two canvas cases, and twelve bounded chaos regressions with simulator parallelism disabled\n'
   printf -- '- Required native coverage: biometric policy, SettingsRow, chaos action accounting, and executed MesocycleCanvas app/view lines. Canvas captures cover reduced motion, replay/readback, and undo.\n'
-  printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
+  printf -- '- Timeouts: build `%ss`, unit `%ss`, UI `%ss`; audit deadline 52m with 60s reserved for evidence\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS" "$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"
 

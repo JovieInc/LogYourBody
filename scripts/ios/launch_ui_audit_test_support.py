@@ -30,7 +30,7 @@ SPEC = importlib.util.spec_from_file_location(
 AUDIT = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = AUDIT
 SPEC.loader.exec_module(AUDIT)
-from launch_ui_home_interaction_audit import _balanced_end  # noqa: E402
+from launch_ui_home_interaction_audit import _balanced_end, check_launch_interruption_taps  # noqa: E402
 
 
 class BraceScannerTests(unittest.TestCase):
@@ -108,6 +108,57 @@ class LaunchUIAuditTests(unittest.TestCase):
         result, output = self.run_audit()
         self.assertEqual(result, 1)
         self.assertIn(check, "\n".join(path.read_text() for path in output.glob("*.json")))
+
+
+class LaunchExecutionAuditTests(unittest.TestCase):
+    def test_launch_monitor_rejects_center_taps_and_preserves_targeted_actions(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        ui = root / "apps/ios/LogYourBodyUITests"
+        ui.mkdir(parents=True)
+        path = ui / "LaunchFixture.swift"
+        path.write_text('app.launch()\napp.activateSystemAlertMonitor()\napp.buttons["Menu"].tap()\n')
+        helper = ui / "LogYourBodyUITestsLaunchTests.swift"
+        original = (ROOT / "apps/ios/LogYourBodyUITests/LogYourBodyUITestsLaunchTests.swift").read_text()
+        helper.write_text(original)
+
+        def findings(source_root):
+            violations = []
+            check_launch_interruption_taps(source_root, violations, AUDIT.AuditViolation)
+            return [finding.check for finding in violations]
+
+        self.assertEqual(findings(ROOT), [])
+        self.assertEqual(findings(root), [])
+        helper.write_text(original.replace("CGVector(dx: 0.02, dy: 0.02)", "CGVector(dx: 0.5, dy: 0.5)"))
+        self.assertEqual(findings(root), ["uitest.launch_interruption_tap"])
+        helper.write_text(original)
+        for separator in ("\n", "\n// trigger the monitor\n", " /* monitor */\n"):
+            path.write_text(f"application.launch(){separator}application.tap()\n")
+            self.assertEqual(findings(root), ["uitest.launch_interruption_tap"])
+
+    def test_ui_command_uses_remaining_audit_budget_without_extending_deadline(self):
+        source = (ROOT / "scripts/ios/launch-quality-audit.sh").read_text()
+        start = source.index('UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")')
+        end = source.index('XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_xcodebuild_test', start)
+        budget = source[start:end]
+        workflow = (ROOT / ".github/workflows/ios-quality.yml").read_text()
+        self.assertIn("timeout-minutes: 52", workflow.split("- name: Run launch quality audit", 1)[1])
+        cases = [(1200, None, 0, "1860"), (1472, None, 0, "1588"),
+                 (1472, "2000", 0, "1588"), (1472, "1200", 0, "1200"),
+                 (3060, None, 124, ""), (3120, None, 124, "")]
+        for elapsed, override, status, expected in cases:
+            with self.subTest(elapsed=elapsed, override=override):
+                script = 'set -euo pipefail\nAUDIT_STARTED_AT=0\nUI_RESULT_BUNDLE=fixture\n'
+                script += f'date() {{ echo {elapsed}; }}\n'
+                if override is not None:
+                    script += f'UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS={override}\n'
+                result = subprocess.run(
+                    ["bash", "-c", script + budget + '\nprintf "%s" "$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS"'],
+                    capture_output=True, text=True, timeout=5,
+                )
+                self.assertEqual(result.returncode, status, result.stderr)
+                self.assertEqual(result.stdout, expected)
 
 
 class TimelineAndTypingAuditTests(LaunchUIAuditTests):

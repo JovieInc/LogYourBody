@@ -4370,7 +4370,7 @@ final class LogYourBodyUITests: XCTestCase {
         ]
         app.forwardActualXCTestContext()
         app.launch()
-        app.tap()
+        app.activateSystemAlertMonitor()
 
         let start = app.buttons["body_score_onboarding_start_button"]
         XCTAssertTrue(start.waitForExistence(timeout: 15))
@@ -4486,7 +4486,7 @@ final class LogYourBodyUITests: XCTestCase {
         ]
         app.forwardActualXCTestContext()
         app.launch()
-        app.tap()
+        app.activateSystemAlertMonitor()
 
         let start = app.buttons["body_score_onboarding_start_button"]
         XCTAssertTrue(start.waitForExistence(timeout: 15))

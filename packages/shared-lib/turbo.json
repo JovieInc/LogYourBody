@@ -29,6 +29,7 @@
         "$TURBO_ROOT$/apps/ios/LogYourBodyWidget/Info.plist",
         "$TURBO_ROOT$/apps/ios/LogYourBody/LogYourBody.entitlements",
         "$TURBO_ROOT$/scripts/ios/launch-quality-audit.sh",
+        "$TURBO_ROOT$/.github/workflows/ios-quality.yml",
         "$TURBO_ROOT$/scripts/ios/test_training_rest_project.py",
         "$TURBO_ROOT$/scripts/ios/check_embedded_bundle_versions.py",
         "$TURBO_ROOT$/scripts/ios/test_embedded_bundle_versions.py",

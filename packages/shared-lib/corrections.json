@@ -6331,5 +6331,23 @@
     },
     "level": "static",
     "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "launch-quality-ui-deadline-and-interruption-activation",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42379798587/job/128425084783",
+    "correction": "PR #1698 / LYB-338, fix-red-5df69c1e5f occurrence 29 in 14 days: merge origin/main first without rebasing, inspect Launch Quality and CI Summary failures, preserve the Apple Distribution signing fix, and extend the existing machine. The harness owns push and PR updates.",
+    "mechanization": "Extend the existing launch-quality runner to allocate UI execution from the remaining unchanged 52-minute audit deadline, reserve 60 seconds for evidence, cap overrides to that remainder and fail when exhausted. Retain all 29 UI selectors, every evidence assertion and the 90/180-second per-test limits. Extend the existing launch UI audit to reject post-launch app-center taps; use one screen-corner interruption helper across all seven launch sites. The log shows the note case spending ~100 seconds on a stray metric detail before exceeding its two-minute allowance and restarting the runner; the 1500-second UI command then interrupts canvas undo. Negative controls reject all seven original taps and fail five budget cases against the old runner. Preserve the generic red-check fingerprint and its existing shell-fixture guard. The harness must replace the existing PR machine line with exactly: Machine: built scripts/ios/launch-quality-audit.sh. No PR edits or push are performed here.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner can derive the UI command budget from the fixed audit deadline for every selector set instead of keeping a stale independent limit. A shared corner-tap helper prevents launch activation from selecting arbitrary content; the already-required audit and behavioral mutations guard its use and geometry."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-audit.sh",
+      "anchor": "UI_REMAINING_SECONDS=$((52 * 60 - ($(date +%s) - AUDIT_STARTED_AT) - 60))"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
