@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@ai-sdk/elevenlabs": "^3.0.76",
-    "@ai-sdk/gateway": "^4.0.96",
+    "@ai-sdk/gateway": "^4.0.137",
     "@headlessui/react": "^2.2.10",
     "@hookform/resolvers": "^5.9.1",
     "@jovie/ui": "workspace:*",
