@@ -630,7 +630,7 @@
 
 /* Begin PBXFileReference section */
 		B34320261102000000000007 /* DatedOutcomeStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStatsTests.swift; sourceTree = "<group>"; };
-		B34320261102000000000005 /* DatedOutcomeStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStatsView.swift; sourceTree = "<group>"; };
+		B34320261102000000000005 /* DatedOutcomeStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DatedOutcomeStatsView.swift; path = Components/DatedOutcomeStatsView.swift; sourceTree = "<group>"; };
 		B34320261102000000000003 /* DatedStatsUITestFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedStatsUITestFixture.swift; sourceTree = "<group>"; };
 		B34320261102000000000001 /* DatedOutcomeStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStats.swift; sourceTree = "<group>"; };
 		7C39AFD0DDC54F0A277E3CB7 /* LogYourBodyUITests+DatedTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogYourBodyUITests+DatedTimeline.swift"; sourceTree = "<group>"; };
