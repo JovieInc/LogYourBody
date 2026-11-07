@@ -5983,5 +5983,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-refuses-indexed-symlinks",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1719",
+    "correction": "PR #1719, fix-red-1423773703 occurrence 48: merge origin/main without rebasing and repair the Prettier 3.9.10 update. Detect Changes and parity reject the stale source projection, causing CI Summary to fail. Extend the existing dependency-repair machine and use it for this instance. Local root pnpm test also exposed an unrelated false privacy failure: the broad 93 sentinel matched a forwarded timestamp ending in .993Z.",
+    "mechanization": "Extend both dependency-repair modes to refuse indexed symlinks in resolution inputs before invoking pnpm. Six real-Git regressions accepted external hook, npmrc and patch targets before the fix and refuse them afterward, preserving artifacts, index and external bytes. Two executable-file controls and eighteen existing dependency cases remain passing. The existing required Detect Changes pre-commit suite imports these tests. Use the extended --verify-lockfile mode on the merged update, then retain frozen installation and source parity checks. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py. Pin the customer-voice privacy test clock to its existing AT fixture, assert the forwarded timestamp, and restore real timers in finally; retain the complete stored-row health-sentinel and no-logging assertions.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing artifact repair helper owns the pnpm invocation and can reject indexed symlinks before external or mutable target bytes enter dependency resolution, preventing unreviewed resolution inputs by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Dependency resolution inputs must be regular indexed files, never symlinks."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
