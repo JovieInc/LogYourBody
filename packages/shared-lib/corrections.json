@@ -5947,5 +5947,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "photo-segmentation-serial-dispatch-worker",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41541363927/job/125606556788",
+    "correction": "PR #1698 / LYB-338, fix-red-5df69c1e5f occurrence 23: merge origin/main and repair CI Summary and Launch Quality without weakening native gates. The edit callback assigns its session and sheet.appear is logged, then the photo-import scanner query times out and the next test cannot terminate that app. The retained stackshot has an idle app main thread and three detached BackgroundRemovalService.personMask tasks blocked inside Vision dispatchGroupWait; this supports cooperative-worker starvation rather than a lost sheet presenter.",
+    "mechanization": "Extend the existing segmentation service with one serial dispatch queue and bridge its synchronous Vision result through a single checked continuation. Every person-mask caller now suspends without occupying a cooperative task worker; requests are serialized and success, unsupported-platform errors and no-person errors retain one completion. Keep all UI assertions, deadlines, feature gates and signing renewal behavior. Add a native eight-caller regression spanning both quality levels alongside the retained invalid-input and unsupported-segmentation cases. Extend the existing required launch UI audit with a worker-boundary guard and real-source mutations rejecting detached tasks, a concurrent queue and a second continuation resume. The new guard fails on the original service, then passes after repair. Native execution and exact-head coverage remain unverified on Linux. The harness owns push and PR edits and must replace the current machine line with exactly one line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared person-mask service can own one serial dispatch worker for all blocking Vision requests, preventing concurrent callers from occupying Swift cooperative task workers by construction. The existing required audit rejects restoration of the recorded scheduling pattern."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "# Blocking Vision work must not exhaust Swift's cooperative worker pool."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

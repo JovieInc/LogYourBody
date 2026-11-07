@@ -351,6 +351,20 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
             self.assert_rejected("settings.logout_alert_action_selection")
             ui_path.write_text(helper)
 
+    def test_segmentation_requires_a_serial_dispatch_worker(self):
+        path = self.app / "Services/BackgroundRemovalService.swift"
+        source = path.read_text()
+        self.assertEqual(self.run_audit()[0], 0)
+        for before, after in (
+            ('segmentationQueue.async {', 'Task.detached {'),
+            ('qos: .userInitiated\n    )', 'qos: .userInitiated, attributes: .concurrent\n    )'),
+            ('continuation.resume(with: Result {', 'continuation.resume(with: Result { continuation.resume()'),
+        ):
+            self.assertIn(before, source)
+            path.write_text(source.replace(before, after, 1))
+            self.assert_rejected("photo.segmentation_dispatch_worker")
+        path.write_text(source)
+
     def test_offline_fixture_must_precede_live_network_monitoring(self):
         path = self.app / "Services/RealtimeSyncManager.swift"
         source = path.read_text()

@@ -4,6 +4,23 @@ import re
 
 
 def check_home_interactions(root: Path, texts: dict, violations: list, violation) -> None:
+    # Blocking Vision work must not exhaust Swift's cooperative worker pool.
+    segmentation = root / "apps/ios/LogYourBody/Services/BackgroundRemovalService.swift"
+    source = texts[segmentation]
+    worker = source.split("func personMask(", 1)[-1].split("func personMaskGrid(", 1)[0]
+    serial_queue = re.search(
+        r'private let segmentationQueue = DispatchQueue\(\s*label: "[^"]+",\s*'
+        r'qos: \.userInitiated\s*\)', source
+    )
+    required = ('try await withCheckedThrowingContinuation { continuation in',
+                'segmentationQueue.async {', 'continuation.resume(with: Result {',
+                'try handler.perform([request])', 'return result.pixelBuffer')
+    if (not serial_queue or any(token not in worker for token in required)
+            or 'Task.' in worker or worker.count('continuation.resume(') != 1):
+        violations.append(violation(
+            check="photo.segmentation_dispatch_worker", file=str(segmentation.relative_to(root)), line=1,
+            detail="Run blocking segmentation on one serial dispatch queue and resume once with its result.",
+        ))
     # Offline fixtures must stop the real monitor before it can overwrite their state.
     sync = root / "apps/ios/LogYourBody/Services/RealtimeSyncManager.swift"
     setup = texts[sync].split("func setupNetworkMonitoring(", 1)[-1]
