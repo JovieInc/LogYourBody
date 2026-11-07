@@ -442,7 +442,10 @@ jobs:
           mkdir -p "$RUNNER_TEMP/swiftlint"
           unzip -q "$RUNNER_TEMP/swiftlint.zip" -d "$RUNNER_TEMP/swiftlint"
           echo "SWIFTLINT=$RUNNER_TEMP/swiftlint/swiftlint" >> "$GITHUB_ENV"
-          echo "LINUX_SOURCEKIT_LIB_PATH=$(dirname "$(dirname "$(command -v swift)")")/lib" >> "$GITHUB_ENV"
+          # Swiftly puts shims on PATH; ask the compiler for the real toolchain libraries.
+          sourcekit_lib="$(swift -print-target-info | python3 -c 'import json, pathlib, sys; print(pathlib.Path(json.load(sys.stdin)["paths"]["runtimeResourcePath"]).parent)')"
+          test -f "$sourcekit_lib/libsourcekitdInProc.so"
+          echo "LINUX_SOURCEKIT_LIB_PATH=$sourcekit_lib" >> "$GITHUB_ENV"
 
       - name: Static quality audits
         env:

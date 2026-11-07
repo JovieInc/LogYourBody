@@ -6041,5 +6041,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "setup-swift-v3-sourcekit-library-location",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1717",
+    "correction": "PR #1717, fix-red-c44c8cd09b occurrence 2: retain setup-swift v3 and repair the failed iOS Static Audits and CI Summary. Run 42357907408 imports the signing keys successfully, then SwiftLint crashes loading libsourcekitdInProc.so because the library path is derived from Swiftly's command shim. Launch Quality passes its unit tests before a simulator termination failure and the UI command's 1500-second timeout; retain every native gate and require fresh CI evidence.",
+    "mechanization": "Resolve SourceKit from swift -print-target-info instead of the command's PATH location, and fail preparation when the library is absent. Extend the existing required Detect Changes setup-swift regression suite to execute the actual installation shell with a Swiftly-style shim, a toolchain path containing spaces, missing SourceKit and invalid compiler metadata. All three new cases fail before the workflow repair and pass afterward. The harness owns push and PR operations; include Machine: built .github/scripts/setup-swift-signing.test.mjs in the PR body.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing CI installation step can derive the library location from the compiler's canonical target metadata and verify it before exporting the environment variable, preventing shim paths from reaching SwiftLint."
+      }
+    },
+    "guard": {
+      "path": ".github/workflows/ci.yml",
+      "anchor": "test -f \"$sourcekit_lib/libsourcekitdInProc.so\""
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

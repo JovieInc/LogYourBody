@@ -80,3 +80,53 @@ test('malformed signing keys fail preparation', (t) => {
   assert.notEqual(f.prepare().status, 0);
   assert.notEqual(f.verify().status, 0);
 });
+
+function sourcekitFixture(t) {
+  const root = mkdtempSync(join(tmpdir(), 'swift-sourcekit-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const bin = join(root, 'swiftly', 'bin');
+  const lib = join(root, 'toolchain with spaces', 'usr', 'lib');
+  mkdirSync(bin, { recursive: true });
+  mkdirSync(lib, { recursive: true });
+  const library = join(lib, 'libsourcekitdInProc.so');
+  writeFileSync(library, 'SourceKit fixture');
+  writeFileSync(join(bin, 'swift'), `#!/bin/bash
+[[ "$*" == '-print-target-info' ]] || exit 2
+printf '%s\\n' "$SWIFT_TEST_TARGET_INFO"
+`, { mode: 0o755 });
+  for (const command of ['curl', 'unzip']) {
+    writeFileSync(join(bin, command), '#!/bin/bash\nexit 0\n', { mode: 0o755 });
+  }
+  const step = staticJob.match(/      - name: Install SwiftLint \(version pinned with setup-ios-build\)\n        run: \|\n((?:          .*\n)+)/);
+  assert.ok(step, 'exercise the SwiftLint installation step from CI');
+  const envFile = join(root, 'github-env');
+  const run = (targetInfo = { paths: { runtimeResourcePath: join(lib, 'swift') } }) => {
+    writeFileSync(envFile, '');
+    return spawnSync('bash', ['-c', step[1].replace(/^          /gm, '')], {
+      cwd: new URL('../../', import.meta.url), encoding: 'utf8',
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, RUNNER_TEMP: root,
+        GITHUB_ENV: envFile, SWIFT_TEST_TARGET_INFO: JSON.stringify(targetInfo) },
+    });
+  };
+  return { run, lib, library, envFile };
+}
+
+test('SwiftLint uses compiler-reported SourceKit libraries behind Swiftly shims', (t) => {
+  const f = sourcekitFixture(t);
+  const result = f.run();
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(readFileSync(f.envFile, 'utf8').split('\n').includes(`LINUX_SOURCEKIT_LIB_PATH=${f.lib}`));
+});
+
+test('missing SourceKit fails SwiftLint preparation', (t) => {
+  const f = sourcekitFixture(t);
+  rmSync(f.library);
+  assert.notEqual(f.run().status, 0);
+  assert.doesNotMatch(readFileSync(f.envFile, 'utf8'), /LINUX_SOURCEKIT_LIB_PATH=/);
+});
+
+test('invalid compiler target information fails SwiftLint preparation', (t) => {
+  const f = sourcekitFixture(t);
+  assert.notEqual(f.run({}).status, 0);
+  assert.doesNotMatch(readFileSync(f.envFile, 'utf8'), /LINUX_SOURCEKIT_LIB_PATH=/);
+});
