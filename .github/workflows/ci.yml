@@ -148,7 +148,7 @@ jobs:
         run: node --test .github/scripts/verify-public-build-env-types.test.mjs
 
       - name: Test change detection and the CI Summary gate
-        run: node --test .github/scripts/detect-changes.test.mjs .github/scripts/detect-changes-signing.test.mjs
+        run: node --test .github/scripts/detect-changes.test.mjs .github/scripts/detect-changes-signing.test.mjs .github/scripts/setup-swift-signing.test.mjs
 
       - name: Test agent environment lifecycle with coverage
         run: >-
@@ -419,6 +419,13 @@ jobs:
         run: |
           node --test scripts/ios/swift-arch/guard.test.mjs
           node scripts/ios/swift-arch/guard.mjs
+
+      # setup-swift v3 verifies Swiftly before importing Swift's signing keys.
+      - name: Import Swift release signing keys
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --compressed https://www.swift.org/keys/all-keys.asc --output "$RUNNER_TEMP/swift-release-keys.asc"
+          gpg --batch --import "$RUNNER_TEMP/swift-release-keys.asc"
 
       # SwiftLint's SourceKit rules (statement_position, ...) need a Swift toolchain; the static
       # binary silently skips them, which would weaken the gate.
