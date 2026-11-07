@@ -1,5 +1,41 @@
 [
   {
+    "fingerprint": "fix-red-e228851098",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1748",
+    "correction": "PR #1748 repair occurrence 3: merge origin/main without rebasing, repair stale diagnostic audit pins reported by Mac Runner Routing Tests and retain the native dated-outcome launch intent. Build the recurring repair machine in this PR.",
+    "mechanization": "Extend the existing repository-docs repair CLI with --reviewed-audit-sha256. Validate the explicit reviewed digest against a regular resolved staged audit and require the workflow plus all three independent regression pins to agree before updating them together. Real-Git refusal, preservation, success and retry cases run through the existing required pre-commit suite. Use the mode on this audit after reviewing the selector and evidence diff. The harness owns push and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair entrypoint can prevent partial pin refreshes by validating all four pins and staged audit identity before writing any of them."
+      }
+    },
+    "guard": {
+      "path": "scripts/diagnostic_audit_pin.py",
+      "anchor": "reviewed audit regression pins must agree with the workflow"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "vision-segmentation-blocks-cooperative-executor",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42382240897/job/128432385799",
+    "correction": "The native launch gate stalled after the Context edit sheet appeared. The captured 15:29:02 hang sample shows all three active Swift worker tasks waiting in VNGeneratePersonSegmentationRequest and VNControlledCapacityTasksQueue.dispatchGroupWait while the main thread is idle.",
+    "mechanization": "Run blocking Vision segmentation on DispatchQueue through a checked throwing continuation so concurrent previews do not consume the Swift cooperative executor. Inject the mask operation into the existing service for deterministic executor, success and failure tests. Require both named native cases in the existing launch-quality evidence validator; retain the photo-import safety UI test and all timeouts. Linux can validate tooling and source audits, but the new native cases require exact-head execution on the real macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing Vision service owns the blocking call. Suspending the task and dispatching that call prevents it from occupying a cooperative worker without changing segmentation policy or results."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/BackgroundRemovalService.swift",
+      "anchor": "continuation.resume(with: Result { try self.makeMask(cgImage, quality) })"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-ignores-workspace-manifests",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1736",
     "correction": "PR #1736, fix-red-1423773703 occurrence 48: merge origin/main without rebasing and repair the Radix radio-group 1.5.1 update. Detect Changes and parity reject the stale source projection, causing CI Summary to fail. Ignored workspace package.json manifests still bypass the dependency-repair preflight and can enter a lockfile destined for CI.",

@@ -567,7 +567,9 @@ run_xcodebuild_test \
   -only-testing:LogYourBodyTests \
   -skip-testing:LogYourBodyTests/StoreKitPurchaseRestoreTests
 assert_xcresult_evidence \
-  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"
+  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}" \
+  --expected-test 'BackgroundRemovalServiceTests/testPersonMaskRunsOutsideCooperativeTasksAndReturnsTheMask()' \
+  --expected-test 'BackgroundRemovalServiceTests/testPersonMaskRunsOutsideCooperativeTasksAndPreservesTheError()'
 
 python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --coverage "$ARTIFACT_DIR/launch-quality-unit-tests.coverage.json" \

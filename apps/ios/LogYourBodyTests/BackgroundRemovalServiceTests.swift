@@ -16,6 +16,36 @@ import UIKit
 final class BackgroundRemovalServiceTests: XCTestCase {
     // MARK: - Input validation
 
+    func testPersonMaskRunsOutsideCooperativeTasksAndReturnsTheMask() async throws {
+        let image = try XCTUnwrap(SyntheticImage.solidCGImage(width: 32, height: 40))
+        let mask = try XCTUnwrap(SyntheticImage.constantMask(width: 16, height: 20, value: 255))
+        let service = BackgroundRemovalService { input, quality in
+            XCTAssertFalse(Thread.isMainThread)
+            withUnsafeCurrentTask { XCTAssertNil($0, "Blocking Vision work must leave the cooperative executor") }
+            XCTAssertEqual(input.width, 32)
+            XCTAssertEqual(input.height, 40)
+            XCTAssertEqual(quality, 0.85)
+            return mask
+        }
+        let output = try await service.personMask(for: image, quality: 0.85)
+        XCTAssertTrue(output === mask)
+    }
+
+    func testPersonMaskRunsOutsideCooperativeTasksAndPreservesTheError() async throws {
+        let image = try XCTUnwrap(SyntheticImage.solidCGImage(width: 32, height: 40))
+        let service = BackgroundRemovalService { _, _ in
+            XCTAssertFalse(Thread.isMainThread)
+            withUnsafeCurrentTask { XCTAssertNil($0, "A failed Vision request must also leave the cooperative executor") }
+            throw BackgroundRemovalService.BackgroundRemovalError.processingFailed
+        }
+        do {
+            _ = try await service.personMask(for: image, quality: 0.85)
+            XCTFail("The failed request must throw")
+        } catch {
+            XCTAssertEqual(error as? BackgroundRemovalService.BackgroundRemovalError, .processingFailed)
+        }
+    }
+
     func testRemoveBackgroundSurfacesUnsupportedSegmentationAsAnErrorNotATrap() async throws {
         let cgImage = try XCTUnwrap(SyntheticImage.solidCGImage(width: 32, height: 40, red: 120, green: 120, blue: 120))
 
