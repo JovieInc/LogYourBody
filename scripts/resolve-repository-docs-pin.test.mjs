@@ -11,11 +11,14 @@ import { env, resolver } from './resolve-repository-docs.test.mjs';
 const DIAGNOSTIC_PROJECT = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj';
 const DIAGNOSTIC_WORKFLOW = '.github/workflows/ios-ui-diagnostics.yml';
 
-function pinWorkflow(digest, note = 'kept') {
-  return `jobs:\n  pins:\n    run: echo ok\n    env:\n      # ${note}\n            '${DIAGNOSTIC_PROJECT}': '${digest}',\n`;
+function pinWorkflow(digest, note = 'kept', auditDigest = undefined) {
+  const audit = auditDigest === undefined
+    ? ''
+    : `          REVIEWED_AUDIT_SHA256 = '${auditDigest}'\n`;
+  return `jobs:\n  pins:\n    run: echo ok\n    env:\n      # ${note}\n${audit}            '${DIAGNOSTIC_PROJECT}': '${digest}',\n`;
 }
 
-function pinFixture(t) {
+function pinFixture(t, { baseAudit } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'lyb-diagnostic-pin-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
@@ -41,9 +44,11 @@ function pinFixture(t) {
     git('add', '-A');
     git('commit', '-qm', 'fixture');
   };
-  const writeProject = (body, note = 'kept') => {
+  const writeProject = (body, note = 'kept', auditDigest = baseAudit) => {
     writeFileSync(join(root, DIAGNOSTIC_PROJECT), body);
-    writeFileSync(join(root, DIAGNOSTIC_WORKFLOW), pinWorkflow(createHash('sha256').update(body).digest('hex'), note));
+    writeFileSync(join(root, DIAGNOSTIC_WORKFLOW), pinWorkflow(
+      createHash('sha256').update(body).digest('hex'), note, auditDigest,
+    ));
   };
   writeProject('base-project\n');
   writeFileSync(join(root, 'a.txt'), 'base-a\n');
@@ -136,6 +141,76 @@ test('reviewed digest refuses a workflow conflict that changes more than the pro
   assert.deepEqual(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW)), beforeWorkflow);
   assert.deepEqual(readFileSync(join(f.root, f.output)), beforeMap);
   assert.equal(f.git('ls-files', '--stage'), index);
+});
+
+const BASE_AUDIT = '11'.repeat(32);
+const OURS_AUDIT = '22'.repeat(32);
+const THEIRS_AUDIT = '33'.repeat(32);
+
+function mergedAuditPin(t, oursAudit, theirsAudit, theirsNote = 'kept') {
+  const f = pinFixture(t, { baseAudit: BASE_AUDIT });
+  f.writeProject('ours-project\n', 'kept', oursAudit);
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'theirs');
+  f.writeProject('theirs-project\n', theirsNote, theirsAudit);
+  f.generate();
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  mergePinFixture(f);
+  const merged = 'ours-project\ntheirs-project\n';
+  writeFileSync(join(f.root, DIAGNOSTIC_PROJECT), merged);
+  f.git('add', '--', DIAGNOSTIC_PROJECT);
+  return { f, digest: createHash('sha256').update(merged).digest('hex') };
+}
+
+function resolveProjectPin(f, digest) {
+  return spawnSync('python3', [
+    resolver, '--root', f.root, '--reviewed-project-sha256', digest,
+  ], { env, encoding: 'utf8' });
+}
+
+test('reviewed project digest keeps a one-sided reviewed audit pin from either parent', (t) => {
+  const branch = mergedAuditPin(t, OURS_AUDIT, BASE_AUDIT);
+  const branchResult = resolveProjectPin(branch.f, branch.digest);
+  assert.equal(branchResult.status, 0, branchResult.stderr);
+  const branchWorkflow = branch.f.git('show', `:${DIAGNOSTIC_WORKFLOW}`);
+  assert.match(branchWorkflow, new RegExp(OURS_AUDIT));
+  assert.doesNotMatch(branchWorkflow, new RegExp(BASE_AUDIT));
+  assert.match(branchWorkflow, new RegExp(branch.digest));
+
+  const incoming = mergedAuditPin(t, BASE_AUDIT, THEIRS_AUDIT);
+  const incomingResult = resolveProjectPin(incoming.f, incoming.digest);
+  assert.equal(incomingResult.status, 0, incomingResult.stderr);
+  const incomingWorkflow = incoming.f.git('show', `:${DIAGNOSTIC_WORKFLOW}`);
+  assert.match(incomingWorkflow, new RegExp(THEIRS_AUDIT));
+  assert.doesNotMatch(incomingWorkflow, new RegExp(BASE_AUDIT));
+  assert.match(incomingWorkflow, new RegExp(incoming.digest));
+  assert.equal(incoming.f.git('diff', '--name-only', '--diff-filter=U'), '');
+});
+
+test('reviewed project digest refuses divergent reviewed audit pins', (t) => {
+  const f = mergedAuditPin(t, OURS_AUDIT, THEIRS_AUDIT);
+  const beforeWorkflow = readFileSync(join(f.f.root, DIAGNOSTIC_WORKFLOW));
+  const beforeMap = readFileSync(join(f.f.root, f.f.output));
+  const index = f.f.git('ls-files', '--stage');
+  const result = resolveProjectPin(f.f, f.digest);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /divergent reviewed audit pins/);
+  assert.deepEqual(readFileSync(join(f.f.root, DIAGNOSTIC_WORKFLOW)), beforeWorkflow);
+  assert.deepEqual(readFileSync(join(f.f.root, f.f.output)), beforeMap);
+  assert.equal(f.f.git('ls-files', '--stage'), index);
+});
+
+test('reviewed project digest still refuses non-pin edits when the audit pin matches', (t) => {
+  const f = mergedAuditPin(t, BASE_AUDIT, BASE_AUDIT, 'moved');
+  const beforeWorkflow = readFileSync(join(f.f.root, DIAGNOSTIC_WORKFLOW));
+  const index = f.f.git('ls-files', '--stage');
+  const result = resolveProjectPin(f.f, f.digest);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /not limited to the project pin/);
+  assert.deepEqual(readFileSync(join(f.f.root, DIAGNOSTIC_WORKFLOW)), beforeWorkflow);
+  assert.equal(f.f.git('ls-files', '--stage'), index);
 });
 
 function projectMember(id, name) {

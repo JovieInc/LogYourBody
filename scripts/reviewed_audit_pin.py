@@ -62,6 +62,50 @@ def reviewed_audit_pins(root, expected):
     ]
 
 
+def conflicted_pin_template(base, ours, theirs, project_pin):
+    """Keep a one-sided reviewed audit pin while the project pin stays explicit.
+
+    A one-sided reviewed audit pin follows the parent that changed it.
+    Divergent reviewed audit pins stay unresolved.
+    """
+    def mask(text):
+        masked, count = project_pin.subn(
+            lambda match: match.group(1) + ("0" * 64) + match.group(2), text, count=1,
+        )
+        if count != 1:
+            raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+        audits = list(AUDIT_PIN.finditer(masked))
+        if len(audits) > 1:
+            raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+        audit = audits[0].group(2) if audits else None
+        if audit is not None:
+            masked = AUDIT_PIN.sub(
+                lambda match: match.group(1) + ("0" * 64) + match.group(3), masked, count=1,
+            )
+        return masked, audit
+
+    masked = [mask(text) for text in (base, ours, theirs)]
+    if len({item[0] for item in masked}) != 1:
+        raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+    base_audit, ours_audit, theirs_audit = (item[1] for item in masked)
+    if ours_audit == theirs_audit:
+        return ours
+    if ours_audit == base_audit:
+        chosen = theirs_audit
+    elif theirs_audit == base_audit:
+        chosen = ours_audit
+    else:
+        raise ValueError("diagnostic workflow conflict includes divergent reviewed audit pins")
+    if chosen is None:
+        raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+    updated, count = AUDIT_PIN.subn(
+        lambda match: match.group(1) + chosen + match.group(3), ours, count=1,
+    )
+    if count != 1:
+        raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+    return updated
+
+
 def apply_pins(root, expected, resolve_staged):
     updates = reviewed_audit_pins(root, expected)
     originals = []

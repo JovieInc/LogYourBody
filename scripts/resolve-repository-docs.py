@@ -162,7 +162,7 @@ def git_bytes(root, *args):
 
 
 def conflicted_diagnostic_template(root):
-    """Return one parent workflow when every stage differs only by the project pin."""
+    """Return branch workflow text when stages differ only by the project and audit pins."""
     entries = [
         entry for entry in git_bytes(
             root, "ls-files", "--unmerged", "-z", "--", DIAGNOSTIC_WORKFLOW,
@@ -178,15 +178,9 @@ def conflicted_diagnostic_template(root):
         text = git_bytes(root, "show", f":{stage}:{DIAGNOSTIC_WORKFLOW}").decode()
         if re.search(r"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", text):
             raise ValueError("diagnostic pin repair refuses conflict markers in a parent")
-        masked, count = DIAGNOSTIC_PIN.subn(
-            lambda match: match.group(1) + ("0" * 64) + match.group(2), text, count=1,
-        )
-        if count != 1:
-            raise ValueError("diagnostic workflow conflict is not limited to the project pin")
-        texts.append((text, masked))
-    if len({masked for _text, masked in texts}) != 1:
-        raise ValueError("diagnostic workflow conflict is not limited to the project pin")
-    return texts[1][0]
+        texts.append(text)
+    from reviewed_audit_pin import conflicted_pin_template
+    return conflicted_pin_template(texts[0], texts[1], texts[2], DIAGNOSTIC_PIN)
 
 
 PBX_MEMBER = re.compile(
@@ -380,6 +374,15 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             ).stdout.strip("\0")
             if untracked:
                 raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
+            # Ignored hooks, npmrc files and patches are still local-only resolver inputs.
+            ignored = subprocess.run(
+                ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
+                 ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
+                 ":(glob,exclude)**/node_modules/**"],
+                cwd=root, check=True, capture_output=True, text=True,
+            ).stdout.strip("\0")
+            if ignored:
+                raise ValueError("ignored dependency inputs: " + ignored.replace("\0", ", "))
             # Dependency resolution inputs must be regular indexed files, never symlinks.
             for entry in git_bytes(root, "ls-files", "--stage", "-z", "--", *inputs).split(b"\0"):
                 if entry and entry.split(b" ", 1)[0] not in {b"100644", b"100755"}:
@@ -390,6 +393,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             if errors and errors != ["source projection stale: " + output]:
                 raise ValueError("; ".join(errors))
             rollback.enter_context(restore_dependency_artifacts_on_failure(root, output))
+            verified_index = git_bytes(root, "ls-files", "--stage", "-z")
             # Verify valid bot lockfiles without re-resolving unrelated dependencies.
             modes = [["--frozen-lockfile", "--offline"]]
             # Explicit repair only: normal commit hooks and CI retain frozen installs.
@@ -411,6 +415,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                     ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
                     cwd=root, check=True,
                 )
+            # Refuse inputs changed during verification before staging dependency artifacts.
+            if (git_bytes(root, "ls-files", "--stage", "-z") != verified_index
+                    or git_bytes(root, "diff", "--name-only", "--",
+                                 *[name for name in inputs if name != "pnpm-lock.yaml"])):
+                raise ValueError("dependency inputs changed during verification; stage reviewed inputs and retry")
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
             resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
             return
