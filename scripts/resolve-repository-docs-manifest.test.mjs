@@ -2,9 +2,82 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { env, manifestRepo, resolver, sourceMapFixture } from './resolve-repository-docs.test.mjs';
+
+function workflowBump(t) {
+  const fixture = sourceMapFixture(t);
+  const workflow = '.github/workflows/ci.yml';
+  const original = 'jobs:\n  audit:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a # v2.4.0\n';
+  const updated = original.replace(
+    '7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a # v2.4.0',
+    '364295d9c23900ce04d4e5cc708387921b4e50f9 # v3',
+  );
+  mkdirSync(join(fixture.root, dirname(workflow)), { recursive: true });
+  writeFileSync(join(fixture.root, workflow), original);
+  const registry = JSON.parse(readFileSync(join(fixture.root, 'repository-docs.json'), 'utf8'));
+  registry.sources = [{ path: workflow, purpose: 'CI dependencies' }];
+  writeFileSync(join(fixture.root, 'repository-docs.json'), JSON.stringify(registry));
+  fixture.generate();
+  fixture.commit();
+  // Dependabot commits the workflow outside local hooks, leaving a clean but stale map.
+  writeFileSync(join(fixture.root, workflow), updated);
+  fixture.git('add', workflow);
+  fixture.git('commit', '-qm', 'ci(deps): bump setup-swift');
+  const run = (script) => spawnSync('python3', [script, '--root', fixture.root], { env, encoding: 'utf8' });
+  const check = () => run(join(dirname(resolver), 'repository_docs.py'));
+  const stale = check();
+  assert.equal(stale.status, 1, stale.stderr);
+  assert.match(stale.stdout, /source projection stale: SOURCES\.md/);
+  return { ...fixture, workflow, updated, check, repair: () => run(resolver) };
+}
+
+for (const dirty of [false, true]) {
+  test(`workflow-only bot repair fingerprints indexed action pins (dirty workflow: ${dirty})`, (t) => {
+    const f = workflowBump(t);
+    const working = f.updated + (dirty ? '# Unstaged local workflow edit\n' : '');
+    writeFileSync(join(f.root, f.workflow), working);
+    const repaired = f.repair();
+    assert.equal(repaired.status, 0, repaired.stderr);
+    const projection = f.git('show', `:${f.output}`);
+    const digest = createHash('sha256').update(f.updated).digest('hex');
+    assert.match(projection, new RegExp(digest));
+    assert.equal(f.git('show', `:${f.workflow}`), f.updated);
+    assert.equal(readFileSync(join(f.root, f.workflow), 'utf8'), working);
+    assert.equal(f.git('diff', '--cached', '--name-only').trim(), f.output);
+    if (!dirty) assert.equal(f.check().status, 0);
+    const index = f.git('ls-files', '--stage');
+    assert.equal(f.repair().status, 0, 'repair remains idempotent');
+    assert.equal(f.git('ls-files', '--stage'), index);
+  });
+}
+
+test('workflow-only bot repair refuses unstaged projection edits without changing files or index', (t) => {
+  const f = workflowBump(t);
+  const local = 'Local projection edits\n';
+  writeFileSync(join(f.root, f.output), local);
+  const index = f.git('ls-files', '--stage');
+  const result = f.repair();
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /unstaged projection edits/);
+  assert.equal(readFileSync(join(f.root, f.output), 'utf8'), local);
+  assert.equal(f.git('ls-files', '--stage'), index);
+});
+
+test('workflow-only bot repair restores the stale projection when staging fails', (t) => {
+  const f = workflowBump(t);
+  const projection = readFileSync(join(f.root, f.output), 'utf8');
+  const index = f.git('ls-files', '--stage');
+  const lock = join(f.root, f.git('rev-parse', '--git-path', 'index.lock').trim());
+  writeFileSync(lock, 'another Git writer\n');
+  const result = f.repair();
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /index\.lock/);
+  assert.equal(readFileSync(join(f.root, f.output), 'utf8'), projection);
+  assert.equal(readFileSync(lock, 'utf8'), 'another Git writer\n');
+  assert.equal(f.git('ls-files', '--stage'), index);
+});
 
 function autoMergedManifests(t) {
   const fixture = manifestRepo(t);

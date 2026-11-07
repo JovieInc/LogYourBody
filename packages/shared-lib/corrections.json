@@ -6001,5 +6001,63 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "workflow-only-source-map-index-repair",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1717",
+    "correction": "PR #1717, fix-red-1423773703 occurrence 20: merge origin/main without rebasing and repair Detect Changes, parity and CI Summary. Dependabot updated the setup-swift pin outside local hooks without refreshing the generated repository source map. Keep the v3 upgrade and the existing parity gates.",
+    "mechanization": "Extend the existing source-map resolver so ordinary workflow-only bot repairs use the index even when the projection has no merge conflict. Reuse its protection of unstaged edits and restoration after staging failures. The existing required pre-commit regression suite exercises a hook-free setup-swift bump, stale parity, indexed pin fingerprints, dirty workflow and projection edits, idempotence and an index lock. Three new cases fail against the previous resolver and pass after repair. Use the default resolver on this PR and verify parity and generator coverage. The harness retains push and PR-body ownership and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver owns projection generation and staging. Routing ordinary bot repairs through the indexed snapshot prevents unreviewed workflow bytes from becoming committed fingerprints and preserves local output on refusal or staging failure."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Bot repairs fingerprint the index even when the projection has no merge conflict."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "setup-swift-v3-release-signing-keys",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1717",
+    "correction": "PR #1717, fix-red-c44c8cd09b occurrence 2: merge origin/main without rebasing and retain setup-swift v3. The iOS static audit fails because v3 verifies the Swiftly archive before importing its signing keys. Preserve signature verification and every native quality gate.",
+    "mechanization": "Import Swift release keys from the official HTTPS endpoint before the pinned setup-swift action. Execute the workflow shell with isolated real GPG keyrings in the existing required Detect Changes suite. All three cases fail before the repair and pass afterward, covering missing-key recovery, tampered payload rejection, failed key downloads and malformed keys. Verify the exact upstream Swiftly 1.1.0 archive is rejected without keys and accepted with the official signer. Preserve both immutable merge parents through the existing ledger and projection resolvers. Native UI timeout evidence remains subject to a fresh CI run; the harness owns push and PR-body operations. Machine: built .github/scripts/setup-swift-signing.test.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The failure occurs in a third-party GitHub Action before application code or native tests execute; product code cannot initialize the runner keyring."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic required CI regression executes the actual workflow preparation shell against isolated real GPG signatures and failed-download or malformed-key fixtures, ensuring missing keys cannot recur without a failing check."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/setup-swift-signing.test.mjs",
+      "anchor": "the workflow imports signing keys before setup-swift and rejects tampered downloads"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "setup-swift-v3-sourcekit-library-location",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1717",
+    "correction": "PR #1717, fix-red-c44c8cd09b occurrence 2: retain setup-swift v3 and repair the failed iOS Static Audits and CI Summary. Run 42357907408 imports the signing keys successfully, then SwiftLint crashes loading libsourcekitdInProc.so because the library path is derived from Swiftly's command shim. Launch Quality passes its unit tests before a simulator termination failure and the UI command's 1500-second timeout; retain every native gate and require fresh CI evidence.",
+    "mechanization": "Resolve SourceKit from swift -print-target-info instead of the command's PATH location, and fail preparation when the library is absent. Extend the existing required Detect Changes setup-swift regression suite to execute the actual installation shell with a Swiftly-style shim, a toolchain path containing spaces, missing SourceKit and invalid compiler metadata. All three new cases fail before the workflow repair and pass afterward. The harness owns push and PR operations; include Machine: built .github/scripts/setup-swift-signing.test.mjs in the PR body.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing CI installation step can derive the library location from the compiler's canonical target metadata and verify it before exporting the environment variable, preventing shim paths from reaching SwiftLint."
+      }
+    },
+    "guard": {
+      "path": ".github/workflows/ci.yml",
+      "anchor": "test -f \"$sourcekit_lib/libsourcekitdInProc.so\""
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

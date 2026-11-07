@@ -148,7 +148,7 @@ jobs:
         run: node --test .github/scripts/verify-public-build-env-types.test.mjs
 
       - name: Test change detection and the CI Summary gate
-        run: node --test .github/scripts/detect-changes.test.mjs .github/scripts/detect-changes-signing.test.mjs
+        run: node --test .github/scripts/detect-changes.test.mjs .github/scripts/detect-changes-signing.test.mjs .github/scripts/setup-swift-signing.test.mjs
 
       - name: Test agent environment lifecycle with coverage
         run: >-
@@ -420,9 +420,16 @@ jobs:
           node --test scripts/ios/swift-arch/guard.test.mjs
           node scripts/ios/swift-arch/guard.mjs
 
+      # setup-swift v3 verifies Swiftly before importing Swift's signing keys.
+      - name: Import Swift release signing keys
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --compressed https://www.swift.org/keys/all-keys.asc --output "$RUNNER_TEMP/swift-release-keys.asc"
+          gpg --batch --import "$RUNNER_TEMP/swift-release-keys.asc"
+
       # SwiftLint's SourceKit rules (statement_position, ...) need a Swift toolchain; the static
       # binary silently skips them, which would weaken the gate.
-      - uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a # v2.4.0
+      - uses: swift-actions/setup-swift@364295d9c23900ce04d4e5cc708387921b4e50f9 # v3
         with:
           swift-version: '6.1.2'
 
@@ -435,7 +442,10 @@ jobs:
           mkdir -p "$RUNNER_TEMP/swiftlint"
           unzip -q "$RUNNER_TEMP/swiftlint.zip" -d "$RUNNER_TEMP/swiftlint"
           echo "SWIFTLINT=$RUNNER_TEMP/swiftlint/swiftlint" >> "$GITHUB_ENV"
-          echo "LINUX_SOURCEKIT_LIB_PATH=$(dirname "$(dirname "$(command -v swift)")")/lib" >> "$GITHUB_ENV"
+          # Swiftly puts shims on PATH; ask the compiler for the real toolchain libraries.
+          sourcekit_lib="$(swift -print-target-info | python3 -c 'import json, pathlib, sys; print(pathlib.Path(json.load(sys.stdin)["paths"]["runtimeResourcePath"]).parent)')"
+          test -f "$sourcekit_lib/libsourcekitdInProc.so"
+          echo "LINUX_SOURCEKIT_LIB_PATH=$sourcekit_lib" >> "$GITHUB_ENV"
 
       - name: Static quality audits
         env:

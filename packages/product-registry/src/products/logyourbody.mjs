@@ -261,6 +261,7 @@ export const logYourBody = {
       { value: 'https://github.com/', reason: 'CI scripts build repo URLs as https://github.com/${repository}.' },
       { value: 'https://cli.github.com', reason: 'GitHub CLI install link in docs.' },
       { value: 'https://developer.apple.com', reason: 'Apple developer documentation links.' },
+      { value: 'https://www.swift.org/keys/all-keys.asc', reason: 'Official Swift release signing keys required by setup-swift v3 before verifying Swiftly.' },
       { value: 'https://help.apple.com', reason: 'Xcode-generated xcconfig help comment.' },
       {
         value: 'http://www.apple.com/DTDs/PropertyList-1.0.dtd',

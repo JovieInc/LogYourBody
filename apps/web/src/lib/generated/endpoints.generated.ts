@@ -698,6 +698,11 @@ export const endpoints = {
       reason: 'Apple developer documentation links.',
     },
     {
+      value: 'https://www.swift.org/keys/all-keys.asc',
+      reason:
+        'Official Swift release signing keys required by setup-swift v3 before verifying Swiftly.',
+    },
+    {
       value: 'https://help.apple.com',
       reason: 'Xcode-generated xcconfig help comment.',
     },
