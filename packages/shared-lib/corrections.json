@@ -6117,5 +6117,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-verification-input-drift",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1731",
+    "correction": "PR #1731, fix-red-1423773703 occurrence 48: the Statsig Node Core 0.24.0 manifest-only bump left the workspace lockfile and generated source map stale, failing frozen installation, Detect Changes, parity and CI Summary. Repeated dependency repairs must retain the same reviewed inputs through verification and artifact staging.",
+    "mechanization": "Extend the existing dependency repair helper to refuse index or manifest changes made while pnpm verifies dependencies, restoring generated artifacts without overwriting the concurrent manifest edit. Four real-Git regressions in the existing required Detect Changes suite fail before the guard and pass afterward across refresh/verify modes and staged/unstaged edits, including successful reviewed retries and idempotence. Merge origin/main first, then use --refresh-lockfile to repair this manifest-only bump and regenerate source parity. Preserve all frozen-install and parity gates. The harness retains push and PR-body ownership and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing helper owns verification and staging of both derived dependency artifacts. Comparing the index and dependency inputs after pnpm returns prevents a concurrent unverified manifest from being committed with a previously verified lockfile."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Refuse inputs changed during verification before staging dependency artifacts."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
