@@ -1,21 +1,25 @@
 [
   {
-    "fingerprint": "idle-chat-never-opens-voice-hardware",
-    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41391664508",
-    "correction": "PR #1706 / LYB-318, fix-red-95726c4f82 occurrence 24: merge-group launch quality failed after chat collapse. The simulator log at 05:24:11 records CoreAudio Initialize: RPC timeout. Apparently deadlocked. Aborting now, then SIGABRT. Chat disappearance cancels an unused voice service, whose unconditional inputNode cleanup opens audio hardware. Tently reports a separate AI-provider outage, reference a9e22d1c-3058-4f4c-af85-c8b7994da4b7, with no source finding.",
-    "mechanization": "Extend the existing required launch UI regression suite to keep capture and playback resources deferred, create recognition only after permission, and require audio cleanup to be conditional on an existing request. Add both services to Turbo test inputs. The new guard fails against the previous eager resources and unconditional cleanup; it passes after the lifecycle fix. Add native idle-cancel, unused-finish and playback-recreation cases with injected resource factories; native execution remains for the real Mac runner. Use the existing split tool to extract playback without growing the company size baseline, and the reviewed project-pin resolver after adding source and test membership. The harness owns push and PR edits and must include exactly one line: Machine: built packages/shared-lib/src/launch-ui-regression-audit.test.ts.",
+    "fingerprint": "launch-copy-merge-duplicate-constants",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1688",
+    "correction": "PR #1688 / LYB-288, fix-red-95726c4f82 occurrence 24: merge origin/main without rebasing and preserve health-memory user/product isolation and fail-closed reads and writes. The LaunchJourney conflict must retain the canonical LaunchPromiseCopy table instead of restoring parallel legacy constants. Tently reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing required shared-lib launch-copy guard to reject repeated approved literals across launch sources. Replay the actual three legacy constants from the PR parent: the previous nine-case guard passes, the extended guard fails, and all thirteen cases pass after restoring the resolved source. Preserve main-side copy references and all branch-side health-memory changes. Existing Turbo inputs already include the Swift sources and this test. The harness owns pushing and PR-body updates and must include exactly one line: Machine: built packages/shared-lib/src/launch-promise-copy.test.ts.",
     "classification": {
       "codebase": {
+        "feasible": false,
+        "rationale": "The app already has a single canonical copy table. Runtime code cannot prevent a later source merge from restoring obsolete declarations alongside it."
+      },
+      "static": {
         "feasible": true,
-        "rationale": "Deferred audio resources and request-owned cleanup prevent ordinary chat construction or dismissal from initializing capture or speech hardware, while actual recording retains its cleanup path."
+        "rationale": "The existing required source-contract suite can reject duplicated approved literals after any merge, with the actual legacy constants as a failing regression."
       }
     },
     "guard": {
-      "path": "apps/ios/LogYourBody/Services/VoiceCaptureService.swift",
-      "anchor": "Never open audio hardware for cleanup."
+      "path": "packages/shared-lib/src/launch-promise-copy.test.ts",
+      "anchor": "rejects approved copy duplicated by a merge outside the canonical table"
     },
-    "level": "codebase",
-    "ruleId": "code-prevention"
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "dependabot-workspace-release-age-resolution",
@@ -5958,6 +5962,24 @@
     "guard": {
       "path": "scripts/correction-classifier.mjs",
       "anchor": "merge ledger changed during validation; retry from the current ledger"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "idle-chat-never-opens-voice-hardware",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41391664508",
+    "correction": "PR #1706 / LYB-318, fix-red-95726c4f82 occurrence 24: merge-group launch quality failed after chat collapse. The simulator log at 05:24:11 records CoreAudio Initialize: RPC timeout. Apparently deadlocked. Aborting now, then SIGABRT. Chat disappearance cancels an unused voice service, whose unconditional inputNode cleanup opens audio hardware. Tently reports a separate AI-provider outage, reference a9e22d1c-3058-4f4c-af85-c8b7994da4b7, with no source finding.",
+    "mechanization": "Extend the existing required launch UI regression suite to keep capture and playback resources deferred, create recognition only after permission, and require audio cleanup to be conditional on an existing request. Add both services to Turbo test inputs. The new guard fails against the previous eager resources and unconditional cleanup; it passes after the lifecycle fix. Add native idle-cancel, unused-finish and playback-recreation cases with injected resource factories; native execution remains for the real Mac runner. Use the existing split tool to extract playback without growing the company size baseline, and the reviewed project-pin resolver after adding source and test membership. The harness owns push and PR edits and must include exactly one line: Machine: built packages/shared-lib/src/launch-ui-regression-audit.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Deferred audio resources and request-owned cleanup prevent ordinary chat construction or dismissal from initializing capture or speech hardware, while actual recording retains its cleanup path."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/VoiceCaptureService.swift",
+      "anchor": "Never open audio hardware for cleanup."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
