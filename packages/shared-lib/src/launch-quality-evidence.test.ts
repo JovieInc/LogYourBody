@@ -180,6 +180,61 @@ it('pins shared offline UI fixtures before late network callbacks can replace th
   expect(release).not.toMatch(/usesOfflineUITestFixture|applyOfflineUITestFixture/);
 });
 
+function barrierBody(source: string): string | undefined {
+  const marker = 'final class Barrier';
+  const start = source.indexOf(marker);
+  if (start < 0) return undefined;
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    else if (source[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(open + 1, index);
+    }
+  }
+  return undefined;
+}
+
+// A parked continuation resumes on one thread and on deinit.
+export function shareExportBarrierFindings(source: string): string[] {
+  const body = barrierBody(source);
+  if (!body) return ['share-export barrier missing'];
+  const findings: string[] = [];
+  if (/withCheckedContinuation\s*\{\s*continuation\s*=/.test(body)) {
+    findings.push('continuation is stored without a single-resume lock');
+  }
+  if (!body.includes('NSLock()')) findings.push('barrier has no lock');
+  if (!body.includes('resumed')) findings.push('barrier can resume twice');
+  if (!/deinit\s*\{\s*resume\(\)\s*\}/.test(body)) {
+    findings.push('dropped barrier leaks its continuation');
+  }
+  if (/\bvar continuation:/.test(body) && !/private var continuation:/.test(body)) {
+    findings.push('barrier publishes the continuation');
+  }
+  return findings;
+}
+
+it('resumes a parked share-export continuation once, including when the barrier is dropped', () => {
+  const unsafe = `final class Barrier {
+        var continuation: CheckedContinuation<Void, Never>?
+        func wait() async { await withCheckedContinuation { continuation = $0 } }
+        func resume() { continuation?.resume(); continuation = nil }
+    }`;
+  expect(shareExportBarrierFindings(unsafe)).toEqual([
+    'continuation is stored without a single-resume lock',
+    'barrier has no lock',
+    'barrier can resume twice',
+    'dropped barrier leaks its continuation',
+    'barrier publishes the continuation',
+  ]);
+  const source = readFileSync(
+    new URL('../../../apps/ios/LogYourBodyTests/BodyScoreShareExportTests.swift', import.meta.url),
+    'utf8',
+  );
+  expect(shareExportBarrierFindings(source)).toEqual([]);
+});
+
 it('rejects incomplete XCTest proof through the launch gate validator with executed line coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const coverage = mkdtempSync(`${tmpdir()}/lyb-evidence-coverage-`);

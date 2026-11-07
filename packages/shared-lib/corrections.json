@@ -6612,5 +6612,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "share-export-barrier-resumes-once",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42401408901",
+    "correction": "PR #1746 / LYB-343, fix-red-5df69c1e5f occurrence 29: Launch Quality run 42401408901 passed the restarted unit summary with zero failures, then xcodebuild exited 65. The host aborted in testPayloadFormatAndPrivacyEditsSuppressDelayedPreparationWithoutSpawningTasks after SWIFT TASK CONTINUATION MISUSE in wait(). The nonisolated prepare closure and the main-actor test raced a stored checked continuation. Keep goal-relative stats and every recovery assertion.",
+    "mechanization": "Extend the existing launch-quality evidence guard to reject a share-export barrier that stores a checked continuation without a single-resume lock or a deinit resume. The unsafe fixture fails that guard; BodyScoreShareExportTests passes after the barrier parks the continuation once under NSLock and resumes it if dropped. Launch Quality still runs the export tests. Native execution remains unverified on this Linux host. The harness owns push and PR-body updates and must add exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The barrier owns the continuation handoff. Parking it once under a lock and resuming on deinit prevents a cross-thread resume from leaking the continuation and aborting the launch-quality host."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "A parked continuation resumes on one thread and on deinit."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
