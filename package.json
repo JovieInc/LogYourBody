@@ -59,6 +59,7 @@
     "lint-staged": "^15.5.2",
     "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.8.1",
+    "rollup": "^4.65.0",
     "turbo": "^2.11.9",
     "typescript": "^5.9.3",
     "vitest": "^5.0.5"
@@ -78,8 +79,13 @@
       "vite": "7.3.7",
       "undici": "^8.12.2",
       "fast-uri": "^3.1.9",
+      "glob": "^14.0.2",
+      "minimatch": "^11.0.1",
       "source-map-js": "1.2.2",
       "postcss-selector-parser": "7.1.6"
+    },
+    "patchedDependencies": {
+      "minimatch@11.0.3": "patches/minimatch@11.0.3.patch"
     }
   },
   "lint-staged": {

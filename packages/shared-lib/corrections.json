@@ -1,18 +1,76 @@
 [
   {
-    "fingerprint": "merged-swift-splitter-keeps-namesake-and-fixture",
+    "fingerprint": "merge-repair-preserves-splitter-capabilities",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1703",
-    "correction": "PR #1703 / LYB-315, fix-red-95726c4f82 occurrence 22: merge origin/main without rebasing and retain both parents' size-guard capabilities, native cleanup paths and resolver tests. The incoming namesake splitter rejects an XCTestCase extension because its sibling path collides with the suite filename. Tently reports an AI-provider outage without code findings.",
-    "mechanization": "Extend the existing size-ratchet splitter to combine namesake preservation with the branch's XCTest fixture rehoming and raw-string parser. Keep Swift splitting in a sibling module below 500 lines while retaining the incoming size, baseline, argument-order and default-reference checks. The real-file regression fails against the incoming splitter with a path collision and passes after the combined splitter preserves the suite, fixture state and raw string. Retain every parent test in the required static audit and use --check on this merged tree. Resolve the project pin/source map and correction ledger with the existing resolvers. The harness owns push and PR-body updates; retain exactly one line: Machine: built scripts/ios/split_size_ratchet.py.",
+    "correction": "PR #1703 / LYB-315, fix-red-cc900b961c occurrence 7: merge origin/main without rebasing, retain both splitter repair modes and every parent correction receipt. CI run 41387854302 passed visualization unit and timeline interaction cases but failed two ChaosEdgeCase tests at app.launch with background-assertion timeouts. Tently check 125092554407 reports an AI-provider outage with no source findings.",
+    "mechanization": "Extend the existing size-ratchet machine by routing incoming declaration extraction through the retained raw-string-aware Swift parser and preserving its public extraction entrypoint and guard anchor. Normalize leading separator newlines when extracting a whole type. Extend the existing required iOS Static Audits suite with a real CLI sequence that extracts a raw-string-bearing type and then rehomes an XCTestCase helper into its independent fixture superclass. This regression fails against both immutable merge parents and passes on the composed machine; all 17 splitter tests pass. Use the extended machine on the merged tree with --check. Resolve the diagnostic pin and source map with the existing reviewed-project resolver, and merge/classify the correction ledger with the existing classifier, retaining both parents. Preserve the no-retry-after-XCTest-start policy and all selectors, coverage floors and assertions. Native execution on the new head remains required on macOS; the provider outage requires a successful hosted review. The harness owns pushes and PR edits. Retain exactly one PR-body line: Machine: built scripts/ios/split_size_ratchet.py.",
     "classification": {
       "codebase": {
+        "feasible": false,
+        "rationale": "Sharing one parser composes both current repair modes, but product or tool code cannot prevent a future one-sided conflict resolution from removing either CLI mode."
+      },
+      "static": {
         "feasible": true,
-        "rationale": "Rehome the XCTest extension before selecting namesake sibling paths so the generator cannot produce a colliding suite path or leave its helpers in a cross-file extension."
+        "rationale": "The existing required iOS Static Audits job executes the splitter behavior suite. One real CLI regression requires both extraction and independent XCTest fixture rehoming after every future merge."
       }
     },
     "guard": {
-      "path": "scripts/ios/split_swift_types.py",
-      "anchor": "text = rehome_extensions_in_source(text)"
+      "path": "scripts/ios/test_split_size_ratchet.py",
+      "anchor": "test_cli_preserves_extraction_and_fixture_rehoming_after_a_merge"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "dependabot-workspace-release-age-resolution",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41420896425",
+    "correction": "LYB-357: the weekly multi-directory Dependabot job reports 38 update_not_possible errors. Run 41420896425 shows all 38 are ERR_PNPM_NO_MATURE_MATCHING_VERSION for the implicitly resolved Rollup peer, not duplicate-PR errors. The workspace member also triggers npm probes without the root package-manager pin.",
+    "mechanization": "Schedule npm updates once at the pnpm workspace root and declare Rollup as a root tool dependency with a compatible caret range. The required shared-lib suite uses the pinned pnpm against a local registry to reproduce the locked immature peer failure, then proves a web dependency updates with mature Rollup. Configuration assertions retain weekly updates, cooldowns and existing exclusions; Turbo hashes every external input. Both regressions fail before the change. The harness owns push and PR operations. Machine: built packages/shared-lib/src/dependabot-workspace.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A single root update entry gives the workspace and shared lockfile one owner. An explicit Rollup range replaces pnpm's implicit locked peer pin, allowing normal release-age filtering to select a mature version without relaxing cooldowns, ignoring dependencies or exempting Rollup."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/dependabot-workspace.test.ts",
+      "anchor": "updates a web dependency while keeping an immature Rollup peer out of the lockfile"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-staged-source-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1726",
+    "correction": "PR #1726, fix-red-1423773703 occurrence 37: the ElevenLabs 3.0.76 bump left the generated repository source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must not fingerprint unrelated unstaged sources when repairing the reviewed dependency artifacts.",
+    "mechanization": "Extend both existing dependency repair modes to reuse the staged source-map generator, staging the refreshed lockfile and projection in one Git operation. Two real-Git regressions fail against the previous worktree rendering and pass after the change, proving staged fingerprints, preserved unstaged source bytes and valid bot resolutions, and idempotence. The existing required Detect Changes pre-commit suite runs them along with the existing failure rollback cases. Use --verify-lockfile for this update. The harness retains push and PR-body ownership and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dependency repair helper owns source-map construction and staging. Reusing its existing index renderer prevents unrelated worktree bytes from becoming the committed source fingerprints, while preserving frozen verification and rollback."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Dependency repairs fingerprint only staged sources, preserving unrelated edits."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "pr1712-dated-timeline-red-checks",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1712",
+    "correction": "LYB-342 / fix-red-b87016832d occurrence 3: repair the dated-outcome timeline checks after merging origin/main. Company guards reject oversized Swift growth; static audits pin a baselined sheet to exact size; Mac routing rejects the stale reviewed-project digest; launch quality loses the Add photo identifier and checks keyboard presence instead of field focus. Tently reports an AI-provider outage.",
+    "mechanization": "Extend the existing size-500 split tool with named whole-type and computed-member extraction, explicit private-access refusal, and collision refusal. Exercise red then green behavioral tests in the existing required static audit and use the tool for six Swift extractions wired into their original Xcode targets. Extend the existing timeline UI audit to reject identifier inheritance and retain the native draft/no-send checks with actual focus admission. Refresh the reviewed project pin using the existing explicit resolver after reviewing membership. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/split_size_ratchet.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing splitter can move complete declarations without truncating a member or silently widening private access, and refuse overwriting a sibling before writing either file. It prevents this recurring repair error by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/split_size_ratchet.py",
+      "anchor": "Move whole types or computed members; never widen access implicitly."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -1280,6 +1338,24 @@
     "correction": "LYB-236: Dependabot's pnpm update commands exited successfully while retaining vulnerable fast-uri 3.1.8 and undici 8.11.2. Enforce patched transitive floors without weakening maturity settings or Dependency Review.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40035673426",
     "mechanization": "Both pnpm override declarations require fast-uri ^3.1.9 and undici ^8.12.2. The existing required shared-lib dependency-security tests reject vulnerable lockfile copies, inconsistent overrides and vulnerable versions resolved through the installed AJV and Eve parents.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Package-manager overrides enforce the patched minimum for every transitive parent during resolution, without a parent major upgrade or an age-gate exception."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/dependency-security.test.ts",
+      "anchor": "%s has no vulnerable locked copies below %s"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependabot-transitive-security-floors",
+    "correction": "LYB-354: Dependabot cannot raise transitive minimatch 3.1.5 to the GHSA-g3hv-75wg-m249 floor 11.0.1 because the eslint, glob 10, and glob 13 parents still request older majors. Force every copy to minimatch >=11.0.1 without an ignore or an age-gate exception.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41216930482",
+    "mechanization": "Both pnpm override declarations require minimatch ^11.0.1 and glob ^14.0.2, because glob 10 and 13 walk minimatch sets as regular expressions and cannot use minimatch 11. A minimatch patch restores the callable module export, Babel default, Minimatch class, and makeRe for the ESLint 3.x parents. The required shared-lib dependency-security tests reject vulnerable lockfile copies, inconsistent overrides, and a minimatch export those parents cannot call.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -5774,6 +5850,136 @@
     "guard": {
       "path": "scripts/resolve-repository-docs.py",
       "anchor": "A conflicted correction ledger stays for its own resolver."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "company-guards-required-ci-summary",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1681",
+    "correction": "LYB-347 / PR #1681, fix-red-95726c4f82 occurrence 9: Company Guards size-500 was advisory because its standalone check did not gate the required CI Summary. Preserve the required dependency across pull requests, merge groups and main pushes during merge repairs. Occurrence 22: merge origin/main first and retain its completed catalog extraction when both parents add catalog-schema.ts; preserve every correction receipt. The current Tently failure is an AI-provider outage (33148843-5b87-4908-b69d-24b16c5bbcd8), not a source finding.",
+    "mechanization": "Extend the existing required merge-queue policy verifier to enforce the canonical reusable Company Guards caller, its pinned shared workflow, unconditional execution, the Detect Changes dependency and failure propagation to CI Summary. Negative controls reject removing the dependency, skipping or softening either workflow, replacing the caller and disconnecting or inverting the summary. The original PR wiring is retained. The harness owns pushing and PR updates and must add exactly one machine line: Machine: built .github/scripts/verify-merge-queue-policy.mjs. Extend the same verifier to reject an advisory or skipped CI Summary result step and mismatched shared-workflow/ci-ref pins; the added negative controls fail against the previous verifier and pass after the extension. Running the pinned full Company Guards suite exposes catalog.ts growth already on main (944 lines against 854). Extract its unchanged schemas and record loader into catalog-schema.ts, preserve all public exports, and shrink the catalog baseline without raising any allowance. Preserve every correction receipt from both merge parents and regenerate the source map from indexed sources. Extend the same verifier to reject a removed or zero-valued CI Summary failure exit; the new negative controls fail with Missing expected exception against the prior verifier and pass after the change. Extend the existing signing/change-detection shell fixture to prove failed, skipped, cancelled and missing detection all exit 1 across pull_request, merge_group and push while successful detection passes. Use this verifier on the merged workflows, retain main's completed catalog split and remove the obsolete catalog size allowance. Both existing required Detect Changes test steps execute the extension without adding a workflow or weakening any gate.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application code cannot require an independent GitHub Actions workflow before merge; the repository's required aggregate check must enforce that dependency."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing merge-queue policy suite runs in required Detect Changes on every diff and can reject conditional, advisory or disconnected Company Guards wiring."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/verify-merge-queue-policy.mjs",
+      "anchor": "Company Guards failures must reach the required CI Summary"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "marketing-capture-provenance-content-identity",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1682",
+    "correction": "PR #1682 / LYB-267, fix-red-95726c4f82 occurrence 7: merge origin/main without rebasing and repair the rejected merge groups. The prebuild marketing sync uses a shallow merge commit timestamp for unchanged screenshots, making capturedAt future-dated and failing marketing-product-assets.test.ts. Tently separately reports an AI-provider outage.",
+    "mechanization": "Extend the existing marketing asset generator to retain capture dates only for the same source path and SHA-256. New provenance requires complete Git history and committed matching bytes; missing archive evidence, changed shallow sources, uncommitted images and invalid retained dates fail before outputs or receipts are rewritten. Track the generator and both canonical image inputs in the existing Turbo global dependencies so future edits invalidate build and test cache receipts. Six real-Git cases in the existing required web Jest suite fail before the repair and pass afterward, covering repeated builds, depth-one checkouts and refusal paths. Keep the existing 60-day freshness, future-date and byte-integrity gates unchanged. The lanes harness retains push and PR-body ownership and must include exactly one machine line: Machine: built scripts/marketing/sync-ios-marketing-assets.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing prebuild generator owns capture provenance and can preserve it by content identity, preventing shallow history and archive extraction times from refreshing unchanged captures by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/marketing/sync-ios-marketing-assets.mjs",
+      "anchor": "Unchanged image bytes retain their capture age, including in shallow CI clones."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "marketing-provenance-validates-all-assets-before-publication",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1682",
+    "correction": "PR #1682 / LYB-267, fix-red-95726c4f82 occurrence 22: merge origin/main without rebasing. Both parents repaired the merge-group marketing timestamp failure, but resolving to either parent loses future-date admission or validation before publication. The rejected CI logs fail the nonfuture capture assertion. Tently separately reports an AI-provider outage, reference c02ecbb6-5f05-41ab-be60-6008a9f28d76, with no code finding.",
+    "mechanization": "Extend the existing marketing generator to validate every asset, including future retained and Git-derived dates, before publishing public files or the manifest. Preserve hash-bound capture ages, bounded Git commands, exact committed-byte evidence, full-history recovery and both parents' regression suites. Add real-generator cases for existing and absent public outputs when the later app icon has unsupported future provenance. Both cases fail against each immutable parent generator and pass with the combined admission rules. Use the extended generator on this checkout and verify unchanged capture receipts. Resolve the correction union with the existing classifier and regenerate the source map. Keep the deload decision and all freshness, integrity and CI gates. The harness owns push and PR edits and must add exactly one PR-body line: Machine: built scripts/marketing/sync-ios-marketing-assets.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing prebuild generator owns all asset provenance and publication. Applying future-date admission before its existing publication phase prevents a later invalid capture from refreshing any public output by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/marketing/sync-ios-marketing-assets.mjs",
+      "anchor": "Date.parse(timestamp) > latestCaptureTime"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-reviews-hooks-config-and-patches",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1732",
+    "correction": "PR #1732, fix-red-1423773703 occurrence 34: merge origin/main and repair the ElevenLabs 3.0.76 dependency artifacts. Detect Changes and parity reject the stale source map, causing CI Summary to fail. The existing repair helper must also refuse unreviewed pnpm hooks, workspace npmrc files and patches before verifying or refreshing dependencies.",
+    "mechanization": "Extend the existing dependency resolver preflight to include .pnpmfile.cjs, workspace .npmrc files and patches/. Twelve real-Git refusal cases fail before the extension and pass afterward; six staged-input controls pass in both versions. The existing required pre-commit suite imports these tests. Use the extended --verify-lockfile helper on the preserved lockfile update, then retain frozen installation and source parity checks. Vercel deployment logs require unavailable credentials, so its hosted result remains unverified. The harness owns push and PR-body edits and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dependency repair helper owns artifact generation and can reject unstaged or untracked resolution inputs before invoking pnpm, preventing local hook, config or patch bytes from contaminating reviewed dependency artifacts."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Pnpm hooks, workspace npmrc files and patches also affect dependency resolution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "746733c9ca17",
+    "source": "https://linear.app/jovie/issue/LYB-298",
+    "correction": "LYB-298: Persistent pain, worsening pain or neurologic symptoms must pause the movement with no swap and no continued coaching. Keep trunk fatigue, missing feedback and joint pain without those flags outside this concerning-pain trigger; use the exact authorized clinician-evaluation sentence without injury-prevention, zero-load or safety assurances.",
+    "mechanization": "Add one typed movement-pain policy and shared message, consumed by selection and swap approval while retaining the broader existing symptom and session holds. The existing required web Jest discovery runs policy, selector and approval regressions; exact string equality and a prohibited-claims assertion lock the copy. Negative controls independently disable each trigger and append injury-prevention, zero-spinal-load and safe-to-continue-coaching claims; each must fail the policy tests. No LYB-114 observation schema, questionnaire, prescription or rollout changes. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One pure policy returns a discriminated movement pause with swapAllowed and coachingAllowed fixed to false, and owns the canonical message. Selection retains stronger exclusions and the approval boundary suppresses all controls for either a movement pause or selector symptom hold."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/pain-policy.test.ts",
+      "anchor": "concerning-pain movement policy (LYB-298)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-ledger-concurrent-worktree-edits",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1686#repair-concurrent-ledger-edits",
+    "correction": "PR #1686 / LYB-298, fix-red-95726c4f82 occurrence 24: merge origin/main without rebasing and retain the concerning-pain policy and both parents correction receipts. A concurrent edit of the working ledger during validation must not be overwritten or receive a stale successful merge verdict. Tently reports an AI-provider outage with no source finding.",
+    "mechanization": "Extend the existing correction classifier snapshot check to re-read the working ledger after index and parent validation in both resolver modes and staged verification. The existing required shared-lib runner exercises concurrent edits and safe retries at 100% classifier coverage. Three new negative controls returned success without the check and pass with it, asserting that the concurrent bytes and index are preserved. Use the extended resolver for this merge. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Compare the reviewed working ledger bytes before writing or returning success so every merge repair refuses stale output and preserves concurrent edits by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "merge ledger changed during validation; retry from the current ledger"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merged-swift-splitter-keeps-namesake-and-fixture",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1703",
+    "correction": "PR #1703 / LYB-315, fix-red-95726c4f82 occurrence 22: merge origin/main without rebasing and retain both parents' size-guard capabilities, native cleanup paths and resolver tests. The incoming namesake splitter rejects an XCTestCase extension because its sibling path collides with the suite filename. Tently reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing size-ratchet splitter to combine namesake preservation with the branch's XCTest fixture rehoming and raw-string parser. Keep Swift splitting in a sibling module below 500 lines while retaining the incoming size, baseline, argument-order and default-reference checks. The real-file regression fails against the incoming splitter with a path collision and passes after the combined splitter preserves the suite, fixture state and raw string. Retain every parent test in the required static audit and use --check on this merged tree. Resolve the project pin/source map and correction ledger with the existing resolvers. The harness owns push and PR-body updates; retain exactly one line: Machine: built scripts/ios/split_size_ratchet.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Rehome the XCTest extension before selecting namesake sibling paths so the generator cannot produce a colliding suite path or leave its helpers in a cross-file extension."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/split_swift_types.py",
+      "anchor": "text = rehome_extensions_in_source(text)"
     },
     "level": "codebase",
     "ruleId": "code-prevention"

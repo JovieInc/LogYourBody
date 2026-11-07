@@ -100,6 +100,20 @@ class StatsCardCompositionTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertIn(check, "\n".join(path.read_text() for path in output.glob("*.json")))
 
+    def test_empty_timeline_keeps_its_photo_button_accessible(self):
+        findings = []
+        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        self.assertEqual(findings, [])
+        self.replace("Services/DatedTimelineUI.swift", ".accessibilityElement(children: .contain)", "")
+        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
+
+    def test_empty_timeline_requires_the_photo_action_identifier(self):
+        self.replace("Services/DatedTimelineUI.swift", '"launch_timeline_add_photo"', '"wrong_photo_action"')
+        findings = []
+        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
+
     def test_geometry_requires_typed_nonfinite_arguments_in_every_native_tree(self):
         cases = [
             "CGPoint(x: .infinity, y: 0)",

@@ -1,14 +1,18 @@
 """The company 500-line guard rejects new Swift files. This ratchet splits them."""
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import split_size_ratchet as ratchet
 from split_size_ratchet import (
     apply_split, argument_order_violations, check_repo, compare,
-    defaulted_static_methods, source_lines, split_namesake, unapplied_default_references,
+    defaulted_static_methods, extract_declarations, source_lines,
+    split_namesake, unapplied_default_references,
 )
 
 OWNED = (
@@ -184,6 +188,83 @@ let vendor = ErrorTrackingService.addBreadcrumb(level: "i", category: "c", messa
 
 
 class SplitSizeRatchetTest(unittest.TestCase):
+    def test_cli_preserves_extraction_and_fixture_rehoming_after_a_merge(self):
+        # Exercise both parents' repair modes through the same raw-string parser.
+        original = (
+            'import XCTest\n\nenum AttachmentKind {\n    let raw = #"brace { quoted " still"#\n}\n\n'
+            'final class SampleTests: XCTestCase {\n    let account = "fixture"\n'
+            '    func testOne() { _ = helper() }\n}\n\n'
+            'extension SampleTests {\n    func helper() -> String { account }\n}\n'
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "SampleTests.swift"
+            sibling = Path(directory) / "AttachmentKind.swift"
+            source.write_text(original)
+            command = [sys.executable, str(ROOT / "scripts/ios/split_size_ratchet.py"), str(source)]
+            extracted = subprocess.run(command + ["--extract", "AttachmentKind", "--sibling", str(sibling)],
+                                       capture_output=True, text=True)
+            self.assertEqual(extracted.returncode, 0, extracted.stderr)
+            self.assertIn('let raw = #"brace { quoted " still"#', sibling.read_text())
+            self.assertNotIn("AttachmentKind", source.read_text())
+            split = subprocess.run(command + ["--limit", "8"], capture_output=True, text=True)
+            self.assertEqual(split.returncode, 0, split.stderr)
+            self.assertIn("class SampleTests: SampleFixtureCase", source.read_text())
+            fixture = (Path(directory) / "SampleFixtureCase.swift").read_text()
+            self.assertIn("class SampleFixtureCase: XCTestCase", fixture)
+            self.assertIn('let account = "fixture"', fixture)
+            self.assertNotIn("extension SampleTests", fixture)
+            for path in Path(directory).glob("*.swift"):
+                self.assertLessEqual(len(path.read_text().splitlines()), 8)
+
+    def test_extract_keeps_complete_members_and_their_comments(self):
+        source = (
+            "import SwiftUI\n\nextension Home {\n"
+            "    // A brace in a string must not end the member.\n"
+            "    var photo: String {\n        \"}\"\n    }\n\n"
+            "    func refresh() {\n        if true { print(\"{\") }\n    }\n}\n"
+            "\n#Preview { Home() }\n"
+        )
+        kept, moved = extract_declarations(source, ["photo"], "Home")
+        self.assertNotIn("var photo", kept)
+        self.assertIn('func refresh()', kept)
+        self.assertIn('#Preview { Home() }', kept)
+        self.assertIn('// A brace', moved)
+        self.assertIn('var photo: String {\n        "}"\n    }', moved)
+        self.assertTrue(moved.startswith("import SwiftUI\n\nextension Home {"))
+        self.assertEqual(extract_declarations(NAMESAKE, ["Alpha"])[1],
+                         "import Foundation\n\nenum Alpha {\n    let value = 1\n}\n")
+
+    def test_extract_refuses_missing_duplicate_or_private_declarations(self):
+        for source, names, owner in [
+            (NAMESAKE, ["Missing"], None),
+            (NAMESAKE, ["Alpha", "Alpha"], None),
+            ("extension Home {\n    private var value: Int { 1 }\n}\n", ["value"], "Home"),
+            ("struct Home {\n    var value = 1\n    func next() {}\n}\n", ["value"], "Home"),
+            ("struct Home {\n    var value = { 1 }()\n}\n", ["value"], "Home"),
+        ]:
+            with self.assertRaises(ValueError):
+                extract_declarations(source, names, owner)
+
+    def test_extract_cli_refuses_collision_and_oversize_before_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source, sibling = Path(tmp) / "Home.swift", Path(tmp) / "Photo.swift"
+            original = "import SwiftUI\n\nextension Home {\n    var photo: Int { 1 }\n}\n"
+            source.write_text(original)
+            command = [sys.executable, str(ROOT / "scripts/ios/split_size_ratchet.py"), str(source),
+                       "--owner", "Home", "--extract", "photo", "--sibling", str(sibling)]
+            for existing, extra in [("retained sibling", []), (None, ["--limit", "1"])]:
+                if existing is not None:
+                    sibling.write_text(existing)
+                else:
+                    sibling.unlink()
+                result = subprocess.run(command + extra, capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(source.read_text(), original)
+                self.assertEqual(sibling.read_text() if sibling.exists() else None, existing)
+            self.assertEqual(subprocess.run(command, capture_output=True).returncode, 0)
+            self.assertNotIn("var photo", source.read_text())
+            self.assertIn("var photo: Int { 1 }", sibling.read_text())
+
     def test_namesake_split_does_not_overwrite_the_original(self):
         parts = split_namesake(NAMESAKE, "Holder.swift", 6)
         names = [name for name, _body in parts]
@@ -225,7 +306,7 @@ class SplitSizeRatchetTest(unittest.TestCase):
     def test_branch_sources_meet_the_company_limit(self):
         baseline = json.loads((ROOT / ".company-guards" / "size-baseline.json").read_text())
         sheet = "apps/ios/LogYourBody/Views/ProgressPhotoAttachSheet.swift"
-        self.assertEqual(source_lines((ROOT / sheet).read_text()), baseline[sheet])
+        self.assertLessEqual(source_lines((ROOT / sheet).read_text()), baseline[sheet])
         under_limit = [
             "apps/ios/LogYourBody/Components/PersonalBodyEstimate.swift",
             "apps/ios/LogYourBody/Components/PersonalBodyViewKind.swift",
