@@ -229,7 +229,7 @@ struct DatedOutcomeLaunchView: View {
     private func refresh() async {
         await model.load(refresh: true)
         guard auth.ownsAccountSession(owner) else { return }
-        let metrics = await CoreDataManager.shared.fetchBodyMetrics(for: owner.subject)
+        let metrics = await CoreDataManager.shared.fetchVisibleBodyMetrics(for: owner.subject)
         let snapshot = await projector.project(
             owner: owner.subject, metrics: metrics,
             input: .init(

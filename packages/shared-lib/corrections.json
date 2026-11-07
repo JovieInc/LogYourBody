@@ -5965,5 +5965,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "lyb-341-launch-projector-value-models",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41501564870/job/125470586165",
+    "correction": "PR #1748 launch-quality build fails because the first-launch view passes [CachedBodyMetrics] to a projector requiring [BodyMetrics]. Company guards and iOS static audits also reject growth in ContentView, LogYourBodyApp and DatedOutcomeStoreTests.",
+    "mechanization": "Reuse the existing fetchVisibleBodyMetrics API to return converted, visibility-filtered value models to the actor projector. Move profile completeness policy beside its gate and store fixtures to a test-target source, retaining every XCTest case and target selector. Keep the app deep-link arguments on one line to avoid file growth. The existing compiler check already rejected the cached-object call, and the existing size behavior suite reproduced all three failures before the repair and passed afterward. Reuse the established source-size and native-build gates; no new repair machine or CI exemption. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing typed, visibility-aware fetch API returns the projector input model by construction. Relocating cohesive declarations and test fixtures removes source growth without changing behavior, tests or baseline allowances."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreHookView.swift",
+      "anchor": "let metrics = await CoreDataManager.shared.fetchVisibleBodyMetrics(for: owner.subject)"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   }
 ]
