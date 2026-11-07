@@ -26,6 +26,12 @@ updates:
     labels:
       - 'dependencies'
       - 'automated'
+    groups:
+      # React DOM requires the exact same React runtime version.
+      react-runtime:
+        patterns:
+          - 'react'
+          - 'react-dom'
     ignore:
       - dependency-name: 'next'
         update-types: ['version-update:semver-major']

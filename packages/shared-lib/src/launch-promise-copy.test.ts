@@ -26,6 +26,13 @@ const launchSources = [
     .map((name) => `Features/Onboarding/Views/${name}`),
 ];
 
+function duplicateApprovedCopy(text: string) {
+  const literals = [...text.matchAll(/"((?:\\.|[^"\\])*)"/g)].map((match) => match[1]);
+  return Object.values(approved).filter(
+    (copy) => literals.filter((literal) => literal === copy).length > 1,
+  );
+}
+
 function resultPromises(text: string) {
   const literals = [...text.matchAll(/"((?:\\.|[^"\\])*)"/g)].map((match) => match[1]);
   return literals.filter((literal) => {
@@ -43,6 +50,15 @@ function resultPromises(text: string) {
 }
 
 describe('LYB-286 approved date-driven launch promise', () => {
+  it('rejects approved copy duplicated by a merge outside the canonical table', () => {
+    expect(duplicateApprovedCopy(launchSources.map(source).join('\n'))).toEqual([]);
+  });
+
+  it.each(Object.values(approved))('detects a restored legacy copy constant: %s', (copy) => {
+    const merged = `${launchSources.map(source).join('\n')}\nstatic let legacyCopy = "${copy}"`;
+    expect(duplicateApprovedCopy(merged)).toContain(copy);
+  });
+
   it('keeps the app copy table exactly equal to the approved strings', () => {
     const table = source('Services/LaunchJourney.swift').match(
       /enum LaunchPromiseCopy \{([^}]+)\}/,
