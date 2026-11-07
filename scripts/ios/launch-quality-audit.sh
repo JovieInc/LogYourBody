@@ -33,6 +33,13 @@ XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
 # missed every Swift package cache and was still compiling test targets at 600s.
 # Allow 15m for compilation; keep test timeouts, retries and the outer step cap.
 BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"
+# Every bounded command below also honors this audit-level deadline. The
+# workflow step kills the whole audit at 52 minutes with zero diagnostics (Mac
+# runs upload no artifacts and job logs are admin-gated), so the audit must
+# always reach its own timeouts first and emit phase evidence as it goes.
+# 2760s (46m) stays above the slowest passing hosted run (38m) and inside the
+# 52-minute step cap. This caps waste, it never extends a bound.
+AUDIT_DEADLINE_SECONDS="${AUDIT_DEADLINE_SECONDS:-2760}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
@@ -58,12 +65,54 @@ if [[ -d "$ARTIFACT_DIR" && -n "$(ls -A "$ARTIFACT_DIR")" ]]; then
 fi
 mkdir -p "$ARTIFACT_DIR"
 AUDIT_STARTED_AT="$(date +%s)"
+
+# Phase and budget helpers must exist before the first phase_start call below.
+remaining_budget_seconds() {
+  local remaining=$(( AUDIT_DEADLINE_SECONDS - $(date +%s) + AUDIT_STARTED_AT ))
+  (( remaining < 60 )) && remaining=60
+  printf '%s\n' "$remaining"
+}
+
+# Cap each phase at min(its own bound, what is left of the audit deadline) so a
+# slow host fails the audit through its own timeout and evidence instead of a
+# silent runner-side step kill.
+bounded_seconds() {
+  local bound="$1" remaining
+  remaining="$(remaining_budget_seconds)"
+  (( bound < remaining )) && printf '%s\n' "$bound" || printf '%s\n' "$remaining"
+}
+
+PHASE_NAME=""
+PHASE_STARTED_AT=0
+emit_phase() {
+  local line="launch-quality audit: $1 (elapsed $(( $(date +%s) - AUDIT_STARTED_AT ))s)"
+  echo "$line"
+  printf '%s\n' "$line" >> "$ARTIFACT_DIR/phase-timeline.log"
+  # The step summary renders even when the runner later kills the step, which
+  # is the only public evidence channel on self-hosted Mac runs.
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    printf '%s\n' "$line" >> "$GITHUB_STEP_SUMMARY"
+  fi
+}
+
+phase_start() {
+  PHASE_NAME="$1"
+  PHASE_STARTED_AT="$(date +%s)"
+  emit_phase "started $PHASE_NAME"
+}
+
+phase_end() {
+  emit_phase "finished $PHASE_NAME in $(( $(date +%s) - PHASE_STARTED_AT ))s"
+  PHASE_NAME=""
+}
+
 # Record source identity without implying an authenticated production build.
 git -C "$ROOT_DIR" rev-parse HEAD > "$ARTIFACT_DIR/source-revision.txt"
 git -C "$ROOT_DIR" diff HEAD --binary > "$ARTIFACT_DIR/source-working-tree.patch"
 
 if [[ "$AUDIT_MODE" == full ]]; then
   # Finish validator shell fixtures before simulator boot competes for host resources.
+  phase_start preflight
   python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
   bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
 fi
@@ -74,6 +123,10 @@ fi
 
 if [[ "$DESTINATION" == "auto" ]]; then
   DESTINATION="$(IOS_DIR="$IOS_DIR" PROJECT="$PROJECT" SCHEME="$SCHEME" bash "$ROOT_DIR/scripts/ios/resolve-simulator-destination.sh")"
+fi
+
+if [[ "$AUDIT_MODE" == full ]]; then
+  phase_end preflight
 fi
 
 run_with_timeout() {
@@ -189,6 +242,11 @@ stop_launch_probe() {
   [[ "$LQ_LAUNCH_PROBE" == "true" ]] || return 0
   local pid
   for pid in ${LAUNCH_PROBE_PIDS[@]+"${LAUNCH_PROBE_PIDS[@]}"}; do
+    # The recorded pid may have exec'd into a tool (xcrun -> simctl) whose
+    # child (e.g. `simctl spawn ... log stream`) survives its parent and
+    # streams forever on a persistent Mac. Kill the children first, or every
+    # attempt leaks one unbounded simulator log stream.
+    pkill -P "$pid" >/dev/null 2>&1 || true
     kill "$pid" >/dev/null 2>&1 || true
     wait "$pid" >/dev/null 2>&1 || true
   done
@@ -208,6 +266,7 @@ run_xcodebuild_test() {
   local log_file="$3"
   local attempt
   local status
+  local effective_timeout
   local -a xcodebuild_command
   shift 3
 
@@ -231,15 +290,16 @@ run_xcodebuild_test() {
     )
 
     set +e
+    effective_timeout="$(bounded_seconds "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS")"
     run_with_timeout \
-      "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS" \
+      "$effective_timeout" \
       "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
     status="${PIPESTATUS[0]}"
     set -e
     stop_launch_probe "$label"
 
     if [[ "$status" -eq 124 ]]; then
-      echo "xcodebuild command timed out after ${XCODEBUILD_COMMAND_TIMEOUT_SECONDS}s" | tee -a "$log_file"
+      echo "xcodebuild command timed out after ${effective_timeout}s" | tee -a "$log_file"
       return "$status"
     fi
 
@@ -273,6 +333,7 @@ assert_xcresult_evidence() {
 build_for_testing_once() {
   local log_file="$ARTIFACT_DIR/launch-quality-build-for-testing.log"
   local status
+  local effective_timeout
   local -a xcodebuild_command
 
   : > "$log_file"
@@ -287,224 +348,24 @@ build_for_testing_once() {
   )
 
   set +e
+  effective_timeout="$(bounded_seconds "$BUILD_FOR_TESTING_TIMEOUT_SECONDS")"
   run_with_timeout \
-    "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" \
+    "$effective_timeout" \
     "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
   status="${PIPESTATUS[0]}"
   set -e
 
   if [[ "$status" -eq 124 ]]; then
-    echo "build-for-testing timed out after ${BUILD_FOR_TESTING_TIMEOUT_SECONDS}s" | tee -a "$log_file"
+    echo "build-for-testing timed out after ${effective_timeout}s" | tee -a "$log_file"
   fi
 
   return "$status"
 }
 
-# A diagnostic subset never emits ordinary unit/UI qualification or coverage receipts.
-DIAGNOSTIC_SEVEN_TESTS=(
-  "ChaosMonkeyUITests/testKeyboardDismissalPreservesDraftWithoutSending"
-  "HomeV2LayoutUITests/testLogSheetEditsUnitsWithKeyboardAndCancelsWithoutChangingHome"
-  "HomeV2LayoutUITests/testEditorialUnsupportedWeightKeepsRawValueAndReviewVisible"
-  "HomeV2LayoutUITests/testBodyFatCheckInRefreshesDataHeroWithoutSavingWeight"
-  "HomeV2LayoutUITests/testCompositionHomeShowsBodyFatFirstAndHonestSupportingMetrics"
-  "HomeV2LayoutUITests/testEditorialSingleReadingDoesNotClaimAWeightTrendBehindPhotoOrBodyFat"
-  "HomeV2LayoutUITests/testBodyFatEditorAtLargestTextPreservesMethodUntilExplicitSelection"
-)
+if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
+  source "$ROOT_DIR/scripts/ios/launch-quality-diagnostic-seven.sh"
+fi
 
-finish_diagnostic_seven() {
-  local command_exit="$1"
-  local catalogue_exit=66
-  trap - EXIT
-  set +e
-  if [[ -d "$ARTIFACT_DIR/diagnostic-seven.xcresult" ]]; then
-    run_with_timeout 60 xcrun xcresulttool get test-results tests \
-      --path "$ARTIFACT_DIR/diagnostic-seven.xcresult" \
-      > "$ARTIFACT_DIR/diagnostic-catalogue.json" 2> "$ARTIFACT_DIR/diagnostic-catalogue.stderr"
-    catalogue_exit="$?"
-  fi
-  python3 -I - "$ROOT_DIR" "$ARTIFACT_DIR" "$command_exit" "$catalogue_exit" \
-    "$DIAGNOSTIC_PHASE" "$DIAGNOSTIC_BUILD_EXIT" "$DIAGNOSTIC_UI_EXIT" <<'DIAGNOSTIC_RECEIPT_PY'
-import collections
-from datetime import datetime, timezone
-import hashlib
-import json
-import os
-from pathlib import Path
-import re
-import subprocess
-import sys
-
-
-def strict_diagnostic_cases(payload, selected, log_text):
-    """Cross-check the complete official catalogue against actual XCTest events."""
-    def walk(nodes):
-        if not isinstance(nodes, list):
-            raise ValueError('Incomplete official test catalogue')
-        for node in nodes:
-            if not isinstance(node, dict) or not isinstance(node.get('nodeType'), str):
-                raise ValueError('Malformed official test node')
-            yield node
-            yield from walk(node.get('children', []))
-
-    cases = [n for n in walk(payload['testNodes']) if n['nodeType'] == 'Test Case']
-    identifiers = [n.get('nodeIdentifier') for n in cases]
-    if len(selected) != 7 or len(set(selected)) != 7:
-        raise ValueError('Expected exactly seven unique selected identities')
-    if collections.Counter(identifiers) != collections.Counter(selected):
-        raise ValueError('Extra, missing or duplicate official cases')
-    for case in cases:
-        if case.get('result') != 'Passed':
-            raise ValueError('Skipped, failed or unfinished official case')
-        children = list(walk(case.get('children', [])))
-        # A single case-run leaf is understood; hidden repetitions/configurations
-        # or a changed schema fail closed rather than inventing execution proof.
-        if children and (len(children) != 1 or children[0]['nodeType'] != 'Test Case Run'
-                         or children[0].get('result') != 'Passed'):
-            raise ValueError('Repeated, non-passing or unsupported child executions')
-    events = []
-    pattern = re.compile(r"^Test Case '-\[LogYourBodyUITests\.([^ ]+) ([^]]+)\]' (started|passed|failed|skipped)(?:[ .])", re.M)
-    for event in pattern.finditer(log_text):
-        events.append((event.group(1) + '/' + event.group(2) + '()', event.group(3)))
-    starts = collections.Counter(i for i, state in events if state == 'started')
-    terminals = collections.Counter(i for i, state in events if state != 'started')
-    if starts != collections.Counter(selected) or terminals != collections.Counter(selected):
-        raise ValueError('Extra, missing, repeated or unfinished XCTest execution events')
-    if any(state not in ('started', 'passed') for _, state in events):
-        raise ValueError('Non-passing XCTest execution event')
-    # Every native Test Case line must belong to the understood module/format.
-    native_lines = [line for line in log_text.splitlines() if line.startswith('Test Case ')]
-    if len(native_lines) != len(events):
-        raise ValueError('Unsupported or foreign XCTest execution event')
-    active = set()
-    for identifier, state in events:
-        if state == 'started':
-            if identifier in active:
-                raise ValueError('Repeated active execution')
-            active.add(identifier)
-        elif identifier not in active:
-            raise ValueError('Terminal event without its own start')
-        else:
-            active.remove(identifier)
-    if active:
-        raise ValueError('Unfinished execution')
-    return [{'identifier': i, 'result': 'Passed', 'executionCount': 1} for i in selected]
-
-
-def write_diagnostic_receipt(root, directory, command_exit, catalogue_exit, phase, build_exit, ui_exit):
-    def git(*args):
-        return subprocess.check_output(['git', '-C', str(root), *args], text=True).strip()
-
-    def digest(path):
-        return hashlib.sha256(path.read_bytes()).hexdigest()
-
-    errors = []
-    selected = (directory / 'diagnostic-selected-tests.txt').read_text().splitlines()
-    log_path = directory / 'diagnostic-seven.log'
-    log_text = log_path.read_text(errors='replace') if log_path.is_file() else ''
-    source = git('rev-parse', 'HEAD')
-    patch = subprocess.check_output(['git', '-C', str(root), 'diff', 'HEAD', '--binary'])
-    untracked = git('ls-files', '--others', '--exclude-standard')
-    if (source != os.environ.get('DIAGNOSTIC_EXPECTED_SOURCE_SHA') or patch or untracked
-            or (directory / 'source-revision.txt').read_text().strip() != source
-            or (directory / 'source-working-tree.patch').read_bytes()):
-        errors.append('sourceMismatch')
-    if command_exit or build_exit or ui_exit:
-        errors.append('commandOrStageFailure')
-    if command_exit == 124 or build_exit == 124 or ui_exit == 124:
-        errors.append('timeout')
-    if log_text.count('Running diagnostic-seven (attempt ') != 1:
-        errors.append('uiCommandAttemptMismatch')
-    observed = None
-    catalogue = None
-    if catalogue_exit:
-        errors.append('officialCatalogueUnavailable')
-    else:
-        try:
-            catalogue = json.loads((directory / 'diagnostic-catalogue.json').read_text())
-            observed = strict_diagnostic_cases(catalogue, selected, log_text)
-        except (ValueError, KeyError, TypeError, OSError) as error:
-            errors.append(str(error))
-    tooling_file = directory / 'trusted-tooling.json'
-    receipt = {
-        'schemaVersion': 1, 'evidenceKind': 'diagnostic_ui_subset',
-        'qualifying': False, 'nativeQualification': False,
-        'status': 'failed' if errors else 'passed', 'errors': errors,
-        'generatedAt': datetime.now(timezone.utc).isoformat(),
-        'profile': 'lyb-ui-seven-v1', 'selectedTests': selected, 'tests': observed,
-        'officialCatalogue': catalogue,
-        'nativeEventLines': [line for line in log_text.splitlines() if line.startswith('Test Case ')],
-        'phase': phase, 'commandExit': command_exit, 'buildExit': build_exit,
-        'uiExit': ui_exit, 'catalogueExit': catalogue_exit,
-        'sourceRevision': source, 'sourceTree': git('rev-parse', 'HEAD^{tree}'),
-        'sourcePatchSha256': hashlib.sha256(patch).hexdigest(), 'untrackedSource': untracked.splitlines(),
-        'policyEventSHA': os.environ.get('GITHUB_SHA', 'unknown'),
-        'policyWorkflowSHA': os.environ.get('GITHUB_WORKFLOW_SHA', 'unknown'),
-        'run': os.environ.get('GITHUB_RUN_ID', 'unknown'),
-        'attempt': os.environ.get('GITHUB_RUN_ATTEMPT', 'unknown'),
-        'job': os.environ.get('GITHUB_JOB', 'unknown'),
-        'auditSha256': digest(root / 'scripts/ios/launch-quality-audit.sh'),
-        'trustedTooling': json.loads(tooling_file.read_text()) if tooling_file.is_file() else None,
-        'catalogueSha256': digest(directory / 'diagnostic-catalogue.json') if not catalogue_exit else None,
-        'logSha256': digest(log_path) if log_path.is_file() else None,
-        'uiCommandAttempts': log_text.count('Running diagnostic-seven (attempt '),
-        'runnerRestartsObserved': log_text.count('Restarting after unexpected exit'),
-        'unitWitnessCoverageRatchetPerformanceProtectedSignedPhysical': 'NOT_EXECUTED_OR_QUALIFIED',
-    }
-    (directory / 'diagnostic-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
-    return 65 if errors else 0
-
-
-if __name__ == '__main__':
-    sys.exit(write_diagnostic_receipt(Path(sys.argv[1]), Path(sys.argv[2]), int(sys.argv[3]),
-                                    int(sys.argv[4]), sys.argv[5], int(sys.argv[6]), int(sys.argv[7])))
-DIAGNOSTIC_RECEIPT_PY
-  local receipt_exit="$?"
-  if [[ "$command_exit" -ne 0 ]]; then
-    exit "$command_exit"
-  fi
-  exit "$receipt_exit"
-}
-
-run_diagnostic_seven() {
-  local -a selectors=()
-  local test_id
-  DIAGNOSTIC_PHASE=source
-  DIAGNOSTIC_BUILD_EXIT=-1
-  DIAGNOSTIC_UI_EXIT=-1
-  for test_id in "${DIAGNOSTIC_SEVEN_TESTS[@]}"; do
-    selectors+=("-only-testing:LogYourBodyUITests/$test_id")
-    printf '%s()\n' "$test_id"
-  done > "$ARTIFACT_DIR/diagnostic-selected-tests.txt"
-  trap 'finish_diagnostic_seven "$?"' EXIT
-  [[ "${DIAGNOSTIC_EXPECTED_SOURCE_SHA:-}" =~ ^[0-9a-f]{40}$ &&
-     "$(cat "$ARTIFACT_DIR/source-revision.txt")" == "$DIAGNOSTIC_EXPECTED_SOURCE_SHA" &&
-     ! -s "$ARTIFACT_DIR/source-working-tree.patch" &&
-     -z "$(git -C "$ROOT_DIR" ls-files --others --exclude-standard)" ]] || return 65
-  if [[ -n "${DIAGNOSTIC_TRUSTED_TOOLING_FILE:-}" ]]; then
-    cp "$DIAGNOSTIC_TRUSTED_TOOLING_FILE" "$ARTIFACT_DIR/trusted-tooling.json"
-  fi
-  DIAGNOSTIC_PHASE=bootstrap
-  bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
-  DIAGNOSTIC_PHASE=destination
-  DESTINATION="$(IOS_DIR="$IOS_DIR" PROJECT="$PROJECT" SCHEME="$SCHEME" bash "$ROOT_DIR/scripts/ios/resolve-simulator-destination.sh")"
-  COMMON_XCODEBUILD_ARGS=(
-    -project LogYourBody.xcodeproj -scheme LogYourBody -destination "$DESTINATION"
-    -parallel-testing-enabled NO -enableCodeCoverage YES
-    -maximum-concurrent-test-simulator-destinations 1 -test-timeouts-enabled YES
-    -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 180
-  )
-  DIAGNOSTIC_PHASE=build
-  if build_for_testing_once; then DIAGNOSTIC_BUILD_EXIT=0; else
-    DIAGNOSTIC_BUILD_EXIT="$?"; return "$DIAGNOSTIC_BUILD_EXIT"
-  fi
-  DIAGNOSTIC_PHASE=ui
-  if XCODEBUILD_COMMAND_TIMEOUT_SECONDS=1500 run_xcodebuild_test \
-      diagnostic-seven "$ARTIFACT_DIR/diagnostic-seven.xcresult" \
-      "$ARTIFACT_DIR/diagnostic-seven.log" "${selectors[@]}"; then DIAGNOSTIC_UI_EXIT=0; else
-    DIAGNOSTIC_UI_EXIT="$?"; return "$DIAGNOSTIC_UI_EXIT"
-  fi
-  DIAGNOSTIC_PHASE=completed
-}
 
 cd "$IOS_DIR"
 
@@ -513,6 +374,7 @@ if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
   exit 0
 fi
 
+phase_start static
 if [[ "$RUN_SWIFTLINT" == "true" ]]; then
   swiftlint lint --strict | tee "$ARTIFACT_DIR/swiftlint.log"
 fi
@@ -537,7 +399,11 @@ else
   echo "Skipping optical grid audit" | tee "$ARTIFACT_DIR/optical-grid-audit.log"
 fi
 
+phase_end static
+
+phase_start build-for-testing
 build_for_testing_once
+phase_end build-for-testing
 
 CHAT_QUALIFICATION_UNIT_TESTS=(
   "ChatServiceTests/testSyntheticChatCompletionRestoresThroughExistingHistoryPort"
@@ -560,6 +426,7 @@ done
 # Launch Quality runs on 2026-10-25 with the LYB-231 signature (empty StoreKit state at restore).
 # Launch Quality gates the general unit target. The StoreKit lifecycle suite
 # remains required in the dedicated merge-group and main job.
+phase_start unit-tests
 run_xcodebuild_test \
   "launch-quality-unit-tests" \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" \
@@ -577,6 +444,7 @@ python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --base-revision "${BASE_SHA:-}" --source-root "$ROOT_DIR" \
   --scheme "$SCHEME" --only-testing LogYourBodyTests \
   > "$ARTIFACT_DIR/launch-quality-unit-tests.ratchet.json"
+phase_end unit-tests
 
 # Every UI check runs in ONE xcodebuild invocation. On hosted macOS each
 # test-without-building invocation pays 3-6 min launching the UI test runner
@@ -632,6 +500,7 @@ UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")
 # replaces three separately bounded invocations, so its own bound is the
 # per-invocation limit plus the work the other two used to carry.
 UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1500}"
+phase_start ui-tests
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_xcodebuild_test \
   "launch-quality-ui" \
   "$UI_RESULT_BUNDLE" \
@@ -639,7 +508,9 @@ XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_
   "${UI_SELECTORS[@]}"
 assert_xcresult_evidence "$UI_RESULT_BUNDLE" "${UI_EVIDENCE_ARGS[@]}" \
   --critical-captures --require-settings-row-coverage --require-chaos-accounting-coverage --require-canvas-coverage
+phase_end ui-tests
 
+phase_start runtime-warnings
 if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
   FAIL_ON_RUNTIME_WARNINGS="$FAIL_ON_RUNTIME_WARNINGS" \
     bash "$ROOT_DIR/scripts/ios/xcresult-runtime-audit.sh" \
@@ -649,6 +520,7 @@ if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
 else
   echo "Skipping XCTest runtime-warning audit" | tee "$ARTIFACT_DIR/runtime-warnings.log"
 fi
+phase_end runtime-warnings
 
 {
   printf '# iOS Launch Quality Audit\n\n'
@@ -663,7 +535,8 @@ fi
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
   printf -- '- Build strategy: one `build-for-testing`, the general unit target (StoreKit lifecycle tests run in the required dedicated job), then one UI invocation covering inherited surface cases, two canvas cases, and twelve bounded chaos regressions with simulator parallelism disabled\n'
   printf -- '- Required native coverage: biometric policy, SettingsRow, chaos action accounting, and executed MesocycleCanvas app/view lines. Canvas captures cover reduced motion, replay/readback, and undo.\n'
-  printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
+  printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation; audit deadline: `%ss`\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS" "$AUDIT_DEADLINE_SECONDS"
+  printf -- '- Phase timing: `phase-timeline.log` (also emitted to the step summary as each phase starts and ends)\n'
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"
 

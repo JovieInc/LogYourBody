@@ -1116,6 +1116,9 @@ def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_d
             if scenario == 'already-booted' or (scenario == 'restart-boot-failure' and restarted):
                 sys.exit(149)
         elif args == ['simctl', 'bootstatus', 'selected', '-b']:
+            if scenario == 'bootstatus-timeout':
+                import time
+                time.sleep(30)
             if scenario == 'bootstatus-failure' or (scenario == 'restart-status-failure' and restarted):
                 sys.exit(71)
         elif args == ['simctl', 'getenv', 'selected', 'TESTMANAGERD_SIM_SOCK']:
@@ -1142,7 +1145,7 @@ def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_d
     regular.write_text('A regular file is not a testmanagerd socket.')
     scenarios = {'stale-persistent': 70, 'healthy': 0, 'already-booted': 0,
                  'stale-recovered': 0, 'empty-socket': 70, 'getenv-failure': 70,
-                 'regular-file': 70, 'bootstatus-failure': 71, 'shutdown-failure': 73,
+                 'regular-file': 70, 'bootstatus-failure': 71, 'bootstatus-timeout': 70, 'shutdown-failure': 73,
                  'restart-boot-failure': 149, 'restart-status-failure': 71,
                  'discovered': 0, 'created': 0, 'no-destination': 70,
                  'inventory-failure': 1, 'inventory-malformed': 1}
@@ -1172,6 +1175,8 @@ def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_d
             ['bash', str(_REPO_ROOT / 'scripts/ios/resolve-simulator-destination.sh')],
             env={**os.environ, 'PATH': f'{binaries}:{os.environ["PATH"]}', 'IOS_DIR': str(tmp_path),
                  'NATIVE_CALLS': str(calls), 'NATIVE_SCENARIO': scenario,
+                 **({'SIM_BOOT_TIMEOUT_SECONDS': '1', 'SIM_SHUTDOWN_TIMEOUT_SECONDS': '1'}
+                    if scenario == 'bootstatus-timeout' else {}),
                  'SIMULATOR_INVENTORY': (
                      'invalid-json' if scenario == 'inventory-malformed' else
                      '{"runtimes": [], "devices": {}}' if scenario in ['created', 'no-destination'] else
@@ -1523,13 +1528,16 @@ def _diagnostic_python(marker: str, source: str) -> dict[str, Any]:
     return namespace
 
 
+def _diagnostic_seven_source() -> str:
+    return (_REPO_ROOT / 'scripts/ios/launch-quality-diagnostic-seven.sh').read_text()
+
+
 def _diagnostic_receipt_module() -> dict[str, Any]:
-    return _diagnostic_python('DIAGNOSTIC_RECEIPT_PY',
-        (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_text())
+    return _diagnostic_python('DIAGNOSTIC_RECEIPT_PY', _diagnostic_seven_source())
 
 
 def _diagnostic_ids() -> list[str]:
-    source = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_text()
+    source = _diagnostic_seven_source()
     block = source.split('DIAGNOSTIC_SEVEN_TESTS=(\n', 1)[1].split('\n)', 1)[0]
     return [line.strip().strip('"') + '()' for line in block.splitlines()]
 
@@ -1601,6 +1609,8 @@ def _diagnostic_repository(tmp_path: Path) -> tuple[Path, str]:
     (root / 'scripts/ios').mkdir(parents=True)
     (root / 'apps/ios').mkdir(parents=True)
     (root / 'scripts/ios/launch-quality-audit.sh').write_bytes((_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes())
+    (root / 'scripts/ios/launch-quality-diagnostic-seven.sh').write_bytes(
+        (_REPO_ROOT / 'scripts/ios/launch-quality-diagnostic-seven.sh').read_bytes())
     for name, code in {
         'bootstrap-local-config.sh': '#!/bin/bash\nprintf "bootstrap\\n" >> "$FAKE_CALLS"\n',
         'resolve-simulator-destination.sh': '#!/bin/bash\nprintf "destination\\n" >> "$FAKE_CALLS"\nprintf "platform=iOS Simulator,id=11111111-1111-1111-1111-111111111111\\n"\n',
@@ -1627,7 +1637,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
+        '1701ad841d1f30e8679cca8d62e7d517a2394fbe60eadb1f0cfc2d84a0d47ff4'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -1895,11 +1905,11 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert source.count('      checkout-ref:\n') == 1
     for forbidden in ['  pull_request:', '  pull_request_target:', '  workflow_call:', '  workflow_run:', 'uses: ./', 'mac-lane', 'secrets.']:
         assert forbidden not in source
-    assert '  push:\n    branches: [main]\n    paths:\n      - .github/workflows/ios-ui-diagnostics.yml\n      - scripts/ios/launch-quality-audit.sh\n      - apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift\n' in source
+    assert '  push:\n    branches: [main]\n    paths:\n      - .github/workflows/ios-ui-diagnostics.yml\n      - scripts/ios/launch-quality-audit.sh\n      - scripts/ios/launch-quality-diagnostic-seven.sh\n      - apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift\n' in source
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'" in source
+    assert "REVIEWED_AUDIT_SHA256 = '1701ad841d1f30e8679cca8d62e7d517a2394fbe60eadb1f0cfc2d84a0d47ff4'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -2136,10 +2146,10 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = 'c4269ae0051375884a623b1b4d3eafd2afd93cc76f4fe1f61efb9fae23ec3928'
+    expected = '1701ad841d1f30e8679cca8d62e7d517a2394fbe60eadb1f0cfc2d84a0d47ff4'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
-    assert len(dependencies) == 7
+    assert len(dependencies) == 8
     project_name = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj'
     # Admission must exercise current source bytes, as the real main diagnostic does.
     # Refreshing the policy digest remains an explicit review of the project diff.

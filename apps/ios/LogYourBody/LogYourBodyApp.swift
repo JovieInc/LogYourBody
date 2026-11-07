@@ -553,7 +553,7 @@ struct LogYourBodyApp: App {
         UserDefaults.standard.removeObject(forKey: Constants.goalWeightKey)
         OnboardingStateManager.shared.updateCompletionStatus(!usesBodyScoreOnboardingFixture)
 
-        realtimeSyncManager.isOnline = false
+        realtimeSyncManager.pinOfflineForUITestFixture()
         realtimeSyncManager.syncStatus = .offline
         realtimeSyncManager.pendingSyncCount = 0
 
