@@ -488,6 +488,41 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         self.assert_rejected("timeline.injected_calendar_day")
 
 
+    def test_character_typing_regains_focus_and_nested_launch_tests_get_time(self):
+        ui = self.root / "apps/ios/LogYourBodyUITests"
+        ui.mkdir(parents=True)
+        shutil.copyfile(ROOT / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift", ui / "LogYourBodyUITests.swift")
+        shutil.copyfile(
+            ROOT / "apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift", ui / "ChaosMonkeyUITests.swift"
+        )
+        self.assertEqual(self.run_audit()[0], 0)
+
+        chat = ui / "LogYourBodyUITests.swift"
+        original = chat.read_text()
+        focus = (
+            '.matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch\n'
+            "                    if !focused.exists {\n"
+            "                        if prefix.isEmpty {\n"
+            "                            composer.tap()\n"
+            "                        } else {\n"
+            "                            composer.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()\n"
+            "                        }\n"
+            "                        guard focused.waitForExistence(timeout: 2) else { break }\n"
+            "                    }\n"
+            "                    "
+        )
+        self.assertIn(focus, original)
+        chat.write_text(original.replace(focus, "", 1))
+        self.assert_rejected("uitest.character_type_keyboard_focus")
+
+        chat.write_text(original.replace(
+            "        executionTimeAllowance = 180\n        let app = XCUIApplication()\n        launch(\n",
+            "        let app = XCUIApplication()\n        launch(\n",
+            1,
+        ))
+        self.assert_rejected("uitest.nested_launch_time_allowance")
+
+
 def run_behavior_suite(suite):
     expected = suite.countTestCases()
     result = unittest.TextTestRunner().run(suite)

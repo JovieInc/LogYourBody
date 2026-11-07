@@ -2,6 +2,95 @@
 from pathlib import Path
 import re
 
+_CHARACTER_LOOP = re.compile(r"for\s+(?P<name>[A-Za-z_]\w*)\s+in\s+[^{\n]+\{")
+_NESTED_TEST_CALL = re.compile(r"\b(test[A-Z]\w*)\s*\(")
+_TEST_FUNC = re.compile(r"\bfunc\s+(test[A-Za-z0-9_]+)\s*\(")
+
+
+def _balanced_end(text, open_brace):
+    """Index of the brace matching open_brace, skipping strings and comments."""
+    depth = 0
+    index = open_brace
+    limit = len(text)
+    while index < limit:
+        char = text[index]
+        if char == '"':
+            index += 1
+            while index < limit and text[index] != '"':
+                index += 2 if text[index] == "\\" else 1
+            index += 1
+            continue
+        if char == "/" and index + 1 < limit and text[index + 1] == "/":
+            newline = text.find("\n", index)
+            index = limit if newline < 0 else newline + 1
+            continue
+        if char == "/" and index + 1 < limit and text[index + 1] == "*":
+            comment = text.find("*/", index + 2)
+            index = limit if comment < 0 else comment + 2
+            continue
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    return limit - 1
+
+
+def check_character_type_keyboard_focus(root, violations, violation):
+    """A paced character loop must regain keyboard focus before every typeText."""
+    ui = root / "apps/ios/LogYourBodyUITests"
+    if not ui.is_dir():
+        return
+    for path in sorted(ui.rglob("*.swift")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for match in _CHARACTER_LOOP.finditer(text):
+            name = match.group("name")
+            open_brace = match.end() - 1
+            body = text[open_brace:_balanced_end(text, open_brace) + 1]
+            typed = body.find(f"String({name})")
+            type_at = body.find(".typeText(")
+            if typed < 0 or type_at < 0 or typed < type_at:
+                continue
+            prelude = body[:type_at]
+            owner = text.rfind("func ", 0, match.start())
+            focus_window = text[0 if owner < 0 else owner:open_brace + type_at]
+            if "hasKeyboardFocus == true" not in focus_window or (
+                "hasKeyboardFocus == true" not in prelude and "if !focused.exists" not in prelude
+            ):
+                violations.append(violation(
+                    check="uitest.character_type_keyboard_focus",
+                    file=str(path.relative_to(root)),
+                    line=text.count("\n", 0, match.start()) + 1,
+                    detail="Re-check hasKeyboardFocus before each character typeText. The field can keep its value and still lose the keyboard.",
+                ))
+
+
+def check_nested_launch_time_allowance(root, violations, violation):
+    """Nested launch scenarios need the audit maximum before XCTest's 2-minute kill."""
+    path = root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
+    if not path.is_file():
+        return
+    text = path.read_text(encoding="utf-8", errors="replace")
+    for match in _TEST_FUNC.finditer(text):
+        brace = text.find("{", match.end())
+        if brace < 0 or brace - match.end() > 80:
+            continue
+        body = text[brace:_balanced_end(text, brace) + 1]
+        call = next((
+            candidate for candidate in _NESTED_TEST_CALL.finditer(body)
+            if candidate.group(1) != match.group(1)
+            and "func " not in body[max(0, candidate.start() - 6):candidate.start()]
+        ), None)
+        if call and "executionTimeAllowance = 180" not in body[:call.start()]:
+            violations.append(violation(
+                check="uitest.nested_launch_time_allowance",
+                file=str(path.relative_to(root)),
+                line=text.count("\n", 0, match.start()) + 1,
+                detail="Set executionTimeAllowance = 180 before running other test methods. XCTest rounds the 90s default up to 2 minutes.",
+            ))
+
 
 def check_home_interactions(root: Path, texts: dict, violations: list, violation) -> None:
     # Blocking Vision work must not exhaust Swift's cooperative worker pool.
@@ -74,6 +163,9 @@ def check_home_interactions(root: Path, texts: dict, violations: list, violation
                 check="settings.logout_alert_one_element", file=str(settings.relative_to(root)), line=1,
                 detail="Combine each logout action into one accessibility element.",
             ))
+
+    check_character_type_keyboard_focus(root, violations, violation)
+    check_nested_launch_time_allowance(root, violations, violation)
 
     ui_path = root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
     if not ui_path.is_file():

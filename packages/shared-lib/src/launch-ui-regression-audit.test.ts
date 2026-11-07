@@ -47,6 +47,33 @@ it('requires verified native text entry before testing draft preservation', () =
   expect(action).not.toContain('field.typeText(');
 });
 
+it('keeps paced chat typing focused and gives nested launch scenarios the audit time cap', () => {
+  const tests = readFileSync(
+    new URL('../../../apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift', import.meta.url),
+    'utf8',
+  );
+  const typing =
+    tests
+      .split('for character in addition {')[1]
+      ?.split('composer.typeText(String(character))')[0] ?? '';
+  expect(typing).toContain('hasKeyboardFocus == true');
+  expect(typing).toContain('if !focused.exists');
+  expect(typing).toContain('guard focused.waitForExistence(timeout: 2) else { break }');
+  const timeline =
+    tests
+      .split('func testLaunchQualityGateCapturesTimelineSurfaces()')[1]
+      ?.split('try testDatedTimelineManualBaselineAndInterruptedPhotoReturn()')[0] ?? '';
+  expect(timeline).toContain('executionTimeAllowance = 180');
+  const audit = readFileSync(
+    new URL('../../../scripts/ios/launch_ui_home_interaction_audit.py', import.meta.url),
+    'utf8',
+  );
+  expect(audit).toContain('uitest.character_type_keyboard_focus');
+  expect(audit).toContain('uitest.nested_launch_time_allowance');
+  expect(audit).toContain('check_character_type_keyboard_focus(root, violations, violation)');
+  expect(audit).toContain('check_nested_launch_time_allowance(root, violations, violation)');
+});
+
 it('checks Stats composition, card styling and provenance dismissal through the launch audit with executed coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));

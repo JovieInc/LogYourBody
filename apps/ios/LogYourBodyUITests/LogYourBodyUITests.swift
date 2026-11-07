@@ -1877,6 +1877,10 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     func testLaunchQualityGateCapturesTimelineSurfaces() throws {
+        // XCTest rounds the 90s default up to 2 minutes. This case also runs
+        // the dated-timeline scenarios. That kill landed inside typeText and
+        // then terminate hung. 180s is the audit maximum.
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         launch(
             app,
@@ -3528,7 +3532,19 @@ final class LogYourBodyUITests: XCTestCase {
                 let addition = syntheticQuestionInsertion(current: current, question: question)
                 var prefix = current
                 // Acknowledge each prefix while the simulator keyboard connects.
+                // Run 42354066867 kept "S" and then lost keyboard focus before "y".
                 for character in addition {
+                    let focused = app.descendants(matching: composer.elementType)
+                        .matching(identifier: composer.identifier)
+                        .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
+                    if !focused.exists {
+                        if prefix.isEmpty {
+                            composer.tap()
+                        } else {
+                            composer.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+                        }
+                        guard focused.waitForExistence(timeout: 2) else { break }
+                    }
                     composer.typeText(String(character))
                     if String(character) == XCUIKeyboardKey.delete.rawValue {
                         prefix = String(prefix.dropLast())
