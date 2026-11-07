@@ -1,25 +1,25 @@
 [
   {
-    "fingerprint": "merge-repair-preserves-splitter-capabilities",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1703",
-    "correction": "PR #1703 / LYB-315, fix-red-cc900b961c occurrence 7: merge origin/main without rebasing, retain both splitter repair modes and every parent correction receipt. CI run 41387854302 passed visualization unit and timeline interaction cases but failed two ChaosEdgeCase tests at app.launch with background-assertion timeouts. Tently check 125092554407 reports an AI-provider outage with no source findings.",
-    "mechanization": "Extend the existing size-ratchet machine by routing incoming declaration extraction through the retained raw-string-aware Swift parser and preserving its public extraction entrypoint and guard anchor. Normalize leading separator newlines when extracting a whole type. Extend the existing required iOS Static Audits suite with a real CLI sequence that extracts a raw-string-bearing type and then rehomes an XCTestCase helper into its independent fixture superclass. This regression fails against both immutable merge parents and passes on the composed machine; all 17 splitter tests pass. Use the extended machine on the merged tree with --check. Resolve the diagnostic pin and source map with the existing reviewed-project resolver, and merge/classify the correction ledger with the existing classifier, retaining both parents. Preserve the no-retry-after-XCTest-start policy and all selectors, coverage floors and assertions. Native execution on the new head remains required on macOS; the provider outage requires a successful hosted review. The harness owns pushes and PR edits. Retain exactly one PR-body line: Machine: built scripts/ios/split_size_ratchet.py.",
+    "fingerprint": "launch-copy-merge-duplicate-constants",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1688",
+    "correction": "PR #1688 / LYB-288, fix-red-95726c4f82 occurrence 24: merge origin/main without rebasing and preserve health-memory user/product isolation and fail-closed reads and writes. The LaunchJourney conflict must retain the canonical LaunchPromiseCopy table instead of restoring parallel legacy constants. Tently reports an AI-provider outage without code findings.",
+    "mechanization": "Extend the existing required shared-lib launch-copy guard to reject repeated approved literals across launch sources. Replay the actual three legacy constants from the PR parent: the previous nine-case guard passes, the extended guard fails, and all thirteen cases pass after restoring the resolved source. Preserve main-side copy references and all branch-side health-memory changes. Existing Turbo inputs already include the Swift sources and this test. The harness owns pushing and PR-body updates and must include exactly one line: Machine: built packages/shared-lib/src/launch-promise-copy.test.ts.",
     "classification": {
       "codebase": {
         "feasible": false,
-        "rationale": "Sharing one parser composes both current repair modes, but product or tool code cannot prevent a future one-sided conflict resolution from removing either CLI mode."
+        "rationale": "The app already has a single canonical copy table. Runtime code cannot prevent a later source merge from restoring obsolete declarations alongside it."
       },
       "static": {
         "feasible": true,
-        "rationale": "The existing required iOS Static Audits job executes the splitter behavior suite. One real CLI regression requires both extraction and independent XCTest fixture rehoming after every future merge."
+        "rationale": "The existing required source-contract suite can reject duplicated approved literals after any merge, with the actual legacy constants as a failing regression."
       }
     },
     "guard": {
-      "path": "scripts/ios/test_split_size_ratchet.py",
-      "anchor": "test_cli_preserves_extraction_and_fixture_rehoming_after_a_merge"
+      "path": "packages/shared-lib/src/launch-promise-copy.test.ts",
+      "anchor": "rejects approved copy duplicated by a merge outside the canonical table"
     },
     "level": "static",
-    "ruleId": "file-pattern-or-string"
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "dependabot-workspace-release-age-resolution",
@@ -5965,6 +5965,28 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-repair-preserves-splitter-capabilities",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1703",
+    "correction": "PR #1703 / LYB-315, fix-red-cc900b961c occurrence 7: merge origin/main without rebasing, retain both splitter repair modes and every parent correction receipt. CI run 41387854302 passed visualization unit and timeline interaction cases but failed two ChaosEdgeCase tests at app.launch with background-assertion timeouts. Tently check 125092554407 reports an AI-provider outage with no source findings.",
+    "mechanization": "Extend the existing size-ratchet machine by routing incoming declaration extraction through the retained raw-string-aware Swift parser and preserving its public extraction entrypoint and guard anchor. Normalize leading separator newlines when extracting a whole type. Extend the existing required iOS Static Audits suite with a real CLI sequence that extracts a raw-string-bearing type and then rehomes an XCTestCase helper into its independent fixture superclass. This regression fails against both immutable merge parents and passes on the composed machine; all 17 splitter tests pass. Use the extended machine on the merged tree with --check. Resolve the diagnostic pin and source map with the existing reviewed-project resolver, and merge/classify the correction ledger with the existing classifier, retaining both parents. Preserve the no-retry-after-XCTest-start policy and all selectors, coverage floors and assertions. Native execution on the new head remains required on macOS; the provider outage requires a successful hosted review. The harness owns pushes and PR edits. Retain exactly one PR-body line: Machine: built scripts/ios/split_size_ratchet.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Sharing one parser composes both current repair modes, but product or tool code cannot prevent a future one-sided conflict resolution from removing either CLI mode."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required iOS Static Audits job executes the splitter behavior suite. One real CLI regression requires both extraction and independent XCTest fixture rehoming after every future merge."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_split_size_ratchet.py",
+      "anchor": "test_cli_preserves_extraction_and_fixture_rehoming_after_a_merge"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "merged-swift-splitter-keeps-namesake-and-fixture",
