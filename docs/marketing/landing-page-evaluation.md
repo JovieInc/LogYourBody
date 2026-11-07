@@ -57,8 +57,13 @@ records source/output hashes and actual PNG dimensions, and fails tests if the
 public asset drifts from the iOS source. Marketing code consumes only the
 registry URL, never a manually recreated dashboard.
 
-The sync retains the recorded capture date when the source path and SHA-256
-match. Without matching evidence, regenerate from complete Git history after
-committing the capture. Shallow merge commits and archive extraction times cannot
-establish capture dates. Missing evidence fails instead of resetting asset age;
-the existing 60-day freshness check still applies.
+Unchanged source bytes retain the hash-matched manifest capture date across
+builds, including shallow CI checkouts. Changed captures require committed,
+matching bytes and complete Git history; fetch that history before syncing.
+An archive without matching provenance must not substitute extraction time for
+capture time. The existing 60-day freshness and source/output hash checks remain
+authoritative.
+
+Future capture dates require recovery from complete, committed history. Every
+asset's provenance is checked before any public asset or manifest is written,
+so an invalid later asset cannot leave partially refreshed outputs.
