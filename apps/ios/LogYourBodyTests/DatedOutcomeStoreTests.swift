@@ -58,6 +58,52 @@ final class DatedOutcomeStoreTests: XCTestCase {
         }
     }
 
+    func testPresentationSaveAndRelaunchRestoreOwnerScopedContext() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("timeline-\(UUID()).sqlite")
+        defer { removeStore(url) }
+        let first = try coordinator(url: url)
+        let background = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
+        background.persistentStoreCoordinator = first
+        try await store(background).saveForPresentation(value, isCurrent: { true })
+        try close(first)
+        let reopened = try coordinator(url: url)
+        defer { try? close(reopened) }
+        let restored = store(context(reopened))
+        let loaded = try await restored.loadForPresentation(isCurrent: { true })
+        XCTAssertEqual(loaded?.value, value)
+        owner = "owner-b"
+        let other = try await restored.loadForPresentation(isCurrent: { true })
+        XCTAssertNil(other)
+        XCTAssertTrue(try restored.pendingEdits().isEmpty)
+    }
+
+    func testStalePresentationCannotSaveIntoAnotherAccount() async throws {
+        let journal = store(context(try coordinator()))
+        owner = "owner-b"
+        do {
+            try await journal.saveForPresentation(value, isCurrent: { false })
+            XCTFail("A stale editor must be rejected before writing")
+        } catch DatedOutcomeError.unauthenticated { }
+        XCTAssertNil(try journal.load())
+        XCTAssertTrue(try journal.pendingEdits().isEmpty)
+        XCTAssertTrue(emitted.isEmpty)
+    }
+
+    func testPresentationReadAfterSessionChangeIsDiscarded() async throws {
+        let journal = store(context(try coordinator()))
+        try journal.save(value)
+        var checks = 0
+        do {
+            _ = try await journal.loadForPresentation {
+                checks += 1
+                if checks > 1 { self.owner = "owner-b" }
+                return checks == 1
+            }
+            XCTFail("A delayed read must not publish the previous account's outcome")
+        } catch DatedOutcomeError.unauthenticated { }
+        XCTAssertNil(try journal.load())
+    }
+
     func testOutcomeConstraintsAndPendingRequestSurviveSQLiteReopen() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("outcome-\(UUID()).sqlite")
         defer { removeStore(url) }

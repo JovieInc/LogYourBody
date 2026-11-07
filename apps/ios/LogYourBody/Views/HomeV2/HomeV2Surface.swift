@@ -37,6 +37,8 @@ struct HomeV2Surface: View {
 
     @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
     @State private var showsProvenance = false
+    @State private var personalBodyDisplays: [String: PersonalBodyDisplay] = [:]
+    @State private var personalBodyEnabled = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var isLogged: Bool { loggedSentence != nil }
@@ -51,7 +53,9 @@ struct HomeV2Surface: View {
                         snapshot: timeline, selectedID: userSelection,
                         size: CGSize(width: geometry.size.width, height: geometry.size.width / HomeV2Tokens.photoAspectRatio),
                         unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto,
-                        isNavigating: isPhotoScrubNavigating || showsProvenance
+                        isNavigating: isPhotoScrubNavigating || showsProvenance,
+                        bodyDisplays: personalBodyDisplays,
+                        bodyEstimateEnabled: personalBodyEnabled
                     )
                     photoNumberBlock
                     if hasAnyPhotoInHistory {
@@ -88,6 +92,30 @@ struct HomeV2Surface: View {
         .onChange(of: metric.id) { _, _ in showsProvenance = false }
         .onChange(of: showsProvenance) { _, presented in onProvenancePresentationChange(presented) }
         .onDisappear { onProvenancePresentationChange(false) }
+        .task(id: personalBodyToken) { await reloadPersonalBody() }
+    }
+
+    private var personalBodyDates: [String] {
+        // key(_:calendar:) is not (Date) -> String when passed unapplied.
+        timeline.chronologicalDates.map { PersonalBodyDay.key($0) }
+    }
+
+    private var personalBodyToken: String {
+        metric.userId + "|" + personalBodyDates.joined(separator: ",")
+    }
+
+    /// The date list, not the scrub position, owns this load. A date change only
+    /// looks up the display that was already built.
+    private func reloadPersonalBody() async {
+        personalBodyDisplays = [:]
+        personalBodyEnabled = false
+        let accountId = metric.userId
+        let dates = personalBodyDates
+        guard PersonalBodyPolicy.isEnabled() else { return }
+        let index = await PersonalBodyEstimateStore.shared.index(accountId: accountId, dates: dates)
+        guard !Task.isCancelled else { return }
+        personalBodyEnabled = true
+        personalBodyDisplays = index.displays
     }
 
     @ViewBuilder
@@ -377,6 +405,19 @@ struct HomeV2DataHero: View {
     }
 
     var body: some View {
+        ZStack {
+            HomeV2Tokens.Colors.card
+            WireframeAvatarStage(topInset: 8)
+            savedGraphic
+                .allowsHitTesting(false)
+                .accessibilityElement(children: .contain)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Measurements stay readable and identifiable. Hits pass through to the wireframe.
+    private var savedGraphic: some View {
         VStack(spacing: 0) {
             if let bodyFat {
                 bodyFatGraphic(bodyFat)
@@ -391,9 +432,6 @@ struct HomeV2DataHero: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(HomeV2Tokens.Colors.card)
-        .accessibilityElement(children: .contain)
     }
 
     private func bodyFatGraphic(_ reading: HomeV2EditorialPolicy.BodyFatReading) -> some View {
@@ -692,62 +730,5 @@ struct HomeV2Filmstrip: View {
     /// Index plus URL, so days that share or lack a photo do not collapse into one view.
     private func thumbIdentity(at index: Int) -> String {
         "\(index)|\(photoURLs[index] ?? "")"
-    }
-}
-
-/// Loads the photo, shows it dimmed immediately, then swaps in the plate once
-/// it is rendered. The image is cropped to the stage before display so nothing
-/// overflows the frame: the layout, the clip and the accessibility frame agree.
-struct SubjectPlateView: View {
-    let urlString: String
-    let size: CGSize
-
-    @State private var plate: UIImage?
-    @State private var original: UIImage?
-    @State private var focus: CGPoint?
-
-    var body: some View {
-        ZStack {
-            HomeV2Tokens.Colors.shell
-
-            if let plate {
-                stagePhoto(plate)
-            } else if let original {
-                stagePhoto(original)
-                    .overlay(Color.black.opacity(0.35))
-            }
-        }
-        .frame(width: size.width, height: size.height)
-        .task(id: urlString) { await load() }
-    }
-
-    private func stagePhoto(_ image: UIImage) -> some View {
-        Image(uiImage: AspectFillCropper.crop(image, to: size, anchor: focus))
-            .resizable()
-            .scaledToFit()
-            .frame(width: size.width, height: size.height)
-    }
-
-    private func load() async {
-        if let cached = SubjectPlateStore.shared.cachedPlate(for: urlString) {
-            plate = cached
-        } else {
-            plate = nil
-        }
-        focus = SubjectPlateStore.shared.cachedFocus(for: urlString)
-
-        guard let image = await ImageCacheService.shared.loadImage(from: urlString), !Task.isCancelled else {
-            return
-        }
-        original = image
-
-        if focus == nil {
-            focus = await SubjectPlateStore.shared.focus(for: urlString, image: image)
-            guard !Task.isCancelled else { return }
-        }
-
-        if plate == nil {
-            plate = await SubjectPlateStore.shared.plate(for: urlString, image: image)
-        }
     }
 }

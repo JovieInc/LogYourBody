@@ -83,7 +83,7 @@ struct LaunchOutcomeEditor: View {
                     .accessibilityIdentifier("launch_outcome_value")
                 TextField("Date (YYYY-MM-DD)", text: $dateText)
                     .accessibilityIdentifier("launch_outcome_date")
-                Text(LaunchJourney.promiseFraming)
+                Text(LaunchPromiseCopy.framing)
                     .font(.footnote)
                 if let errorText {
                     Text(errorText)

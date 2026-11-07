@@ -106,6 +106,11 @@ export const endpoints = {
   },
   allowlist: [
     {
+      value: 'https://app.bodyspec.com',
+      reason:
+        'LYB-246 public OpenAPI and Scalar docs for the BodySpec capability finding. Host only; not a new runtime endpoint.',
+    },
+    {
       value: 'https://www.atg.wa.gov/file-complaint',
       reason:
         'Washington Attorney General complaint link in the supplied consumer health data privacy policy.',
@@ -511,6 +516,11 @@ export const endpoints = {
       value: 'https://linear.app/jovie/issue/LYB-176',
       reason:
         'Source receipt for distinct exercise/setup selection, observed tolerability, approval and correction regression guards.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-298',
+      reason:
+        'Source receipt for the concerning-pain movement pause policy and exact clinician-evaluation message; not a runtime endpoint.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-189',

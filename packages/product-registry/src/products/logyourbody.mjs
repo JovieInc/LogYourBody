@@ -115,6 +115,7 @@ export const logYourBody = {
       apple: { appStore: 'https://apps.apple.com/us/app/logyourbody/id6755209876' },
     },
     allowlist: [
+      { value: 'https://app.bodyspec.com', reason: 'LYB-246 public OpenAPI and Scalar docs for the BodySpec capability finding. Host only; not a new runtime endpoint.' },
       { value: 'https://www.atg.wa.gov/file-complaint', reason: 'Washington Attorney General complaint link in the supplied consumer health data privacy policy.' },
       { value: 'https://linear.app/jovie/issue/LYB-328', reason: 'LYB-328 source review and counsel handoff for health-data consent and wellness claims; not a runtime endpoint.' },
       { value: 'https://app.leg.wa.gov/RCW/default.aspx?cite=19.373&full=true', reason: 'Washington My Health My Data Act primary source for the LYB-328 review; not a runtime endpoint.' },
@@ -218,6 +219,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-173', reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.' },
       { value: 'https://linear.app/jovie/issue/LYB-174', reason: 'Source receipt for timestamped rolling training allocations and unfinished-work recovery; not a runtime endpoint.' },
       { value: 'https://linear.app/jovie/issue/LYB-176', reason: 'Source receipt for distinct exercise/setup selection, observed tolerability, approval and correction regression guards.' },
+      { value: 'https://linear.app/jovie/issue/LYB-298', reason: 'Source receipt for the concerning-pain movement pause policy and exact clinician-evaluation message; not a runtime endpoint.' },
       { value: 'https://linear.app/jovie/issue/LYB-189', reason: 'LYB-189 source evidence and Tim/legal review handoff for the Apple Health privacy disclosure.' },
       { value: 'https://linear.app/jovie/issue/LYB-194', reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.' },
       { value: 'https://linear.app/jovie/issue/LYB-47', reason: 'LYB-47 source evidence for dated metric observations and neutral trend semantics.' },

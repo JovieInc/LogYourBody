@@ -138,11 +138,11 @@ jobs:
         run: |
           cd apps/ios
 
-          # Info.plist stores the Xcode placeholder, so resolve the real app
-          # version from build settings before passing it to downstream jobs.
-          # The release tag was already named from the project file; the
-          # binary must use that same version and the build number pinned
-          # before release validation waited on CI.
+          # Info.plist stores Xcode placeholders ($(MARKETING_VERSION) and
+          # $(CURRENT_PROJECT_VERSION)). Resolve the marketing version from
+          # build settings before passing it to downstream jobs. The release
+          # tag was already named from the project file; the archive stamps
+          # that version and the pinned build number onto every target.
           VERSION=$(xcodebuild \
             -project LogYourBody.xcodeproj \
             -scheme LogYourBody \
@@ -258,15 +258,6 @@ jobs:
           echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> "$GITHUB_ENV"
           echo "APP_STORE_APP_ID=${{ env.LOGYOURBODY_APP_STORE_APP_ID }}" >> "$GITHUB_ENV"
 
-      - name: Update version and build
-        run: |
-          cd apps/ios
-
-          # Update build number
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ needs.bind-release-version.outputs.build_number }}" LogYourBody/Info.plist
-
-          echo "📱 Building iOS app for release..."
-
       - name: Install sentry-cli (pinned)
         env:
           SENTRY_CLI_VERSION: '3.8.0'
@@ -281,15 +272,36 @@ jobs:
           set -o pipefail
           cd apps/ios
 
-          # Use Fastlane to build while preserving its exit status through tee.
+          # Stamp CURRENT_PROJECT_VERSION and MARKETING_VERSION onto every
+          # target. The host plist and generated extension plists both read
+          # those settings.
           bundle exec fastlane build_release 2>&1 | tee fastlane.log
         env:
+          RELEASE_BUILD_NUMBER: ${{ needs.bind-release-version.outputs.build_number }}
+          RELEASE_MARKETING_VERSION: ${{ needs.bind-release-version.outputs.version }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
           MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
           MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH || 'main' }}
+
+      - name: Verify embedded extension versions
+        env:
+          EXPECTED_BUILD: ${{ needs.bind-release-version.outputs.build_number }}
+          EXPECTED_VERSION: ${{ needs.bind-release-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          ipas=(apps/ios/build/*.ipa)
+          if [[ ${#ipas[@]} -ne 1 ]]; then
+            echo "::error::Expected one exported IPA, found ${#ipas[@]}"
+            exit 1
+          fi
+          python3 scripts/ios/check_embedded_bundle_versions.py \
+            --ipa "${ipas[0]}" \
+            --expected-build "$EXPECTED_BUILD" \
+            --expected-version "$EXPECTED_VERSION"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v5

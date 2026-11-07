@@ -7,12 +7,25 @@ import io
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
+# The coverage tracer counts every Python line. Copying the Swift tree in
+# this process pushes the required suite past its 30s limit.
+_COPY_APP_SWIFT_TREE = """
+import shutil
+import sys
+from pathlib import Path
+root, dest = (Path(arg) for arg in sys.argv[1:])
+for source in (root / "apps/ios/LogYourBody").rglob("*.swift"):
+    target = dest / source.relative_to(root)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+"""
 SPEC = importlib.util.spec_from_file_location(
     "launch_ui_audit", ROOT / "scripts/ios/launch-ui-regression-audit.py"
 )
@@ -22,6 +35,18 @@ SPEC.loader.exec_module(AUDIT)
 
 
 class StatsCardCompositionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._swift_template = tempfile.TemporaryDirectory()
+        subprocess.run(
+            [sys.executable, "-c", _COPY_APP_SWIFT_TREE, str(ROOT), cls._swift_template.name],
+            check=True,
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._swift_template.cleanup()
+
     def test_behavior_runner_requires_complete_unskipped_execution(self):
         class IncompleteSuite(unittest.TestSuite):
             def countTestCases(self):
@@ -52,10 +77,10 @@ class StatsCardCompositionTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.app = self.root / "apps/ios/LogYourBody"
-        for source in (ROOT / "apps/ios/LogYourBody").rglob("*.swift"):
-            target = self.root / source.relative_to(ROOT)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, target)
+        subprocess.run(
+            ["cp", "-a", str(Path(self._swift_template.name) / "apps"), str(self.root)],
+            check=True,
+        )
 
     def replace(self, relative_path, before, after):
         path = self.app / relative_path
@@ -74,6 +99,20 @@ class StatsCardCompositionTests(unittest.TestCase):
         result, output = self.run_audit()
         self.assertEqual(result, 1)
         self.assertIn(check, "\n".join(path.read_text() for path in output.glob("*.json")))
+
+    def test_empty_timeline_keeps_its_photo_button_accessible(self):
+        findings = []
+        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        self.assertEqual(findings, [])
+        self.replace("Services/DatedTimelineUI.swift", ".accessibilityElement(children: .contain)", "")
+        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
+
+    def test_empty_timeline_requires_the_photo_action_identifier(self):
+        self.replace("Services/DatedTimelineUI.swift", '"launch_timeline_add_photo"', '"wrong_photo_action"')
+        findings = []
+        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
 
     def test_geometry_requires_typed_nonfinite_arguments_in_every_native_tree(self):
         cases = [
@@ -292,6 +331,78 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 self.replace("Views/DashboardViewLiquid+PhotoTimelineInsights.swift", before, after)
                 self.assert_rejected("dashboard.checkin_card_hit_region")
                 path.write_text(source)
+
+    def test_every_size_ratchet_sibling_loads_or_the_audit_fails_closed(self):
+        loaded = [
+            AUDIT._load_sibling(module_name, filename, export)
+            for module_name, filename, export in AUDIT._AUDIT_SIBLINGS
+        ]
+        self.assertEqual(
+            [item[0] for item in AUDIT._AUDIT_SIBLINGS],
+            [
+                "launch_ui_timeline_day",
+                "launch_ui_opacity_audit",
+                "launch_ui_regression_report",
+            ],
+        )
+        for export in loaded:
+            self.assertTrue(callable(export))
+        with self.assertRaises(RuntimeError) as missing_file:
+            AUDIT._load_sibling("missing_sibling", "missing_launch_ui_sibling.py", "missing")
+        self.assertIn("Cannot load launch UI audit sibling", str(missing_file.exception))
+        with self.assertRaises(RuntimeError) as missing_export:
+            AUDIT._load_sibling(
+                "launch_ui_timeline_day", "launch_ui_timeline_day.py", "not_an_export",
+            )
+        self.assertIn("Cannot load launch UI audit sibling", str(missing_export.exception))
+
+    def test_optional_cgfloat_opacity_must_be_explicit_double(self):
+        policy = self.app / "Services/PersonMaskPolicy.swift"
+        compare = self.app / "Views/HomeV2/HomeV2CompareView.swift"
+        original_policy = policy.read_text()
+        original_compare = compare.read_text()
+        self.assertIn("var earlierOpacity: Double", original_policy)
+        self.assertEqual(self.run_audit()[0], 0)
+
+        policy.write_text(original_policy.replace(
+            "var earlierOpacity: Double", "var earlierOpacity: CGFloat", 1
+        ))
+        self.assert_rejected("swift.optional_cgfloat_opacity")
+
+        # A CGFloat member is allowed only after an explicit Double conversion.
+        compare.write_text(original_compare.replace(
+            ".opacity(blend?.earlierOpacity ?? 1)",
+            ".opacity(Double(blend?.earlierOpacity ?? 1))",
+            1,
+        ))
+        self.assertEqual(self.run_audit()[0], 0)
+        policy.write_text(original_policy)
+        compare.write_text(original_compare)
+
+    def test_timeline_position_uses_the_injected_calendar_day(self):
+        calculator = self.app / "Helpers/TimelineCalculator.swift"
+        original = calculator.read_text()
+        self.assertIn("now: Date = Date()", original)
+        self.assertIn("if point.date >= thirtyDaysAgo {", original)
+        tests = self.root / "apps/ios/LogYourBodyTests/TimelineCalculatorTests.swift"
+        tests.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / "apps/ios/LogYourBodyTests/TimelineCalculatorTests.swift", tests)
+        self.assertEqual(self.run_audit()[0], 0)
+
+        tests.write_text("let date = now.addingTimeInterval(-daysAgo * 24 * 60 * 60)\n")
+        self.assert_rejected("timeline.elapsed_day_offset")
+        self.assert_rejected("timeline.fallback_hour_regression")
+
+        tests.unlink()
+        calculator.write_text(original.replace(
+            "if point.date >= thirtyDaysAgo {",
+            "if point.date >= thirtyDaysAgo {\n            let now = Date()",
+            1,
+        ))
+        self.assert_rejected("timeline.injected_calendar_day")
+
+        calculator.write_text(original.replace("now: Date = Date(),\n        ", "", 1))
+        self.assert_rejected("timeline.injected_calendar_day")
 
 
 def run_behavior_suite(suite):

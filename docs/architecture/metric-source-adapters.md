@@ -10,11 +10,59 @@ separate admission checks. An unsupported trigger performs no provider work.
 | BodySpecDexaImporter | false      | true            | true          | false        |
 | HealthKitManager     | true       | true            | false         | false        |
 
-BodySpec event support is unverified. Its existing REST client and atomic DEXA
-importer remain the single implementation. The Sync action uses incremental
-pull. Polling callers use the same scheduler and replay operation; this slice
-does not install a background polling timer or an event endpoint. HealthKit
-uses its existing observer queries for push delivery.
+## BodySpec capabilities (LYB-246)
+
+No BodySpec user or partner token was available, so nothing below is a live
+call. The finding is the public OpenAPI document loaded by the
+[Scalar reference](https://app.bodyspec.com/docs) from
+`https://app.bodyspec.com/openapi.json`, retrieved 2026-11-01 (OpenAPI 3.1.0,
+info.version 0.20.0, SHA-256
+`fb531c62157e0ac2061aa43c65d67ed5a4a528608431cafcc4591f038b40662a`). The API
+description calls the surface early-access. The
+[decision record](../../packages/shared-lib/decisions/bodyspec-event-support.json)
+locks these facts. The existing REST client and atomic DEXA importer remain
+the single implementation.
+
+**Push.** Partner webhooks are documented. Creating one is
+`POST /api/v1/partners/{partner_id}/webhooks` with partner Basic auth
+(`partner_id:partner_secret`). One registration subscribes to one of
+`results_ready`, `reservation_created`, `reservation_canceled`, or
+`reservation_no_show`. `results_ready` is at-least-once, including another
+delivery when the same scan is re-analyzed. Dedupe on `data.result_id`.
+`event_id` changes across repeats. An optional secret is standard-base64
+encoded into `Authorization: Bearer`. Registration can return 503,
+`Webhook system not configured`. The user OAuth surface
+(`/api/v1/users/me/...`, scopes `openid`, `profile`, `email`) has no
+subscription, callback, or event stream. The document does not mention MCP
+events. `BodySpecDexaImporter` keeps `pushEvents` false. A connected user
+account is not push delivery. Partner push stays off until a partner account
+can register a webhook and a delivery is observed.
+
+**Incremental pull.** `GET /api/v1/users/me/results/` lists the authenticated
+user's results. Query parameters are `page` (default 1) and `page_size`
+(default 20, maximum 100). The response includes `pagination.has_more`.
+There is no cursor, `updated_since`, or `start_time` filter on this list.
+Each summary has `start_time`, `create_time`, and `update_time`. The adapter
+keeps walking pages and applies `replay(from:)` to `start_time` locally. It
+does not assume order or a server cursor. Appointment listing does expose
+`start_time` and `reserve_time` filters. Those routes are not the DEXA result
+feed. The current client stops a short page (`count < pageSize`) and does not
+read `has_more`.
+
+**Rate limits.** The document defines no quota, no 429, no `Retry-After`, and
+no rate-limit header. No numeric limit is published. Response headers were
+not observed.
+
+**Decision.** The unanswered default is adopted: no test account, so ship
+polling only. Supported delivery is incremental pull when a connected
+BodySpec session is opened with the app, plus one daily `scheduledPoll` of
+the same replay. This slice does not install that app-open caller, a
+background timer, or an event endpoint. The Sync action remains the
+production incremental-pull caller. `scheduledPoll` stays admitted for a
+later caller. Revisit partner webhooks only with partner credentials.
+Published webhook docs are not MCP events and do not turn `pushEvents` on.
+
+HealthKit uses its existing observer queries for push delivery.
 
 `replay(from:)` accepts an inclusive start date or nil for all available history.
 BodySpec filters the provider's report `start_time` while continuing through all

@@ -28,6 +28,26 @@ def exclude_rest_timer_extension_from_release_archive(project_path = nil)
   UI.message('Rest Timer extension excluded from this Release archive (no App Store profile yet; LYB-310)')
 end
 
+# Command-line settings override every target, including extensions whose
+# Info.plist is generated from CURRENT_PROJECT_VERSION. A one-plist edit
+# leaves those bundles on the project file's frozen build number (LYB-336).
+def reject_release_stamp!(message)
+  UI.user_error!(message)
+  raise message
+end
+
+def release_version_xcargs
+  build_number = ENV['RELEASE_BUILD_NUMBER'].to_s.strip
+  marketing_version = ENV['RELEASE_MARKETING_VERSION'].to_s.strip
+  unless build_number.match?(/\A\d+(?:\.\d+){0,2}\z/)
+    reject_release_stamp!('RELEASE_BUILD_NUMBER must be the pinned CFBundleVersion')
+  end
+  unless marketing_version.match?(/\A\d+\.\d+(?:\.\d+)?\z/)
+    reject_release_stamp!('RELEASE_MARKETING_VERSION must be the pinned CFBundleShortVersionString')
+  end
+  " CURRENT_PROJECT_VERSION=#{build_number} MARKETING_VERSION=#{marketing_version}"
+end
+
   desc "Build and upload Alpha to TestFlight (dev branch - rapid)"
   lane :alpha do |options|
     # Setup API key
@@ -204,7 +224,8 @@ end
       disable_package_automatic_updates: true,
       cloned_source_packages_path: "SourcePackages",
       skip_profile_detection: true,
-      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM='#{ENV["APPLE_TEAM_ID"]}' CODE_SIGN_STYLE=Manual"
+      # LYB-336: stamp the pinned build and marketing version onto every target.
+      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM='#{ENV["APPLE_TEAM_ID"]}' CODE_SIGN_STYLE=Manual#{release_version_xcargs}"
     )
 
     # The production release path (build_release -> upload_testflight) never uploaded dSYMs,

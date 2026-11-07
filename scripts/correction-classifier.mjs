@@ -219,7 +219,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
       const readIndex = () => git('--literal-pathspecs', 'ls-files', '--stage', '-z');
       const indexSnapshot = readIndex();
       const index = indexSnapshot.split('\0');
-      const assertMergeUnchanged = () => {
+      const assertMergeUnchanged = (working) => {
         assert.ok(
           readIndex() === indexSnapshot,
           'merge index changed during validation; retry from the current index',
@@ -228,6 +228,11 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
           git('rev-parse', 'HEAD', 'MERGE_HEAD').trim(),
           parents.join('\n'),
           'merge parents changed during validation; retry from the current merge',
+        );
+        assert.equal(
+          readSource(LEDGER_PATH, { root }),
+          working,
+          'merge ledger changed during validation; retry from the current ledger',
         );
       };
       // Verify the whole merge is conflict-free, including staged retries.
@@ -295,14 +300,15 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
           regularGuards.has(LEDGER_PATH),
           'staged source must be a regular file: correction ledger',
         );
+        const working = readSource(LEDGER_PATH, { root });
         const staged = readLedgers().get(`:0:${LEDGER_PATH}`);
         verifyMerge(JSON.parse(staged));
         assert.equal(
-          readSource(LEDGER_PATH, { root }),
+          working,
           staged,
           'staged retry refuses unstaged ledger edits; review and stage them explicitly',
         );
-        assertMergeUnchanged();
+        assertMergeUnchanged(working);
         logger.log('correction-classifier: verified staged ledger against both merge parents');
         return 0;
       }
@@ -348,7 +354,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
         verifyMerge(result);
         stageResolution = () => git('add', '--', LEDGER_PATH);
       }
-      assertMergeUnchanged();
+      assertMergeUnchanged(working);
     } else {
       path = args[0] ?? resolve(ROOT, LEDGER_PATH);
       const receipts = JSON.parse(readFileSync(path, 'utf8'));
