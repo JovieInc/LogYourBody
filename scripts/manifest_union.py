@@ -335,6 +335,14 @@ def assert_auto_merged_parent_inputs(root):
         )
 
 
+def projection_is_unmerged(root, output):
+    result = subprocess.run(
+        ["git", "ls-files", "--unmerged", "--", output],
+        cwd=root, check=True, capture_output=True, text=True,
+    )
+    return bool(result.stdout.strip())
+
+
 @contextmanager
 def restore_dependency_artifacts_on_failure(root, output):
     paths = [repository_docs.local(root, name) for name in ("pnpm-lock.yaml", output)]
@@ -365,8 +373,9 @@ def merge_ledger(root, resolve_staged, staged_bytes, git_bytes):
     path = repository_docs.local(root, output)
     original = path.read_bytes() if path.exists() else None
     index = git_bytes(root, "ls-files", "--stage", "--", output)
+    # Rendering refusals preserve concurrent projection edits; only roll back our completed render.
+    resolve_staged(root)
     try:
-        resolve_staged(root)
         subprocess.run(
             ["node", str(Path(__file__).with_name("correction-classifier.mjs")),
              "--resolve-merge", str(root), "--stage"], cwd=root, check=True,

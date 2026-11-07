@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-index-change-during-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1758",
+    "correction": "PR #1758, fix-red-1423773703 occurrence 55: merge origin/main without rebasing and repair the bundle-analyzer 16.4.3 update. Detect Changes and parity reject a stale source projection, causing CI Summary to fail. The dependency helper must not stage a projection for an index changed during rendering.",
+    "mechanization": "Extend the existing staged projection renderer to recheck its source index before writing, carrying the dependency verifier snapshot through rendering in both repair modes. Two real-Git regressions fail against the old helper and pass after the extension, preserving concurrent staged manifest edits, lockfile and projection bytes, then proving successful retry and idempotence. Extend the existing ignored-input fixtures to retain generated Next.js manifests while still refusing local-only workspace manifests, hooks, npmrc files and patches; all eight cases fail without the output exclusion. Move the existing unmerged-index query to the companion module to retain the 500-line limit. The required Detect Changes pre-commit suite already imports these cases. Use the extended --verify-lockfile helper to retain the merged lockfile resolutions and regenerate source parity. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing helper owns staged source rendering and artifact writes. Comparing the verified index after rendering prevents observed concurrent edits from producing a stale committed source map by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Refuse a source index changed while rendering instead of staging stale parity."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-ignores-workspace-manifests",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1736",
     "correction": "PR #1736, fix-red-1423773703 occurrence 48: merge origin/main without rebasing and repair the Radix radio-group 1.5.1 update. Detect Changes and parity reject the stale source projection, causing CI Summary to fail. Ignored workspace package.json manifests still bypass the dependency-repair preflight and can enter a lockfile destined for CI.",
@@ -6663,6 +6681,24 @@
     "guard": {
       "path": "scripts/manifest_union.py",
       "anchor": "A refused ledger repair restores the projection and its conflict stages."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-repair-preserves-concurrent-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
+    "correction": "PR #1746 / LYB-343, fix-red-e3b0c44298 occurrence 87: merge origin/main without rebasing and preserve goal-relative stats and date recovery. Main added an index-snapshot rendering refusal; the branch ledger helper rolls back projection bytes and index stages even when rendering refused before writing, erasing a concurrent staged projection.",
+    "mechanization": "Extend the existing --merge-ledger resolver so its classifier rollback begins only after its own staged render completes. The real-Git regression stages a concurrent projection while reading a source, fails against the old helper because rollback reinstates unmerged stages, then passes with the extension, proving preservation of both projection snapshots and the conflicted ledger, successful retry and idempotence. The existing required pre-commit-lint suite imports this regression. Resolve the helper conflict retaining reviewed audit pins and the main index-snapshot guard, and use --merge-ledger for this instance. The harness owns pushing and PR edits; the existing PR body already has exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing merge repair helper owns artifact rollback. Starting that rollback only after its renderer succeeds prevents a pre-write refusal from erasing another writer's staged projection by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "Rendering refusals preserve concurrent projection edits; only roll back our completed render."
     },
     "level": "codebase",
     "ruleId": "code-prevention"

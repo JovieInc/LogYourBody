@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -52,6 +52,40 @@ test('ledger repair refreshes staged fingerprints, preserves both parents and is
   assert.equal(f.git('ls-files', '--unmerged'), '');
   const index = f.git('ls-files', '--stage');
   assert.equal(f.resolve().status, 0, 'staged retries remain valid during the same merge');
+  assert.equal(f.git('ls-files', '--stage'), index);
+});
+
+test('ledger repair preserves concurrent projection edits when rendering refuses a changed index', (t) => {
+  const f = ledgerMergeFixture(t);
+  const ledger = readFileSync(join(f.root, f.ledger));
+  const ledgerIndex = f.git('ls-files', '--stage', '--', f.ledger);
+  const gitBinary = execFileSync('which', ['git'], { env, encoding: 'utf8' }).trim();
+  mkdirSync(join(f.root, 'bin'));
+  writeFileSync(join(f.root, 'bin/git'), `#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+result = subprocess.run([${JSON.stringify(gitBinary)}, *sys.argv[1:]])
+marker = Path('changed-once')
+if sys.argv[1:] == ['show', ':a.txt'] and not marker.exists():
+    Path('SOURCES.md').write_text('concurrent reviewed projection\\n')
+    subprocess.run([${JSON.stringify(gitBinary)}, 'add', 'SOURCES.md'], check=True)
+    marker.touch()
+sys.exit(result.returncode)
+`, { mode: 0o755 });
+  const result = spawnSync('python3', [resolver, '--root', f.root, '--merge-ledger'], {
+    env: { ...env, PATH: `${join(f.root, 'bin')}:${env.PATH}` }, encoding: 'utf8',
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /source index changed during projection generation/);
+  assert.equal(f.git('show', ':SOURCES.md'), 'concurrent reviewed projection\n');
+  assert.equal(readFileSync(join(f.root, f.output), 'utf8'), 'concurrent reviewed projection\n');
+  assert.deepEqual(readFileSync(join(f.root, f.ledger)), ledger);
+  assert.equal(f.git('ls-files', '--stage', '--', f.ledger), ledgerIndex);
+  assert.equal(f.resolve().status, 0, 'reviewed inputs can be regenerated on retry');
+  assert.deepEqual(JSON.parse(f.git('show', `:${f.ledger}`)).map(({ fingerprint }) => fingerprint),
+    ['base', 'theirs', 'ours']);
+  const index = f.git('ls-files', '--stage');
+  assert.equal(f.resolve().status, 0);
   assert.equal(f.git('ls-files', '--stage'), index);
 });
 
