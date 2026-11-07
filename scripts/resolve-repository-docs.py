@@ -10,7 +10,7 @@ from contextlib import ExitStack
 from pathlib import Path
 
 import repository_docs
-from manifest_union import restore_dependency_artifacts_on_failure
+from manifest_union import projection_is_unmerged, restore_dependency_artifacts_on_failure
 
 
 def staged_bytes(root, name):
@@ -88,8 +88,9 @@ def union_project(root):
     apply_project_union(root)
 
 
-def resolve_staged(root, extra_outputs=()):
+def resolve_staged(root, extra_outputs=(), expected_index=None):
     root = Path(root).resolve()
+    source_index = expected_index if expected_index is not None else git_bytes(root, "ls-files", "--stage", "-z")
     # An auto-merged manifest must keep every parent test input.
     from manifest_union import assert_auto_merged_parent_inputs
     assert_auto_merged_parent_inputs(root)
@@ -128,6 +129,9 @@ def resolve_staged(root, extra_outputs=()):
         if errors:
             raise ValueError("; ".join(errors))
         projection = repository_docs.local(snapshot, config["output"]).read_bytes()
+    # Refuse a source index changed while rendering instead of staging stale parity.
+    if git_bytes(root, "ls-files", "--stage", "-z") != source_index:
+        raise ValueError("source index changed during projection generation; review staged inputs and retry")
     output.parent.mkdir(parents=True, exist_ok=True)
     original = output.read_bytes() if output.exists() else None
     try:
@@ -336,14 +340,6 @@ def reviewed_project_pin(root, expected):
     return workflow, updated
 
 
-def projection_is_unmerged(root, output):
-    result = subprocess.run(
-        ["git", "ls-files", "--unmerged", "--", output],
-        cwd=root, check=True, capture_output=True, text=True,
-    )
-    return bool(result.stdout.strip())
-
-
 def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_project_sha256=None):
     root = Path(root).resolve()
     config = json.loads(repository_docs.local(root, "repository-docs.json").read_text())
@@ -411,7 +407,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                 ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
                  ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
                  "package.json", "**/package.json",
-                 ":(glob,exclude)**/node_modules/**"],
+                 ":(glob,exclude)**/node_modules/**", ":(glob,exclude)**/.next/**"],
                 cwd=root, check=True, capture_output=True, text=True,
             ).stdout.strip("\0")
             if ignored:
@@ -454,7 +450,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                                  *[name for name in inputs if name != "pnpm-lock.yaml" or verify_lockfile or not modes])):
                 raise ValueError("dependency inputs changed during verification; stage reviewed inputs and retry")
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
-            resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
+            resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [], expected_index=verified_index)
             return
         if pin_update:
             repository_docs.local(root, pin_update[0]).write_text(pin_update[1])

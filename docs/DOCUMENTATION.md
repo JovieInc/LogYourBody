@@ -90,6 +90,10 @@ Valid lockfiles keep their resolutions; other installation failures stop repair.
 Both dependency repair modes refuse index or manifest edits made while pnpm is
 verifying inputs. They preserve those edits and restore the original generated
 artifacts; stage the reviewed inputs and retry the same command.
+Staged projection generation also rechecks the index before writing. Dependency
+repair carries the verified index through rendering, so an observed concurrent
+staged edit cannot leave the source map describing an older manifest. Review the
+changed inputs and retry; the other writer's staged edit remains intact.
 Frozen verification also refuses lockfile changes before regenerating or staging
 the source map. Only a confirmed outdated lockfile permits refresh mode to write
 new resolutions; retrying after a refusal uses the original reviewed artifacts.
@@ -101,7 +105,8 @@ It then stages the lockfile and source map, refusing unresolved source conflicts
 unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift. It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.
 Both dependency modes also refuse ignored npmrc files, pnpm hooks and patches;
-configuration inside installed `node_modules` is excluded from this preflight.
+configuration inside installed `node_modules` and generated `.next` build output
+is excluded from this preflight. Next.js-generated manifests are preserved.
 Both dependency modes check pnpm hooks (`.pnpmfile.cjs`), workspace `.npmrc`
 files and `patches/` as dependency inputs. Stage reviewed changes to these files
 before repair; local edits remain untouched when the preflight refuses them.

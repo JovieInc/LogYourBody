@@ -335,6 +335,14 @@ def assert_auto_merged_parent_inputs(root):
         )
 
 
+def projection_is_unmerged(root, output):
+    result = subprocess.run(
+        ["git", "ls-files", "--unmerged", "--", output],
+        cwd=root, check=True, capture_output=True, text=True,
+    )
+    return bool(result.stdout.strip())
+
+
 @contextmanager
 def restore_dependency_artifacts_on_failure(root, output):
     paths = [repository_docs.local(root, name) for name in ("pnpm-lock.yaml", output)]
