@@ -300,6 +300,12 @@ def reviewed_project_pin(root, expected):
     return workflow, updated
 
 
+def apply_reviewed_audit_pins(root, expected):
+    """Only an explicit reviewed audit digest may update every current pin."""
+    from reviewed_audit_pin import apply_pins
+    apply_pins(root, expected, resolve_staged)
+
+
 def projection_is_unmerged(root, output):
     result = subprocess.run(
         ["git", "ls-files", "--unmerged", "--", output],
@@ -308,7 +314,8 @@ def projection_is_unmerged(root, output):
     return bool(result.stdout.strip())
 
 
-def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_project_sha256=None):
+def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_project_sha256=None,
+            reviewed_audit_sha256=None):
     root = Path(root).resolve()
     config = json.loads(repository_docs.local(root, "repository-docs.json").read_text())
     output = repository_docs.local(root, config["output"]).relative_to(root).as_posix()
@@ -328,6 +335,9 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
     if conflicted_pin is not None:
         stage_conflicted_diagnostic_pin(root, conflicted_pin, output)
         return
+    if reviewed_audit_sha256 is not None:
+        apply_reviewed_audit_pins(root, reviewed_audit_sha256)
+        return
     # A conflicted source map is rebuilt from the merged index.
     # Unstaged worktree bytes and either parent's projection cannot change fingerprints.
     # The worktree registry still fails closed: import and path errors are not a stale map.
@@ -335,6 +345,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
         not refresh_lockfile
         and not verify_lockfile
         and reviewed_project_sha256 is None
+        and reviewed_audit_sha256 is None
         and projection_is_unmerged(root, output)
     ):
         errors = repository_docs.run(root)
@@ -422,6 +433,7 @@ def main():
     mode.add_argument("--refresh-lockfile", action="store_true", help="repair and verify the pnpm lockfile before refreshing docs")
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
     mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
+    mode.add_argument("--reviewed-audit-sha256", help="refresh every current reviewed audit pin using an explicitly reviewed audit digest")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
     args = parser.parse_args()
@@ -434,7 +446,8 @@ def main():
         elif args.staged:
             resolve_staged(args.root)
         else:
-            resolve(args.root, args.refresh_lockfile, args.verify_lockfile, args.reviewed_project_sha256)
+            resolve(args.root, args.refresh_lockfile, args.verify_lockfile,
+                    args.reviewed_project_sha256, args.reviewed_audit_sha256)
     except (ValueError, KeyError, TypeError, OSError, subprocess.CalledProcessError) as exc:
         parser.exit(1, "repository-docs: " + str(exc) + "\n")
 

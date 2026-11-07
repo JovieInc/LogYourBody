@@ -181,3 +181,123 @@ test('reviewed digest refuses a merged project that dropped a parent file', (t) 
   assert.match(f.git('show', `:${DIAGNOSTIC_WORKFLOW}`), new RegExp(createHash('sha256').update(kept).digest('hex')));
   assert.equal(f.git('diff', '--name-only', '--diff-filter=U'), '');
 });
+
+const DIAGNOSTIC_AUDIT = 'scripts/ios/launch-quality-audit.sh';
+const ROUTING_TESTS = 'scripts/tests/test_runner_routing.py';
+const HISTORICAL_AUDIT = 'ab'.repeat(32);
+
+function auditFixture(t) {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-audit-pin-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+  mkdirSync(join(root, 'scripts/ios'), { recursive: true });
+  mkdirSync(join(root, 'scripts/tests'), { recursive: true });
+  mkdirSync(join(root, '.github/workflows'), { recursive: true });
+  const output = 'SOURCES.md';
+  writeFileSync(join(root, 'README.md'), 'Local instructions\n');
+  writeFileSync(join(root, 'repository-docs.json'), JSON.stringify({
+    schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+    sources: [
+      { path: DIAGNOSTIC_AUDIT, purpose: 'Reviewed launch audit' },
+      { path: 'a.txt', purpose: 'Unrelated source' },
+    ],
+    imports: [], output,
+  }));
+  writeFileSync(join(root, 'a.txt'), 'kept-source\n');
+  const audit = 'audit-v1\n';
+  const digest = createHash('sha256').update(audit).digest('hex');
+  writeFileSync(join(root, DIAGNOSTIC_AUDIT), audit);
+  writeFileSync(join(root, DIAGNOSTIC_WORKFLOW), [
+    'jobs:',
+    '  pins:',
+    '    run: |',
+    `          REVIEWED_AUDIT_SHA256 = '${digest}'`,
+    '',
+  ].join('\n'));
+  writeFileSync(join(root, ROUTING_TESTS), [
+    `expected = '${digest}'`,
+    `assert module['REVIEWED_AUDIT_SHA256'] == '${digest}'`,
+    `assert "REVIEWED_AUDIT_SHA256 = '${digest}'" in source`,
+    `historical = '${HISTORICAL_AUDIT}'`,
+    '',
+  ].join('\n'));
+  execFileSync('python3', [
+    fileURLToPath(new URL('./repository_docs.py', import.meta.url)), '--root', root, '--write',
+  ], { env });
+  git('init', '-q', '-b', 'main');
+  git('config', 'core.hooksPath', '/dev/null');
+  git('add', '-A');
+  git('commit', '-qm', 'fixture');
+  return { root, git, output, digest };
+}
+
+test('reviewed audit digest updates every current pin and ignores unstaged source bytes', (t) => {
+  const f = auditFixture(t);
+  const next = 'audit-v2\n';
+  const digest = createHash('sha256').update(next).digest('hex');
+  writeFileSync(join(f.root, DIAGNOSTIC_AUDIT), next);
+  f.git('add', '--', DIAGNOSTIC_AUDIT);
+  const beforeWorkflow = readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW));
+  const beforeTests = readFileSync(join(f.root, ROUTING_TESTS));
+  const beforeMap = readFileSync(join(f.root, f.output));
+  const index = f.git('ls-files', '--stage');
+  const wrong = spawnSync('python3', [
+    resolver, '--root', f.root, '--reviewed-audit-sha256', '0'.repeat(64),
+  ], { env, encoding: 'utf8' });
+  assert.notEqual(wrong.status, 0);
+  assert.match(wrong.stderr, /does not match merged source/);
+  assert.deepEqual(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW)), beforeWorkflow);
+  assert.deepEqual(readFileSync(join(f.root, ROUTING_TESTS)), beforeTests);
+  assert.deepEqual(readFileSync(join(f.root, f.output)), beforeMap);
+  assert.equal(f.git('ls-files', '--stage'), index);
+  writeFileSync(join(f.root, DIAGNOSTIC_AUDIT), `${next}unstaged\n`);
+  const dirty = spawnSync('python3', [
+    resolver, '--root', f.root, '--reviewed-audit-sha256', digest,
+  ], { env, encoding: 'utf8' });
+  assert.notEqual(dirty.status, 0);
+  assert.match(dirty.stderr, /stage reviewed audit and pin edits first/);
+  assert.deepEqual(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW)), beforeWorkflow);
+  assert.equal(f.git('ls-files', '--stage'), index);
+  writeFileSync(join(f.root, DIAGNOSTIC_AUDIT), next);
+  writeFileSync(join(f.root, 'a.txt'), 'DIRTY\n');
+  const result = spawnSync('python3', [
+    resolver, '--root', f.root, '--reviewed-audit-sha256', digest,
+  ], { env, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  const workflow = f.git('show', `:${DIAGNOSTIC_WORKFLOW}`);
+  const tests = f.git('show', `:${ROUTING_TESTS}`);
+  const staged = f.git('show', `:${f.output}`);
+  assert.match(workflow, new RegExp(digest));
+  assert.doesNotMatch(workflow, new RegExp(f.digest));
+  assert.equal(tests.split(digest).length - 1, 3);
+  assert.doesNotMatch(tests, new RegExp(f.digest));
+  assert.match(tests, new RegExp(HISTORICAL_AUDIT));
+  assert.match(staged, new RegExp(digest));
+  assert.match(staged, new RegExp(createHash('sha256').update('kept-source\n').digest('hex')));
+  assert.doesNotMatch(staged, new RegExp(createHash('sha256').update('DIRTY\n').digest('hex')));
+  assert.equal(readFileSync(join(f.root, 'a.txt'), 'utf8'), 'DIRTY\n');
+  const again = spawnSync('python3', [
+    resolver, '--root', f.root, '--reviewed-audit-sha256', digest,
+  ], { env, encoding: 'utf8' });
+  assert.equal(again.status, 0, again.stderr);
+  assert.equal(f.git('show', `:${DIAGNOSTIC_WORKFLOW}`), workflow);
+  assert.equal(f.git('show', `:${ROUTING_TESTS}`), tests);
+});
+
+test('reviewed audit digest refuses to move the workflow pin without the routing tests', (t) => {
+  const f = auditFixture(t);
+  const next = 'audit-v2\n';
+  const digest = createHash('sha256').update(next).digest('hex');
+  writeFileSync(join(f.root, DIAGNOSTIC_AUDIT), next);
+  writeFileSync(join(f.root, ROUTING_TESTS), `historical = '${HISTORICAL_AUDIT}'\n`);
+  f.git('add', '--', DIAGNOSTIC_AUDIT, ROUTING_TESTS);
+  const beforeWorkflow = readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW));
+  const index = f.git('ls-files', '--stage');
+  const refused = spawnSync('python3', [
+    resolver, '--root', f.root, '--reviewed-audit-sha256', digest,
+  ], { env, encoding: 'utf8' });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /absent from the routing tests/);
+  assert.deepEqual(readFileSync(join(f.root, DIAGNOSTIC_WORKFLOW)), beforeWorkflow);
+  assert.equal(f.git('ls-files', '--stage'), index);
+});
