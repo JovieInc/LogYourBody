@@ -109,6 +109,12 @@ start a second PR owner.
 
 For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
 merges and classifies the correction ledger after other conflicts are resolved.
+When the remaining conflicts are the ledger and generated source projection, run
+`python3 scripts/resolve-repository-docs.py --merge-ledger` to refresh the projection
+from staged inputs and invoke that same parent-preserving classifier. It refuses
+other source conflicts and missing merge parents before writing. A classifier
+refusal restores the projection bytes and index stages; resolve the reported
+source or guard problem and retry. Unrelated unstaged source edits stay untouched.
 Union generation and parent verification share guard snapshots within that command;
 each retry reads the index and guard sources afresh.
 The reviewed diagnostic project-pin resolver also retains each newly added parent

@@ -435,7 +435,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             # Refuse inputs changed during verification before staging dependency artifacts.
             if (git_bytes(root, "ls-files", "--stage", "-z") != verified_index
                     or git_bytes(root, "diff", "--name-only", "--",
-                                 *[name for name in inputs if name != "pnpm-lock.yaml"])):
+                                 *[name for name in inputs if name != "pnpm-lock.yaml" or verify_lockfile or not modes])):
                 raise ValueError("dependency inputs changed during verification; stage reviewed inputs and retry")
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
             resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
@@ -462,18 +462,22 @@ def main():
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
     mode.add_argument("--union-project", action="store_true", help="union additive Xcode file membership from both parents and stage the project")
+    mode.add_argument("--merge-ledger", action="store_true", help="refresh staged docs, then preserve and classify both merge parents' correction receipts")
     parser.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     parser.add_argument("--reviewed-audit-sha256", help="refresh every current reviewed audit pin using an explicitly reviewed audit digest")
     args = parser.parse_args()
     exclusive = any((
         args.staged, args.refresh_lockfile, args.verify_lockfile, args.merge_sections,
-        args.union_manifests, args.union_project,
+        args.union_manifests, args.union_project, args.merge_ledger,
     ))
     if exclusive and (args.reviewed_project_sha256 or args.reviewed_audit_sha256):
         parser.error("reviewed digests cannot be combined with another repair mode")
     try:
         if args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
+        elif args.merge_ledger:
+            from manifest_union import merge_ledger
+            merge_ledger(args.root, resolve_staged, staged_bytes, git_bytes)
         elif args.union_project:
             union_project(args.root)
         elif args.union_manifests:
