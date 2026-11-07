@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "merge-commit-skips-staged-source-map",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1721",
+    "correction": "PR #1721, fix-red-1423773703 occurrence 48: the @statsig/js-client 3.33.7 bump left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, parity and CI Summary. Merging origin/main auto-merged the manifest and the generated map, and the merge commit skipped the staged source-map repair.",
+    "mechanization": "Extend the existing Husky merge entry so a merge commit runs the pre-commit staged source-map repair. The Husky shim exits successfully when that entry is absent, which skips the repair and can commit a clean but stale projection. The required pre-commit suite proves the shim skips without the entry and runs the repair when the entry delegates to pre-commit. Use that repair on this merged bump and retain frozen installation and parity gates. The harness owns push and PR-body updates and must add exactly one line: Machine: built .husky/pre-merge-commit.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The merge hook can run the existing staged source-map repair before a merge commit is created, so a clean auto-merge cannot keep a stale projection."
+      }
+    },
+    "guard": {
+      "path": ".husky/pre-merge-commit",
+      "anchor": "Merge commits run the staged source-map repair."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "launch-copy-merge-duplicate-constants",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1688",
     "correction": "PR #1688 / LYB-288, fix-red-95726c4f82 occurrence 24: merge origin/main without rebasing and preserve health-memory user/product isolation and fail-closed reads and writes. The LaunchJourney conflict must retain the canonical LaunchPromiseCopy table instead of restoring parallel legacy constants. Tently reports an AI-provider outage without code findings.",

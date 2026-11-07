@@ -121,6 +121,9 @@ non-documentation paths. It does not adjudicate contradictory prose.
 Repair a conflicted source projection first with
 `python3 scripts/resolve-repository-docs.py --staged`. If staging fails, it restores
 the original projection bytes (or absence), so the same command remains retryable.
+Merge commits run that same repair through `.husky/pre-merge-commit`. Husky exits
+successfully when that file is missing and then skips pre-commit, so a clean
+auto-merge can commit a stale projection.
 The shared readiness check also rejects newly added conflict markers in the index,
 including diff3 base markers, markers shorter than seven characters, and files
 marked binary by Git attributes, before
