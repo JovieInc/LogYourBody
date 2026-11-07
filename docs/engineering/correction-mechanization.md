@@ -121,6 +121,9 @@ non-documentation paths. It does not adjudicate contradictory prose.
 Repair a conflicted source projection first with
 `python3 scripts/resolve-repository-docs.py --staged`. If staging fails, it restores
 the original projection bytes (or absence), so the same command remains retryable.
+Index snapshots admit only regular stage-zero registry, entry-point, fingerprint
+and imported-source files, including executable files. Symlink blobs fail before
+the projection or index changes, even when the worktree contains regular bytes.
 When the merged `project.pbxproj` is already stage zero and the diagnostic workflow
 conflicts only on its project pin, pass the reviewed digest of that staged project:
 `python3 scripts/resolve-repository-docs.py --reviewed-project-sha256 <digest>`.

@@ -33,6 +33,37 @@ function autoMergedManifests(t) {
   return { ...fixture, run };
 }
 
+for (const mode of ['--staged', null]) {
+  for (const input of ['repository-docs.json', 'README.md', 'packages/shared-lib/turbo.json']) {
+    test(`source-map repair ${mode ?? 'default'} refuses indexed symlink ${input}`, (t) => {
+      const f = autoMergedManifests(t);
+      const blob = f.git('rev-parse', `:${input}`).trim();
+      // Keep regular worktree bytes: the index mode must determine admission.
+      f.git('update-index', '--cacheinfo', `120000,${blob},${input}`);
+      const before = readFileSync(join(f.root, f.output));
+      const index = f.git('ls-files', '--stage');
+      const result = spawnSync('python3', [resolver, '--root', f.root, ...(mode ? [mode] : [])], {
+        env, encoding: 'utf8',
+      });
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /source input must be a regular indexed file/);
+      assert.deepEqual(readFileSync(join(f.root, f.output)), before);
+      assert.equal(f.git('ls-files', '--stage'), index);
+    });
+  }
+
+  test(`source-map repair ${mode ?? 'default'} accepts executable indexed sources`, (t) => {
+    const f = autoMergedManifests(t);
+    f.git('update-index', '--chmod=+x', 'README.md');
+    const result = spawnSync('python3', [resolver, '--root', f.root, ...(mode ? [mode] : [])], {
+      env, encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(f.git('ls-files', '--stage', '--', 'README.md'), /^100755 /);
+    assert.equal(f.git('ls-files', '--unmerged'), '');
+  });
+}
+
 test('auto-merged manifest refuses a dropped parent turbo input', (t) => {
   const fixture = autoMergedManifests(t);
   const turbo = JSON.parse(readFileSync(join(fixture.root, fixture.turbo), 'utf8'));

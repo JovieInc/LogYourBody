@@ -29,6 +29,16 @@ def restore_dependency_artifacts_on_failure(root, output):
 
 
 def staged_bytes(root, name):
+    # Source-map snapshots must retain regular stage-zero inputs, never symlink blobs.
+    entries = subprocess.run(
+        ["git", "ls-files", "--stage", "-z", "--", name],
+        cwd=root, check=True, capture_output=True,
+    ).stdout.strip(b"\0").split(b"\0")
+    metadata = entries[0].split(b"\t", 1)[0].split()
+    if len(entries) != 1 or len(metadata) != 3 or metadata[2] != b"0":
+        raise ValueError("resolve source conflicts first: " + name)
+    if metadata[0] not in {b"100644", b"100755"}:
+        raise ValueError("source input must be a regular indexed file: " + name)
     return subprocess.run(
         ["git", "show", ":" + name], cwd=root, check=True, capture_output=True,
     ).stdout
