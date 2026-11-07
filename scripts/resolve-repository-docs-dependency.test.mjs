@@ -81,19 +81,21 @@ if not marker.exists():
       assert.equal(f.git('ls-files', '--stage'), repairedIndex);
     });
   }
-  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch']) {
+  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch', 'apps/local-only/package.json']) {
     test(`dependency repair ${mode} refuses ignored ${input} before invoking pnpm`, (t) => {
       const f = fixture(t, input, 'untracked');
       writeFileSync(join(f.root, '.gitignore'), `${input}\nnode_modules/\n`);
       f.git('add', '.gitignore');
       mkdirSync(join(f.root, 'node_modules/example'), { recursive: true });
       writeFileSync(join(f.root, 'node_modules/example/.npmrc'), 'vendor config\n');
+      writeFileSync(join(f.root, 'node_modules/example/package.json'), '{"name":"vendor"}\n');
       const index = f.git('ls-files', '--stage');
       const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
       const result = f.resolve(mode);
       assert.notEqual(result.status, 0, result.stdout);
       assert.match(result.stderr, /ignored dependency inputs:/);
       assert.ok(result.stderr.includes(input), result.stderr);
+      assert.equal(result.stderr.includes('node_modules/'), false, result.stderr);
       assert.equal(existsSync(join(f.root, 'pnpm-calls')), false);
       assert.equal(f.git('ls-files', '--stage'), index);
       assert.equal(readFileSync(f.path, 'utf8'), 'local input\n');
