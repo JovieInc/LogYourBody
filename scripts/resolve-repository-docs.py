@@ -358,9 +358,10 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
     with ExitStack() as rollback:
         if refresh_lockfile or verify_lockfile:
             # Pnpm hooks, workspace npmrc files and patches also affect dependency resolution.
+            # Projection configuration must be staged before dependency verification.
             inputs = ["package.json", "**/package.json", "pnpm-workspace.yaml",
                       "pnpm-lock.yaml", ".npmrc", "**/.npmrc", ".pnpmfile.cjs",
-                      "**/.pnpmfile.cjs", "patches/**", output]
+                      "**/.pnpmfile.cjs", "patches/**", "repository-docs.json", output]
             dirty = subprocess.run(
                 ["git", "diff", "--name-only", "--", *inputs],
                 cwd=root, check=True, capture_output=True, text=True,
