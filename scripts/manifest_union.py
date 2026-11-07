@@ -9,6 +9,7 @@ import json
 import re
 import subprocess
 from collections import Counter
+from contextlib import contextmanager
 from pathlib import Path
 
 import repository_docs
@@ -400,3 +401,19 @@ def assert_auto_merged_parent_inputs(root):
             node_value(parse_json_spans(merged)),
             (),
         )
+
+
+@contextmanager
+def restore_dependency_artifacts_on_failure(root, output):
+    paths = [repository_docs.local(root, name) for name in ("pnpm-lock.yaml", output)]
+    originals = {path: path.read_bytes() if path.exists() else None for path in paths}
+    try:
+        yield
+    except (ValueError, OSError, subprocess.CalledProcessError):
+        # Failed dependency repairs restore both artifacts, including staging failures.
+        for path, original in originals.items():
+            if original is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(original)
+        raise

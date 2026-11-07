@@ -3,7 +3,8 @@
 // 500 lines fail. Read only the supplied snapshot.
 export const LIMIT = 500;
 const CODE = /\.(ts|tsx|js|jsx|mjs|cjs|py|swift|ex|exs|sh|rb|go|rs)$/;
-const SKIP = /(^|\/)(node_modules|vendor|dist|build|\.next|Pods)\/|\.gen\.|\.generated\.|\.min\.|\.d\.ts$|lock/;
+const SKIP =
+  /(^|\/)(node_modules|vendor|dist|build|\.next|Pods)\/|\.gen\.|\.generated\.|\.min\.|\.d\.ts$|lock/;
 export const BASELINE_PATH = '.company-guards/size-baseline.json';
 
 export function lineCount(text) {

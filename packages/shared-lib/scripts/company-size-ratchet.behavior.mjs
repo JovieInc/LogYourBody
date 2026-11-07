@@ -19,7 +19,6 @@ function baseline(entries) {
 }
 
 test('company size ratchet rejects growth and a new file over 500 lines', () => {
-  const allowed = `${'line\n'.repeat(908)}`;
   const grown = `${'line\n'.repeat(924)}`;
   const over = `${'line\n'.repeat(LIMIT + 1)}`;
   const files = {

@@ -6,25 +6,11 @@ import json
 import re
 import subprocess
 import tempfile
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack
 from pathlib import Path
 
 import repository_docs
-
-
-@contextmanager
-def restore_dependency_artifacts_on_failure(root, output):
-    paths = [repository_docs.local(root, name) for name in ("pnpm-lock.yaml", output)]
-    originals = {path: path.read_bytes() if path.exists() else None for path in paths}
-    try:
-        yield
-    except (ValueError, OSError, subprocess.CalledProcessError):
-        for path, original in originals.items():
-            if original is None:
-                path.unlink(missing_ok=True)
-            else:
-                path.write_bytes(original)
-        raise
+from manifest_union import restore_dependency_artifacts_on_failure
 
 
 def staged_bytes(root, name):
@@ -105,6 +91,12 @@ def union_manifests(root):
     apply_manifest_union(root)
 
 
+def union_project(root):
+    """Stage insertion-only Xcode membership. Never derive the diagnostic digest."""
+    from pbx_union import apply_project_union
+    apply_project_union(root)
+
+
 def resolve_staged(root, extra_outputs=()):
     root = Path(root).resolve()
     from manifest_union import assert_auto_merged_parent_inputs
@@ -171,8 +163,35 @@ def git_bytes(root, *args):
     ).stdout
 
 
+def _ours_pin_conflict(text):
+    """Return the branch side when every conflict hunk is one project-pin line."""
+    lines, out, index, saw = text.splitlines(keepends=True), [], 0, False
+    while index < len(lines):
+        line = lines[index]
+        if line[:1] != "<" or not re.match(r"^<{2,}(?: |\r?$)", line):
+            if re.match(r"^(?:\|{2,}|={2,}|>{2,})(?: |\r?$)", line):
+                raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+            out.append(line)
+            index += 1
+            continue
+        saw, index, ours = True, index + 1, None
+        for end in "=>":
+            chunk = []
+            while index < len(lines) and not re.match(rf"^{end}{{2,}}(?: |\r?$)", lines[index]):
+                chunk.append(lines[index])
+                index += 1
+            if index >= len(lines) or len(chunk) != 1 or not DIAGNOSTIC_PIN.fullmatch(chunk[0].rstrip("\r\n")):
+                raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+            ours = chunk[0] if end == "=" else ours
+            index += 1
+        out.append(ours)
+    if not saw:
+        raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+    return "".join(out)
+
+
 def conflicted_diagnostic_template(root):
-    """Return one parent workflow when every stage differs only by the project pin."""
+    """Retain independent parent edits around a project-pin-only conflict."""
     entries = [
         entry for entry in git_bytes(
             root, "ls-files", "--unmerged", "-z", "--", DIAGNOSTIC_WORKFLOW,
@@ -194,68 +213,26 @@ def conflicted_diagnostic_template(root):
         if count != 1:
             raise ValueError("diagnostic workflow conflict is not limited to the project pin")
         texts.append((text, masked))
-    if len({masked for _text, masked in texts}) != 1:
+    # Keep branch edits when incoming changed only this project pin.
+    # Preserve incoming independent edits in the symmetric case too.
+    template = texts[1] if texts[0][1] == texts[2][1] else texts[2]
+    if len({item[1] for item in texts}) != 1 and (
+        texts[0][1] not in (texts[1][1], texts[2][1])
+        or DIAGNOSTIC_PIN.sub(
+            lambda match: match.group(1) + ("0" * 64) + match.group(2),
+            _ours_pin_conflict(repository_docs.local(root, DIAGNOSTIC_WORKFLOW).read_text()),
+        ) != template[1]
+    ):
         raise ValueError("diagnostic workflow conflict is not limited to the project pin")
-    return texts[1][0]
-
-
-PBX_MEMBER = re.compile(
-    r"(?m)^\t\t([A-Za-z0-9]+) /\* .*? \*/ = \{isa = PBX(?:BuildFile|FileReference);"
-)
-PBX_PLACEMENT = re.compile(r"(?m)^\t\t\t\t([A-Za-z0-9]+) /\* .*? \*/,")
-
-
-def _project_membership(text):
-    return set(PBX_MEMBER.findall(text)), set(PBX_PLACEMENT.findall(text))
+    return template[0]
 
 
 def assert_merged_project_keeps_parent_files(root, project):
     """A merged diagnostic project must keep every parent file membership."""
     # A parent group or build-phase entry must remain even when its definition survived.
-    if subprocess.run(
-        ["git", "rev-parse", "--verify", "MERGE_HEAD"], cwd=root, capture_output=True,
-    ).returncode:
-        raise ValueError("diagnostic pin repair requires an active merge")
-    base_rev = subprocess.run(
-        ["git", "merge-base", "HEAD", "MERGE_HEAD"],
-        cwd=root, check=True, capture_output=True, text=True,
-    ).stdout.strip()
-
-    def blob(spec):
-        try:
-            return git_bytes(root, "show", spec).decode()
-        except subprocess.CalledProcessError as error:
-            raise ValueError("diagnostic pin repair cannot read " + spec) from error
-        except UnicodeDecodeError as error:
-            raise ValueError("diagnostic project is not text: " + spec) from error
-
-    base_defs, base_rows = _project_membership(blob(f"{base_rev}:{DIAGNOSTIC_PROJECT}"))
-    added_defs, added_rows, parent_sources = set(), set(), []
-    for parent in ("HEAD", "MERGE_HEAD"):
-        source = blob(f"{parent}:{DIAGNOSTIC_PROJECT}")
-        parent_sources.append(source)
-        defs, rows = _project_membership(source)
-        added_defs.update(defs - base_defs)
-        added_rows.update(rows - base_rows)
-    try:
-        merged = project.decode()
-        merged_defs, merged_rows = _project_membership(merged)
-    except UnicodeDecodeError as error:
-        raise ValueError("diagnostic project is not text") from error
-    missing = sorted((added_defs - merged_defs) | (added_rows - merged_rows))
-    references = [
-        identifier for identifier in sorted(added_defs)
-        if len(re.findall(r"\b" + re.escape(identifier) + r"\b", merged))
-        < max(len(re.findall(r"\b" + re.escape(identifier) + r"\b", source)) for source in parent_sources)
-    ]
     # Placement rows and reference counts both survive a merged diagnostic project.
-    if missing or references:
-        detail = []
-        if missing:
-            detail.append("merged project dropped a parent file: " + ", ".join(missing))
-        if references:
-            detail.append("merged project dropped a parent file reference: " + ", ".join(references))
-        raise ValueError("; ".join(detail))
+    from pbx_union import assert_merged_project_keeps_parent_files as verify
+    verify(root, project)
 
 
 def reviewed_conflicted_pin(root, expected):
@@ -475,10 +452,13 @@ def main():
     mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
+    mode.add_argument("--union-project", action="store_true", help="union additive Xcode file membership from both parents and stage the project")
     args = parser.parse_args()
     try:
         if args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
+        elif args.union_project:
+            union_project(args.root)
         elif args.union_manifests:
             union_manifests(args.root)
             # A conflicted diagnostic project pin stays for the reviewed digest resolver.
