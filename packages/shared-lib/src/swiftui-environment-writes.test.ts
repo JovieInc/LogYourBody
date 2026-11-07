@@ -92,6 +92,74 @@ it.each(['LogYourBody', 'LogYourBodyTests', 'LogYourBodyUITests'])(
   },
 );
 
+const bodyMetricsHandler = (source: string) => {
+  const start = source.indexOf('func handleDashboardBodyMetricsChange');
+  const open = start < 0 ? -1 : source.indexOf('{', start);
+  if (open < 0) return '';
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    else if (source[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  return '';
+};
+
+// A merge that keeps only one parent's body-metrics subscriber drops either the
+// receipt observer or the dated timeline. Both calls belong to one handler.
+const bodyMetricsRefreshGaps = (handler: string) =>
+  [
+    ['healthSyncPresentation.observe', 'Apple Health observation'],
+    ['scheduleDatedTimelineRefresh', 'dated timeline refresh'],
+  ]
+    .filter(([call]) => !handler.includes(call))
+    .map(([, gap]) => gap);
+
+it('rejects a body metrics handler that drops one parent refresh', () => {
+  expect(
+    bodyMetricsRefreshGaps(`
+      func handleDashboardBodyMetricsChange(_ metrics: [BodyMetrics]) {
+        healthSyncPresentation.observe(metrics, owner: owner)
+        reconcileHomeV2Timeline(with: metrics)
+      }
+    `),
+  ).toEqual(['dated timeline refresh']);
+  expect(
+    bodyMetricsRefreshGaps(`
+      func handleDashboardBodyMetricsChange(_ metrics: [BodyMetrics]) {
+        scheduleDatedTimelineRefresh(metrics: metrics)
+      }
+    `),
+  ).toEqual(['Apple Health observation']);
+});
+
+it('body metric changes keep Apple Health observation and dated timeline refresh', () => {
+  const handler = bodyMetricsHandler(
+    readFileSync(
+      fileURLToPath(
+        new URL(
+          '../../../apps/ios/LogYourBody/Views/DashboardViewLiquid+CoreAccessors.swift',
+          import.meta.url,
+        ),
+      ),
+      'utf8',
+    ),
+  );
+  const dashboard = readFileSync(
+    fileURLToPath(
+      new URL('../../../apps/ios/LogYourBody/Views/DashboardViewLiquid.swift', import.meta.url),
+    ),
+    'utf8',
+  );
+
+  expect(bodyMetricsRefreshGaps(handler)).toEqual([]);
+  expect(dashboard).toMatch(
+    /\.onReceive\(viewModel\.\$bodyMetrics, perform: handleDashboardBodyMetricsChange\)/,
+  );
+});
+
 it('keeps merged native views free of duplicate environment bindings', () => {
   const root = fileURLToPath(new URL('../../../apps/ios/LogYourBody/', import.meta.url));
   const violations = readdirSync(root, { recursive: true })

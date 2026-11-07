@@ -235,7 +235,7 @@ enum LaunchJourney {
         ))
     }
 
-    private static func conflicts(_ readings: [Reading]) -> Bool {
+    static func conflicts(_ readings: [Reading]) -> Bool {
         var seen: [Date: Double] = [:]
         for reading in readings {
             if let prior = seen[reading.date], prior != reading.value { return true }
@@ -244,13 +244,13 @@ enum LaunchJourney {
         return false
     }
 
-    private static func stale(_ readings: [Reading], now: Date, window: TimeInterval?) -> Bool {
+    static func stale(_ readings: [Reading], now: Date, window: TimeInterval?) -> Bool {
         guard let latest = readings.map(\.date).max() else { return false }
         guard let window else { return true }
         return SignalFreshness(measuredAt: latest, now: now, window: window, isUsable: true) != .fresh
     }
 
-    private static func maintenanceCovers(_ outcome: DatedOutcome, now: Date) -> Bool {
+    static func maintenanceCovers(_ outcome: DatedOutcome, now: Date) -> Bool {
         let today = day(now)
         return outcome.constraints.maintenance.contains { $0.start <= today && today <= $0.end }
     }

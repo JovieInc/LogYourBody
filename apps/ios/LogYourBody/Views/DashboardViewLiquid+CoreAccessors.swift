@@ -5,6 +5,7 @@ extension DashboardViewLiquid {
         if layoutMode == .photoTimelineHUD, HomeV2Policy.isEnabled(), HealthSyncPresentationPolicy.isEnabled() {
             healthSyncPresentation.observe(metrics, owner: authManager.captureAccountSession())
         }
+        scheduleDatedTimelineRefresh(metrics: metrics)
         reconcileHomeV2Timeline(with: metrics)
         scheduleDashboardDerivedStateRefresh()
         scheduleMetricCacheRefresh()

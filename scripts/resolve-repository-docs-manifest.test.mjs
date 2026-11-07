@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { env, manifestRepo, resolver } from './resolve-repository-docs.test.mjs';
+import { env, manifestRepo, resolver, sourceMapFixture } from './resolve-repository-docs.test.mjs';
 
 function autoMergedManifests(t) {
   const fixture = manifestRepo(t);
@@ -65,3 +65,43 @@ test('auto-merged manifest keeps both parent inputs and ignores dirty worktree b
   assert.match(projection, new RegExp(turboDigest));
   assert.equal(fixture.git('ls-files', '--unmerged'), '');
 });
+
+for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
+  test(`dependency repair ${mode} fingerprints staged sources and preserves valid lockfile resolutions`, (t) => {
+    const f = sourceMapFixture(t);
+    writeFileSync(join(f.root, 'package.json'), JSON.stringify({ dependencies: { example: '1.0.0' } }));
+    writeFileSync(join(f.root, 'pnpm-lock.yaml'), 'reviewed bot resolutions\n');
+    const config = JSON.parse(readFileSync(join(f.root, 'repository-docs.json'), 'utf8'));
+    config.sources.push({ path: 'package.json', purpose: 'Dependencies' });
+    writeFileSync(join(f.root, 'repository-docs.json'), JSON.stringify(config));
+    f.generate();
+    f.commit();
+    writeFileSync(join(f.root, 'package.json'), JSON.stringify({ dependencies: { example: '1.0.1' } }));
+    f.git('add', 'package.json');
+    writeFileSync(join(f.root, 'a.txt'), 'Unstaged source bytes\n');
+    mkdirSync(join(f.root, 'bin'));
+    writeFileSync(join(f.root, 'bin/corepack'), `#!/usr/bin/env python3
+import sys
+from pathlib import Path
+assert sys.argv[1:] == ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--frozen-lockfile', '--offline']
+assert Path('pnpm-lock.yaml').read_text() == 'reviewed bot resolutions\\n'
+`, { mode: 0o755 });
+    const resolve = () => spawnSync('python3', [resolver, '--root', f.root, mode], {
+      env: { ...env, PATH: `${join(f.root, 'bin')}:${env.PATH}` }, encoding: 'utf8',
+    });
+    const result = resolve();
+    assert.equal(result.status, 0, result.stderr);
+    const projection = f.git('show', `:${f.output}`);
+    const digest = (text) => createHash('sha256').update(text).digest('hex');
+    assert.match(projection, new RegExp(digest('base-a\n')));
+    assert.doesNotMatch(projection, new RegExp(digest('Unstaged source bytes\n')));
+    assert.match(projection, /"example": "1\.0\.1"/);
+    assert.equal(readFileSync(join(f.root, 'a.txt'), 'utf8'), 'Unstaged source bytes\n');
+    assert.equal(f.git('show', ':a.txt'), 'base-a\n');
+    assert.equal(readFileSync(join(f.root, 'pnpm-lock.yaml'), 'utf8'), 'reviewed bot resolutions\n');
+    assert.deepEqual(f.git('diff', '--cached', '--name-only').trim().split('\n').sort(), [f.output, 'package.json'].sort());
+    const index = f.git('ls-files', '--stage');
+    assert.equal(resolve().status, 0, 'dependency repair is retryable with unstaged source edits');
+    assert.equal(f.git('ls-files', '--stage'), index);
+  });
+}
