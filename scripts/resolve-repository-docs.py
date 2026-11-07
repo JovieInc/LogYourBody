@@ -369,6 +369,15 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             ).stdout.strip("\0")
             if untracked:
                 raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
+            # Ignored hooks, npmrc files and patches are still local-only resolver inputs.
+            ignored = subprocess.run(
+                ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
+                 ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
+                 ":(glob,exclude)**/node_modules/**"],
+                cwd=root, check=True, capture_output=True, text=True,
+            ).stdout.strip("\0")
+            if ignored:
+                raise ValueError("ignored dependency inputs: " + ignored.replace("\0", ", "))
             # Dependency resolution inputs must be regular indexed files, never symlinks.
             for entry in git_bytes(root, "ls-files", "--stage", "-z", "--", *inputs).split(b"\0"):
                 if entry and entry.split(b" ", 1)[0] not in {b"100644", b"100755"}:

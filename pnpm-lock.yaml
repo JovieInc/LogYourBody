@@ -200,8 +200,8 @@ importers:
         specifier: ^11.9.0
         version: 11.9.0(next@15.5.28(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.63.0)(@types/node@20.19.43)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(vite@7.3.7(@types/node@20.19.43)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15)(yaml@2.9.1))
       '@statsig/js-client':
-        specifier: ^3.33.5
-        version: 3.33.5
+        specifier: ^3.33.7
+        version: 3.33.7
       '@statsig/statsig-node-core':
         specifier: 0.24.0
         version: 0.24.0
@@ -3560,11 +3560,11 @@ packages:
   '@standard-schema/utils@0.3.0':
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
 
-  '@statsig/client-core@3.33.5':
-    resolution: {integrity: sha512-wGStmLCXMiZ2XYawLm/m8pgQS2NmYEvNXXhpsie/Hs06LKsnSHK3H15mkSCj5br+gut6K6GuU1U8mi2obQPYXg==}
+  '@statsig/client-core@3.33.7':
+    resolution: {integrity: sha512-tnhczy57w879pAAz7z6x8KmbnfeLe1H++wsVtZfFGLy/xhssMdCCyMFXX9UunUHv7a+1mCj7jJNsphPGnTmIqQ==}
 
-  '@statsig/js-client@3.33.5':
-    resolution: {integrity: sha512-QOPoLJQQegNT+onF1fsV6YnR7X8t3Di9bOTLezlAfv6R46QzsuLz+6Oqk9P1n9lWGPhdXHnxUNRohradF9sN2w==}
+  '@statsig/js-client@3.33.7':
+    resolution: {integrity: sha512-xVhjheb7UEqA0HxdO+aztZ0bT7aEE1RTcpu8RcCaM2L+Tm0ebFLzn1NH4VA0pbjfVi+WVBh8KGXolxcYrXVPug==}
 
   '@statsig/statsig-node-core-darwin-arm64@0.24.0':
     resolution: {integrity: sha512-wAICPDV2pHEd1UHML1sPpS1MkT7QZs0nW2GVorGKviqE+t3vsd7KU2rusKFMGPllYCRbK3dzRbb8MMJRJ2DvOQ==}
@@ -10742,11 +10742,11 @@ snapshots:
 
   '@standard-schema/utils@0.3.0': {}
 
-  '@statsig/client-core@3.33.5': {}
+  '@statsig/client-core@3.33.7': {}
 
-  '@statsig/js-client@3.33.5':
+  '@statsig/js-client@3.33.7':
     dependencies:
-      '@statsig/client-core': 3.33.5
+      '@statsig/client-core': 3.33.7
 
   '@statsig/statsig-node-core-darwin-arm64@0.24.0':
     optional: true

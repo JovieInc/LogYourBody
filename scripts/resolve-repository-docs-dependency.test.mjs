@@ -81,6 +81,33 @@ if not marker.exists():
       assert.equal(f.git('ls-files', '--stage'), repairedIndex);
     });
   }
+  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch']) {
+    test(`dependency repair ${mode} refuses ignored ${input} before invoking pnpm`, (t) => {
+      const f = fixture(t, input, 'untracked');
+      writeFileSync(join(f.root, '.gitignore'), `${input}\nnode_modules/\n`);
+      f.git('add', '.gitignore');
+      mkdirSync(join(f.root, 'node_modules/example'), { recursive: true });
+      writeFileSync(join(f.root, 'node_modules/example/.npmrc'), 'vendor config\n');
+      const index = f.git('ls-files', '--stage');
+      const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+      const result = f.resolve(mode);
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /ignored dependency inputs:/);
+      assert.ok(result.stderr.includes(input), result.stderr);
+      assert.equal(existsSync(join(f.root, 'pnpm-calls')), false);
+      assert.equal(f.git('ls-files', '--stage'), index);
+      assert.equal(readFileSync(f.path, 'utf8'), 'local input\n');
+      for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+        assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
+      }
+      unlinkSync(f.path);
+      const retry = f.resolve(mode);
+      assert.equal(retry.status, 0, retry.stderr);
+      const repairedIndex = f.git('ls-files', '--stage');
+      assert.equal(f.resolve(mode).status, 0, 'repair stays idempotent with ignored vendor config');
+      assert.equal(f.git('ls-files', '--stage'), repairedIndex);
+    });
+  }
   test(`dependency repair ${mode} requires staged projection configuration before invoking pnpm`, (t) => {
     const f = fixture(t, '.npmrc', 'staged');
     const configPath = join(f.root, 'repository-docs.json');
