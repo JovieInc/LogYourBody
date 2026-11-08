@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-lockfile-change-during-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1759",
+    "correction": "PR #1759, fix-red-1423773703 occurrence 56: merge origin/main without rebasing and repair the gateway 4.0.137 update. Detect Changes and parity reject a stale source projection, causing CI Summary to fail. Dependency repair must not accept or stage lockfile bytes changed during source-map rendering after frozen verification.",
+    "mechanization": "Extend the existing staged projection renderer to compare the verified lockfile bytes before writing or staging artifacts in both dependency modes. Two real-Git regressions fail against the previous helper and pass after the extension, proving unchanged index, artifact rollback, successful retry and idempotence. The required Detect Changes pre-commit suite already imports these cases. Use the extended --verify-lockfile helper to retain merged resolutions and regenerate source parity. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dependency repair helper owns verified lockfile input and artifact staging. Comparing those bytes after rendering prevents an observed concurrent lockfile edit from being accepted or staged as verified by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "lockfile changed during projection generation; review dependency inputs and retry"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-index-change-during-projection",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1758",
     "correction": "PR #1758, fix-red-1423773703 occurrence 55: merge origin/main without rebasing and repair the bundle-analyzer 16.4.3 update. Detect Changes and parity reject a stale source projection, causing CI Summary to fail. The dependency helper must not stage a projection for an index changed during rendering.",

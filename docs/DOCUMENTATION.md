@@ -97,6 +97,9 @@ Staged projection generation also rechecks the index before writing. Dependency
 repair carries the verified index through rendering, so an observed concurrent
 staged edit cannot leave the source map describing an older manifest. Review the
 changed inputs and retry; the other writer's staged edit remains intact.
+Both dependency modes also compare the verified lockfile bytes after rendering
+and before writing or staging artifacts. Lockfile changes during rendering refuse
+repair and restore the original artifacts; retry uses the reviewed inputs.
 Frozen verification also refuses lockfile changes before regenerating or staging
 the source map. Only a confirmed outdated lockfile permits refresh mode to write
 new resolutions; retrying after a refusal uses the original reviewed artifacts.
