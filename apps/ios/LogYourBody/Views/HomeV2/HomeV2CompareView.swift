@@ -34,6 +34,7 @@ struct HomeV2CompareView: View {
 
     @State private var mode: Mode = .slider
     @State private var split: CGFloat = 0.5
+    @State private var poseAlignment: BodyPhotoAlignment?
 
     /// Top bar, delta row, mode row and the dates block below the stage.
     private static let chromeHeight: CGFloat = 52 + 66 + 52 + 120
@@ -173,6 +174,36 @@ struct HomeV2CompareView: View {
             .frame(width: size.width, height: size.height)
             .accessibilityIdentifier("home_v2_compare_stage")
         case .overlay:
+            overlayStage(before: before, after: after, size: size)
+                .task(id: "\(pair.id)|\(Int(size.width))x\(Int(size.height))") {
+                    await resolvePose(before: before, after: after, stage: size)
+                }
+        }
+    }
+
+    @ViewBuilder
+    private func overlayStage(before: BodyMetrics, after: BodyMetrics, size: CGSize) -> some View {
+        if case .honest = poseAlignment {
+            ZStack(alignment: .bottom) {
+                HStack(spacing: 2) {
+                    let half = CGSize(width: (size.width - 2) / 2, height: size.height)
+                    SubjectPlateView(urlString: before.photoUrl ?? "", size: half)
+                    SubjectPlateView(urlString: after.photoUrl ?? "", size: half)
+                }
+                Text(HomeV2PhotoCopy.differentPose)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .caption)
+                    .foregroundStyle(HomeV2Tokens.Colors.ink)
+                    .padding(.horizontal, HomeV2Tokens.Space.row)
+                    .frame(minHeight: JovieTokens.minimumHitTarget)
+                    .background(HomeV2Tokens.Colors.canvas.opacity(0.72), in: Capsule())
+                    .padding(HomeV2Tokens.Space.row)
+                    .accessibilityIdentifier("home_v2_compare_pose_mismatch")
+            }
+            .frame(width: size.width, height: size.height)
+            .accessibilityIdentifier("home_v2_compare_stage")
+        } else if case .aligned(let registration, _, _) = poseAlignment {
+            alignedOverlay(before: before, after: after, size: size, registration: registration)
+        } else {
             ZStack(alignment: .topLeading) {
                 SubjectPlateView(urlString: before.photoUrl ?? "", size: size)
                 SubjectPlateView(urlString: after.photoUrl ?? "", size: size)
@@ -183,6 +214,54 @@ struct HomeV2CompareView: View {
             .frame(width: size.width, height: size.height)
             .accessibilityIdentifier("home_v2_compare_stage")
         }
+    }
+
+    private func alignedOverlay(
+        before: BodyMetrics,
+        after: BodyMetrics,
+        size: CGSize,
+        registration: BodyPhotoRegistration
+    ) -> some View {
+        let blend = BodyPhotoTransition.crossDissolve(
+            earlierDate: before.date,
+            earlierID: before.id,
+            laterDate: after.date,
+            laterID: after.id,
+            progress: 0.5
+        )
+        return ZStack(alignment: .topLeading) {
+            SubjectPlateView(
+                urlString: before.photoUrl ?? "",
+                size: size,
+                drawingRegistration: registration
+            )
+            .opacity(blend?.earlierOpacity ?? 1)
+            SubjectPlateView(urlString: after.photoUrl ?? "", size: size)
+                .opacity(blend?.laterOpacity ?? 0.55)
+            tag(for: before, alignment: .leading)
+            tag(for: after, alignment: .trailing)
+        }
+        .frame(width: size.width, height: size.height)
+        .accessibilityIdentifier("home_v2_compare_stage")
+    }
+
+    private func resolvePose(before: BodyMetrics, after: BodyMetrics, stage: CGSize) async {
+        guard let beforeURL = before.photoUrl, let afterURL = after.photoUrl else {
+            poseAlignment = nil
+            return
+        }
+        let store = SubjectPlateStore.shared
+        if store.landmarkFrame(for: beforeURL) == nil,
+           let image = await ImageCacheService.shared.loadImage(from: beforeURL) {
+            _ = await store.focus(for: beforeURL, image: image)
+        }
+        guard !Task.isCancelled else { return }
+        if store.landmarkFrame(for: afterURL) == nil,
+           let image = await ImageCacheService.shared.loadImage(from: afterURL) {
+            _ = await store.focus(for: afterURL, image: image)
+        }
+        guard !Task.isCancelled else { return }
+        poseAlignment = store.alignment(from: beforeURL, to: afterURL, stage: stage)
     }
 
     private func tag(for metric: BodyMetrics, alignment: Alignment) -> some View {

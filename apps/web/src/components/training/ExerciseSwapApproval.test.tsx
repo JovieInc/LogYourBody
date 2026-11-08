@@ -3,6 +3,11 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { suggestAlternatives } from '@/lib/training/alternatives';
 import { EXERCISE_CATALOG, type CatalogEquipment } from '@/lib/training/catalog';
 import { evaluateDeload } from '@/lib/training/engine';
+import {
+  CONCERNING_PAIN_MESSAGE,
+  evaluateMovementPain,
+  type MovementPainFeedback,
+} from '@/lib/training/pain-policy';
 import type { DeloadState, TrainingFeedback } from '@/lib/training/types';
 import { ExerciseSwapApproval } from './ExerciseSwapApproval';
 
@@ -179,6 +184,40 @@ describe('exercise swap approval', () => {
     expect(within(panel).queryByRole('radio')).not.toBeInTheDocument();
     expect(persist).not.toHaveBeenCalled();
     expect(screen.getByRole('status')).toHaveTextContent(`Active exercise: ${CURRENT.name}`);
+  });
+
+  it.each<MovementPainFeedback>([
+    { persistentPain: true },
+    { worseningPain: true },
+    { symptomFlags: ['neurologic'] },
+  ])('shows only the shared movement-pause sentence for %p, even with candidates', (feedback) => {
+    const { persist } = review(undefined, { painPolicy: evaluateMovementPain(feedback) });
+    const panel = screen.getByRole('region', { name: 'Review exercise swap' });
+    expect(panel.textContent).toBe(CONCERNING_PAIN_MESSAGE);
+    expect(within(panel).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(panel).queryByRole('radio')).not.toBeInTheDocument();
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it('keeps the selector symptom hold even when the separate pain policy permits swap review', () => {
+    const { persist } = review(undefined, {
+      painPolicy: evaluateMovementPain(),
+      suggestions: { ...suggestions, status: 'symptom_safety' },
+    });
+    const panel = screen.getByRole('region', { name: 'Review exercise swap' });
+    expect(panel.textContent).toBe(CONCERNING_PAIN_MESSAGE);
+    expect(within(panel).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(panel).queryByRole('radio')).not.toBeInTheDocument();
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it('continues fatigue-only feedback to swap review through the shared policy', () => {
+    const { persist } = review(undefined, {
+      painPolicy: evaluateMovementPain({ trunkFatigue: 6 }),
+    });
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Approve swap' })).toBeDisabled();
+    expect(persist).not.toHaveBeenCalled();
   });
 
   it('preserves the current exercise on a failed save and allows an explicit retry', async () => {

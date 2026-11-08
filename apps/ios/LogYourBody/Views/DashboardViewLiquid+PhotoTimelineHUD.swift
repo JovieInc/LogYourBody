@@ -20,12 +20,14 @@ extension DashboardViewLiquid {
                             bodyMetrics: bodyMetrics,
                             selectedIndex: $selectedIndex,
                             dateText: formatHUDDate(metric.date),
-                            weightValue: heroWeightValue(),
-                            weightCaption: heroWeightCaption(),
-                            bodyFatValue: heroBodyFatValue(),
-                            bodyFatCaption: heroBodyFatCaption(),
-                            ffmiValue: heroFFMIValue(),
-                            ffmiCaption: heroFFMICaption(),
+                            weightValue: isDatedTimelineEnabled ? (datedTimelineEntry?.weight ?? "—") : heroWeightValue(),
+                            weightCaption: isDatedTimelineEnabled
+                                ? (datedTimelineEntry?.weightSource ?? "No recorded weight") : heroWeightCaption(),
+                            bodyFatValue: isDatedTimelineEnabled ? (datedTimelineEntry?.bodyFat ?? "—") : heroBodyFatValue(),
+                            bodyFatCaption: isDatedTimelineEnabled
+                                ? (datedTimelineEntry?.bodyFatSource ?? "No recorded body fat") : heroBodyFatCaption(),
+                            ffmiValue: isDatedTimelineEnabled ? (datedTimelineEntry?.ffmi ?? "—") : heroFFMIValue(),
+                            ffmiCaption: isDatedTimelineEnabled ? "Derived metric" : heroFFMICaption(),
                             onTapWeight: {
                                 selectedMetricType = .weight
                                 isMetricDetailActive = true
@@ -38,7 +40,8 @@ extension DashboardViewLiquid {
                                 selectedMetricType = .ffmi
                                 isMetricDetailActive = true
                             },
-                            onShare: makeBodyScoreShareAction(metric: metric, score: bodyScore.score),
+                            onShare: isDatedTimelineEnabled
+                                ? nil : makeBodyScoreShareAction(metric: metric, score: bodyScore.score),
                             onAddPhoto: { presentProgressPhotoAttach(for: metric) }
                         )
                     }
@@ -52,7 +55,15 @@ extension DashboardViewLiquid {
 
     var photoTimelineRoot: some View {
         VStack(spacing: 0) {
-            if isLaunchJourneyEnabled {
+            if isDatedTimelineEnabled {
+                datedTimelineDirective
+                if let provenance = datedTimelineEntry?.provenance {
+                    Text(provenance)
+                        .font(.caption)
+                        .padding(.horizontal, JovieTokens.screenInset)
+                        .accessibilityIdentifier("dated_timeline_provenance")
+                }
+            } else if isLaunchJourneyEnabled {
                 launchJourneyDirective
             }
 
@@ -63,6 +74,17 @@ extension DashboardViewLiquid {
 
             photoTimelineHomeContent
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? 0 : .infinity)
+                // The edge swipe lives on the content, below the header. A
+                // high-priority drag that shares the menu button's edge drops
+                // the Open Menu tap before the sidebar can present.
+                .overlay(alignment: .leading) {
+                    Color.clear
+                        .frame(width: 20)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(photoTimelineSwipe)
+                        .accessibilityHidden(true)
+                }
                 .opacity(isHomeChatExpanded ? 0 : 1)
                 .allowsHitTesting(!isHomeChatExpanded)
                 .accessibilityHidden(isHomeChatExpanded)
@@ -93,14 +115,6 @@ extension DashboardViewLiquid {
         )
         .onChange(of: selectedPhotoTimelineRootPage) { _, _ in
             isHomeChatExpanded = false
-        }
-        .overlay(alignment: .leading) {
-            Color.clear
-                .frame(width: 20)
-                .padding(.top, 56)
-                .contentShape(Rectangle())
-                .highPriorityGesture(photoTimelineSwipe)
-                .accessibilityHidden(true)
         }
         .fullScreenCover(isPresented: $isHomeV2ViewerPresented) {
             homeV2PhotoViewer
@@ -193,33 +207,42 @@ extension DashboardViewLiquid {
     @ViewBuilder
     private var photoTimelineHomeContent: some View {
         ZStack {
-            switch selectedPhotoTimelineRootPage {
-            case .timeline, .chat:
-                ZStack {
-                    timelineAccessibilityMarker(
-                        id: "photo_timeline_root_page_timeline",
-                        label: "Timeline page"
-                    )
-                    if isHomeV2CheckIn, homeV2SystemState == .loading {
-                        HomeV2LoadingHome()
-                    } else if isHomeV2CheckIn, homeV2DisplayedTodayMetric() == nil {
-                        homeV2DayZero
-                    } else if bodyMetrics.isEmpty {
-                        photoTimelineHUDEmptyState
-                    } else {
-                        photoTimelineHUD
+            if isDatedTimelineEnabled && (!datedTimelineIsOwned || datedTimelineSnapshot == nil ||
+                (!isDatedStatsSurface && !datedTimelineCanShowHistory)) {
+                ProgressView()
+            } else {
+                switch selectedPhotoTimelineRootPage {
+                case .timeline, .chat:
+                    ZStack {
+                        timelineAccessibilityMarker(
+                            id: "photo_timeline_root_page_timeline",
+                            label: "Timeline page"
+                        )
+                        if isDatedTimelineEnabled && currentMetric == nil {
+                            datedTimelineEmptyState
+                        } else if !isDatedTimelineEnabled, isHomeV2CheckIn, homeV2SystemState == .loading {
+                            HomeV2LoadingHome()
+                        } else if !isDatedTimelineEnabled, isHomeV2CheckIn, homeV2DisplayedTodayMetric() == nil {
+                            homeV2DayZero
+                        } else if bodyMetrics.isEmpty {
+                            photoTimelineHUDEmptyState
+                        } else {
+                            photoTimelineHUD
+                        }
                     }
-                }
-            case .analytics:
-                ZStack {
-                    timelineAccessibilityMarker(
-                        id: "photo_timeline_root_page_analytics",
-                        label: "Stats page"
-                    )
-                    if HomeV2Policy.isEnabled() {
-                        homeV2ProgressView
-                    } else {
-                        photoTimelineAnalyticsPage
+                case .analytics:
+                    ZStack {
+                        timelineAccessibilityMarker(
+                            id: "photo_timeline_root_page_analytics",
+                            label: "Stats page"
+                        )
+                        if isDatedTimelineEnabled {
+                            photoTimelineAnalyticsPage
+                        } else if HomeV2Policy.isEnabled() {
+                            homeV2ProgressView
+                        } else {
+                            photoTimelineAnalyticsPage
+                        }
                     }
                 }
             }
@@ -409,60 +432,6 @@ extension DashboardViewLiquid {
         }
 
         return globalTimelineStore.weeklyBuckets.last
-    }
-
-    var progressPhotoAttachFallbackDate: Date {
-        currentMetric?.date ?? globalTimelineStore.cursor?.date ?? activeTimelineBucket?.endDate ?? Date()
-    }
-
-    var progressPhotoAttachMetric: BodyMetrics? {
-        if let currentMetric {
-            return currentMetric
-        }
-
-        let targetDate = progressPhotoAttachFallbackDate
-        return bodyMetrics.min { lhs, rhs in
-            abs(lhs.date.timeIntervalSince(targetDate)) < abs(rhs.date.timeIntervalSince(targetDate))
-        }
-    }
-
-    func presentProgressPhotoAttach(for metric: BodyMetrics?) {
-        progressPhotoAttachTarget = metric
-        HapticManager.shared.selection()
-        isProgressPhotoAttachPresented = true
-    }
-
-    @MainActor
-    func handleProgressPhotoAttachComplete() async {
-        await viewModel.refreshData(
-            authManager: authManager,
-            realtimeSyncManager: realtimeSyncManager
-        )
-        refreshGlobalTimelineStore()
-
-        if let targetId = progressPhotoAttachTarget?.id,
-           let refreshedIndex = bodyMetrics.firstIndex(where: { $0.id == targetId }) {
-            selectedIndex = refreshedIndex
-            updateAnimatedValues(for: refreshedIndex)
-        } else if !bodyMetrics.isEmpty {
-            selectedIndex = min(selectedIndex, bodyMetrics.count - 1)
-            updateAnimatedValues(for: selectedIndex)
-        }
-    }
-
-    func selectClosestMetric(to date: Date) {
-        PerfSignpost.measure("scrub_select_closest") {
-            guard let index = nearestBodyMetricIndex(in: bodyMetrics, to: date) else {
-                return
-            }
-
-            selectedIndex = index
-            updateAnimatedValues(for: index, animate: false)
-        }
-    }
-
-    func formatHUDDate(_ date: Date) -> String {
-        DashboardMetricFormatting.readingDateLabel(effectiveDate: date)
     }
 
     var photoTimelineHUDEmptyState: some View {

@@ -107,12 +107,12 @@ esac`;
 const holdIssues = (count) => groupGh({ hold: count });
 const noHold = groupGh();
 
-const surfaces = (web, iosChanged, unit, quality, deferred = 'false') => ({
+const surfaces = (web, iosChanged, unit, quality, deferred = 'false', signing = 'false') => ({
   web,
   ios_changed: iosChanged,
   ios_unit: unit,
   ios_quality: quality,
-  ios_quality_deferred: deferred,
+  ios_quality_deferred: deferred, signing,
 });
 
 test('large native source imports preserve detection under pipefail', () => {
@@ -214,11 +214,11 @@ test('iOS release and diagnostic workflows are not inputs of the PR iOS jobs', (
 test('an unfetchable base selects every surface', () => {
   const fx = queueFixture({ 'README.md': 'v2' });
   const { outputs } = detect(fx.workspace, { ...mergeGroup(fx), BASE_SHA: 'f'.repeat(40) }, noHold);
-  assert.deepEqual(outputs, surfaces('true', 'true', 'true', 'false'));
+  assert.deepEqual(outputs, surfaces('true', 'true', 'true', 'false', 'false', 'true'));
   const zero = detect(fx.workspace, { ...mergeGroup(fx), BASE_SHA: '0'.repeat(40) }, noHold);
-  assert.deepEqual(zero.outputs, surfaces('true', 'true', 'true', 'false'));
+  assert.deepEqual(zero.outputs, surfaces('true', 'true', 'true', 'false', 'false', 'true'));
   const pr = detect(fx.workspace, { ...mergeGroup(fx), GITHUB_EVENT_NAME: 'pull_request', BASE_SHA: 'f'.repeat(40) });
-  assert.deepEqual(pr.outputs, surfaces('true', 'true', 'false', 'true'));
+  assert.deepEqual(pr.outputs, surfaces('true', 'true', 'false', 'true', 'false', 'true'));
 });
 
 test('ready pull requests run Launch Quality on the PR head; drafts defer it; Unit waits for the group', () => {
@@ -268,7 +268,7 @@ test('StoreKit evidence runs on every main push and gates native changes', () =>
   assert.match(storekit, /runs-on: macos-15/);
   assert.match(storekit, /run: bash scripts\/ios\/storekit-purchase-restore\.sh/);
   assert.match(storekit, /if: always\(\)[\s\S]*actions\/upload-artifact/);
-  assert.match(jobBlock('ci-summary'), /needs: \[.*ios_storekit\]/);
+  assert.match(jobBlock('ci-summary'), /needs: \[.*ios_storekit[,\]]/);
 });
 
 test('ci.yml wires detection, the iOS jobs and the CI Summary dependencies', () => {
@@ -280,7 +280,7 @@ test('ci.yml wires detection, the iOS jobs and the CI Summary dependencies', () 
   }
   assert.match(jobBlock('ios'), /if: needs\.detect-changes\.outputs\.ios_unit == 'true'/);
   assert.match(jobBlock('ios_quality'), /if: needs\.detect-changes\.outputs\.ios_quality == 'true'/);
-  assert.match(jobBlock('ci-summary'), /if: always\(\)[\s\S]*needs: \[detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_static, ios_storekit\]/);
+  assert.match(jobBlock('ci-summary'), /if: always\(\)[\s\S]*needs: \[detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_static, ios_storekit, release-signing\]/);
 });
 
 test('required CI rejects a stale repository source projection', () => {
@@ -322,7 +322,7 @@ function runSummaryGate({ web, ios, quality = ios, js, iosResult, qualityResult,
     'needs.ios.result': iosResult,
     'needs.ios_quality.result': qualityResult,
     'needs.ios_static.result': staticResult ?? qualityResult,
-    'needs.ios_storekit.result': storekitResult ?? (event === 'push' || (event === 'merge_group' && (ios === 'true' || quality === 'true')) ? 'success' : 'skipped'),
+    'needs.ios_storekit.result': storekitResult ?? (event === 'push' || (event === 'merge_group' && (ios === 'true' || quality === 'true')) ? 'success' : 'skipped'), 'needs.detect-changes.outputs.signing': 'false', 'needs.release-signing.result': 'skipped', 'needs.release-signing.outputs.conclusion': '', 'github.event.pull_request.head.repo.fork': 'false',
   };
   const rendered = script.replace(/\$\{\{\s*([^}]+?)\s*\}\}/g, (_, expr) => {
     assert.ok(expr in values, `unrendered expression ${expr}`);

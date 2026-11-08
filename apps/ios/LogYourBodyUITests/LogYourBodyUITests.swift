@@ -1892,8 +1892,11 @@ final class LogYourBodyUITests: XCTestCase {
         // Preserve the loaded history and selected snapshot across all three
         // surfaces; a relaunch briefly exposes only the newest measurement.
         try assertAndCaptureTimelineAnalytics(in: app)
+        XCTAssertFalse(app.descendants(matching: .any)["dated_stats_target"].exists,
+                       "The dated-outcome gate is off for this existing stats flow")
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_settings"].exists)
         openSettingsFromPhotoTimelineMenu(in: app)
+        app.terminate()
     }
 
     func testLaunchQualityGateCapturesBodyScoreShareSheet() throws {
@@ -2548,7 +2551,6 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "field-provenance-restored-after-undo", from: app)
     }
 
-
     func testBodyFatEditorPreservesMissingWeightAndRecoversFromValidation() throws {
         let app = openBodyFatEditor(photoOnly: true)
         let weight = app.textFields["home_v2_log_sheet_value"]
@@ -2735,7 +2737,6 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.textFields["home_v2_log_sheet_body_fat"].waitForExistence(timeout: 8))
         return app
     }
-
 
     func testHomeV2PhotoOnlyEditorDoesNotInventWeight() throws {
         let app = XCUIApplication()
@@ -4194,14 +4195,14 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "home-v2-progress-after-edit", from: app)
     }
 
-    private func attachScreenshot(named name: String, from app: XCUIApplication) {
+    func attachScreenshot(named name: String, from app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
     }
 
-    private func launch(_ app: XCUIApplication, with arguments: [String]) {
+    func launch(_ app: XCUIApplication, with arguments: [String]) {
         if app.state != .notRunning {
             app.terminate()
         }

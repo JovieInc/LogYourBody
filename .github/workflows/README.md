@@ -12,6 +12,7 @@ Primary pull request workflow for `main`.
 - `Detect Changes`: path filter for web/package and iOS changes (`.github/scripts/detect-changes.sh`, tested by `detect-changes.test.mjs`). A merge group diffs against its own base (the previous group's head), so a web-only group never inherits a queued iOS PR; iOS runs only when a file the iOS jobs read changed, and an unknown diff selects everything. Also audits the live repository branch rulesets (`verify-ruleset-targets.mjs`) so quoted or missing ref targets cannot silently unprotect `main`/`production`. On every pull request, merge group, and main push it runs `python3 scripts/repository_docs.py` with no `continue-on-error`, so a stale `docs/REPOSITORY_SOURCES.md` fails CI Summary. The shadow workflow remains the nonblocking coverage qualification and is not weakened.
 - `JavaScript/TypeScript`: runs `pnpm install`, `pnpm lint`, `pnpm typecheck`, and `pnpm test:ci` when web, package, or CI harness files change. The job uses no privileged data-provider configuration, so pull request CI can verify buildability without credentials.
 - `iOS` (Unit) and `iOS Launch Quality Gate`: each runs once, where it still gates the merge. Launch Quality runs on the PR head once the PR is ready for review (drafts defer it; `ready_for_review` reruns CI). Unit runs in the merge group, on the exact tree that lands; the group also runs Launch Quality when the entry's PR head has no passing Launch Quality run (e.g. entries enqueued before this split). While the `post-merge-lq-red` issue is open (see `ios-post-merge-quality.yml`), iOS merge groups run Launch Quality too, and an unknown hold state counts as held. A web-only change runs neither.
+- `Release signing provisioned`: runs when `apps/ios/fastlane/`, a `project.pbxproj`, or an entitlements file changes. It reads App Store Connect and fails unless every bundle ID the readonly release lane requests is registered, has an active App Store profile, and that profile covers the target entitlements. `CI Summary` requires success for those pulls. A fork pull request has no credentials, finishes neutral, and is not a pass. Runbook: `docs/engineering/signing-expiry.md`.
 - `CI Summary`: aggregate required status. Branch protection should depend on this stable aggregate name rather than individual implementation jobs.
 
 `CI Summary` is the normal hard merge gate. Keep it deterministic and fast enough for agent throughput.
@@ -176,25 +177,7 @@ The required `iOS` and `iOS Launch Quality Gate` jobs always use standard hosted
 availability, heartbeat state, and `MAC_RUNNER`; setting that variable cannot
 reroute either required job. Existing tests and quality gates remain required.
 
-Self-hosted Macs are optional capacity pending successful setup qualification and
-measured pickup time, execution time, and reliability benefit. A fresh heartbeat
-is not a capacity reservation: a Mac can become busy or disappear after the
-probe, and GitHub does not switch a queued self-hosted job to hosted macOS. Job
-execution timeouts do not bound that queue wait. No dispatcher or duplicate
-product/release execution path is introduced.
-
-The shared Mac workflow is manual only and cannot gate required CI. After it is
-on `main`, request a secretless setup canary explicitly:
-
-```sh
-gh workflow run mac-runner-heartbeat.yml --repo JovieInc/LogYourBody --ref main \
-  -f verify-ios-setup=true
-```
-
-Inspect the **Self-hosted iOS setup canary** job, its recorded runner name, and
-Xcode, pinned SwiftLint, xcbeautify, Ruby/Bundler and `bundle check` output. Setup
-or heartbeat success alone does not demonstrate shipping benefit or authorize
-routing required builds onto the shared Macs.
+The shared self-hosted Mac pool is retired; the manual heartbeat and setup canary have been removed.
 
 CI tests this hosted policy and the diagnostic heartbeat helpers with Bashcov
 4.0.0, requiring at least 80% executed-line coverage for each helper. The coverage

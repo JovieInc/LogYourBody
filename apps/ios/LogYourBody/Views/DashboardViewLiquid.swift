@@ -22,6 +22,8 @@ struct DashboardViewLiquid: View {
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @StateObject var viewModel = DashboardViewModel()
     @StateObject var globalTimelineStore = GlobalTimelineStore()
+    @State var healthSyncPresentation = HealthSyncPresentationStore()
+    @State var showsRecentHealthReadings = false
 
     // Core data / selection
     @State var selectedIndex: Int = 0
@@ -92,6 +94,13 @@ struct DashboardViewLiquid: View {
     @State var showsLaunchOutcomeEditor = false
     @State var launchOutcomeError: String?
     @State var launchHoldNote: String?
+    @State var datedTimelineProjector = DatedTimelineProjector()
+    @State var datedTimelineSnapshot: DatedTimelineProjector.Snapshot?
+    @State var datedTimelineOwner: AuthManager.ProfileSessionOwnership?
+    @State var datedTimelineRefreshTask: Task<Void, Never>?
+    @State var datedTimelineRefreshID = UUID()
+    @State var datedTimelineLoadFailed = false
+    @State var showsDatedTimelineEditor = false
     @State var homeChatDraft = AccountSessionChatDraft()
     @State var isShowingPhotoTimelineMenu = false
     @State var isPhotoTimelineSettingsPresented = false
@@ -246,6 +255,7 @@ struct DashboardViewLiquid: View {
             .onAppear {
                 LaunchMetrics.markFirstDashboardFrame()
                 openReleaseReviewDestinationIfNeeded()
+                scheduleDatedTimelineRefresh()
                 Task { @MainActor in
                     await Task.yield()
                     handleOnAppear()
@@ -261,12 +271,27 @@ struct DashboardViewLiquid: View {
                 syncBannerDismissTask?.cancel()
                 metricCacheRefreshTask?.cancel()
                 metricCacheBuildID = UUID()
+                datedTimelineRefreshTask?.cancel()
             }
 
         let withSyncAndState = withLifecycle
+            .onReceive(HealthSyncCoordinator.shared.$syncStatus, perform: healthSyncPresentation.updateSyncStatus)
             .onChange(of: realtimeSyncManager.syncStatus) { oldStatus, newStatus in
                 previousSyncStatus = oldStatus
                 handleSyncStatusChange(from: oldStatus, to: newStatus)
+                scheduleDatedTimelineRefresh()
+            }
+            .onChange(of: realtimeSyncManager.isOnline) { _, _ in
+                scheduleDatedTimelineRefresh()
+            }
+            .onChange(of: authManager.currentUser?.profile?.height) { _, _ in
+                scheduleDatedTimelineRefresh()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                scheduleDatedTimelineRefresh()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { scheduleDatedTimelineRefresh() }
             }
             .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)) { notification in
                 handleCoreDataContextChange(notification)
@@ -275,18 +300,18 @@ struct DashboardViewLiquid: View {
                 scheduleDashboardDerivedStateRefresh(rebuildDailyMetricsLookup: true)
                 scheduleMetricCacheRefresh()
             }
-            .onReceive(viewModel.$bodyMetrics) { metrics in
-                reconcileHomeV2Timeline(with: metrics)
-                scheduleDashboardDerivedStateRefresh()
-                scheduleMetricCacheRefresh()
-            }
+            .onReceive(viewModel.$bodyMetrics, perform: handleDashboardBodyMetricsChange)
             .onChange(of: authManager.captureAccountSession()) { _, owner in
+                clearDatedTimelineContext()
+                scheduleDatedTimelineRefresh()
                 invalidateDashboardShareContext(currentOwner: owner)
                 homeV2EditingSession = nil
+                healthSyncPresentation.reset()
+                showsRecentHealthReadings = false
                 homeV2TimelineSelection = nil
                 isMetricDetailActive = false
                 isStatsDestinationActive = false
-                selectedPhotoTimelineRootPage = .timeline
+                selectedPhotoTimelineRootPage = Self.pageAfterAccountChange()
                 isHomeV2MetricProvenancePresented = false
                 metricCacheRefreshTask?.cancel()
                 metricCacheBuildID = UUID()
@@ -325,25 +350,30 @@ struct DashboardViewLiquid: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
                 featureGateRefreshToken = UUID()
+                clearDatedTimelineContext()
+                scheduleDatedTimelineRefresh()
                 reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
                 loadGlp1WeeklyCheckInDataIfNeeded()
             }
 
         let withSheetsAndNavigation = withSyncAndState
             .sheet(isPresented: $showAddEntrySheet) {
-                AddEntrySheet(
-                    isPresented: $showAddEntrySheet,
-                    initialTab: addEntryInitialTab,
-                    includesGlp1Entry: addEntryIncludesGlp1Entry,
-                    initialDate: addEntryInitialDate,
-                    initialWeight: addEntryInitialWeight,
-                    initialBodyFat: addEntryInitialBodyFat,
-                    initialBodyFatMethod: addEntryInitialBodyFatMethod,
-                    isHomeV2LogEntry: isHomeV2LoggingWeight,
-                    onWeightSaved: handleHomeV2WeightEntrySaved,
-                    onBodyFatSaved: handleHomeV2BodyFatEntrySaved
-                )
-                    .environmentObject(authManager)
+                if !isDatedTimelineEnabled || datedTimelineIsOwned {
+                    AddEntrySheet(
+                        isPresented: $showAddEntrySheet,
+                        initialTab: addEntryInitialTab,
+                        includesGlp1Entry: addEntryIncludesGlp1Entry,
+                        initialDate: addEntryInitialDate,
+                        initialWeight: addEntryInitialWeight,
+                        initialBodyFat: addEntryInitialBodyFat,
+                        initialBodyFatMethod: addEntryInitialBodyFatMethod,
+                        isHomeV2LogEntry: isHomeV2LoggingWeight,
+                        onWeightSaved: handleHomeV2WeightEntrySaved,
+                        onBodyFatSaved: handleHomeV2BodyFatEntrySaved,
+                        presentationOwner: isDatedTimelineEnabled ? datedTimelineOwner : nil
+                    )
+                        .environmentObject(authManager)
+                }
             }
             .sheet(isPresented: $showSyncDetails) {
                 DashboardSyncDetailsSheet(
@@ -351,15 +381,19 @@ struct DashboardViewLiquid: View {
                     syncManager: realtimeSyncManager
                 )
             }
+            .sheet(isPresented: $showsRecentHealthReadings) { homeV2RecentReadingsSheet }
             .sheet(isPresented: $isProgressPhotoAttachPresented) {
-                ProgressPhotoAttachSheet(
-                    targetMetric: progressPhotoAttachTarget,
-                    fallbackDate: progressPhotoAttachFallbackDate,
-                    onComplete: {
-                        await handleProgressPhotoAttachComplete()
-                    }
-                )
-                .environmentObject(authManager)
+                if !isDatedTimelineEnabled || datedTimelineIsOwned {
+                    ProgressPhotoAttachSheet(
+                        targetMetric: progressPhotoAttachTarget,
+                        fallbackDate: progressPhotoAttachFallbackDate,
+                        onComplete: {
+                            await handleProgressPhotoAttachComplete()
+                        },
+                        presentationOwner: isDatedTimelineEnabled ? datedTimelineOwner : nil
+                    )
+                    .environmentObject(authManager)
+                }
             }
             .navigationDestination(isPresented: $isMetricDetailActive) {
                 fullMetricChartView
@@ -569,7 +603,7 @@ struct DashboardViewLiquid: View {
     }
 
     @MainActor
-    private func scheduleMetricCacheRefresh() {
+    func scheduleMetricCacheRefresh() {
         // Published values arrive before the model finishes updating its sorted
         // history. Coalesce that burst and snapshot only after the update completes.
         metricCacheBuildID = UUID()
@@ -579,52 +613,6 @@ struct DashboardViewLiquid: View {
             guard !Task.isCancelled else { return }
             await prewarmMetricCaches()
         }
-    }
-
-    func scheduleDashboardDerivedStateRefresh(
-        rebuildDailyMetricsLookup: Bool = false,
-        animatedIndex: Int? = nil
-    ) {
-        // Scrub hot path: index-only updates must NOT rebuild weekly/monthly/yearly
-        // global timeline buckets (that is multi-ms main-thread work and causes jank).
-        if let animatedIndex, !rebuildDailyMetricsLookup {
-            Task { @MainActor in
-                guard !viewModel.bodyMetrics.isEmpty else { return }
-                PerfSignpost.measure("dashboard_scrub_refresh") {
-                    updateAnimatedValues(for: animatedIndex, animate: false)
-                }
-            }
-            return
-        }
-
-        Task { @MainActor in
-            await Task.yield()
-
-            PerfSignpost.measure("dashboard_derived_refresh") {
-                if rebuildDailyMetricsLookup {
-                    rebuildDailyMetricsLookupCache()
-                }
-
-                refreshGlobalTimelineStore()
-
-                if let animatedIndex, !viewModel.bodyMetrics.isEmpty {
-                    updateAnimatedValues(for: animatedIndex, animate: true)
-                }
-            }
-        }
-    }
-
-    func refreshGlobalTimelineStore() {
-        let heightInches = convertHeightToInches(
-            height: authManager.currentUser?.profile?.height,
-            heightUnit: authManager.currentUser?.profile?.heightUnit
-        )
-
-        globalTimelineStore.updateMetrics(
-            bodyMetrics,
-            dailyMetrics: recentDailyMetrics,
-            heightInches: heightInches
-        )
     }
 
     private var heroSection: some View {

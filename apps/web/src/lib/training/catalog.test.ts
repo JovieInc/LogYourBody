@@ -6,7 +6,9 @@ import {
   catalogVariantSeedSchema,
   catalogVariantById,
   isEligibleVariant,
+  loadExerciseVariantRecord,
   missingEquipment,
+  OBJECTIVE_VARIANT_MEASURE_MESSAGE,
   profileEquipment,
   queryExerciseLibrary,
   resolveAvailableEquipment,
@@ -116,6 +118,65 @@ describe('curated exercise variant contract', () => {
     expect(edited.jointDiscomfort).toEqual(['user prefers a different grip']);
     expect(edited.rom).toEqual(['user selected shorter range']);
     expect(variantSeed[0].toleranceTags.jointDiscomfort).toEqual([]);
+  });
+
+  it('keeps omitted tolerance, fatigue, and ROM unknown rather than zero', () => {
+    const existing = catalogVariantById('dead_bug')!;
+    const legacy = { ...existing };
+    delete legacy.variantMetadata;
+    const loaded = loadExerciseVariantRecord(legacy);
+    expect(loaded.record.id).toBe('dead_bug');
+    expect(loaded.record.primaryMuscle).toBe('core');
+    expect(loaded.bodyPosition).toBe(existing.bodyPosition);
+    expect(loaded.equipment).toEqual(existing.requires);
+    expect(loaded.targetedMuscle).toBe('unknown');
+    expect(loaded.support).toBe('unknown');
+    expect(loaded.romSetupCaveat).toBe('unknown');
+    expect(loaded.loadTolerance).toEqual({
+      tolerance: 'unknown',
+      fatigue: 'unknown',
+      rom: 'unknown',
+    });
+    for (const value of Object.values(loaded.loadTolerance)) {
+      expect(value).not.toBe(0);
+      expect(value).not.toBe('0');
+      expect(typeof value).not.toBe('number');
+    }
+    expect(
+      catalogVariantSchema.safeParse({
+        ...legacy,
+        variantMetadata: { tolerance: 0, fatigue: 0, rom: 0 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects objective spinal load and a numeric SFR score in variant metadata', () => {
+    const entry = catalogVariantById('incline_dumbbell_press')!;
+    const metadata = entry.variantMetadata!;
+    const forbidden = [
+      { spinalLoad: 3500 },
+      { spinalLoadN: 3500 },
+      { axialLoad: 1200 },
+      { objectiveSpinalLoad: 80 },
+      { sfr: 1.5 },
+      { sfrScore: 9 },
+      { stimulusToFatigue: 7 },
+      { stimulusToFatigueRatio: 4 },
+      { toleranceTags: { ...metadata.toleranceTags, spinalLoad: 400, sfrScore: 8 } },
+    ];
+    for (const extra of forbidden) {
+      const parsed = catalogVariantMetadataSchema.safeParse({ ...metadata, ...extra });
+      expect(parsed.success).toBe(false);
+      if (!parsed.success) {
+        expect(parsed.error.issues.map((issue) => issue.message)).toContain(
+          OBJECTIVE_VARIANT_MEASURE_MESSAGE,
+        );
+      }
+      expect(
+        catalogVariantSchema.safeParse({ ...entry, variantMetadata: { ...metadata, ...extra } })
+          .success,
+      ).toBe(false);
+    }
   });
 
   it('distinguishes torso contact from thigh and arm anchoring', () => {

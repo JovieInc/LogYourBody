@@ -4,6 +4,41 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 
+it('keeps voice hardware dormant during ordinary chat construction and dismissal', () => {
+  const source = readFileSync(
+    new URL('../../../apps/ios/LogYourBody/Services/VoiceCaptureService.swift', import.meta.url),
+    'utf8',
+  );
+  const capture =
+    source.split('final class VoiceCaptureService {')[1]?.split('enum VoiceCoachPolicy')[0] ?? '';
+  expect(capture).toMatch(/@ObservationIgnored\s+private lazy var audioEngine/);
+  expect(capture.split('func start()')[0]).not.toMatch(
+    /(?:let|var) recognizer[^\n]*=\s*SFSpeechRecognizer/,
+  );
+  const start = capture.split('func start()')[1]?.split('func finish()')[0] ?? '';
+  expect(start.indexOf('try await requestPermissions()')).toBeGreaterThan(-1);
+  expect(start.indexOf('SFSpeechRecognizer(locale:')).toBeGreaterThan(
+    start.indexOf('try await requestPermissions()'),
+  );
+  const cancel =
+    capture.split('func cancel()')[1]?.split('private func requestPermissions()')[0] ?? '';
+  expect(cancel).toMatch(
+    /if request != nil \{\s*audioEngine\.stop\(\)\s*audioEngine\.inputNode\.removeTap\(onBus: 0\)\s*try\? AVAudioSession\.sharedInstance\(\)\.setActive\(false, options: \.notifyOthersOnDeactivation\)\s*\}/,
+  );
+  expect(cancel.match(/audioEngine/g)).toHaveLength(2);
+  expect(cancel.match(/AVAudioSession/g)).toHaveLength(1);
+  const playback = readFileSync(
+    new URL('../../../apps/ios/LogYourBody/Services/VoicePlaybackService.swift', import.meta.url),
+    'utf8',
+  );
+  expect(playback).toMatch(/private lazy var synthesizer/);
+  expect(playback).not.toMatch(/(?:let|var) synthesizer[^\n]*=\s*AVSpeechSynthesizer\(\)/);
+  const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
+  for (const file of ['VoiceCaptureService.swift', 'VoicePlaybackService.swift']) {
+    expect(turbo.tasks.test.inputs).toContain(`$TURBO_ROOT$/apps/ios/LogYourBody/Services/${file}`);
+  }
+});
+
 it('requires verified native text entry before testing draft preservation', () => {
   const source = readFileSync(
     new URL('../../../apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift', import.meta.url),
@@ -17,13 +52,15 @@ it('requires verified native text entry before testing draft preservation', () =
   const loop = typing.split('for character in text {')[1] ?? '';
   const [focus, readback] = loop.split('field.typeText(String(character))');
   expect(focus).toMatch(
-    /if !keyboard\.exists \{\s*field\.tap\(\)\s*guard keyboard\.waitForExistence\(timeout: 1\.5\) else \{ return false \}\s*\}/,
+    /if !focused\.exists \{\s*field\.tap\(\)\s*guard focused\.waitForExistence\(timeout: 1\.5\) else \{ return false \}\s*\}/,
   );
   expect(focus.match(/waitForExistence/g)).toHaveLength(1);
   expect(readback).toMatch(
     /expected\.append\(character\)\s*if field\.value as\? String == expected \{ continue \}\s*let entered = XCTNSPredicateExpectation/,
   );
   expect(readback).toContain('attachDiagnostics(app: app, name: "incomplete-native-text-entry")');
+  expect(typing).toContain('.matching(NSPredicate(format: "hasKeyboardFocus == true"))');
+  expect(typing).not.toContain('if !keyboard.exists');
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
   expect(turbo.tasks.test.inputs).toContain('$TURBO_ROOT$/apps/ios/LogYourBodyUITests/**/*.swift');
 
@@ -50,13 +87,37 @@ it('checks Stats composition, card styling and provenance dismissal through the 
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
   for (const input of [
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_opacity_audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_timeline_gesture_audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_dated_stats_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-report.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_timeline_day.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
     '$TURBO_ROOT$/apps/ios/LogYourBodyWidget/**/*.swift',
     '$TURBO_ROOT$/apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift',
   ]) {
     expect(turbo.tasks.test.inputs).toContain(input);
   }
+  const audit = readFileSync(
+    new URL('../../../scripts/ios/launch-ui-regression-audit.py', import.meta.url),
+    'utf8',
+  );
+  // launch audit keeps every size-ratchet sibling
+  expect(audit).toContain('Cannot load launch UI audit sibling');
+  expect(audit).toContain('_AUDIT_SIBLINGS');
+  expect(audit).toContain('launch_ui_timeline_day.py');
+  expect(audit).toContain('launch_ui_opacity_audit.py');
+  expect(audit).toContain('launch_ui_timeline_gesture_audit.py');
+  expect(audit).toContain('launch_ui_dated_stats_audit.py');
+  expect(audit).toContain('launch-ui-regression-report.py');
+  expect(audit).not.toMatch(/^def write_outputs\(/m);
+  expect(audit).not.toMatch(/^def check_timeline_calendar_day\(/m);
+  expect(audit).not.toMatch(/^def check_optional_cgfloat_opacity\(/m);
+  expect(audit).not.toMatch(/^def check_timeline_gestures\(/m);
+  expect(audit).not.toMatch(/^def check_dated_stats_fixture\(/m);
+  // The parent audit stays within the company 500-line ratchet.
+  const parentLines = audit.endsWith('\n') ? audit.slice(0, -1).split('\n') : audit.split('\n');
+  expect(parentLines.length).toBeLessThanOrEqual(500);
   const coverage = mkdtempSync(`${tmpdir()}/lyb-ui-audit-coverage-`);
   try {
     const pythonLibrary = execFileSync('python3', ['-c', 'import sys; print(sys.prefix)'], {

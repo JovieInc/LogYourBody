@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const root = new URL('../../../', import.meta.url);
@@ -16,19 +17,45 @@ function expectAtLeast(version: string, minimum: string) {
 }
 
 describe('Dependabot security update resolution', () => {
+  it('keeps web React and React DOM dependency ranges in lockstep', () => {
+    const manifest = JSON.parse(readFileSync(new URL('apps/web/package.json', root), 'utf8'));
+    expect(manifest.dependencies.react).toBe(manifest.dependencies['react-dom']);
+  });
+
+  it('renders HTML with the installed web React and React DOM pair', () => {
+    const webRequire = createRequire(new URL('apps/web/package.json', root));
+    const react = webRequire('react');
+    const { renderToString } = webRequire('react-dom/server');
+
+    expect(renderToString(react.createElement('p', null, 'React dependency probe'))).toBe(
+      '<p>React dependency probe</p>',
+    );
+  });
+
+  it('shares the web React runtime with workspace UI components', () => {
+    const webRequire = createRequire(new URL('apps/web/package.json', root));
+    const uiRequire = createRequire(new URL('packages/jovie-ui/package.json', root));
+    expect(uiRequire('react')).toBe(webRequire('react'));
+  });
+
   it.each([
     ['fast-uri', '3.1.9'],
+    ['glob', '14.0.2'],
+    ['minimatch', '11.0.1'],
     ['undici', '8.12.2'],
   ])('%s has no vulnerable locked copies below %s', (dependency, minimum) => {
     const lockfile = readFileSync(new URL('pnpm-lock.yaml', root), 'utf8');
     const versions = [...lockfile.matchAll(new RegExp(`^ {2}${dependency}@([^:\\s]+):`, 'gm'))];
 
     expect(versions.length).toBeGreaterThan(0);
-    for (const [, version] of versions) expectAtLeast(version, minimum);
+    // A patched copy is locked as name@version(patch_hash=...). Compare the semver.
+    for (const [, version] of versions) expectAtLeast(version.split('(')[0], minimum);
   });
 
   it.each([
     ['fast-uri', '3.1.9'],
+    ['glob', '14.0.2'],
+    ['minimatch', '11.0.1'],
     ['undici', '8.12.2'],
   ])('%s keeps manifest, workspace and lockfile overrides consistent', (dependency, minimum) => {
     const manifest = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
@@ -48,16 +75,55 @@ describe('Dependabot security update resolution', () => {
       '3.1.9',
       ['@commitlint/cli', '@commitlint/load', '@commitlint/config-validator', 'ajv'],
     ],
+    ['glob', '14.0.2', ['apps/web/package.json']],
+    ['minimatch', '11.0.1', ['eslint']],
+    ['minimatch', '11.0.1', ['eslint-plugin-react']],
     ['undici', '8.12.2', ['eve']],
   ])(
     '%s resolves to a patched version through its installed parent',
     (dependency, minimum, parents) => {
       let parentRequire = createRequire(new URL('package.json', root));
-      for (const parent of parents) parentRequire = createRequire(parentRequire.resolve(parent));
+      for (const parent of parents) {
+        const parentUrl = parent.endsWith('/package.json')
+          ? new URL(parent, root)
+          : parentRequire.resolve(parent);
+        parentRequire = createRequire(parentUrl);
+      }
 
       expectAtLeast(parentRequire(`${dependency}/package.json`).version, minimum);
     },
   );
+
+  it('keeps minimatch 11 callable for the ESLint 3.x parents', () => {
+    const rootRequire = createRequire(new URL('package.json', root));
+    const webRequire = createRequire(new URL('apps/web/package.json', root));
+    const parents = [
+      rootRequire.resolve('eslint-plugin-import'),
+      rootRequire.resolve('eslint-plugin-react'),
+      webRequire.resolve('eslint-plugin-jsx-a11y'),
+    ];
+
+    for (const parent of parents) {
+      const parentRequire = createRequire(parent);
+      const loaded = parentRequire('minimatch');
+      // eslint-plugin-react calls the module itself. eslint-plugin-import and
+      // eslint-plugin-jsx-a11y call the Babel __esModule default.
+      const callable = loaded.__esModule ? loaded.default : loaded;
+      expect(typeof loaded, parent).toBe('function');
+      expect(callable, parent).toBe(loaded);
+      expect(loaded('src/a.ts', 'src/**/*.ts')).toBe(true);
+      expect(loaded.makeRe('*.jsx').test('Button.jsx')).toBe(true);
+      expect(new loaded.Minimatch('src/**/*.ts', { dot: true }).match('src', true)).toBe(true);
+      expectAtLeast(parentRequire('minimatch/package.json').version, '11.0.1');
+    }
+
+    const glob = webRequire('glob');
+    const matches = glob.globSync('dependency-security.test.ts', {
+      cwd: fileURLToPath(new URL('.', import.meta.url)),
+      nodir: true,
+    });
+    expect(matches).toContain('dependency-security.test.ts');
+  });
 
   describe.each(['package.json', 'packages/shared-lib/package.json'])(
     '%s installed dependencies',
