@@ -116,8 +116,19 @@ receipt order, then branch-only receipts. Divergent edits of one receipt stay
 conflicted. A checkout without the driver keeps Git's text merge.
 `node scripts/correction-classifier.mjs --resolve-merge . --stage`
 merges and classifies the correction ledger after other conflicts are resolved.
+When the remaining conflicts are the ledger and generated source projection, run
+`python3 scripts/resolve-repository-docs.py --merge-ledger` to refresh the projection
+from staged inputs and invoke that same parent-preserving classifier. It refuses
+other source conflicts and missing merge parents before writing. A classifier
+refusal restores the projection bytes and index stages; resolve the reported
+source or guard problem and retry. Unrelated unstaged source edits stay untouched.
 Union generation and parent verification share guard snapshots within that command;
 each retry reads the index and guard sources afresh.
+If the staged index changes during projection rendering, refusal preserves the
+other writer's projection bytes and index entries; rollback begins only after
+the resolver completes its own render. Review the inputs and retry.
+The reviewed diagnostic project-pin resolver also retains each newly added parent
+file's group and build-phase references; retaining a declaration alone is insufficient.
 For a documentation rewrite conflicting with incoming new sections, run
 `python3 scripts/resolve-repository-docs.py --merge-sections docs/path.md`.
 It prints a proposal from the three unmerged index stages, preserving the branch
@@ -125,6 +136,11 @@ and appending distinct incoming level-two sections. Review the proposal, replace
 the conflicted file and stage it explicitly. This mode never writes or stages;
 it refuses incoming edits/deletions, duplicate headings, unheaded additions and
 non-documentation paths. It does not adjudicate contradictory prose.
+For a conflicted Xcode project whose parents only insert file membership, run
+`python3 scripts/resolve-repository-docs.py --union-project`.
+It stages those insertions from both parents and refuses an edit or deletion of
+an existing line. Review the staged project, then pass its digest to
+`--reviewed-project-sha256`. The union never derives that digest.
 Repair a conflicted source projection first with
 `python3 scripts/resolve-repository-docs.py --staged`. If staging fails, it restores
 the original projection bytes (or absence), so the same command remains retryable.
@@ -159,8 +175,16 @@ cannot change the reviewed staged snapshot. Refusal preserves the ledger and ind
 Both resolution modes and staged verification refuse an index that changes during
 validation, before writing the ledger or returning success. Retry the same command
 against the current index; the refusal preserves the other writer's staged changes.
+
+The classifier also snapshots the working ledger and rechecks its bytes after
+validating the index and both merge parents, and again immediately before
+replacing the file. An edit during validation or in that pre-write window
+refuses resolution, staging and a successful verification verdict without
+overwriting the other writer. Review the working ledger and retry against the
+current merge. Concurrent ledger edits are preserved and cannot be overwritten
+by a resolution computed from earlier bytes.
 They also recheck `HEAD` and `MERGE_HEAD` before writing or returning success;
 changed parents invalidate the review even when the index is unchanged.
-Both resolver modes and staged verification also recheck the working ledger
-after validation. Concurrent ledger edits are preserved and require a fresh retry;
-they cannot be overwritten by a resolution computed from earlier bytes.
+The pre-write boundary samples the index, then repeats the index, parent and
+ledger comparison before replacement. A writer that lands during that sample
+cannot authorize the write, staging or a successful verdict.

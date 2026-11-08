@@ -34,6 +34,34 @@ class RealtimeSyncManager: ObservableObject {
     let analyticsService: AnalyticsService
     let networkMonitor: NWPathMonitor
 
+    #if DEBUG
+    private var usesOfflineUITestFixture = false
+
+    func applyOfflineUITestFixture() {
+        usesOfflineUITestFixture = true
+        networkMonitor.cancel()
+        isOnline = false
+        syncStatus = .offline
+        pendingSyncCount = 0
+    }
+    #endif
+
+    func handleNetworkPathUpdate(isOnline: Bool) {
+        // A queued path callback can outlive monitor cancellation.
+        #if DEBUG
+        guard !usesOfflineUITestFixture else { return }
+        #endif
+        let wasOffline = !self.isOnline
+        self.isOnline = Self.online(isOnline)
+        if self.isOnline {
+            syncStatus = .idle
+            if wasOffline { syncAll() }
+        } else {
+            syncStatus = .offline
+            disconnectRealtime()
+        }
+    }
+
     var syncTimer: Timer?
     var cancellables = Set<AnyCancellable>()
     var syncQueue = DispatchQueue(label: "com.logyourbody.sync", qos: .background)
@@ -126,38 +154,27 @@ class RealtimeSyncManager: ObservableObject {
         self.analyticsService = analyticsService
     }
 
-    // MARK: - Network Monitoring
-    func setupNetworkMonitoring(arguments: [String] = ProcessInfo.processInfo.arguments) {
-        #if DEBUG
-        if arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument) {
-            isOnline = false
-            syncStatus = .offline
-            return
-        }
-        #endif
-        let queue = DispatchQueue.global(qos: .background)
-        networkMonitor.start(queue: queue)
-
-        networkMonitor.pathUpdateHandler = { [weak self] path in
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
-
-                let wasOffline = !self.isOnline
-                self.isOnline = path.status == .satisfied
-
-                if self.isOnline {
-                    self.syncStatus = .idle
-                    if wasOffline {
-                        // Coming back online - sync immediately
-                        self.syncAll()
-                    }
-                } else {
-                    self.syncStatus = .offline
-                    self.disconnectRealtime()
-                }
-            }
-        }
+    /// Paid UI fixtures force offline before the first snapshot. A satisfied
+    /// path must not replace that, or an empty Stats launch classifies as no-data.
+    static func online(
+        _ pathSatisfied: Bool,
+        _ arguments: [String] = ProcessInfo.processInfo.arguments
+    ) -> Bool {
+        guard pathSatisfied else { return false }
+        let fixtureForcesOffline = offlineUITestFixtures.contains { arguments.contains($0) }
+        return !fixtureForcesOffline
     }
+
+    static let offlineUITestFixtures = [
+        "-lybUITestPaidMVPFixture",
+        "-lybUITestWeightLoggerMVPFixture",
+        "-lybUITestPaywallFixture",
+        "-lybUITestPaywallPlansFixture",
+        "-lybUITestFullDashboardFixture",
+        "-lybUITestPhotoTimelineHUDFixture",
+        "-lybUITestBodyScoreOnboardingFixture",
+        "-lybUITestBodyScoreFirstPhotoFixture"
+    ]
 }
 
 extension PendingBodyMetricSyncItem {

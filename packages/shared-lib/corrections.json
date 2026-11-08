@@ -1,5 +1,135 @@
 [
   {
+    "fingerprint": "fix-red-81061e944d",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42468669321",
+    "correction": "LYB-319 PR #1709 repair, occurrence 2 in 14 days: merge origin/main without rebasing and repair red checks without weakening gates. Static Audits failed on a SwiftLint HTTP 504 download; Launch Quality exhausted primary HTTP 504 retries and anonymous API HTTP 403 retries before native execution. Shared Gitleaks run 42468669245 also exhausted archive HTTP 504 retries, without executing the scanner.",
+    "mechanization": "Extract the existing pinned release downloader into scripts/download-release-asset.sh and use it for both macOS setup and Linux Static Audits. Preserve bounded HTTP retries, authenticate only the asset API request with the existing job token when available, and verify each platform archive against the official release SHA-256 before extraction. Extend the existing required routing suite to exercise both actual installer steps with real curl, HTTP 504/403 refusal and recovery, authenticated and anonymous fallback, corrupt archives, and checksum mismatch on both routes. Three regressions fail against the prior steps: macOS authenticated fallback, Linux fallback, and Linux checksum rejection. Preserve the pinned shared Gitleaks scanner; its upstream download failure needs a successful required rerun or a repair in JovieInc/ci, whose current main still has the failing release URL. The harness owns pushing and PR edits and should include: Machine: built scripts/download-release-asset.sh.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One shared download boundary prevents platform installers from diverging on retry, API authentication and checksum verification. Both native callers must verify the pinned bytes before extracting them; failed HTTP responses and substituted archives remain hard failures."
+      }
+    },
+    "guard": {
+      "path": "scripts/download-release-asset.sh",
+      "anchor": "# Neither HTTP error content nor substituted archives may reach extraction."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-a510b9a468",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1709",
+    "correction": "LYB-319 PR #1709 repair: CI Summary and Launch Quality failed before native execution because the pinned SwiftLint download returned HTTP 504 even after the bounded retries added in 1a18bfd0. Shared Gitleaks also exhausted its retries on HTTP 504 on the prior head and now passes unchanged. Merge origin/main without rebasing and preserve the photographic feature and required gates.",
+    "mechanization": "Extend the shared iOS setup action with a fallback to the exact GitHub release asset API after bounded release-URL retries, and verify either download against the published SHA-256 before extraction. The asset API archive was downloaded and its digest and ZIP integrity verified. The existing required Mac Runner Routing Tests job imports real-curl installer regressions for success, transient 504 recovery, persistent primary 504 recovery through the asset API, refusal when both routes fail even with valid ZIP bodies, corrupt archive refusal, and checksum rejection on both routes. The fallback and checksum cases fail against 1a18bfd0 and pass after this change. Reuse the action across native workflows; do not duplicate or weaken the shared Gitleaks scanner. The harness owns pushing and PR updates and should include: Machine: built .github/actions/setup-ios-build/action.yml.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared installer owns the download and extraction boundary. A second route to the same pinned asset recovers persistent release-URL failures, while bounded retries, HTTP failure propagation and checksum verification prevent callers from extracting unverified error or substituted content by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/download-release-asset.sh",
+      "anchor": "curl --fail --silent --show-error --location"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-89c44c062f",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1709",
+    "correction": "LYB-319 PR #1709 repair: merge origin/main without rebasing, preserve gated on-device photographic appearance, fix three size-500 violations, the XCTest geometry argument order, and the stale reviewed Xcode project fingerprint. Tently failed because its AI provider was unreachable.",
+    "mechanization": "Reuse the existing whole-declaration splitter and required size/call-shape ratchet instead of adding a parallel repair system. The existing static audit reproduced all four source violations before the repair and passes after extraction and call-order correction. Retain all extracted Swift declarations in the app target, preserve TypeScript exports and behavioral tests, and refresh the project fingerprint through the existing explicit reviewed-pin resolver. No gates or baselines are weakened. The harness owns pushing and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Splitting these files and ordering this call fixes the current sources but cannot prevent future file growth or misordered calls; the existing deterministic source ratchet is the preventive boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required static audit checks repository-wide source size and declared Swift argument order, and the routing tests reject a project fingerprint that differs from the actual project bytes."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_split_size_ratchet.py",
+      "anchor": "self.assertEqual(check_repo(ROOT), [])"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "dependency-repair-worktree-change-during-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1756",
+    "correction": "PR #1756, fix-red-1423773703 occurrence 58: merge origin/main without rebasing and preserve the ElevenLabs 3.0.80 bump. Detect Changes and parity reject its stale source projection, causing CI Summary to fail. Dependency repair must also refuse tracked manifest or resolver-configuration edits made during rendering after frozen verification.",
+    "mechanization": "Extend the existing staged projection renderer to recheck tracked dependency inputs before writing or staging artifacts in both dependency modes. Four real-Git regressions fail against the previous helper and prove refusal with unchanged index and artifacts, preserved manifest or npmrc edits, successful reviewed retry and idempotence after the extension. The required Detect Changes pre-commit suite already imports these cases. Use the extended --verify-lockfile helper to retain bot resolutions and regenerate source parity. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing helper owns dependency verification, projection generation and artifact staging. Rechecking tracked dependency inputs after rendering prevents observed worktree drift from being accepted as verified by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "dependency inputs changed during projection generation; stage reviewed inputs and retry"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-lockfile-change-during-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1759",
+    "correction": "PR #1759, fix-red-1423773703 occurrence 56: merge origin/main without rebasing and repair the gateway 4.0.137 update. Detect Changes and parity reject a stale source projection, causing CI Summary to fail. Dependency repair must not accept or stage lockfile bytes changed during source-map rendering after frozen verification.",
+    "mechanization": "Extend the existing staged projection renderer to compare the verified lockfile bytes before writing or staging artifacts in both dependency modes. Two real-Git regressions fail against the previous helper and pass after the extension, proving unchanged index, artifact rollback, successful retry and idempotence. The required Detect Changes pre-commit suite already imports these cases. Use the extended --verify-lockfile helper to retain merged resolutions and regenerate source parity. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dependency repair helper owns verified lockfile input and artifact staging. Comparing those bytes after rendering prevents an observed concurrent lockfile edit from being accepted or staged as verified by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "lockfile changed during projection generation; review dependency inputs and retry"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-index-change-during-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1758",
+    "correction": "PR #1758, fix-red-1423773703 occurrence 55: merge origin/main without rebasing and repair the bundle-analyzer 16.4.3 update. Detect Changes and parity reject a stale source projection, causing CI Summary to fail. The dependency helper must not stage a projection for an index changed during rendering.",
+    "mechanization": "Extend the existing staged projection renderer to recheck its source index before writing, carrying the dependency verifier snapshot through rendering in both repair modes. Two real-Git regressions fail against the old helper and pass after the extension, preserving concurrent staged manifest edits, lockfile and projection bytes, then proving successful retry and idempotence. Extend the existing ignored-input fixtures to retain generated Next.js manifests while still refusing local-only workspace manifests, hooks, npmrc files and patches; all eight cases fail without the output exclusion. Move the existing unmerged-index query to the companion module to retain the 500-line limit. The required Detect Changes pre-commit suite already imports these cases. Use the extended --verify-lockfile helper to retain the merged lockfile resolutions and regenerate source parity. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing helper owns staged source rendering and artifact writes. Comparing the verified index after rendering prevents observed concurrent edits from producing a stale committed source map by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Refuse a source index changed while rendering instead of staging stale parity."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-ignores-workspace-manifests",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1736",
+    "correction": "PR #1736, fix-red-1423773703 occurrence 48: merge origin/main without rebasing and repair the Radix radio-group 1.5.1 update. Detect Changes and parity reject the stale source projection, causing CI Summary to fail. Ignored workspace package.json manifests still bypass the dependency-repair preflight and can enter a lockfile destined for CI.",
+    "mechanization": "Extend the ignored-input preflight in both dependency repair modes to reject ignored workspace package.json manifests while still excluding installed node_modules package.json files. Two real-Git regressions fail before the extension and pass afterward, preserving artifacts, index, local manifests and vendor package.json files, then retry and stay idempotent. The existing required Detect Changes pre-commit suite imports these tests. Use the extended --verify-lockfile helper on the merged 1.5.1 lockfile and regenerate source parity. Retain frozen installation and parity gates. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dependency repair helper owns resolver input preflight. Rejecting ignored workspace manifests before pnpm runs prevents a gitignored package.json from changing the lockfile committed for CI."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Ignored workspace manifests are still local-only resolver inputs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-ignored-resolver-inputs",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1729",
     "correction": "PR #1729, fix-red-1423773703 occurrence 48: the Statsig 3.33.7 manifest bump retained the 3.33.5 lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Recurring dependency repairs must not depend on ignored local resolver configuration, hooks or patches.",
@@ -6132,6 +6262,555 @@
     "guard": {
       "path": "scripts/resolve-repository-docs.py",
       "anchor": "Refuse inputs changed during verification before staging dependency artifacts."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-ledger-prewrite-preserves-concurrent-edits",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679#repair-prewrite-ledger",
+    "correction": "PR #1679 / LYB-245, fix-red-e3b0c44298 occurrence 81: merge origin/main without rebasing and retain the Apple Health sync receipt, the concerning-pain policy, and both parents' correction receipts. A working-ledger edit that lands after validation and before replacement must not be overwritten.",
+    "mechanization": "Extend the existing correction classifier to snapshot the working ledger before readiness checks and compare those bytes again immediately before writing. The existing required shared-lib suite adds two real-Git negative controls for unstaged and staged resolution; they preserve the concurrent bytes and index, then retry successfully. Use the extended --resolve-merge . --stage path for this merge. The harness retains push and PR-body ownership and must add exactly one line: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The resolver owns the only write of the merged ledger, so comparing the snapshotted bytes immediately before replacement refuses a stale resolution and preserves a concurrent edit by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "Recheck the working ledger immediately before replacing it."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-95726c4f82",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679",
+    "correction": "PR #1679 / LYB-245, occurrence 4 in 14 days: merge origin/main without rebasing and repair the generated repository source-map conflict while preserving sync-state copy, receipt placement and every parent correction receipt. Tently failed because its AI provider was unreachable, with no code finding.",
+    "mechanization": "Extend the existing source-map repair machine to reject conflict markers in every staged input before generating or staging the projection. Six real-Git negative controls fail against the previous resolver and pass after the change, including standard, diff3, short and CRLF markers and a clean working copy hiding marked staged source. Clean staged retries preserve unrelated working edits and remain idempotent. The existing required pre-commit-lint test entrypoint runs these regressions. Use the extended --staged resolver for this instance and retain the reviewed merged-project digest. The harness owns pushing and PR edits and must include exactly one machine line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair command owns ledger writes, staging and successful merge verification. Rechecking both parent refs at that boundary prevents stale merge evidence from authorizing those operations even when indexed bytes are unchanged."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "merge parents changed during validation; retry from the current merge"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "swift-catch-statement-position",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41282526154/job/124777328731",
+    "correction": "PR #1679 / LYB-245: the required iOS Static Audits job rejects the receipt dismissal task because catch starts on a new line after the do block. Local SwiftLint without SourceKit skips statement_position and cannot establish that this rule passes.",
+    "mechanization": "Keep catch on the same line as the preceding closing brace. Reuse the existing required SourceKit-backed SwiftLint statement_position gate, retaining its Swift toolchain setup and every native test. The immutable hosted audit artifact proves the original source fails. Retain the source-map repair machine already extended in this PR, run its regression suite and use its --staged path on this repaired index. The harness owns pushing and PR edits and must retain exactly one machine declaration: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Runtime receipt logic cannot prevent Swift source formatting regressions. Changing cancellation behavior would not address the source-position requirement."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required iOS Static Audits job installs Swift and enables SourceKit so SwiftLint deterministically rejects misplaced catch statements throughout the native sources. Its hosted failure is the regression proof; this host without SourceKit cannot execute that rule."
+      }
+    },
+    "guard": {
+      "path": ".github/workflows/ci.yml",
+      "anchor": "# SwiftLint's SourceKit rules (statement_position, ...) need a Swift toolchain; the static"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "privacy-tests-separate-message-content-from-operational-metadata",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41282526154/job/124777328706",
+    "correction": "PR #1679: JavaScript/TypeScript failed because the customer-voice privacy test matched the health sentinel 93 inside a valid forwarded timestamp ending in .935Z. Runtime support redaction was correct; the whole-record substring oracle was time-dependent.",
+    "mechanization": "Extend the existing inbound privacy test with fixed .000Z and the recorded .935Z clocks, restoring real timers after each case. Assert the entire stored record against its exact approved event, salted sender hash, reply destination and stage timestamps, and retain the health-sentinel scan on the complete event. The .935Z case fails against the original assertion while the other 23 cases pass. This preserves unknown-field rejection and every no-health-data and no-console-log assertion without changing runtime capture or privacy controls. Retain the source-map machine already extended in this PR; the harness owns pushing and the single PR-body machine declaration.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The application already persists a fixed category summary and legitimate operational timestamps. Altering runtime timestamps or redaction would not repair the test oracle's accidental digit collision."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required web test suite can exercise both clock values and compare all allowed saved fields exactly while scanning message fields for health sentinels, preventing false failures without allowing additional persisted data."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/customer-voice/customer-voice.test.ts",
+      "anchor": "accepts signed input, classifies canaries and never logs health data at %s"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-95726c4f82",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679#repair-20261101-occurrence-5",
+    "correction": "PR #1679 / LYB-245, occurrence 5 in 14 days: merge origin/main without rebasing, preserve sync-state copy and receipt placement, retain every correction receipt, and extend the existing repair machine. Concurrent working-ledger edits must not be overwritten or receive a stale successful verdict.",
+    "mechanization": "Align the shared repair fingerprint annotations explicitly to the incoming codebase classifier guard, retaining each parent receipt identity and its original correction and mechanization text. Extend that existing classifier to snapshot and recheck working-ledger bytes alongside the index and both merge parents before writing, staging or returning success. Add the working-ledger target to all three existing concurrency modes. The three negative controls fail before the change, while the original nine cases pass; all 71 classifier cases then pass with unchanged 100% line, branch and function coverage gates. Replay the actual PR parents and use the extended staged verifier on the reviewed union. Tently check 124779536021 reports an AI-provider outage with no code finding; preserve the gate for the harness push. The harness owns push and PR edits and must use exactly one PR-body machine declaration: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair command owns ledger writes, staging and successful merge verification. Rechecking both parent refs at that boundary prevents stale merge evidence from authorizing those operations even when indexed bytes are unchanged."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "merge parents changed during validation; retry from the current merge"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-cc900b961c",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41284487184/job/124783086308",
+    "correction": "PR #1679 / LYB-245: the required launch-quality build fails because handleDashboardBodyMetricsChange in a separate DashboardViewLiquid extension calls the private scheduleMetricCacheRefresh method. CI Summary reports that native failure; Tently reports an AI-provider outage without a code finding.",
+    "mechanization": "Make scheduleMetricCacheRefresh module-internal, matching the other dashboard refresh operations used by cross-file extensions. Preserve its main-actor isolation, coalescing, cancellation and deferred cache prewarming. Reuse the required launch-quality Swift compilation as the regression gate: run 41284487184 proves the private declaration fails at the actual extension call. Do not add a duplicate source-string test or weaken any native gate. origin/main is already an ancestor and git merge --no-edit origin/main reports up to date. This Linux host cannot provide the repaired native build or execution receipt; the harness must push and rerun the existing required native and Tently checks.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The method's access boundary is the defect. A module-internal method permits the existing cross-file extension call by construction while keeping the cache task state private; the required Swift compiler continues to reject inaccessible references."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Views/DashboardViewLiquid.swift",
+      "anchor": "    func scheduleMetricCacheRefresh() {"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "swiftui-reduce-motion-environment-is-read-only",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41285773987/job/124786814816",
+    "correction": "PR #1679 / LYB-245 (fix-red-cc900b961c occurrence 2): Launch Quality cannot compile HealthSyncPresentationTests because its render snapshot writes the read-only accessibilityReduceMotion environment. CI Summary reflects that native build failure. Tently check 124786645463 reports an unreachable AI provider without a code finding.",
+    "mechanization": "Disable snapshot animation through a SwiftUI transaction instead of assigning a get-only environment value. Extend the existing required shared-lib Reduce Motion guard from app sources to the unit-test and UI-test targets. The expanded guard fails specifically on HealthSyncPresentationTests.swift before the fix while the other 336 tests pass, then all 337 pass after the fix. Preserve every native test, copy, snapshot combination, feature gate and production motion behavior. The harness owns pushing and PR edits and should use the single declaration: Machine: built packages/shared-lib/src/swiftui-environment-writes.test.ts. The existing native compiler remains an independent gate; this Linux host cannot establish native build, execution or coverage success.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Runtime app logic cannot prevent future source edits from invoking an unsupported SwiftUI modifier, including within debug-only preview code."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic source regression in the existing required shared-lib test task detects the unsupported environment write on Linux before the native compiler independently rejects it on macOS."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/swiftui-environment-writes.test.ts",
+      "anchor": "keeps native views and previews free of read-only Reduce Motion writes (LYB-153)"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "merged-project-parent-file-references",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679",
+    "correction": "PR #1679 / LYB-245, fix-red-95726c4f82 occurrence 22: merge origin/main without rebasing and preserve both HomeV2RecentReadings.swift and SubjectPlateView.swift group registrations. The existing reviewed diagnostic project-pin resolver accepts a retained declaration with a missing group reference. Tently check 124791749497 reports its AI-provider outage without code findings.",
+    "mechanization": "Extend the existing project-pin/source-map resolver to require every newly added parent file identifier to retain at least its parent reference count. A real-Git negative control accepts the broken project before this change and refuses it afterward without changing the workflow, source map or index; the complete merged project then succeeds. The required Detect Changes pre-commit suite already runs this test module. Preserve both parents staged-marker and source-map tests, moving staged-marker cases into the existing pin module to retain the file-size limit. Use the extended resolver with reviewed digest 52639494cc700ebfd3fdd174d4820d6409cc9fafaf4bb5f2552a300234d1e935, then union the ledger and verify both parents. The harness owns push and PR-body updates and must retain exactly one machine line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver owns the reviewed project-pin update and can refuse a merged project that loses a newly added parent file reference before staging any derived artifacts. This directly prevents publishing a trusted project digest for this incomplete merge."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "merged project dropped a parent file reference: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dashboard-body-metrics-keeps-both-refreshes",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679#repair-20261107-occurrence-24",
+    "correction": "PR #1679 / LYB-245, fix-red-95726c4f82 occurrence 24: merge origin/main without rebasing. The body-metrics subscriber conflict would keep either the Apple Health receipt observer or the dated timeline refresh. Tently check 125250332316 reports an AI-provider outage (e85fe4fe-8681-422c-a573-9d21b071fbe6) and no source finding.",
+    "mechanization": "Keep both calls in handleDashboardBodyMetricsChange and subscribe with that handler. Extend the existing merged-native-view guard so a handler missing either call fails. The real dashboard source failed that assertion before the dated timeline call was added and passes after it; the inline one-sided fixtures fail in the same required test. Use the existing reviewed project-pin resolver with digest 56c40866070585623a231d659fbf91c6bbc93333c07d37df126b920baa820513 and the correction classifier to union both parents. The harness owns push and PR edits and must add exactly one line: Machine: built packages/shared-lib/src/swiftui-environment-writes.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One handler owns both parent refresh calls, so a later merge of the subscriber cannot keep only one side."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/swiftui-environment-writes.test.ts",
+      "anchor": "body metric changes keep Apple Health observation and dated timeline refresh"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "offline-ui-fixtures-ignore-live-network-callbacks",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42354637142/job/128350191401",
+    "correction": "PR #1679 / LYB-245, fix-red-5df69c1e5f occurrence 24: Launch Quality fails the dated timeline offline retry assertion because a live NWPathMonitor callback replaces the shared offline fixture state, showing Record a fresh measurement instead of Retry sync. CI Summary reflects that failure.",
+    "mechanization": "Extend the existing RealtimeSyncManager fixture setup to pin offline state before cancelling the monitor. Route network callbacks through one handler that rejects even callbacks already queued before the pin; every paid/dashboard/photo fixture uses the same setup. Register the callback before starting monitoring. Preserve the native retry assertion, copy, gates and release behavior. Add native regressions for queued and repeated path updates plus ordinary connectivity transitions. Extend the existing required shared-lib launch-evidence guard to require shared fixture wiring, the guarded callback and DEBUG-only override. The guard fails on the original source with the other 440 tests passing; native execution and coverage still require the real macOS runner. The harness owns push and PR edits and must use exactly one declaration: Machine: built apps/ios/LogYourBody/Services/RealtimeSyncManager.swift.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared sync fixture can own a persistent DEBUG-only offline override at the network-update boundary, preventing live runner connectivity and already-queued callbacks from replacing fixture state for all callers by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/RealtimeSyncManager.swift",
+      "anchor": "guard !usesOfflineUITestFixture else { return }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-ledger-prewrite-rechecks-index-and-parents",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679#repair-prewrite-index",
+    "correction": "PR #1679 / LYB-245, fix-red-e3b0c44298 occurrence 83: merge origin/main without rebasing and retain the Apple Health sync caption, weight receipt, and both parents' correction receipts. The pre-write index sample was discarded, so an index or parent change during that read still received a successful merge verdict.",
+    "mechanization": "Extend the existing correction classifier to compare the index, both merge parents and the working ledger after the pre-write index sample and before replacement. Four real-Git negative controls returned success before the comparison and now refuse, preserving the other writer's index or parent and the untouched ledger, then retry successfully. The existing required shared-lib suite runs these cases at the unchanged 100% line, branch and function coverage gates. Use the extended --resolve-merge . --stage path for this merge. Keep the privacy test's fixed clocks, including the .935Z case, so the stored event scan and the receipt anchor both remain. The harness owns push and PR edits and must add exactly one line: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The resolver owns the only write of the merged ledger. Comparing the reviewed index and both parents immediately after the pre-write sample refuses a stale resolution before replacement."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "Sample the index so the pre-write comparison observes a concurrent writer."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "repeated-ledger-merges-retain-earlier-receipts",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1679",
+    "correction": "PR #1679 / LYB-245, fix-red-e3b0c44298 occurrence 86: merge origin/main without rebasing and resolve the recurring correction-ledger conflict through the existing machine. Later repairs must retain earlier branch and main receipts as both sides add evidence.",
+    "mechanization": "Extend the existing required classifier regression matrix with three successive real-Git conflicted merges using the same resolver. Compare the exact staged union on every round, seed a missing branch receipt and a missing earliest-main receipt, require refusal without mutation, then restore the union and verify the staged retry before committing the fixture merge. All six known-bad omissions fail; the complete unions pass. Use --resolve-merge . --stage for this actual conflict and --check-merge . for both-parent verification. The classifier was already extended in this PR; this guard protects its repeated use. The harness owns pushing and PR edits and must retain exactly one machine declaration: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The existing resolver prevents receipt loss when invoked, but application code cannot prevent a future one-sided source merge or establish that the developer tool remains correct across successive merges."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required shared-lib test task can exercise successive real-Git merge states and reject exact staged unions that lose earlier receipts, including six explicit negative controls."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier-concurrency.test.mjs",
+      "anchor": "repeated main merges retain every earlier receipt and reject one-sided resolutions"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-pin-keeps-branch-workflow-edits",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1706",
+    "correction": "PR #1706 / LYB-318, fix-red-e3b0c44298 occurrence 86: merge origin/main without rebasing. The diagnostic workflow conflict was only the Xcode project pin, while this branch also pins the xcodebuild finalization helper. The pin resolver refused that repair because the parent blobs were not identical after masking the pin.",
+    "mechanization": "Extend the conflicted diagnostic pin resolver so an incoming workflow that differs from the merge base only by the project pin keeps the branch workflow, including its other reviewed pins. A real-Git regression fails while the resolver rejects that shape and passes after the extension; a hand-edited conflict and an incoming edit beyond the pin still fail with the workflow and index unchanged. Use the extended resolver with the reviewed digest of this merge's project, which keeps both parents' file membership, then union the correction ledger. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing diagnostic pin resolver owns this workflow conflict. Accepting an incoming pin-only change while requiring the conflicted worktree to be the branch plus that pin updates the trust boundary without dropping branch pins or deriving the digest."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Keep branch edits when incoming changed only this project pin."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "xcodebuild-finalization-grace",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42366173881/job/128385148002",
+    "correction": "PR #1706 / LYB-318, fix-red-5df69c1e5f occurrence 27: Launch Quality run 42366173881 passed all 29 selected UI tests in 1358s, then the 1500s hang cap killed xcodebuild during result-bundle finalization (exit 124). The same class of red check must not be repaired by raising the hang cap.",
+    "mechanization": "Extend the existing xcodebuild command deadline so a terminal XCTest result line may finish result-bundle finalization for at most 180 seconds past the original hang cap, and only when that result is observed inside the grace window. A run that never prints ** TEST EXECUTE SUCCEEDED ** or ** TEST EXECUTE FAILED ** still dies at the unchanged 1020s or 1500s cap. Early results do not add grace. Grace above 180 is refused before the command starts. The new behavior tests fail on the old single-deadline kill and pass after the split. Wire the watcher through run_with_timeout for every launch-quality test command, keep build-for-testing on the existing timeout, and pin the helper in the reviewed diagnostic tooling. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/xcodebuild-command-timeout.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing command deadline owns the xcodebuild test invocation, so it can tell a finished run from a hang and allow only bounded result-bundle finalization without raising the hang cap or skipping tests."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/xcodebuild-command-timeout.py",
+      "anchor": "A terminal XCTest result extends the deadline only until observed_at + grace."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "idle-chat-never-opens-voice-hardware",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41391664508",
+    "correction": "PR #1706 / LYB-318, fix-red-95726c4f82 occurrence 24: merge-group launch quality failed after chat collapse. The simulator log at 05:24:11 records CoreAudio Initialize: RPC timeout. Apparently deadlocked. Aborting now, then SIGABRT. Chat disappearance cancels an unused voice service, whose unconditional inputNode cleanup opens audio hardware. Tently reports a separate AI-provider outage, reference a9e22d1c-3058-4f4c-af85-c8b7994da4b7, with no source finding.",
+    "mechanization": "Extend the existing required launch UI regression suite to keep capture and playback resources deferred, create recognition only after permission, and require audio cleanup to be conditional on an existing request. Add both services to Turbo test inputs. The new guard fails against the previous eager resources and unconditional cleanup; it passes after the lifecycle fix. Add native idle-cancel, unused-finish and playback-recreation cases with injected resource factories; native execution remains for the real Mac runner. Use the existing split tool to extract playback without growing the company size baseline, and the reviewed project-pin resolver after adding source and test membership. The harness owns push and PR edits and must include exactly one line: Machine: built packages/shared-lib/src/launch-ui-regression-audit.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Deferred audio resources and request-owned cleanup prevent ordinary chat construction or dismissal from initializing capture or speech hardware, while actual recording retains its cleanup path."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/VoiceCaptureService.swift",
+      "anchor": "Never open audio hardware for cleanup."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "conflicted-project-unions-additive-membership",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1706",
+    "correction": "PR #1706 / LYB-318, fix-red-95726c4f82: merge origin/main without rebasing. Both parents inserted different Xcode file membership at the same points, so the project conflicted along with the diagnostic pin. Tently reports an AI-provider outage (reference 8a97e18d-363c-4496-afd6-b0698abb91e2) and no source finding; do not bypass that gate.",
+    "mechanization": "Extend the source-map resolver with --union-project. It stages a conflicted Xcode project only when both parents insert lines, and it keeps every inserted file membership. An edit or deletion of an existing line, a duplicate membership id, or a missing parent file leaves the index unchanged. The new real-Git regression fails on the previous resolver and passes after the extension; the reviewed pin still ignores unstaged source bytes. Use that command, review the staged project, then pass its digest to the existing pin command. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The resolver owns the project write during a merge. Unioning insertion-only membership keeps both parents' files, and refusing an edited line prevents a rewritten build setting from being staged as a membership union."
+      }
+    },
+    "guard": {
+      "path": "scripts/pbx_union.py",
+      "anchor": "A conflicted project unions additive file membership from both parents."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "company-size-growth-stays-within-baseline",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1706",
+    "correction": "PR #1706 / LYB-318, fix-red-e563739b4b occurrence 5: company guards reject body-shape-calibration.ts at 900 lines, BodyScoreShareCardTests.swift growing 1891 -> 1892, and resolve-repository-docs.test.mjs at 618 lines. The diagnostic project pin is stale after additive BodyShapeCalibration membership. Tently reports an AI-provider outage and no source finding; do not bypass that gate.",
+    "mechanization": "Extend the existing correction ratchet with the company size-500 scanner: same count, extensions, skip rules, and size baseline as JovieInc/ci guards/size.mjs. Baselined files may not grow and new files over 500 lines fail. Split body-shape calibration and the repository-doc manifest tests so each file stays at or under 500 lines, and keep the share-card test at its recorded 1891 lines. The behavior test fails on 908 -> 924 growth and on a new 501-line file, and passes when the recorded size is kept. Do not raise the company size baseline. Refresh the reviewed diagnostic project digest with the existing resolver after confirming the project diff only adds BodyShapeCalibration source and test membership. The harness owns push and PR-body updates and must add exactly one line: Machine: built packages/shared-lib/scripts/company-size-ratchet.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Splitting these three files clears the current company size failures, but the product modules cannot stop a later edit from growing another source file past the company size baseline."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The correction ratchet runs the company size scanner on the git snapshot, so a baselined file that grows or a new file over 500 lines fails before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/company-size-ratchet.mjs",
+      "anchor": "Baselined files may not grow.",
+      "ratchet": {
+        "baseline": "packages/shared-lib/company-size-ratchet-baseline.json"
+      }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "offline-ui-fixtures-ignore-live-network-callbacks",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42382426948/job/128432993283",
+    "correction": "PR #1706 / LYB-318, fix-red-5df69c1e5f occurrence 29: Launch Quality failed at LogYourBodyUITests+DatedTimeline.swift:85 because the offline retry action became Record a fresh measurement. Main advanced during repair and PR #1679 supplied the same shared fixture/network callback fix; keep that implementation and the original Retry sync assertion.",
+    "mechanization": "Merge main without rebasing, use the reviewed-project digest and correction-classifier resolvers to retain both parents, and extend the existing required launch-quality-evidence source guard. Require the shared offline pin before authenticated fixture publication, callback registration before monitor startup, and the complete offline status/pending-count reset. A negative control removing only the fixture syncStatus reset fails the extended guard; restored source passes. Preserve the inherited queued/repeated callback and ordinary transition native tests. The combined resolver exceeded 500 lines, so move its unchanged dependency rollback context into its existing manifest_union sibling and retain the required pin and dependency failure/retry tests. Native compilation, execution and coverage remain for macOS CI. The harness owns pushing and PR edits and must replace earlier machine declarations with exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared sync fixture can own a persistent DEBUG-only offline override at the network-update boundary, preventing live runner connectivity and already-queued callbacks from replacing fixture state for all callers by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/RealtimeSyncManager.swift",
+      "anchor": "guard !usesOfflineUITestFixture else { return }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-frozen-lockfile-drift",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1755",
+    "correction": "PR #1755, fix-red-1423773703 occurrence 53: merge origin/main without rebasing and preserve the ws 8.22.1 and @types/ws 8.18.2 update. Detect Changes and parity reject the stale generated source map, causing CI Summary to fail. Extend and use the existing dependency-repair machine in this PR.",
+    "mechanization": "Extend the existing repair helper to reject lockfile drift during frozen-only verification in both dependency modes. Two real-Git negative controls fail before the guard and pass afterward, proving rollback, successful retries and idempotence; all 42 dependency cases pass through the existing required pre-commit-lint test entrypoint. Use the extended --verify-lockfile helper to verify the unchanged bot lockfile and regenerate the source map. Preserve frozen installs and every CI gate. The harness owns push and PR edits and must include exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing helper owns dependency verification and artifact staging. Treating the lockfile as a reviewed input whenever no regeneration is required prevents changed resolutions from receiving a successful frozen-verification result."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "or verify_lockfile or not modes"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "reviewed-audit-pin-follows-explicit-digest",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
+    "correction": "PR #1746 / LYB-343, fix-red-d96bbbfa0f occurrence 5: Mac Runner Routing Tests rejected the dated-recovery launch audit because REVIEWED_AUDIT_SHA256 stayed at the previous digest after launch-quality-audit.sh selected each recovery case on its own. Merge origin/main without rebasing and keep goal-relative stats.",
+    "mechanization": "Extend the existing diagnostic pin resolver so one explicit reviewed audit digest replaces the workflow pin and every current routing-test copy, refusing a mismatched digest, unstaged audit bytes, or a workflow move that leaves the routing tests behind. Historical fixture digests stay. Two real-Git regressions fail on the previous resolver and pass after the extension. Use that command for the reviewed digest 2b9b36774845a7e67864c40bc8d3f2f5e2900de149e42a1b5aff38298024526d. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing pin resolver owns this trust boundary and can move every current audit pin from one reviewed digest, so a later repair cannot update the workflow and leave a routing-test copy behind."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Only an explicit reviewed audit digest may update every current pin."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "xctest-launch-recovery-cases-own-execution-budgets",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
+    "correction": "PR #1746 / LYB-343, fix-red-5df69c1e5f occurrence 25: merge origin/main without rebasing and repair CI Summary and iOS Launch Quality. Run 42356725053 exceeded the two-minute test allowance because the Timeline capture test called four other tests, including a ten-state recovery loop; a later termination failure was the timeout symptom. Keep goal-relative stats and all recovery assertions.",
+    "mechanization": "Extend the existing required shared-lib launch-quality evidence suite to reject XCTest-to-XCTest calls across native UI sources and require a separately selected native case for every Stats manifest state and dated journey. The two new checks fail against the original four nested calls and missing independent state cases, then pass after splitting the matrix and adding exact selectors. The existing runner derives --expected-test for every selector and rejects missing, skipped, failed and duplicate receipts. Keep one UI runner launch, native per-test limits, outer workflow caps and coverage floors. Budget 30 minutes for the complete UI matrix because the failing invocation already used 24m15s before most new states ran. Record fresh macOS execution and coverage as unverified on this Linux host. The harness owns push and PR-body edits and must include exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Swift XCTest discovery requires callable test methods; runtime app types cannot prevent future test-to-test calls or omissions from a shell selector list."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required source-contract suite can reject nested test calls and compare each manifest recovery state and dated method with the runner selectors before spending native CI time. Existing Turbo inputs cover the test suite, native sources and launcher."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "keeps XCTest methods independent so each receives its own execution budget"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-keeps-one-sided-audit-pin",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
+    "correction": "PR #1746 / LYB-343, fix-red-e3b0c44298 occurrence 86: merge origin/main without rebasing. Both parents changed the diagnostic project pin, and this branch also changed the reviewed audit pin. The resolver refused that workflow as more than a project-pin conflict, which would drop the one-sided audit digest or block the repair. Keep goal-relative stats, dated recovery states, visualization membership, and the content-level edge swipe.",
+    "mechanization": "Extend the existing diagnostic pin resolver so a workflow conflict whose only extra difference is a one-sided reviewed audit pin keeps the parent that changed that pin, while the project pin still requires an explicit reviewed digest. Divergent audit pins and any other workflow edit still fail closed without writing. Three real-Git regressions cover the branch pin, the incoming pin, divergent pins, and a matching pin with an unrelated edit. The one-sided and divergent cases failed on the previous resolver and pass after the extension. Use that command with reviewed project digest d9a32b60e75f66cf3fdb97e2cf6b0a43f469acce57ce0dda32a96ec2b65c2870, which keeps every parent file membership. The reviewed audit digest stays 2b9b36774845a7e67864c40bc8d3f2f5e2900de149e42a1b5aff38298024526d. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The diagnostic pin resolver owns the three workflow stages. Masking the project pin and the reviewed audit pin, then keeping the parent that changed the audit pin, prevents a project-pin repair from discarding a one-sided audit digest."
+      }
+    },
+    "guard": {
+      "path": "scripts/reviewed_audit_pin.py",
+      "anchor": "A one-sided reviewed audit pin follows the parent that changed it."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dated-stats-fixture-survives-path-and-account",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42381056124",
+    "correction": "PR #1746 / LYB-343, fix-red-5df69c1e5f occurrence 29: Launch Quality run 42381056124 failed testDatedStatsManualMeasurementDateEditExpiryAndAccountReturn because dated_stats_offline never appeared. The paid UI fixture forces offline, then a satisfied path can mark the app online, and account publication can leave the analytics fixture. Keep goal-relative stats and every recovery assertion. The generic red-check fingerprint keeps its existing shell-fixture guard.",
+    "mechanization": "Keep paid UI fixtures offline when the path is satisfied, and keep the analytics fixture on Stats when the account session is published. Extend the existing launch UI regression audit with dated_stats.offline_survives_path and dated_stats.analytics_survives_account. Those behavior cases fail on the direct path assignment, a raw path return, a dropped photo-timeline fixture, the timeline reset, and a dropped analytics return, then pass on the repaired sources. The existing required shared-lib suite runs that audit. Launch Quality keeps the manual measurement, expiry, and account-return assertions. Native execution remains unverified on this Linux host. Do not bypass Tently. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The path decision and the account-page decision now honor the fixture arguments that forced offline and Stats, so a later path update or account publication cannot hide dated_stats_offline. The existing launch UI audit rejects both regressions before native CI."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "dated_stats.fixture_survives_path_and_account"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merged-project-preserves-parent-build-file-mappings",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746#repair-20261107",
+    "correction": "PR #1746 / LYB-343, fix-red-e3b0c44298 occurrence 86: merge origin/main without rebasing and preserve dated Stats, date recovery, the Apple Health receipt, and both parents correction receipts. The project-pin resolver counted identifiers but could certify PBXBuildFile entries rewired to the wrong fileRef.",
+    "mechanization": "Extend the existing reviewed project-pin merge resolver to preserve new parent PBXBuildFile-to-fileRef mappings. The real-Git negative control accepted swapped mappings before the change, then refused them without changing the workflow, projection or index; the intact merge passed. The unchanged required Detect Changes pre-commit suite imports this regression. Use the extended resolver with reviewed merged project digest 3a2a2d8598c2b8ad0f792f723fa3c1c34ef423cf8aef384ba24cf7db4f4d57e2 and the parent-preserving correction classifier for this merge. Preserve both the shared late-callback fixture guard and the dated fixture policy through one network handler; update both existing launch guards accordingly. The harness owns push and PR edits and must add exactly one declaration: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver owns the trusted merged project pin, so it can refuse changed parent build-file mappings before staging any derived artifacts."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "merged project changed a parent build-file mapping: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "diagnostic-pin-keeps-one-sided-dependency-lines",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
+    "correction": "PR #1746 / LYB-343, fix-red-e3b0c44298 occurrence 86: merge origin/main without rebasing and keep dated stats, date recovery, and the xcodebuild finalization dependency. Both parents changed the diagnostic project pin and the reviewed audit pin, and only main added the timeout helper digest. Keeping the branch workflow blob would drop that dependency.",
+    "mechanization": "Extend the conflicted diagnostic pin resolver so one-sided dependency lines are unioned and divergent audit pins update only from an explicit reviewed audit digest. A real-Git regression fails with divergent reviewed audit pins and an unchanged workflow until that digest is staged, then keeps the dependency line, both reviewed digests, and the routing-test pins. Use the extended resolver with the reviewed digests of this merge's project and launch-quality audit. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing pin resolver owns this workflow conflict. Unioning one-sided dependency lines and requiring an explicit audit digest keeps both parents' pins without deriving either digest."
+      }
+    },
+    "guard": {
+      "path": "scripts/reviewed_audit_pin.py",
+      "anchor": "One-sided dependency lines stay; divergent audit pins need an explicit digest."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "share-export-barrier-resumes-once",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42401408901",
+    "correction": "PR #1746 / LYB-343, fix-red-5df69c1e5f occurrence 29: Launch Quality run 42401408901 passed the restarted unit summary with zero failures, then xcodebuild exited 65. The host aborted in testPayloadFormatAndPrivacyEditsSuppressDelayedPreparationWithoutSpawningTasks after SWIFT TASK CONTINUATION MISUSE in wait(). The nonisolated prepare closure and the main-actor test raced a stored checked continuation. Keep goal-relative stats and every recovery assertion.",
+    "mechanization": "Extend the existing launch-quality evidence guard to reject a share-export barrier that stores a checked continuation without a single-resume lock or a deinit resume. The unsafe fixture fails that guard; BodyScoreShareExportTests passes after the barrier parks the continuation once under NSLock and resumes it if dropped. Launch Quality still runs the export tests. Native execution remains unverified on this Linux host. The harness owns push and PR-body updates and must add exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The barrier owns the continuation handoff. Parking it once under a lock and resuming on deinit prevents a cross-thread resume from leaking the continuation and aborting the launch-quality host."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "A parked continuation resumes on one thread and on deinit."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-repair-refreshes-staged-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746#repair-occurrence-87",
+    "correction": "PR #1746 / LYB-343, fix-red-e3b0c44298 occurrence 87: merge origin/main without rebasing, retain goal-relative stats and date recovery, and resolve the correction-ledger conflict with a reusable repair machine. The harness retains push and PR ownership.",
+    "mechanization": "Extend scripts/resolve-repository-docs.py with --merge-ledger to refresh the staged source projection and invoke the existing parent-preserving correction classifier. Refuse other source conflicts or absent merge parents before writing; restore the projection and its index stages if the classifier refuses missing guards or staged markers. Five real-Git regressions fail before the extension and pass afterward through the existing required pre-commit-lint suite. Use the extended command for this merge, retaining all 340 parent receipts before adding this one. The existing PR body already has exactly one declaration: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair entrypoint can own projection refresh and ledger resolution in order, retaining the classifier checks and restoring the projection after refusal so each attempt remains retryable."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "A refused ledger repair restores the projection and its conflict stages."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-repair-preserves-concurrent-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
+    "correction": "PR #1746 / LYB-343, fix-red-e3b0c44298 occurrence 87: merge origin/main without rebasing and preserve goal-relative stats and date recovery. Main added an index-snapshot rendering refusal; the branch ledger helper rolls back projection bytes and index stages even when rendering refused before writing, erasing a concurrent staged projection.",
+    "mechanization": "Extend the existing --merge-ledger resolver so its classifier rollback begins only after its own staged render completes. The real-Git regression stages a concurrent projection while reading a source, fails against the old helper because rollback reinstates unmerged stages, then passes with the extension, proving preservation of both projection snapshots and the conflicted ledger, successful retry and idempotence. The existing required pre-commit-lint suite imports this regression. Resolve the helper conflict retaining reviewed audit pins and the main index-snapshot guard, and use --merge-ledger for this instance. The harness owns pushing and PR edits; the existing PR body already has exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing merge repair helper owns artifact rollback. Starting that rollback only after its renderer succeeds prevents a pre-write refusal from erasing another writer's staged projection by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "Rendering refusals preserve concurrent projection edits; only roll back our completed render."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-simctl-terminate-stays-bounded",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42413512859",
+    "correction": "PR #1746 / LYB-343, fix-red-5df69c1e5f occurrence 29: Launch Quality run 42413512859 timed out the 52-minute step while MesocycleCanvasUITests was starting. simctl terminate blocked for 7 minutes on the cold simulator before the build, after every selected case that ran had passed. Keep goal-relative stats, every recovery assertion, the 52-minute step, and the per-test allowances.",
+    "mechanization": "Extend the existing launch-quality timeout helper so each pre-build and pre-test simctl terminate dies at 20 seconds instead of waiting on cold CoreSimulator. The required evidence test runs the previous direct xcrun cleanup and the current function: the old cleanup records two raw terminates and no cap, and the current function records two 20-second caps and both bundle ids even when terminate returns 124. The shell stays at its 670-line company size cap. Native execution remains unverified on this Linux host. The harness owns push and PR-body updates and must add exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Launch-quality cleanup owns every simctl terminate before build and test. Routing those calls through the existing timeout helper makes a cold CoreSimulator hang die at 20 seconds, so the last canvas and onboarding cases still fit in the 52-minute step."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "A cold simctl terminate cannot consume the launch-quality step."
     },
     "level": "codebase",
     "ruleId": "code-prevention"

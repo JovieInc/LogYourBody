@@ -4,6 +4,23 @@ import Network
 import UIKit
 
 extension RealtimeSyncManager {
+// MARK: - Network Monitoring
+    func setupNetworkMonitoring(arguments: [String] = ProcessInfo.processInfo.arguments) {
+        #if DEBUG
+        if arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument) {
+            applyOfflineUITestFixture()
+            return
+        }
+        #endif
+        let queue = DispatchQueue.global(qos: .background)
+        networkMonitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor [weak self] in
+                self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)
+            }
+        }
+        networkMonitor.start(queue: queue)
+    }
+
 // MARK: - Auth Listener
     func setupAuthListener() {
         authManager.$currentUser

@@ -300,6 +300,7 @@ struct AccountDeletionCleanupService {
                 deletePersonalBodyEstimates: {
                     guard let subject = ownership?.subject else { return }
                     await PersonalBodyEstimateStore.shared.forgetAccount(subject)
+                    await PhotographicAppearanceStore.shared.forgetAccount(subject)
                 }
             )
         )

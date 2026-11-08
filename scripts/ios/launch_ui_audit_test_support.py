@@ -216,9 +216,38 @@ class TimelineAndTypingAuditTests(LaunchUIAuditTests):
         chat.write_text(original.replace(focus, "", 1))
         self.assert_rejected("uitest.character_type_keyboard_focus")
 
-        chat.write_text(original.replace(
-            "        executionTimeAllowance = 180\n        let app = XCUIApplication()\n        launch(\n",
-            "        let app = XCUIApplication()\n        launch(\n",
-            1,
-        ))
+        scenario = "func testLaunchQualityGateCapturesTimelineSurfaces()"
+        prefix, body = original.split(scenario, 1)
+        self.assertIn("        executionTimeAllowance = 180\n", body)
+        chat.write_text(prefix + scenario + body.replace("        executionTimeAllowance = 180\n",
+            "        try testDatedTimelineManualBaselineAndInterruptedPhotoReturn()\n", 1))
         self.assert_rejected("uitest.nested_launch_time_allowance")
+
+    def test_dated_stats_fixture_survives_path_and_account_change(self):
+        self.assertEqual(self.run_audit()[0], 0)
+        cases = [
+            ("Services/RealtimeSyncManager+Part01.swift",
+             "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)",
+             "self.isOnline = path.status == .satisfied", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "self.isOnline = Self.online(isOnline)",
+             "self.isOnline = isOnline", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "guard !usesOfflineUITestFixture else { return }",
+             "", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "return !fixtureForcesOffline",
+             "return pathSatisfied", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", '"-lybUITestPhotoTimelineHUDFixture"',
+             '"-not-an-offline-fixture"', "dated_stats.offline_survives_path"),
+            ("Views/DashboardViewLiquid.swift",
+             "selectedPhotoTimelineRootPage = Self.pageAfterAccountChange()",
+             "selectedPhotoTimelineRootPage = .timeline", "dated_stats.analytics_survives_account"),
+            ("Services/DatedTimelineUI.swift", "return .analytics", "return .timeline",
+             "dated_stats.analytics_survives_account"),
+        ]
+        for relative, before, after, check in cases:
+            with self.subTest(before=before):
+                path = self.app / relative
+                source = path.read_text()
+                self.assertIn(before, source)
+                path.write_text(source.replace(before, after, 1))
+                self.assert_rejected(check)
+                path.write_text(source)

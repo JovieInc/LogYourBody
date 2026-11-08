@@ -8,6 +8,7 @@
 //
 import XCTest
 import UIKit
+import CoreData
 @testable import LogYourBody
 
 final class SyncIntervalAndChunkingTests: XCTestCase {
@@ -34,6 +35,50 @@ final class SyncIntervalAndChunkingTests: XCTestCase {
         defer { sync.networkMonitor.cancel() }
         sync.setupNetworkMonitoring(arguments: [])
         XCTAssertNotNil(sync.networkMonitor.pathUpdateHandler)
+    }
+
+    @MainActor
+    func testOfflineFixtureIgnoresLateOnlineAndOfflinePathUpdates() async throws {
+        let manager = try makeNetworkManager()
+        let queuedPathUpdate = Task { manager.handleNetworkPathUpdate(isOnline: true) }
+        manager.pendingSyncCount = 3
+        manager.applyOfflineUITestFixture()
+        await queuedPathUpdate.value
+        for isOnline in [true, false, true] {
+            manager.handleNetworkPathUpdate(isOnline: isOnline)
+            manager.syncAll()
+            XCTAssertFalse(manager.isOnline)
+            XCTAssertEqual(manager.syncStatus, .offline)
+            XCTAssertFalse(manager.isSyncing)
+            XCTAssertEqual(manager.pendingSyncCount, 0)
+            XCTAssertNil(manager.lastSyncAttempt)
+        }
+    }
+
+    @MainActor
+    func testLiveNetworkUpdatesStillChangeStateWithoutOfflineFixture() throws {
+        let manager = try makeNetworkManager()
+        manager.handleNetworkPathUpdate(isOnline: false)
+        XCTAssertFalse(manager.isOnline)
+        XCTAssertEqual(manager.syncStatus, .offline)
+        manager.handleNetworkPathUpdate(isOnline: true)
+        XCTAssertTrue(manager.isOnline)
+        XCTAssertEqual(manager.syncStatus, .idle)
+    }
+
+    @MainActor
+    private func makeNetworkManager() throws -> RealtimeSyncManager {
+        let suite = "SyncNetworkTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
+        let store = NSPersistentStoreDescription()
+        store.type = NSInMemoryStoreType
+        store.shouldAddStoreAsynchronously = false
+        return RealtimeSyncManager(
+            coreDataManager: CoreDataManager(persistentStoreDescriptions: [store]),
+            authManager: AuthManager(userDefaults: defaults), productAPIClient: ProductAPIClient(),
+            userDefaults: defaults
+        )
     }
 
     // MARK: - BatterySyncIntervalPolicy

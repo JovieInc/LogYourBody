@@ -339,14 +339,14 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         path.write_text(source)
 
     def test_offline_fixture_must_precede_live_network_monitoring(self):
-        path = self.app / "Services/RealtimeSyncManager.swift"
+        path = self.app / "Services/RealtimeSyncManager+Part01.swift"
         source = path.read_text()
         self.assertEqual(self.run_audit()[0], 0)
         for before, after in (
             ('#if DEBUG\n        if arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument)',
              'if arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument)'),
-            ('isOnline = false\n            syncStatus = .offline', 'isOnline = true'),
-            ('syncStatus = .offline\n            return', 'syncStatus = .offline'),
+            ('applyOfflineUITestFixture()', 'isOnline = true'),
+            ('applyOfflineUITestFixture()\n            return', 'applyOfflineUITestFixture()'),
             ('#if DEBUG\n        if arguments.contains(',
              'networkMonitor.start(queue: .global())\n        #if DEBUG\n        if arguments.contains('),
         ):
@@ -414,6 +414,7 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 "launch_ui_opacity_audit",
                 "launch_ui_timeline_gesture_audit",
                 "launch_ui_home_interaction_audit",
+                "launch_ui_dated_stats_audit",
                 "launch_ui_regression_report",
             ],
         )

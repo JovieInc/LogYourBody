@@ -125,11 +125,11 @@ def check_home_interactions(root: Path, texts: dict, violations: list, violation
             detail="Run blocking segmentation on one serial dispatch queue and resume once with its result.",
         ))
     # Offline fixtures must stop the real monitor before it can overwrite their state.
-    sync = root / "apps/ios/LogYourBody/Services/RealtimeSyncManager.swift"
+    sync = root / "apps/ios/LogYourBody/Services/RealtimeSyncManager+Part01.swift"
     setup = texts[sync].split("func setupNetworkMonitoring(", 1)[-1]
     offline_guard = re.search(
         r'#if DEBUG\s+if arguments.contains\(HomeV2SystemStatePolicy.offlineFixtureArgument\) '
-        r'\{\s+isOnline = false\s+syncStatus = \.offline\s+return\s+\}\s+#endif', setup
+        r'\{\s+applyOfflineUITestFixture\(\)\s+return\s+\}\s+#endif', setup
     )
     if (not offline_guard or 'arguments: [String] = ProcessInfo.processInfo.arguments' not in setup
             or any(setup.find(token) < offline_guard.end() for token in (
