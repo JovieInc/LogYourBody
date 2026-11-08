@@ -30,7 +30,9 @@ SPEC = importlib.util.spec_from_file_location(
 AUDIT = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = AUDIT
 SPEC.loader.exec_module(AUDIT)
-from launch_ui_home_interaction_audit import _balanced_end, check_launch_interruption_taps  # noqa: E402
+from launch_ui_home_interaction_audit import (
+    _balanced_end, check_launch_interruption_taps, check_viewer_history_navigation,
+)  # noqa: E402
 
 
 class BraceScannerTests(unittest.TestCase):
@@ -136,6 +138,35 @@ class LaunchExecutionAuditTests(unittest.TestCase):
         for separator in ("\n", "\n// trigger the monitor\n", " /* monitor */\n"):
             path.write_text(f"application.launch(){separator}application.tap()\n")
             self.assertEqual(findings(root), ["uitest.launch_interruption_tap"])
+
+    def test_viewer_history_navigation_waits_for_the_sidebar_destination(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            relative = "apps/ios/LogYourBodyUITests/HomeV2PhotoViewerLayoutUITests.swift"
+            path = root / relative
+            path.parent.mkdir(parents=True)
+            original = (ROOT / relative).read_text()
+
+            def findings():
+                violations = []
+                check_viewer_history_navigation(root, violations, AUDIT.AuditViolation)
+                return [item.check for item in violations]
+
+            self.assertEqual(findings(), [])  # Missing optional fixture tree.
+            path.write_text(original)
+            self.assertEqual(findings(), [])
+            cases = [
+                ('app.buttons["home_v2_sidebar_entries"]',
+                 'app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch'),
+                ('guard entries.waitForExistence(timeout: 8) else {', 'if false {'),
+                ('return app\n        }\n        entries.tap()', 'entries.tap()\n        }'),
+                ('private func launch(', 'private func wrongLaunch('),
+            ]
+            for before, after in cases:
+                with self.subTest(before=before):
+                    self.assertIn(before, original)
+                    path.write_text(original.replace(before, after, 1))
+                    self.assertEqual(findings(), ["uitest.viewer_history_navigation"])
 
     def test_ui_command_uses_remaining_audit_budget_without_extending_deadline(self):
         source = (ROOT / "scripts/ios/launch-quality-audit.sh").read_text()

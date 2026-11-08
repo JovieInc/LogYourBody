@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import repository_docs
+from json_union import _skip, _parse_json_node
 
 MANIFESTS = (
     "packages/shared-lib/package.json",
@@ -34,65 +35,6 @@ _PY_LIST = re.compile(
     re.S,
 )
 _TS_LIST = re.compile(r"for \(const input of \[(.*?)\]", re.S)
-
-
-def _skip(text, index):
-    while index < len(text) and text[index] in " \t\r\n":
-        index += 1
-    return index
-
-
-def _parse_json_node(text, index):
-    index = _skip(text, index)
-    if index >= len(text):
-        raise ValueError("manifest union expected JSON")
-    start, char = index, text[index]
-    if char == '"':
-        index += 1
-        while index < len(text):
-            if text[index] == "\\":
-                index += 2
-                continue
-            if text[index] == '"':
-                index += 1
-                return ("str", json.loads(text[start:index]), start, index)
-            index += 1
-        raise ValueError("manifest union expected a string")
-    if char in "{[":
-        closer = "}" if char == "{" else "]"
-        index += 1
-        items = []
-        index = _skip(text, index)
-        if index < len(text) and text[index] == closer:
-            return ("obj" if char == "{" else "arr", items, start, index + 1)
-        while True:
-            key = None
-            if char == "{":
-                key = _parse_json_node(text, index)
-                if key[0] != "str":
-                    raise ValueError("manifest union expected an object key")
-                index = _skip(text, key[3])
-                if index >= len(text) or text[index] != ":":
-                    raise ValueError("manifest union expected a colon")
-                index += 1
-            value = _parse_json_node(text, index)
-            items.append((key[1], value) if key else value)
-            index = _skip(text, value[3])
-            if index < len(text) and text[index] == ",":
-                index += 1
-                continue
-            if index < len(text) and text[index] == closer:
-                return ("obj" if char == "{" else "arr", items, start, index + 1)
-            raise ValueError("manifest union expected " + closer)
-    if text.startswith(("true", "false", "null"), index):
-        literal = next(item for item in ("true", "false", "null") if text.startswith(item, index))
-        return ("lit", json.loads(literal), start, index + len(literal))
-    if char == "-" or char.isdigit():
-        end = index + 1
-        while end < len(text) and text[end] in "0123456789.eE+-":
-            end += 1
-        return ("lit", json.loads(text[index:end]), start, end)
-    raise ValueError("manifest union expected JSON")
 
 
 def parse_json_spans(text):

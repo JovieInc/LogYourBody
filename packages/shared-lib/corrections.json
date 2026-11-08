@@ -7028,5 +7028,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e228851098",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42386058398",
+    "correction": "PR #1698 / LYB-338 repair, occurrence 4 in 14 days: merge origin/main without rebasing, repair Mac Runner Routing Tests stale reviewed-audit digests and Launch Quality viewer setup failing to find the Entries button. Preserve Apple Distribution renewal and every required gate. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing required launch UI regression audit and its executed behavior suite to require the viewer history helper to select the existing sidebar Entries identifier, wait for it with a bounded timeout, fail explicitly if absent, then tap it. The new real-source regression fails on the original immediate label lookup and passes with the repair; mutations reject label selection, missing waits, a tap inside the failure branch and a missing helper. The existing shared-lib wrapper now verifies this guard is wired. Reuse the reviewed-audit resolver from incoming main for merged audit SHA-256 7077c51ffd2111a59572d7ef74bf097e8156f5a85c59800a5fa7cc3c96806446. Preserve both parents offline-fixture guards through one path handler, both sibling audit suites and all correction receipts. The current PR body already has exactly one declaration, retained for the extended entrypoint: Machine: built packages/shared-lib/src/launch-ui-regression-audit.test.ts. Native execution and coverage remain unverified on Linux. Keep the merged helpers within the unchanged size limits by moving the span parser into the existing json_union module and removing seven blank audit separators; all assertions and runner commands remain.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The sidebar already supplies the correct destination identifier. Changing production navigation cannot make an XCTest query wait for a presentation; the test helper must await the destination and retain an explicit failure."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required launch UI source audit can reject the recorded immediate label lookup and enforce bounded identifier-based navigation in the shared viewer launch helper. Executed source mutations verify refusal without weakening the native UI assertions."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "check=\"uitest.viewer_history_navigation\""
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

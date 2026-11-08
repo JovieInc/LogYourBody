@@ -27,7 +27,6 @@ MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
 BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}" # Bound the one cold build independently of XCTest execution.
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
-
 if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
   PROJECT=LogYourBody.xcodeproj
   SCHEME=LogYourBody
@@ -550,7 +549,6 @@ CHAT_UNIT_EVIDENCE_ARGS=()
 for test_id in "${CHAT_QUALIFICATION_UNIT_TESTS[@]}"; do
   CHAT_UNIT_EVIDENCE_ARGS+=(--expected-test "${test_id}()")
 done
-
 # StoreKitPurchaseRestoreTests is skipped here: it shares one StoreKit test environment, is gated by the
 # dedicated StoreKit job (ci.yml ios_storekit, test plan StoreKit, merge queue and main) and failed 2 of 13
 # Launch Quality runs on 2026-10-25 with the LYB-231 signature (empty StoreKit state at restore).
@@ -573,7 +571,6 @@ python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --base-revision "${BASE_SHA:-}" --source-root "$ROOT_DIR" \
   --scheme "$SCHEME" --only-testing LogYourBodyTests \
   > "$ARTIFACT_DIR/launch-quality-unit-tests.ratchet.json"
-
 # One UI invocation avoids repeated hosted runner startup (340-537s in run 38320479871).
 LAUNCH_QUALITY_UI_TESTS=(
   "HomeV2TimelineIntegrationUITests/testPhotoHoldScrubsBothDirectionsThenAnotherHoldRestoresTap"
@@ -608,7 +605,6 @@ LAUNCH_QUALITY_UI_TESTS=(
   "MesocycleCanvasUITests/testReducedMotionUsesStackedDayCards"
   "MesocycleCanvasUITests/testGoalThroughUndoKeepsTheCanvasAndReadbackTogether"
 )
-
 CHAOS_REGRESSIONS=(
   "ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration"
   "ChaosEdgeCaseUITests/testIntegrationDirectorySeparatesHealthAccessAndScanHistory"
@@ -646,7 +642,6 @@ XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_
   "${UI_SELECTORS[@]}"
 assert_xcresult_evidence "$UI_RESULT_BUNDLE" "${UI_EVIDENCE_ARGS[@]}" \
   --critical-captures --require-settings-row-coverage --require-chaos-accounting-coverage --require-canvas-coverage
-
 if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
   FAIL_ON_RUNTIME_WARNINGS="$FAIL_ON_RUNTIME_WARNINGS" \
     bash "$ROOT_DIR/scripts/ios/xcresult-runtime-audit.sh" \
@@ -656,7 +651,6 @@ if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
 else
   echo "Skipping XCTest runtime-warning audit" | tee "$ARTIFACT_DIR/runtime-warnings.log"
 fi
-
 {
   printf '# iOS Launch Quality Audit\n\n'
   printf -- '- Destination: `%s`\n' "$DESTINATION"
@@ -673,5 +667,4 @@ fi
   printf -- '- Timeouts: build `%ss`, unit `%ss`, UI `%ss`; audit deadline 52m with 60s reserved for evidence\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS" "$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"
-
 echo "Launch quality audit logs written to $ARTIFACT_DIR"

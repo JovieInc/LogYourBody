@@ -106,6 +106,30 @@ def check_launch_interruption_taps(root, violations, violation):
             ))
 
 
+def check_viewer_history_navigation(root, violations, violation):
+    """Wait for the sidebar destination before opening imported viewer history."""
+    path = root / "apps/ios/LogYourBodyUITests/HomeV2PhotoViewerLayoutUITests.swift"
+    if not path.is_file():
+        return
+    source = path.read_text()
+    start = source.find("private func launch(")
+    brace = source.find("{", start) if start >= 0 else -1
+    helper = source[start:_balanced_end(source, brace) + 1] if brace >= 0 else ""
+    required = ('let entries = app.buttons["home_v2_sidebar_entries"]',
+                'guard entries.waitForExistence(timeout: 8) else {', 'entries.tap()')
+    wait = helper.find(required[1])
+    brace = helper.find("{", wait) if wait >= 0 else -1
+    end = _balanced_end(helper, brace) if brace >= 0 else -1
+    failure = helper[brace:end] if brace >= 0 else ""
+    if (any(token not in helper for token in required)
+            or any(token not in failure for token in ('XCTFail(', 'return app'))
+            or helper.find('entries.tap()') < end or 'label == %@' in helper):
+        violations.append(violation(
+            check="uitest.viewer_history_navigation", file=str(path.relative_to(root)), line=1,
+            detail="Open viewer history through the sidebar Entries identifier after its bounded existence wait.",
+        ))
+
+
 def check_home_interactions(root: Path, texts: dict, violations: list, violation) -> None:
     # Blocking Vision work must not exhaust Swift's cooperative worker pool.
     segmentation = root / "apps/ios/LogYourBody/Services/BackgroundRemovalService.swift"
@@ -181,6 +205,7 @@ def check_home_interactions(root: Path, texts: dict, violations: list, violation
     check_character_type_keyboard_focus(root, violations, violation)
     check_nested_launch_time_allowance(root, violations, violation)
     check_launch_interruption_taps(root, violations, violation)
+    check_viewer_history_navigation(root, violations, violation)
 
     ui_path = root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
     if not ui_path.is_file():
