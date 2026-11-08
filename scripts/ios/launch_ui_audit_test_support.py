@@ -112,6 +112,60 @@ class LaunchUIAuditTests(unittest.TestCase):
         self.assertIn(check, "\n".join(path.read_text() for path in output.glob("*.json")))
 
 
+class PatternScanTests(LaunchUIAuditTests):
+    def test_full_tree_patterns_skip_irrelevant_sources_without_changing_findings(self):
+        scan = AUDIT.add_pattern_violations
+        with patch.object(AUDIT, "add_pattern_violations", wraps=scan) as calls:
+            self.assertEqual(self.run_audit()[0], 0)
+        cases = {
+            "swift.explicit_geometry_nonfinite": [
+                "let point = CGPoint(\n x: +.infinity, y: -.nan)\n",
+                "let size = CGSize(width: .nan, height: 1)\n",
+                "let safe = CGPoint(x: 0, y: 0) // .infinity is only a comment\n",
+            ],
+            "overscroll.no_large_fake_bottom_spacers": [
+                "Spacer \n (minLength: 120)\n",
+                "Spacer(minLength: 8)\n",
+            ],
+            "timeline.no_bottom_stats_card": [
+                'let identifier = "photo_timeline_hud_stats_button"\n',
+                'let identifier = "photo_timeline_hud_stats"\n',
+            ],
+        }
+        checked = set()
+        for call in calls.call_args_list:
+            arguments = call.kwargs.copy()
+            check = arguments["check"]
+            if check not in cases:
+                continue
+            checked.add(check)
+            sources = ["struct Irrelevant { let value = 0 }\n" * 100] * 100 + cases[check]
+            texts = {self.root / f"Fixture{index}.swift": text
+                     for index, text in enumerate(sources)}
+            pattern = arguments["pattern"]
+            expected = [AUDIT.AuditViolation(
+                check=check, file=str(path.relative_to(self.root)),
+                line=AUDIT.line_number(text, match.start()), detail=arguments["detail"],
+            ) for path, text in texts.items() for match in pattern.finditer(text)]
+            scanned = []
+
+            class CountedPattern:
+                def finditer(self, text):
+                    scanned.append(text)
+                    return pattern.finditer(text)
+
+            findings = []
+            arguments.update(paths=list(texts), texts=texts, pattern=CountedPattern(),
+                             violations=findings)
+            scan(**arguments)
+            with self.subTest(check=check):
+                self.assertEqual(findings, expected)
+                self.assertTrue(expected, "The negative control must contain a violation")
+                self.assertLessEqual(len(scanned), len(cases[check]),
+                                     "Full-tree regexes must skip irrelevant source bytes")
+        self.assertEqual(checked, set(cases))
+
+
 class LaunchExecutionAuditTests(unittest.TestCase):
     def test_launch_monitor_rejects_center_taps_and_preserves_targeted_actions(self):
         temp = tempfile.TemporaryDirectory()

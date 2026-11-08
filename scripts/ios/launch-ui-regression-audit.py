@@ -70,9 +70,13 @@ def add_pattern_violations(
     check: str,
     detail: str,
     violations: list[AuditViolation],
+    required_tokens: tuple[str, ...] = (),
 ) -> None:
     for path in paths:
         text = texts[path]
+        # Skip full-tree regex work only when every possible match is absent.
+        if required_tokens and not any(token in text for token in required_tokens):
+            continue
         for match in pattern.finditer(text):
             violations.append(
                 AuditViolation(
@@ -162,6 +166,7 @@ def main() -> int:
             r"[^()]*?\b\w+\s*:\s*[+-]?\s*\.(?:infinity|nan)\b"
         ),
         check="swift.explicit_geometry_nonfinite",
+        required_tokens=("CGPoint", "CGSize", "CGRect", "CGVector", "CGAffineTransform"),
         detail="Qualify non-finite geometry arguments with CGFloat or Double to avoid ambiguous overloads.",
         violations=violations,
     )
@@ -173,6 +178,7 @@ def main() -> int:
         paths=app_swift_files,
         pattern=re.compile(r"Spacer\s*\(\s*minLength:\s*(?:1[2-9]\d|[2-9]\d{2,})"),
         check="overscroll.no_large_fake_bottom_spacers",
+        required_tokens=("Spacer",),
         detail="Use real bottom padding or safe-area insets instead of fake ScrollView content.",
         violations=violations,
     )
@@ -193,6 +199,7 @@ def main() -> int:
         paths=app_swift_files,
         pattern=re.compile(r"photo_timeline_hud_stats_button"),
         check="timeline.no_bottom_stats_card",
+        required_tokens=("photo_timeline_hud_stats_button",),
         detail="Stats must stay in top navigation or swipe navigation, not a bottom switch card.",
         violations=violations,
     )

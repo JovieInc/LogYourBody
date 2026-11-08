@@ -7050,5 +7050,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "launch-ui-audit-full-tree-pattern-prefilter",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42501363232/job/128795274500",
+    "correction": "PR #1698 / LYB-338, fix-red-1a39536f40 occurrence 10 in 14 days: JavaScript/TypeScript exceeds the unchanged 30-second launch UI behavior subprocess deadline; CI Summary reflects that failure. Merge origin/main first without rebasing, retain Apple Distribution renewal, and extend the existing machine. The harness owns pushes and PR edits.",
+    "mechanization": "Extend the existing launch UI pattern scanner with optional required literal tokens so full-tree geometry, spacer and forbidden-card regexes skip sources that cannot match. All files still enter the audit and every original regex and behavior case remains. A regression captures the actual main entrypoint configurations, compares complete findings with unfiltered regex results and counts regex invocations across 100 irrelevant sources per rule. It fails against the original scanner with 103/102/102 scans, then passes with the filters. The required shared-lib wrapper discovers the support-module case and retains its 30-second deadline and executed coverage. origin/main was already an ancestor, so the required merge was a no-op. Vercel reports Deployment was blocked without a build error in GitHub deployment records. The harness must replace the existing declaration with exactly one PR body line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing scanner can avoid regex execution by construction when required match tokens are absent, reducing repeated work for every audit invocation. Its already-required behavior suite can enforce the property with invocation counts and exact finding equivalence without a timing benchmark, a second runner or a larger timeout."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "Skip full-tree regex work only when every possible match is absent."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
