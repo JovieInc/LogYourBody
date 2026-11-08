@@ -408,7 +408,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             ignored = subprocess.run(
                 ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
                  ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
-                 "package.json", "**/package.json",
+                 "pnpm-workspace.yaml", "package.json", "**/package.json",
                  ":(glob,exclude)**/node_modules/**", ":(glob,exclude)**/.next/**"],
                 cwd=root, check=True, capture_output=True, text=True,
             ).stdout.strip("\0")
