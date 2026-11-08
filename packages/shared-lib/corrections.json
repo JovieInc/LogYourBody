@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "fix-red-a510b9a468",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1709",
+    "correction": "LYB-319 PR #1709 repair: CI Summary and Launch Quality failed before native execution because the pinned SwiftLint download returned a non-ZIP HTTP error response. Shared Gitleaks exhausted its existing retries on HTTP 504; the exact pinned archive now downloads and verifies successfully. Merge origin/main without rebasing and preserve the photographic feature and required gates.",
+    "mechanization": "Extend the shared iOS setup action with bounded curl retries, connection and transfer timeouts, and HTTP failure propagation before extraction. The existing required Mac Runner Routing Tests job imports real-curl installer regressions for success, transient 504 recovery, persistent 504 refusal even with a valid ZIP body, and corrupt archive refusal. The transient and persistent cases fail before this change. Reuse the action across native workflows; do not duplicate or weaken the shared Gitleaks scanner. The harness owns pushing and PR updates and should include: Machine: built .github/actions/setup-ios-build/action.yml.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared installer owns the download and extraction boundary. Retrying bounded failures and rejecting HTTP errors there prevents every caller from extracting an HTTP error body or abandoning a recoverable download by construction."
+      }
+    },
+    "guard": {
+      "path": ".github/actions/setup-ios-build/action.yml",
+      "anchor": "curl --fail --silent --show-error --location"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-89c44c062f",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1709",
     "correction": "LYB-319 PR #1709 repair: merge origin/main without rebasing, preserve gated on-device photographic appearance, fix three size-500 violations, the XCTest geometry argument order, and the stale reviewed Xcode project fingerprint. Tently failed because its AI provider was unreachable.",

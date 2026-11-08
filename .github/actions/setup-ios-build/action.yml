@@ -57,7 +57,10 @@ runs:
           if [[ ! -x "$SWIFTLINT_DIR/swiftlint" ]]; then
             echo "Installing SwiftLint ${SWIFTLINT_VERSION}..."
             mkdir -p "$SWIFTLINT_DIR"
-            curl -L "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip
+            curl --fail --silent --show-error --location \
+              --retry 3 --retry-all-errors --retry-delay 2 \
+              --connect-timeout 30 --max-time 120 \
+              "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip
             unzip -o swiftlint.zip -d "$SWIFTLINT_DIR"
             chmod +x "$SWIFTLINT_DIR/swiftlint"
           fi
