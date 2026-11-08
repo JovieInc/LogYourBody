@@ -726,7 +726,7 @@ final class LogYourBodyUITests: XCTestCase {
         logoutButton.tap()
 
         // Native alerts can expose both a wrapper button and its action button.
-        // Require one hittable leaf inside this alert, never a background button.
+        // Require one distinct action frame inside this alert.
         XCTAssertTrue(logoutConfirmation.waitForExistence(timeout: 5), app.debugDescription)
         let cancelLogout = try hittableLogoutAction(
             in: logoutConfirmation, identifier: "settings_logout_cancel", label: "Cancel"
@@ -751,7 +751,10 @@ final class LogYourBodyUITests: XCTestCase {
         func interactiveActions() -> [XCUIElement] {
             candidates.allElementsBoundByIndex.filter {
                 $0.label == label && $0.isEnabled && $0.isHittable
-                    && !$0.descendants(matching: .button).matching(identifier: identifier).firstMatch.exists
+            }.reduce(into: [XCUIElement]()) { unique, action in
+                if !unique.contains(where: { $0.frame == action.frame }) {
+                    unique.append(action)
+                }
             }
         }
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
@@ -3519,16 +3522,19 @@ final class LogYourBodyUITests: XCTestCase {
             if current != question {
                 // A center tap in a short draft can leave the caret before the
                 // committed prefix. The trailing edge puts it after that text.
-                if current.isEmpty {
-                    composer.tap()
-                } else {
-                    composer.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
-                }
-                _ = app.keyboards.element.waitForExistence(timeout: 2)
                 let addition = syntheticQuestionInsertion(current: current, question: question)
                 var prefix = current
-                // Acknowledge each prefix while the simulator keyboard connects.
+                // typeText fails the test when focus drops. Refocus, then continue.
+                let keyboard = app.keyboards.firstMatch
                 for character in addition {
+                    if !keyboard.exists {
+                        if prefix.isEmpty {
+                            composer.tap()
+                        } else {
+                            composer.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+                        }
+                        guard keyboard.waitForExistence(timeout: 2) else { break }
+                    }
                     composer.typeText(String(character))
                     if String(character) == XCUIKeyboardKey.delete.rawValue {
                         prefix = String(prefix.dropLast())

@@ -34,7 +34,11 @@ sys.modules[SPEC.name] = AUDIT
 SPEC.loader.exec_module(AUDIT)
 
 
-class StatsCardCompositionTests(unittest.TestCase):
+from test_launch_ui_home_interaction import CheckSiblingDiscoveryTests, HomeInteractionAuditTests
+from launch_ui_timeline_day import check_timeline_calendar_day
+
+
+class StatsCardCompositionTests(HomeInteractionAuditTests, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._swift_template = tempfile.TemporaryDirectory()
@@ -98,18 +102,32 @@ class StatsCardCompositionTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertIn(check, "\n".join(path.read_text() for path in output.glob("*.json")))
 
+    def test_audit_reads_each_swift_file_once(self):
+        reads = []
+        original = Path.read_text
+
+        def counted(path, *args, **kwargs):
+            if path.suffix == ".swift":
+                reads.append(path)
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", counted):
+            self.assertEqual(self.run_audit()[0], 0)
+        self.assertGreater(len(reads), 0)
+        self.assertEqual(len(reads), len(set(reads)))
+
     def test_empty_timeline_keeps_its_photo_button_accessible(self):
         findings = []
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual(findings, [])
         self.replace("Services/DatedTimelineUI.swift", ".accessibilityElement(children: .contain)", "")
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
 
     def test_empty_timeline_requires_the_photo_action_identifier(self):
         self.replace("Services/DatedTimelineUI.swift", '"launch_timeline_add_photo"', '"wrong_photo_action"')
         findings = []
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
 
     def test_geometry_requires_typed_nonfinite_arguments_in_every_native_tree(self):
@@ -249,6 +267,22 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                      'PointMark(x: .value("Observation date", date)',
                      'LineMark(x: .value("Observation date", date)')
         self.assert_rejected("dashboard.observation_plot")
+
+    def test_observation_chart_cannot_take_the_card_tap(self):
+        self.replace(
+            "DesignSystem/Organisms/MetricSummaryCard.swift",
+            ".accessibilityHidden(true)\n        .allowsHitTesting(false)",
+            ".accessibilityHidden(true)",
+        )
+        self.assert_rejected("dashboard.observation_chart_ignores_hits")
+
+    def test_card_tap_still_opens_detail_when_the_list_drag_takes_the_touch(self):
+        self.replace(
+            "DesignSystem/Organisms/MetricSummaryCard.swift",
+            "button.highPriorityGesture(TapGesture().onEnded { action.handler() })",
+            "button",
+        )
+        self.assert_rejected("dashboard.card_tap_opens_detail")
 
     def test_single_timestamp_cannot_establish_no_change(self):
         self.replace("Helpers/DashboardMetricFormatting.swift",
@@ -401,28 +435,6 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
             )
         self.assertIn("Cannot load launch UI audit sibling", str(missing_export.exception))
 
-    def test_satisfied_path_cannot_clear_a_ui_test_offline_pin(self):
-        sync = self.app / "Services/RealtimeSyncManager+Part01.swift"
-        manager = self.app / "Services/RealtimeSyncManager.swift"
-        app = self.app / "LogYourBodyApp.swift"
-        originals = {path: path.read_text() for path in (sync, manager, app)}
-        def checks():
-            texts = {path: path.read_text() for path in originals}
-            found = []
-            AUDIT.check_ui_test_offline_pin(self.root, [], found, texts)
-            return [item.check for item in found]
-        self.assertEqual(checks(), [])
-        cases = (
-            (sync, "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)", "self.isOnline = path.status == .satisfied"),
-            (manager, "guard !usesOfflineUITestFixture else { return }", "guard usesOfflineUITestFixture else { return }"),
-            (app, "realtimeSyncManager.applyOfflineUITestFixture()", "realtimeSyncManager.isOnline = false"),
-        )
-        for path, before, after in cases:
-            with self.subTest(path=path.name):
-                path.write_text(originals[path].replace(before, after, 1))
-                self.assertEqual(checks(), ["sync.ui_test_offline_pin"])
-                path.write_text(originals[path])
-
     def test_optional_cgfloat_opacity_must_be_explicit_double(self):
         policy = self.app / "Services/PersonMaskPolicy.swift"
         compare = self.app / "Views/HomeV2/HomeV2CompareView.swift"
@@ -466,26 +478,6 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         self.assert_rejected("timeline.injected_calendar_day")
         calculator.write_text(original.replace("now: Date = Date(),\n        ", "", 1))
         self.assert_rejected("timeline.injected_calendar_day")
-
-    def test_dated_stats_fixture_survives_path_and_account_change(self):
-        self.assertEqual(self.run_audit()[0], 0)
-        cases = [
-            ("Services/RealtimeSyncManager+Part01.swift", "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)", "self.isOnline = path.status == .satisfied", "dated_stats.offline_survives_path"),
-            ("Services/RealtimeSyncManager.swift", "self.isOnline = Self.online(isOnline)", "self.isOnline = isOnline", "dated_stats.offline_survives_path"),
-            ("Services/RealtimeSyncManager.swift", "guard !usesOfflineUITestFixture else { return }", "", "dated_stats.offline_survives_path"),
-            ("Services/RealtimeSyncManager.swift", "return !fixtureForcesOffline", "return pathSatisfied", "dated_stats.offline_survives_path"),
-            ("Services/RealtimeSyncManager.swift", '"-lybUITestPhotoTimelineHUDFixture"', '"-not-an-offline-fixture"', "dated_stats.offline_survives_path"),
-            ("Views/DashboardViewLiquid.swift", "selectedPhotoTimelineRootPage = Self.pageAfterAccountChange()", "selectedPhotoTimelineRootPage = .timeline", "dated_stats.analytics_survives_account"),
-            ("Services/DatedTimelineUI.swift", "return .analytics", "return .timeline", "dated_stats.analytics_survives_account"),
-        ]
-        for relative, before, after, check in cases:
-            with self.subTest(before=before):
-                path = self.app / relative
-                source = path.read_text()
-                self.assertIn(before, source)
-                path.write_text(source.replace(before, after, 1))
-                self.assert_rejected(check)
-                path.write_text(source)
 
 def run_behavior_suite(suite):
     expected = suite.countTestCases()

@@ -46,3 +46,13 @@ def check_ui_test_offline_pin(
             line=line_number(sync_text, max(sync_text.find("isOnline"), 0)),
             detail=_DETAIL,
         ))
+
+
+def contribute(root, _app_dir, violations, violation, _line_number) -> None:
+    """Run this check from the shared Swift source snapshot."""
+    import launch_ui_timeline_audit as sources
+
+    texts = sources.SWIFT_SOURCES
+    if texts is None:
+        texts = sources.begin_swift_sources(root)
+    check_ui_test_offline_pin(root, list(texts), violations, texts)

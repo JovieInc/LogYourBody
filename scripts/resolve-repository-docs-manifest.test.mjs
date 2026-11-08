@@ -109,6 +109,68 @@ test('manifest union leaves a conflicted correction ledger for its resolver', (t
   assert.equal(fixture.git('ls-files', '-u', '--', fixture.output).trim(), '');
 });
 
+test('manifest union accepts a glob that covers the other parent explicit inputs', (t) => {
+  const fixture = conflictingManifests(
+    t,
+    'node --test shared.test.mjs',
+    ['$TURBO_DEFAULT$', 'shared.mjs', 'shared_gesture.mjs', 'workflow.yml', 'workflow.yml'],
+    'node --test shared.test.mjs',
+    ['$TURBO_DEFAULT$', 'shared*.mjs', 'size.mjs', 'workflow.yml', 'workflow.yml'],
+  );
+  const result = fixture.run('--union-manifests');
+  assert.equal(result.status, 0, result.stderr);
+  const inputs = JSON.parse(readFileSync(join(fixture.root, fixture.turbo), 'utf8')).tasks.test.inputs;
+  assert.deepEqual(inputs, [
+    '$TURBO_DEFAULT$', 'shared*.mjs', 'size.mjs', 'workflow.yml', 'workflow.yml',
+  ]);
+});
+
+test('manifest union leaves a conflicted diagnostic pin for its resolver', (t) => {
+  const fixture = manifestRepo(t);
+  const workflow = '.github/workflows/ios-ui-diagnostics.yml';
+  const writePin = (digest) => {
+    mkdirSync(dirname(join(fixture.root, workflow)), { recursive: true });
+    writeFileSync(
+      join(fixture.root, workflow),
+      `jobs:\n  pins:\n            'apps/ios/LogYourBody.xcodeproj/project.pbxproj': '${digest}',\n`,
+    );
+  };
+  writePin('a'.repeat(64));
+  fixture.git('add', '--', workflow);
+  fixture.git('commit', '-qm', 'pin base');
+  fixture.git('switch', '-qc', 'incoming');
+  writePin('b'.repeat(64));
+  fixture.commit(
+    'node --test shared.test.mjs theirs.test.mjs',
+    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
+    'incoming',
+  );
+  fixture.git('switch', '-q', 'feature');
+  writePin('c'.repeat(64));
+  fixture.commit(
+    'node --test shared.test.mjs ours.test.mjs',
+    ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs'],
+    'ours',
+  );
+  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: fixture.root, env });
+  assert.equal(merge.status, 1, merge.stderr?.toString());
+  const beforeWorkflow = readFileSync(join(fixture.root, workflow), 'utf8');
+  assert.match(beforeWorkflow, /^<<<<<<< /m);
+  const result = spawnSync('python3', [resolver, '--root', fixture.root, '--union-manifests'], {
+    env, encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(join(fixture.root, workflow), 'utf8'), beforeWorkflow);
+  const unmerged = fixture.git('diff', '--name-only', '--diff-filter=U');
+  assert.match(unmerged, /ios-ui-diagnostics\.yml/);
+  assert.doesNotMatch(unmerged, /turbo\.json/);
+  const testScript = JSON.parse(readFileSync(join(fixture.root, fixture.pkg), 'utf8')).scripts.test;
+  assert.match(testScript, /ours\.test\.mjs/);
+  assert.match(testScript, /theirs\.test\.mjs/);
+  const inputs = JSON.parse(readFileSync(join(fixture.root, fixture.turbo), 'utf8')).tasks.test.inputs;
+  assert.ok(inputs.includes('ours.mjs') && inputs.includes('theirs.mjs'));
+});
+
 test('manifest union refuses an unrelated conflict without staging', (t) => {
   const fixture = manifestRepo(t);
   fixture.git('switch', '-qc', 'incoming');
@@ -190,6 +252,37 @@ function autoMergedManifests(t) {
   return { ...fixture, run };
 }
 
+for (const mode of ['--staged', null]) {
+  for (const input of ['repository-docs.json', 'README.md', 'packages/shared-lib/turbo.json']) {
+    test(`source-map repair ${mode ?? 'default'} refuses indexed symlink ${input}`, (t) => {
+      const f = autoMergedManifests(t);
+      const blob = f.git('rev-parse', `:${input}`).trim();
+      // Keep regular worktree bytes: the index mode must determine admission.
+      f.git('update-index', '--cacheinfo', `120000,${blob},${input}`);
+      const before = readFileSync(join(f.root, f.output));
+      const index = f.git('ls-files', '--stage');
+      const result = spawnSync('python3', [resolver, '--root', f.root, ...(mode ? [mode] : [])], {
+        env, encoding: 'utf8',
+      });
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /source input must be a regular indexed file/);
+      assert.deepEqual(readFileSync(join(f.root, f.output)), before);
+      assert.equal(f.git('ls-files', '--stage'), index);
+    });
+  }
+
+  test(`source-map repair ${mode ?? 'default'} accepts executable indexed sources`, (t) => {
+    const f = autoMergedManifests(t);
+    f.git('update-index', '--chmod=+x', 'README.md');
+    const result = spawnSync('python3', [resolver, '--root', f.root, ...(mode ? [mode] : [])], {
+      env, encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(f.git('ls-files', '--stage', '--', 'README.md'), /^100755 /);
+    assert.equal(f.git('ls-files', '--unmerged'), '');
+  });
+}
+
 test('auto-merged manifest refuses a dropped parent turbo input', (t) => {
   const fixture = autoMergedManifests(t);
   const turbo = JSON.parse(readFileSync(join(fixture.root, fixture.turbo), 'utf8'));
@@ -203,6 +296,56 @@ test('auto-merged manifest refuses a dropped parent turbo input', (t) => {
   assert.match(result.stderr, /additive manifest union keeps every parent test input/);
   assert.equal(readFileSync(join(fixture.root, fixture.output), 'utf8'), before);
   assert.equal(fixture.git('ls-files', '--stage'), index);
+});
+
+test('auto-merged manifest accepts a new glob that covers replaced inputs', (t) => {
+  const fixture = manifestRepo(t);
+  const named = ['scripts/ios/launch_ui_timeline_day.py', 'scripts/ios/launch_ui_opacity_audit.py'];
+  fixture.commit('node --test shared.test.mjs', ['$TURBO_DEFAULT$', ...named, 'workflow.yml'], 'narrow');
+  fixture.git('branch', 'incoming');
+  fixture.commit(
+    'node --test shared.test.mjs',
+    ['$TURBO_DEFAULT$', 'scripts/ios/launch_ui_*.py', 'workflow.yml', 'company.mjs'],
+    'glob',
+  );
+  fixture.git('switch', '-q', 'incoming');
+  fixture.commit(
+    'node --test shared.test.mjs',
+    ['$TURBO_DEFAULT$', ...named, 'workflow.yml', 'personal.ts'],
+    'personal',
+  );
+  fixture.git('switch', '-q', 'feature');
+  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], {
+    cwd: fixture.root, env, encoding: 'utf8',
+  });
+  assert.equal(merge.status, 1, merge.stderr);
+  const kept = {
+    extends: ['//'],
+    tasks: {
+      test: {
+        outputs: ['$TURBO_EXTENDS$'],
+        inputs: ['$TURBO_DEFAULT$', 'scripts/ios/launch_ui_*.py', 'workflow.yml', 'company.mjs', 'personal.ts'],
+      },
+      'test:mutation': { cache: false },
+    },
+  };
+  writeFileSync(join(fixture.root, fixture.turbo), `${JSON.stringify(kept, null, 2)}\n`);
+  fixture.git('add', fixture.turbo);
+  const accepted = spawnSync('python3', [resolver, '--root', fixture.root, '--staged'], {
+    env, encoding: 'utf8',
+  });
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.match(fixture.git('show', `:${fixture.turbo}`), /launch_ui_\*\.py/);
+  assert.match(fixture.git('show', `:${fixture.turbo}`), /personal\.ts/);
+  const dropped = structuredClone(kept);
+  dropped.tasks.test.inputs = dropped.tasks.test.inputs.filter((item) => item !== 'personal.ts');
+  writeFileSync(join(fixture.root, fixture.turbo), `${JSON.stringify(dropped, null, 2)}\n`);
+  fixture.git('add', fixture.turbo);
+  const refused = spawnSync('python3', [resolver, '--root', fixture.root, '--staged'], {
+    env, encoding: 'utf8',
+  });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /additive manifest union keeps every parent test input/);
 });
 
 test('auto-merged manifest keeps both parent inputs and ignores dirty worktree bytes', (t) => {

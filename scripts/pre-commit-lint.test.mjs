@@ -10,6 +10,7 @@ import './resolve-repository-docs.test.mjs';
 import './resolve-repository-docs-dependency.test.mjs';
 import './resolve-repository-docs-ledger.test.mjs';
 import './resolve-repository-docs-pin.test.mjs';
+import './resolve-repository-docs-project.test.mjs';
 import './resolve-repository-docs-pin-union.test.mjs';
 import './resolve-repository-docs-manifest.test.mjs';
 

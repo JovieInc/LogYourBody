@@ -89,3 +89,13 @@ def check_dated_stats_fixture(root: Path, texts: dict, violations: list, violati
             "The analytics fixture must stay on Stats when the account session is published.",
             violation_cls,
         ))
+
+
+def contribute(root, _app_dir, violations, violation, _line_number) -> None:
+    """Run this check from the shared Swift source snapshot."""
+    import launch_ui_timeline_audit as sources
+
+    texts = sources.SWIFT_SOURCES
+    if texts is None:
+        texts = sources.begin_swift_sources(root)
+    check_dated_stats_fixture(root, texts, violations, violation)
