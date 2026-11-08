@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Union additive shared-lib test wiring during a merge.
+"""Union additive shared-lib test wiring and resolve correction ledgers during a merge.
 
 The repository-docs resolver keeps this sibling so it stays within the company
 500-line ratchet. Unchanged manifest bytes are copied from the branch; only
@@ -356,4 +356,36 @@ def restore_dependency_artifacts_on_failure(root, output):
                 path.unlink(missing_ok=True)
             else:
                 path.write_bytes(original)
+        raise
+
+
+def merge_ledger(root, resolve_staged, staged_bytes, git_bytes):
+    """Refresh the staged projection before the parent-preserving ledger resolver."""
+    root = Path(root).resolve()
+    git_bytes(root, "rev-parse", "--verify", "MERGE_HEAD")
+    config = json.loads(staged_bytes(root, "repository-docs.json"))
+    output = config["output"]
+    conflicts = set(git_bytes(
+        root, "diff", "--name-only", "--diff-filter=U", "--relative", "-z",
+    ).decode().split("\0")) - {"", output, LEDGER}
+    if conflicts:
+        raise ValueError("resolve source conflicts first: " + ", ".join(sorted(conflicts)))
+    path = repository_docs.local(root, output)
+    original = path.read_bytes() if path.exists() else None
+    index = git_bytes(root, "ls-files", "--stage", "--", output)
+    # Rendering refusals preserve concurrent projection edits; only roll back our completed render.
+    resolve_staged(root)
+    try:
+        subprocess.run(
+            ["node", str(Path(__file__).with_name("correction-classifier.mjs")),
+             "--resolve-merge", str(root), "--stage"], cwd=root, check=True,
+        )
+    except (ValueError, OSError, subprocess.CalledProcessError):
+        # A refused ledger repair restores the projection and its conflict stages.
+        if original is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.write_bytes(original)
+        subprocess.run(["git", "update-index", "--force-remove", "--", output], cwd=root, check=True)
+        subprocess.run(["git", "update-index", "--index-info"], cwd=root, input=index, check=True)
         raise

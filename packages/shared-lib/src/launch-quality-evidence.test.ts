@@ -100,6 +100,55 @@ it('keeps replay and onboarding state fixtures free of UIKit and SwiftUI animati
   );
 });
 
+it('keeps XCTest methods independent so each receives its own execution budget', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const paths = execFileSync('git', ['ls-files', 'apps/ios/LogYourBodyUITests'], {
+    cwd: root,
+    encoding: 'utf8',
+  })
+    .trim()
+    .split('\n')
+    .filter((path) => path.endsWith('.swift'));
+  const calls = /(?<!\bfunc\s+)\b(?:self\.)?(test[A-Z]\w*)\s*\(/g;
+  expect('func testExample() throws { assertRecovery() }'.match(calls)).toBeNull();
+  expect('func testExample() throws { try self.testNested() }'.match(calls)).toEqual([
+    'self.testNested(',
+  ]);
+  const nested = paths.flatMap((path) =>
+    [...readFileSync(`${root}/${path}`, 'utf8').matchAll(calls)].map(
+      (match) => `${path}: ${match[1]}`,
+    ),
+  );
+  expect(nested, 'Select separate XCTest cases instead of calling tests from tests').toEqual([]);
+});
+
+it('selects every dated recovery state and journey as independent native evidence', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const native = readFileSync(
+    `${root}/apps/ios/LogYourBodyUITests/LogYourBodyUITests+DatedTimeline.swift`,
+    'utf8',
+  );
+  const audit = readFileSync(`${root}/scripts/ios/launch-quality-audit.sh`, 'utf8');
+  const selectors = audit.split('LAUNCH_QUALITY_UI_TESTS=(')[1].split('\n)')[0];
+  const journey = readFileSync(`${root}/apps/ios/LogYourBody/Services/LaunchJourney.swift`, 'utf8');
+  const registry = journey.match(/enum RouteState[^{]*\{([^}]+)\}/)?.[1];
+  expect(registry).toBeDefined();
+  const states = [...registry!.matchAll(/case (\w+)(?: = "([\w-]+)")?/g)].map(
+    (match) => match[2] ?? match[1],
+  );
+  const cases = [...native.matchAll(/func (testDated\w+)\(\) throws \{/g)];
+  const recoveryCases = [
+    ...native.matchAll(
+      /func (testDatedStats\w+HasOneReachableRecovery)\(\) throws \{\s*assertDatedStatsRecovery\(state: "([\w-]+)"\)\s*\}/g,
+    ),
+  ];
+  expect(recoveryCases.map((match) => match[2]).sort()).toEqual(states.sort());
+  expect(cases.length).toBeGreaterThan(recoveryCases.length);
+  for (const [, name] of cases) {
+    expect(selectors.match(new RegExp(`"LogYourBodyUITests/${name}"`, 'g')), name).toHaveLength(1);
+  }
+});
+
 it('pins shared offline UI fixtures before late network callbacks can replace their state', () => {
   const read = (path: string) =>
     readFileSync(new URL(`../../../apps/ios/LogYourBody/${path}`, import.meta.url), 'utf8');
@@ -125,10 +174,65 @@ it('pins shared offline UI fixtures before late network callbacks can replace th
   );
   const update = manager.split('func handleNetworkPathUpdate(isOnline: Bool)')[1];
   expect(update).toMatch(
-    /#if DEBUG\s*guard !usesOfflineUITestFixture else \{ return \}\s*#endif\s*let wasOffline = !self.isOnline\s*self.isOnline = isOnline/,
+    /#if DEBUG\s*guard !usesOfflineUITestFixture else \{ return \}\s*#endif\s*let wasOffline = !self.isOnline\s*self.isOnline = Self\.online\(isOnline\)/,
   );
   const release = manager.replace(/^[ \t]*#if DEBUG\n.*?^[ \t]*#endif/gms, '');
   expect(release).not.toMatch(/usesOfflineUITestFixture|applyOfflineUITestFixture/);
+});
+
+function barrierBody(source: string): string | undefined {
+  const marker = 'final class Barrier';
+  const start = source.indexOf(marker);
+  if (start < 0) return undefined;
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    else if (source[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(open + 1, index);
+    }
+  }
+  return undefined;
+}
+
+// A parked continuation resumes on one thread and on deinit.
+export function shareExportBarrierFindings(source: string): string[] {
+  const body = barrierBody(source);
+  if (!body) return ['share-export barrier missing'];
+  const findings: string[] = [];
+  if (/withCheckedContinuation\s*\{\s*continuation\s*=/.test(body)) {
+    findings.push('continuation is stored without a single-resume lock');
+  }
+  if (!body.includes('NSLock()')) findings.push('barrier has no lock');
+  if (!body.includes('resumed')) findings.push('barrier can resume twice');
+  if (!/deinit\s*\{\s*resume\(\)\s*\}/.test(body)) {
+    findings.push('dropped barrier leaks its continuation');
+  }
+  if (/\bvar continuation:/.test(body) && !/private var continuation:/.test(body)) {
+    findings.push('barrier publishes the continuation');
+  }
+  return findings;
+}
+
+it('resumes a parked share-export continuation once, including when the barrier is dropped', () => {
+  const unsafe = `final class Barrier {
+        var continuation: CheckedContinuation<Void, Never>?
+        func wait() async { await withCheckedContinuation { continuation = $0 } }
+        func resume() { continuation?.resume(); continuation = nil }
+    }`;
+  expect(shareExportBarrierFindings(unsafe)).toEqual([
+    'continuation is stored without a single-resume lock',
+    'barrier has no lock',
+    'barrier can resume twice',
+    'dropped barrier leaks its continuation',
+    'barrier publishes the continuation',
+  ]);
+  const source = readFileSync(
+    new URL('../../../apps/ios/LogYourBodyTests/BodyScoreShareExportTests.swift', import.meta.url),
+    'utf8',
+  );
+  expect(shareExportBarrierFindings(source)).toEqual([]);
 });
 
 it('rejects incomplete XCTest proof through the launch gate validator with executed line coverage', () => {
@@ -152,6 +256,58 @@ it('rejects incomplete XCTest proof through the launch gate validator with execu
     rmSync(coverage, { recursive: true, force: true });
   }
 }, 90_000);
+
+function terminateCleanupReceipt(body: string) {
+  const directory = mkdtempSync(`${tmpdir()}/lyb-simctl-terminate-`);
+  try {
+    const script = `${directory}/cleanup.sh`;
+    writeFileSync(
+      script,
+      `set -euo pipefail
+run_with_timeout() {
+  printf '%s\\n' "$1" >> "$RECEIPT/caps"
+  printf '%s\\n' "$6" >> "$RECEIPT/bundles"
+  return 124
+}
+xcrun() {
+  printf '%s\\n' "$4" >> "$RECEIPT/raw"
+}
+${body}
+cleanup_booted_simulator_apps
+`,
+    );
+    execFileSync('/bin/bash', [script], {
+      env: { PATH: '/usr/bin:/bin', RECEIPT: directory },
+      encoding: 'utf8',
+    });
+    const lines = (name: string) => {
+      try {
+        return readFileSync(`${directory}/${name}`, 'utf8').trim().split('\n').filter(Boolean);
+      } catch {
+        return [];
+      }
+    };
+    return { caps: lines('caps'), bundles: lines('bundles'), raw: lines('raw') };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+// A cold simctl terminate cannot consume the launch-quality step.
+it('bounds cold simctl terminate so the launch-quality step can finish its last UI cases', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const source = readFileSync(`${root}/scripts/ios/launch-quality-audit.sh`, 'utf8');
+  const start = source.indexOf('cleanup_booted_simulator_apps() {');
+  const end = source.indexOf('\n}\n', start);
+  const body = source.slice(start, end + 2);
+  const unbounded = `cleanup_booted_simulator_apps() {
+  xcrun simctl terminate booted com.logyourbody.app >/dev/null 2>&1 || true
+  xcrun simctl terminate booted com.logyourbody.app.xctrunner >/dev/null 2>&1 || true
+}`;
+  const bundles = ['com.logyourbody.app', 'com.logyourbody.app.xctrunner'];
+  expect(terminateCleanupReceipt(unbounded)).toEqual({ caps: [], bundles: [], raw: bundles });
+  expect(terminateCleanupReceipt(body)).toEqual({ caps: ['20', '20'], bundles, raw: [] });
+});
 
 it('propagates evidence assertion failures and nonzero exits despite passing suite markers', () => {
   const directory = mkdtempSync(`${tmpdir()}/lyb-evidence-failure-`);

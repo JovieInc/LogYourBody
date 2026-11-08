@@ -36,16 +36,19 @@ other file is unmerged or a shared import fails parity. It stages only the
 generated output; review the source diff before committing.
 
 When a merged Xcode project changes the diagnostic workflow's exact project pin,
-stage the merged project. If incoming changed only that pin, pass the merged
-project's digest. The resolver keeps other branch workflow lines, writes that
-pin, and rebuilds a conflicted source map from the index, ignoring unstaged
-source bytes. It refuses a digest that does not match the staged project, a
-merged project that dropped a parent file membership, an incoming workflow edit
-beyond the pin, a conflicted worktree that is not the branch plus that pin, and
+stage the merged project and pass its digest. The resolver keeps branch workflow
+lines, a one-sided reviewed audit pin, and dependency lines added by only one
+parent. Divergent audit pins also need `--reviewed-audit-sha256`. It writes
+those pins and rebuilds a conflicted source map from the index, ignoring
+unstaged source bytes. It refuses a digest that does not match the staged
+project or audit, a merged project that dropped a parent file membership or
+changed a new parent build-file mapping, any other workflow difference, and
 every other unmerged path.
 
 ```sh
-python3 scripts/resolve-repository-docs.py --reviewed-project-sha256 <reviewed-merged-project-sha256>
+python3 scripts/resolve-repository-docs.py \
+  --reviewed-project-sha256 <reviewed-merged-project-sha256> \
+  --reviewed-audit-sha256 <reviewed-merged-audit-sha256>
 ```
 
 Staging the workflow yourself, with one project-pin line, still works. This

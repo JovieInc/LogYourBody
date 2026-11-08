@@ -57,18 +57,30 @@ struct LaunchOutcomeEditor: View {
     var existing: DatedOutcome?
     var errorText: String?
     var onSave: (DatedOutcome) -> Void
+    var allowsMaintenance: Bool
+    @Environment(\.dismiss) private var dismiss
 
     @State private var metric: DatedOutcome.Metric
     @State private var valueText: String
     @State private var dateText: String
+    @State private var includesMaintenance: Bool
+    @State private var maintenanceStart: String
+    @State private var maintenanceEnd: String
 
-    init(existing: DatedOutcome?, errorText: String?, onSave: @escaping (DatedOutcome) -> Void) {
+    init(
+        existing: DatedOutcome?, errorText: String?, allowsMaintenance: Bool = false,
+        onSave: @escaping (DatedOutcome) -> Void
+    ) {
         self.existing = existing
         self.errorText = errorText
         self.onSave = onSave
+        self.allowsMaintenance = allowsMaintenance
         _metric = State(initialValue: existing?.outcome.metric ?? .weightKg)
         _valueText = State(initialValue: existing.map { String(existingValue($0)) } ?? "")
         _dateText = State(initialValue: existing?.outcomeDate ?? "")
+        _includesMaintenance = State(initialValue: existing?.constraints.maintenance.isEmpty == false)
+        _maintenanceStart = State(initialValue: existing?.constraints.maintenance.first?.start ?? "")
+        _maintenanceEnd = State(initialValue: existing?.constraints.maintenance.first?.end ?? "")
     }
 
     var body: some View {
@@ -83,6 +95,16 @@ struct LaunchOutcomeEditor: View {
                     .accessibilityIdentifier("launch_outcome_value")
                 TextField("Date (YYYY-MM-DD)", text: $dateText)
                     .accessibilityIdentifier("launch_outcome_date")
+                if allowsMaintenance {
+                    Toggle("Maintenance interval", isOn: $includesMaintenance)
+                        .accessibilityIdentifier("launch_outcome_maintenance")
+                    if includesMaintenance {
+                        TextField("Start (YYYY-MM-DD)", text: $maintenanceStart)
+                            .accessibilityIdentifier("launch_maintenance_start")
+                        TextField("End (YYYY-MM-DD)", text: $maintenanceEnd)
+                            .accessibilityIdentifier("launch_maintenance_end")
+                    }
+                }
                 Text(LaunchPromiseCopy.framing)
                     .font(.footnote)
                 if let errorText {
@@ -91,6 +113,12 @@ struct LaunchOutcomeEditor: View {
             }
             .navigationTitle("Outcome and date")
             .toolbar {
+                if allowsMaintenance {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                            .accessibilityIdentifier("launch_outcome_cancel")
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
                         .accessibilityIdentifier("launch_outcome_save")
@@ -111,6 +139,18 @@ struct LaunchOutcomeEditor: View {
         outcome.outcome.metric = metric
         outcome.outcome.targetValue = value
         outcome.outcomeDate = dateText
+        if allowsMaintenance {
+            if includesMaintenance {
+                let interval = DatedOutcome.Interval(start: maintenanceStart, end: maintenanceEnd)
+                if outcome.constraints.maintenance.isEmpty {
+                    outcome.constraints.maintenance.append(interval)
+                } else {
+                    outcome.constraints.maintenance[0] = interval
+                }
+            } else {
+                outcome.constraints.maintenance = []
+            }
+        }
         onSave(outcome)
     }
 

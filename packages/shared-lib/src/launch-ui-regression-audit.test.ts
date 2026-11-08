@@ -89,6 +89,7 @@ it('checks Stats composition, card styling and provenance dismissal through the 
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-audit.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_opacity_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_timeline_gesture_audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_dated_stats_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-report.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_timeline_day.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
@@ -107,11 +108,13 @@ it('checks Stats composition, card styling and provenance dismissal through the 
   expect(audit).toContain('launch_ui_timeline_day.py');
   expect(audit).toContain('launch_ui_opacity_audit.py');
   expect(audit).toContain('launch_ui_timeline_gesture_audit.py');
+  expect(audit).toContain('launch_ui_dated_stats_audit.py');
   expect(audit).toContain('launch-ui-regression-report.py');
   expect(audit).not.toMatch(/^def write_outputs\(/m);
   expect(audit).not.toMatch(/^def check_timeline_calendar_day\(/m);
   expect(audit).not.toMatch(/^def check_optional_cgfloat_opacity\(/m);
   expect(audit).not.toMatch(/^def check_timeline_gestures\(/m);
+  expect(audit).not.toMatch(/^def check_dated_stats_fixture\(/m);
   // The parent audit stays within the company 500-line ratchet.
   const parentLines = audit.endsWith('\n') ? audit.slice(0, -1).split('\n') : audit.split('\n');
   expect(parentLines.length).toBeLessThanOrEqual(500);

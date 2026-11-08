@@ -52,8 +52,8 @@ class RealtimeSyncManager: ObservableObject {
         guard !usesOfflineUITestFixture else { return }
         #endif
         let wasOffline = !self.isOnline
-        self.isOnline = isOnline
-        if isOnline {
+        self.isOnline = Self.online(isOnline)
+        if self.isOnline {
             syncStatus = .idle
             if wasOffline { syncAll() }
         } else {
@@ -153,6 +153,28 @@ class RealtimeSyncManager: ObservableObject {
         self.userDefaults = userDefaults
         self.analyticsService = analyticsService
     }
+
+    /// Paid UI fixtures force offline before the first snapshot. A satisfied
+    /// path must not replace that, or an empty Stats launch classifies as no-data.
+    static func online(
+        _ pathSatisfied: Bool,
+        _ arguments: [String] = ProcessInfo.processInfo.arguments
+    ) -> Bool {
+        guard pathSatisfied else { return false }
+        let fixtureForcesOffline = offlineUITestFixtures.contains { arguments.contains($0) }
+        return !fixtureForcesOffline
+    }
+
+    static let offlineUITestFixtures = [
+        "-lybUITestPaidMVPFixture",
+        "-lybUITestWeightLoggerMVPFixture",
+        "-lybUITestPaywallFixture",
+        "-lybUITestPaywallPlansFixture",
+        "-lybUITestFullDashboardFixture",
+        "-lybUITestPhotoTimelineHUDFixture",
+        "-lybUITestBodyScoreOnboardingFixture",
+        "-lybUITestBodyScoreFirstPhotoFixture"
+    ]
 }
 
 extension PendingBodyMetricSyncItem {
