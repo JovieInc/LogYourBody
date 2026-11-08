@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-worktree-change-during-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1756",
+    "correction": "PR #1756, fix-red-1423773703 occurrence 58: merge origin/main without rebasing and preserve the ElevenLabs 3.0.80 bump. Detect Changes and parity reject its stale source projection, causing CI Summary to fail. Dependency repair must also refuse tracked manifest or resolver-configuration edits made during rendering after frozen verification.",
+    "mechanization": "Extend the existing staged projection renderer to recheck tracked dependency inputs before writing or staging artifacts in both dependency modes. Four real-Git regressions fail against the previous helper and prove refusal with unchanged index and artifacts, preserved manifest or npmrc edits, successful reviewed retry and idempotence after the extension. The required Detect Changes pre-commit suite already imports these cases. Use the extended --verify-lockfile helper to retain bot resolutions and regenerate source parity. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing helper owns dependency verification, projection generation and artifact staging. Rechecking tracked dependency inputs after rendering prevents observed worktree drift from being accepted as verified by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "dependency inputs changed during projection generation; stage reviewed inputs and retry"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-lockfile-change-during-projection",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1759",
     "correction": "PR #1759, fix-red-1423773703 occurrence 56: merge origin/main without rebasing and repair the gateway 4.0.137 update. Detect Changes and parity reject a stale source projection, causing CI Summary to fail. Dependency repair must not accept or stage lockfile bytes changed during source-map rendering after frozen verification.",

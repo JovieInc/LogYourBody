@@ -88,7 +88,7 @@ def union_project(root):
     apply_project_union(root)
 
 
-def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfile=None):
+def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfile=None, dependency_inputs=()):
     root = Path(root).resolve()
     source_index = expected_index if expected_index is not None else git_bytes(root, "ls-files", "--stage", "-z")
     # An auto-merged manifest must keep every parent test input.
@@ -134,6 +134,8 @@ def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfil
         raise ValueError("source index changed during projection generation; review staged inputs and retry")
     if expected_lockfile is not None and (root / "pnpm-lock.yaml").read_bytes() != expected_lockfile:
         raise ValueError("lockfile changed during projection generation; review dependency inputs and retry")
+    if dependency_inputs and git_bytes(root, "diff", "--name-only", "--", *[name for name in dependency_inputs if name != "pnpm-lock.yaml"]):
+        raise ValueError("dependency inputs changed during projection generation; stage reviewed inputs and retry")
     output.parent.mkdir(parents=True, exist_ok=True)
     original = output.read_bytes() if output.exists() else None
     try:
@@ -425,7 +427,6 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                 raise ValueError("; ".join(errors))
             rollback.enter_context(restore_dependency_artifacts_on_failure(root, output))
             verified_index = git_bytes(root, "ls-files", "--stage", "-z")
-            # Verify valid bot lockfiles without re-resolving unrelated dependencies.
             modes = [["--frozen-lockfile", "--offline"]]
             # Explicit repair only: normal commit hooks and CI retain frozen installs.
             if refresh_lockfile:
@@ -453,7 +454,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                 raise ValueError("dependency inputs changed during verification; stage reviewed inputs and retry")
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
             resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [], expected_index=verified_index,
-                           expected_lockfile=(root / "pnpm-lock.yaml").read_bytes())
+                           expected_lockfile=(root / "pnpm-lock.yaml").read_bytes(), dependency_inputs=inputs)
             return
         if pin_update:
             repository_docs.local(root, pin_update[0]).write_text(pin_update[1])

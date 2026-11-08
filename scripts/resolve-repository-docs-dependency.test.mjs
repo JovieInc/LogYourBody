@@ -45,6 +45,42 @@ function fixture(t, input, state) {
 }
 
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
+  for (const input of ['package.json', '.npmrc']) {
+    test(`dependency repair ${mode} refuses unstaged ${input} changes while rendering source parity`, (t) => {
+      const f = fixture(t, '.npmrc', 'staged');
+      const gitBinary = execFileSync('which', ['git'], { env, encoding: 'utf8' }).trim();
+      const index = f.git('ls-files', '--stage');
+      const outputs = ['pnpm-lock.yaml', 'SOURCES.md'].map((name) => readFileSync(join(f.root, name)));
+      const edited = input === 'package.json' ? '{"dependencies":{"example":"3.0.0"}}\n' : 'strict-peer-dependencies=true\n';
+      writeFileSync(join(f.root, 'bin/git'), `#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+result = subprocess.run([${JSON.stringify(gitBinary)}, *sys.argv[1:]])
+marker = Path('changed-once')
+if sys.argv[1:] == ['show', ':package.json'] and not marker.exists():
+    Path(${JSON.stringify(input)}).write_text(${JSON.stringify(edited)})
+    marker.touch()
+sys.exit(result.returncode)
+`, { mode: 0o755 });
+      const result = f.resolve(mode);
+      assert.notEqual(result.status, 0, 'rendering must not authorize dependency inputs changed after verification');
+      assert.match(result.stderr, /dependency inputs changed during projection generation/);
+      assert.equal(f.git('ls-files', '--stage'), index);
+      assert.equal(readFileSync(join(f.root, input), 'utf8'), edited);
+      for (const [i, name] of ['pnpm-lock.yaml', 'SOURCES.md'].entries()) {
+        assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
+        assert.deepEqual(Buffer.from(f.git('show', `:${name}`)), outputs[i]);
+      }
+      f.git('add', input);
+      const retry = f.resolve(mode);
+      assert.equal(retry.status, 0, retry.stderr);
+      assert.deepEqual(readFileSync(join(f.root, 'pnpm-lock.yaml')), outputs[0]);
+      if (input === 'package.json') assert.match(f.git('show', ':SOURCES.md'), /"example": "3\.0\.0"/);
+      const repairedIndex = f.git('ls-files', '--stage');
+      assert.equal(f.resolve(mode).status, 0, 'repair stays idempotent after reviewing the changed inputs');
+      assert.equal(f.git('ls-files', '--stage'), repairedIndex);
+    });
+  }
   test(`dependency repair ${mode} refuses lockfile changes while rendering source parity`, (t) => {
     const f = fixture(t, '.npmrc', 'staged');
     const gitBinary = execFileSync('which', ['git'], { env, encoding: 'utf8' }).trim();

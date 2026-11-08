@@ -97,6 +97,9 @@ changed inputs and retry; the other writer's staged edit remains intact.
 Both dependency modes also compare the verified lockfile bytes after rendering
 and before writing or staging artifacts. Lockfile changes during rendering refuse
 repair and restore the original artifacts; retry uses the reviewed inputs.
+Tracked dependency edits during rendering also refuse repair before artifact
+writes or staging. The edits remain available for review; stage them and retry
+the same command.
 Frozen verification also refuses lockfile changes before regenerating or staging
 the source map. Only a confirmed outdated lockfile permits refresh mode to write
 new resolutions; retrying after a refusal uses the original reviewed artifacts.

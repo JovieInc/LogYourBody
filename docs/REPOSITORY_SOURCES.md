@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `7e13001cfecca3bf00d435920a56e5776dc05a3fe9e9b00188b0f37c0be1ebbb`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c363d7c1320a5028ffb6208923ce59f079cd168fd14da5eccb0bb5aca9b3425e`)
 
 ### `apps/web/package.json`: engines
 
@@ -72,7 +72,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@ai-sdk/elevenlabs": "^3.0.76",
+  "@ai-sdk/elevenlabs": "^3.0.80",
   "@ai-sdk/gateway": "^4.0.137",
   "@headlessui/react": "^2.2.10",
   "@hookform/resolvers": "^5.9.1",
