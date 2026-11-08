@@ -32,6 +32,7 @@ sys.modules[SPEC.name] = AUDIT
 SPEC.loader.exec_module(AUDIT)
 from launch_ui_home_interaction_audit import (
     _balanced_end, check_launch_interruption_taps, check_viewer_history_navigation,
+    check_progress_share_readiness,
 )  # noqa: E402
 
 
@@ -113,6 +114,28 @@ class LaunchUIAuditTests(unittest.TestCase):
 
 
 class PatternScanTests(LaunchUIAuditTests):
+    def test_native_discovery_reuses_app_paths_and_keeps_exact_file_order(self):
+        directories = ("LogYourBody", "LogYourBodyTests", "LogYourBodyUITests", "LogYourBodyWidget")
+        for directory in directories[1:]:
+            path = self.root / "apps/ios" / directory / "Discovery.swift"
+            path.parent.mkdir(parents=True)
+            path.write_text("struct Discovery {}\n")
+        expected = sorted(path for directory in directories
+                          for path in (self.root / "apps/ios" / directory).rglob("*.swift"))
+        rglob = Path.rglob
+        visited = []
+
+        def tracked_rglob(path, pattern):
+            visited.append(path)
+            return rglob(path, pattern)
+
+        with patch.object(Path, "rglob", tracked_rglob), \
+                patch.object(Path, "__lt__", side_effect=AssertionError("Sort path parts once")), \
+                patch.object(AUDIT, "read_sources", wraps=AUDIT.read_sources) as read:
+            self.assertEqual(self.run_audit()[0], 0)
+        self.assertEqual(read.call_args.args[0], expected)
+        self.assertEqual(visited.count(self.app), 1, "Do not rediscover the same app tree")
+
     def test_full_tree_patterns_skip_irrelevant_sources_without_changing_findings(self):
         scan = AUDIT.add_pattern_violations
         with patch.object(AUDIT, "add_pattern_violations", wraps=scan) as calls:
@@ -167,6 +190,43 @@ class PatternScanTests(LaunchUIAuditTests):
 
 
 class LaunchExecutionAuditTests(unittest.TestCase):
+    def test_progress_share_waits_for_selection_and_exact_title_before_readback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            relative = "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
+            path = root / relative
+            path.parent.mkdir(parents=True)
+            original = (ROOT / relative).read_text()
+
+            def findings():
+                violations = []
+                check_progress_share_readiness(root, violations, AUDIT.AuditViolation)
+                return [item.check for item in violations]
+
+            self.assertEqual(findings(), [])  # Missing optional fixture tree.
+            path.write_text(original)
+            self.assertEqual(findings(), [])
+            wait = 'XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)'
+            title = 'XCTAssertTrue(app.staticTexts["Share \\(title)"].waitForExistence(timeout: 5))'
+            cases = [
+                ('NSPredicate(format: "isSelected == true"), object: tab)',
+                 'NSPredicate(format: "exists == true"), object: tab)'),
+                (wait, ''),
+                (wait, 'let prematureValue = value.label\n            ' + wait),
+                (title, 'XCTAssertTrue(app.staticTexts["Share \\(title)"].exists)'),
+                (title, 'XCTAssertTrue(app.staticTexts["Share Body Score"].waitForExistence(timeout: 5))'),
+                ('func testProgressShareKeepsSelectedMetricAndVisibleValue()', 'func missingShareTest()'),
+            ]
+            for before, after in cases:
+                with self.subTest(before=before, after=after):
+                    self.assertIn(before, original)
+                    mutated = original.replace(before, after, 1)
+                    if 'prematureValue' in mutated:
+                        mutated = mutated.replace('let expectedValue = value.label',
+                                                  'let expectedValue = prematureValue', 1)
+                    path.write_text(mutated)
+                    self.assertEqual(findings(), ["uitest.progress_share_readiness"])
+
     def test_launch_monitor_rejects_center_taps_and_preserves_targeted_actions(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)

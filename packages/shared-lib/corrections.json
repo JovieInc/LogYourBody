@@ -7068,5 +7068,45 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "progress-share-transition-readiness",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42507130336/job/128812488136",
+    "correction": "PR #1698 / LYB-338 repair, work fingerprint fix-red-5df69c1e5f occurrence 30 in 14 days: merge origin/main first without rebasing, inspect failed-check logs, repair Launch Quality without weakening native assertions, and extend the existing machine. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing required launch UI audit to enforce metric-selection readiness before capturing the Progress value and an exact bounded share-title wait before card readback. The real-source regression fails on the original immediate title query, then passes with the repair; six mutations reject existence-only selection, missing selection waits, premature value reads, immediate title queries, a wrong metric title and a missing scenario. Retain all value, unit, footer, privacy and dismissal assertions. The existing shared-lib wrapper executes the behavior suite with coverage under its unchanged 30-second deadline and now checks the new guard anchor. The required merge of fetched origin/main was already up to date. The failed native run executed 2258 unit tests with 50 skipped and no failures; 42 of 43 UI tests passed; the recorded failure is the immediate Share FFMI title assertion. The transition-readiness repair remains unverified on a native runner because this host is Linux. Vercel reports Deployment was blocked; no authenticated Vercel CLI credentials are available to inspect the provider reason. Keep exactly the existing PR body declaration: Machine: built packages/shared-lib/src/launch-ui-regression-audit.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The production switcher already publishes the selected accessibility trait and the share sheet renders the exact metric title. Production changes cannot make an XCTest observation await those transitions; the native test must synchronize before reading them."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required launch audit can reject premature Progress value reads and immediate share-title queries. Its executed real-source mutation suite proves refusal of the recorded pattern while the native test retains exact metric and value oracles."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "check=\"uitest.progress_share_readiness\""
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "launch-ui-audit-source-discovery-cost",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1698",
+    "correction": "The PR #1698 repair root pnpm test run exceeded the unchanged 30-second traced launch UI subprocess deadline (30053ms), even though all 50 behavior cases passed directly. Reduce repeated work without raising a timeout or removing behavior proof.",
+    "mechanization": "Profiling the complete traced suite identified repeated Path comparisons and duplicate app-tree discovery across 84 audit invocations. Reuse the already discovered app paths and sort once by path.parts, preserving the exact prior Path ordering across the app, unit tests, UI tests and widget. Extend the existing behavior suite with a real-tree regression that rejects Path comparison calls, requires one app-tree discovery and compares every source path in exact order with the original algorithm. It fails against the prior implementation and passes after repair. The existing shared-lib wrapper retains its 30-second deadline and coverage execution. No guard, file, assertion or native selector is removed.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing scanner can discover the app tree once and compute tuple sort keys once per file, eliminating duplicate traversal and repeated Python Path comparisons by construction while retaining the same complete ordered source snapshot."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "Reuse app discovery; tuple keys preserve Path order without Python comparisons."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

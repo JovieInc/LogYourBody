@@ -104,6 +104,8 @@ it('keeps paced chat typing focused and gives nested launch scenarios the audit 
     'utf8',
   );
   expect(audit).toContain('uitest.character_type_keyboard_focus');
+  expect(audit).toContain('uitest.progress_share_readiness');
+  expect(audit).toContain('check_progress_share_readiness(root, violations, violation)');
   expect(audit).toContain('uitest.nested_launch_time_allowance');
   expect(audit).toContain('uitest.viewer_history_navigation');
   expect(audit).toContain('check_viewer_history_navigation(root, violations, violation)');

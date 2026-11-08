@@ -2880,7 +2880,10 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
         var sharedMetrics = Set<String>()
         for (identifier, title) in [("steps", "Steps"), ("weight", "Weight"), ("body_fat", "Body fat"), ("ffmi", "FFMI")] {
-            app.buttons["home_v2_progress_tab_\(identifier)"].tap()
+            let tab = app.buttons["home_v2_progress_tab_\(identifier)"]
+            tab.tap()
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: tab)
+            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
             let expectedValue = value.label
             let share = app.buttons["home_v2_progress_share"]
             if ["—", "–"].contains(expectedValue) {
@@ -2906,6 +2909,7 @@ final class LogYourBodyUITests: XCTestCase {
             share.tap()
             let sheet = app.descendants(matching: .any)["body_score_share_sheet"]
             XCTAssertTrue(sheet.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.staticTexts["Share \(title)"].waitForExistence(timeout: 5))
             XCTAssertFalse(app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists)
             let summary = sheet.descendants(matching: .any)["body_score_share_summary"]
             XCTAssertTrue(summary.exists)
@@ -2918,7 +2922,6 @@ final class LogYourBodyUITests: XCTestCase {
                 XCTAssertTrue(summary.staticTexts[unitIdentifier].exists)
                 XCTAssertEqual(summary.staticTexts[unitIdentifier].label, try XCTUnwrap(expectedUnit))
             }
-            XCTAssertTrue(app.staticTexts["Share \(title)"].exists)
             XCTAssertEqual(app.staticTexts["body_score_share_score"].label, expectedValue)
             XCTAssertFalse(app.staticTexts["Share Body Score"].exists)
             XCTAssertFalse(app.descendants(matching: .any)["body_score_share_photo_visual"].exists)

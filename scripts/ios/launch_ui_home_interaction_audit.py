@@ -130,6 +130,33 @@ def check_viewer_history_navigation(root, violations, violation):
         ))
 
 
+def check_progress_share_readiness(root, violations, violation):
+    """Read each metric only after selection, then await its exact share title."""
+    path = root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
+    if not path.is_file():
+        return
+    source = path.read_text()
+    start = source.find("func testProgressShareKeepsSelectedMetricAndVisibleValue()")
+    brace = source.find("{", start) if start >= 0 else -1
+    body = source[brace:_balanced_end(source, brace) + 1] if brace >= 0 else ""
+    ordered = (
+        'let tab = app.buttons["home_v2_progress_tab_\\(identifier)"]',
+        'tab.tap()',
+        'NSPredicate(format: "isSelected == true"), object: tab)',
+        'XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)',
+        'let expectedValue = value.label',
+        'share.tap()',
+        'XCTAssertTrue(app.staticTexts["Share \\(title)"].waitForExistence(timeout: 5))',
+        'XCTAssertEqual(summary.staticTexts["body_score_share_score"].label, expectedValue)',
+    )
+    positions = [body.find(token) for token in ordered]
+    if -1 in positions or positions != sorted(positions):
+        violations.append(violation(
+            check="uitest.progress_share_readiness", file=str(path.relative_to(root)), line=1,
+            detail="Await the selected metric before capturing its value, and the exact share title before checking its card.",
+        ))
+
+
 def check_home_interactions(root: Path, texts: dict, violations: list, violation) -> None:
     # Blocking Vision work must not exhaust Swift's cooperative worker pool.
     segmentation = root / "apps/ios/LogYourBody/Services/BackgroundRemovalService.swift"
@@ -206,6 +233,7 @@ def check_home_interactions(root: Path, texts: dict, violations: list, violation
     check_nested_launch_time_allowance(root, violations, violation)
     check_launch_interruption_taps(root, violations, violation)
     check_viewer_history_navigation(root, violations, violation)
+    check_progress_share_readiness(root, violations, violation)
 
     ui_path = root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
     if not ui_path.is_file():

@@ -142,16 +142,17 @@ def main() -> int:
 
     root = args.root.resolve()
     app_dir = root / "apps/ios/LogYourBody"
-    app_swift_files = sorted(app_dir.rglob("*.swift"))
-    native_swift_files = sorted(
-        path
+    # Reuse app discovery; tuple keys preserve Path order without Python comparisons.
+    app_swift_files = sorted(app_dir.rglob("*.swift"), key=lambda path: path.parts)
+    native_swift_files = app_swift_files + sorted(
+        (path
         for directory in (
-            "LogYourBody",
             "LogYourBodyTests",
             "LogYourBodyUITests",
             "LogYourBodyWidget",
         )
-        for path in (root / "apps/ios" / directory).rglob("*.swift")
+        for path in (root / "apps/ios" / directory).rglob("*.swift")),
+        key=lambda path: path.parts,
     )
     # One read per file. Repeating read_text inside every check blows the traced 30s suite.
     texts = read_sources(native_swift_files)
