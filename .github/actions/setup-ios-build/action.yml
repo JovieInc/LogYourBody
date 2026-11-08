@@ -50,6 +50,7 @@ runs:
         # picks up new/renamed default-enabled rules (e.g. legacy_swiftui_aspect_ratio)
         # and breaks --strict CI on unrelated PRs with no local repro.
         SWIFTLINT_VERSION="0.63.3"
+        SWIFTLINT_SHA256="fb045e85e7cb3374f42a4840b6b85a0106302afa69035c0c6f29af4a44c810b6"
         # The tool cache is user-writable on hosted and self-hosted runners;
         # /usr/local/bin is root-owned on the self-hosted Macs.
         SWIFTLINT_DIR="${RUNNER_TOOL_CACHE}/swiftlint/${SWIFTLINT_VERSION}"
@@ -57,10 +58,18 @@ runs:
           if [[ ! -x "$SWIFTLINT_DIR/swiftlint" ]]; then
             echo "Installing SwiftLint ${SWIFTLINT_VERSION}..."
             mkdir -p "$SWIFTLINT_DIR"
-            curl --fail --silent --show-error --location \
+            if ! curl --fail --silent --show-error --location \
               --retry 3 --retry-all-errors --retry-delay 2 \
               --connect-timeout 30 --max-time 120 \
-              "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip
+              "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip; then
+              # The asset API serves the same pinned archive when the release URL times out.
+              curl --fail --silent --show-error --location \
+                --retry 3 --retry-all-errors --retry-delay 2 \
+                --connect-timeout 30 --max-time 120 \
+                --header 'Accept: application/octet-stream' \
+                "https://api.github.com/repos/realm/SwiftLint/releases/assets/430524024" -o swiftlint.zip
+            fi
+            printf '%s  %s\n' "$SWIFTLINT_SHA256" swiftlint.zip | shasum -a 256 --check --strict
             unzip -o swiftlint.zip -d "$SWIFTLINT_DIR"
             chmod +x "$SWIFTLINT_DIR/swiftlint"
           fi

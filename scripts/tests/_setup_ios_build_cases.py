@@ -1,5 +1,6 @@
 """Exercise the actual iOS tool installer with real curl and a local HTTP server."""
 
+import hashlib
 import io
 import os
 import re
@@ -16,18 +17,22 @@ from _runner_routing_fixture import _REPO_ROOT, _coverage_fds
 
 
 @pytest.mark.parametrize(
-    ("statuses", "valid_archive", "success", "requests"),
+    ("statuses", "fallback_statuses", "valid_archive", "checksum_matches", "success", "requests"),
     [
-        ((200,), True, True, 1),
-        ((504, 200), True, True, 2),
-        ((504,), True, False, 4),
-        ((200,), False, False, 1),
+        ((200,), (200,), True, True, True, (1, 0)),
+        ((504, 200), (200,), True, True, True, (2, 0)),
+        ((504,), (200,), True, True, True, (4, 1)),
+        ((504,), (504,), True, True, False, (4, 4)),
+        ((200,), (200,), False, True, False, (1, 0)),
+        ((200,), (200,), True, False, False, (1, 0)),
+        ((504,), (200,), True, False, False, (4, 1)),
     ],
-    ids=["success", "transient-504", "persistent-504", "invalid-archive"],
+    ids=["success", "transient-504", "asset-api-fallback", "persistent-504",
+         "invalid-archive", "checksum-mismatch", "fallback-checksum-mismatch"],
 )
 def test_swiftlint_download_handles_http_failures(
-    tmp_path: Path, statuses: tuple[int, ...], valid_archive: bool,
-    success: bool, requests: int,
+    tmp_path: Path, statuses: tuple[int, ...], fallback_statuses: tuple[int, ...],
+    valid_archive: bool, checksum_matches: bool, success: bool, requests: tuple[int, int],
 ) -> None:
     action = (_REPO_ROOT / ".github/actions/setup-ios-build/action.yml").read_text()
     step = action.split("    - name: Install SwiftLint and xcbeautify\n", 1)[1]
@@ -38,11 +43,16 @@ def test_swiftlint_download_handles_http_failures(
     with zipfile.ZipFile(archive, "w") as output:
         output.writestr("swiftlint", binary)
     payload = archive.getvalue() if valid_archive else b"invalid archive"
+    digest = hashlib.sha256(payload).hexdigest() if checksum_matches else "0" * 64
+    body = body.replace("fb045e85e7cb3374f42a4840b6b85a0106302afa69035c0c6f29af4a44c810b6", digest)
     observed: list[str] = []
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
-            status = statuses[min(len(observed), len(statuses) - 1)]
+            responses = fallback_statuses if self.path == "/asset-api.zip" else statuses
+            status = responses[min(observed.count(self.path), len(responses) - 1)]
+            if self.path == "/asset-api.zip":
+                assert self.headers.get("Accept") == "application/octet-stream"
             observed.append(self.path)
             self.send_response(status)
             self.send_header("Content-Length", str(len(payload)))
@@ -59,6 +69,8 @@ def test_swiftlint_download_handles_http_failures(
     url = "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip"
     assert body.count(url) == 1
     body = body.replace(url, f"http://{server.server_address[0]}:{server.server_port}/swiftlint.zip")
+    body = body.replace("https://api.github.com/repos/realm/SwiftLint/releases/assets/430524024",
+                        f"http://{server.server_address[0]}:{server.server_port}/asset-api.zip")
     tools = tmp_path / "bin"
     tools.mkdir()
     for name in ("xcbeautify", "swiftlint"):
@@ -79,7 +91,7 @@ def test_swiftlint_download_handles_http_failures(
         server.server_close()
         thread.join(timeout=5)
     assert (result.returncode == 0) == success, result.stdout + result.stderr
-    assert observed == ["/swiftlint.zip"] * requests
+    assert observed == ["/swiftlint.zip"] * requests[0] + ["/asset-api.zip"] * requests[1]
     installed = tmp_path / "cache" / "swiftlint" / version / "swiftlint"
     if success:
         assert installed.read_text() == binary and os.access(installed, os.X_OK)
