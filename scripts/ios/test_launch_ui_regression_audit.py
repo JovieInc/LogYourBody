@@ -293,6 +293,23 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
 
     def test_header_swipe_isolates_buttons_and_keeps_a_usable_title_region(self):
         self.assertEqual(self.run_audit()[0], 0)
+        path = self.app / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
+        source = path.read_text()
+        frame = ".frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? 0 : .infinity)"
+        bounds = frame + "\n                .contentShape(Rectangle())"
+        for before, after in (
+            (".zIndex(1)", ""),
+            (".zIndex(1)", ".zIndex(-1)"),
+            (".zIndex(0)", ".zIndex(2)"),
+            (".zIndex(0)", ""),
+            (bounds, frame),
+            (bounds, ".contentShape(Rectangle())\n                " + frame),
+        ):
+            with self.subTest(replacement=after):
+                self.assertIn(before, source)
+                path.write_text(source.replace(before, after, 1))
+                self.assert_rejected("timeline.header_hit_test_priority")
+                path.write_text(source)
 
     def test_header_container_cannot_observe_button_touches(self):
         path = self.app / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
@@ -324,32 +341,15 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
 """
         self.assertIn(content_overlay, source)
         detached = source.replace(content_overlay, "", 1)
-        header_end = """        .onChange(of: selectedPhotoTimelineRootPage) { _, _ in
-            isHomeChatExpanded = false
-        }
-"""
-        parent_overlay = header_end + """        .overlay(alignment: .leading) {
-            Color.clear
-                .frame(width: 20)
-                .padding(.top, 56)
-                .contentShape(Rectangle())
-                .highPriorityGesture(photoTimelineSwipe)
-                .accessibilityHidden(true)
-        }
-"""
-        self.assertIn(header_end, detached)
-        path.write_text(detached.replace(header_end, parent_overlay, 1))
+        parent_anchor = "        .fullScreenCover(isPresented: $isHomeV2ViewerPresented)"
+        parent_overlay = "".join(line[8:] + "\n" for line in content_overlay.splitlines())
+        self.assertIn(parent_anchor, detached)
+        path.write_text(detached.replace(parent_anchor, parent_overlay + parent_anchor, 1))
         self.assert_rejected("timeline.edge_swipe_excludes_header")
 
         padded = source.replace(
-            """.frame(width: 20)
-                        .frame(maxHeight: .infinity)
-                        .contentShape(Rectangle())
-                        .highPriorityGesture(photoTimelineSwipe)""",
-            """.frame(width: 20)
-                        .padding(.top, 56)
-                        .contentShape(Rectangle())
-                        .highPriorityGesture(photoTimelineSwipe)""",
+            ".frame(width: 20)\n",
+            ".frame(width: 20)\n                        .padding(.top, 56)\n",
             1,
         )
         self.assertNotEqual(padded, source)

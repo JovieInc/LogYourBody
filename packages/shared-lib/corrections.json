@@ -6799,5 +6799,23 @@
     },
     "level": "codebase",
     "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "timeline-header-hit-test-priority",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42462840066",
+    "correction": "PR #1704 / LYB-316, fix-red-5df69c1e5f occurrence 29: Launch Quality fails testPhotoScrubResetsWhenNavigatingToTheMenuAndBack after one menu tap. The simulator trace delivers the tap at the menu center (42, 89), but no sidebar presentation begins. Existing header and edge gesture isolation checks pass; keep the optional 3D engine evaluation and every native assertion.",
+    "mechanization": "Extend the existing launch gesture audit with timeline.header_hit_test_priority. Bound hit testing after content sizing and give the header explicit priority above scroll and pager descendants, since clipping only bounds drawing. The extended audit rejects the unchanged Swift source before the repair and passes afterward. Six mutations reject missing or inverted stacking priorities and missing or misplaced content bounds. The existing required shared-lib suite runs the behavior tests and Launch Quality runs the audit and unchanged three-tap/title-swipe/detail regression. Native execution remains unverified on this Linux host. The harness owns pushes and PR-body edits and must add exactly one line: Machine: built scripts/ios/launch_ui_timeline_gesture_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The root layout owns both siblings. Explicit header priority and a content shape after sizing keep scrolling descendants below the header and bound their hit region by construction, without changing gesture semantics or delaying taps."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_timeline_gesture_audit.py",
+      "anchor": "timeline.header_hit_test_priority"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
