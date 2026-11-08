@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "fix-red-89c44c062f",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1709",
+    "correction": "LYB-319 PR #1709 repair: merge origin/main without rebasing, preserve gated on-device photographic appearance, fix three size-500 violations, the XCTest geometry argument order, and the stale reviewed Xcode project fingerprint. Tently failed because its AI provider was unreachable.",
+    "mechanization": "Reuse the existing whole-declaration splitter and required size/call-shape ratchet instead of adding a parallel repair system. The existing static audit reproduced all four source violations before the repair and passes after extraction and call-order correction. Retain all extracted Swift declarations in the app target, preserve TypeScript exports and behavioral tests, and refresh the project fingerprint through the existing explicit reviewed-pin resolver. No gates or baselines are weakened. The harness owns pushing and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Splitting these files and ordering this call fixes the current sources but cannot prevent future file growth or misordered calls; the existing deterministic source ratchet is the preventive boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required static audit checks repository-wide source size and declared Swift argument order, and the routing tests reject a project fingerprint that differs from the actual project bytes."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_split_size_ratchet.py",
+      "anchor": "self.assertEqual(check_repo(ROOT), [])"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "dependency-repair-worktree-change-during-projection",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1756",
     "correction": "PR #1756, fix-red-1423773703 occurrence 58: merge origin/main without rebasing and preserve the ElevenLabs 3.0.80 bump. Detect Changes and parity reject its stale source projection, causing CI Summary to fail. Dependency repair must also refuse tracked manifest or resolver-configuration edits made during rendering after frozen verification.",

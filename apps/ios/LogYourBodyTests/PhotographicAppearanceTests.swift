@@ -123,7 +123,7 @@ final class PhotographicAppearanceTests: XCTestCase {
         XCTAssertNil(forgotten["2026-11-01"])
         _ = await store.remember(
             sample(accountId: "account-b", photoId: "photo-b"),
-            geometry: geometry(accountId: "account-b", bodyId: "account-b.body", snapshotId: "snapshot-b")
+            geometry: geometry(snapshotId: "snapshot-b", accountId: "account-b", bodyId: "account-b.body")
         )
         await store.forgetAccount("account-a")
         let remaining = await store.index(accountId: "account-b", dates: ["2026-11-01"])

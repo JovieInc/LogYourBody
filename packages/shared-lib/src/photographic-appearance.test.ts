@@ -320,8 +320,10 @@ it('keeps promotion behind repeatability, a real coverage gain, and device evide
 });
 
 it('wires the native stage without blocking the photo timeline or paid R1', () => {
-  const model = read('apps/ios/LogYourBody/Components/PhotographicAppearance.swift');
-  const stage = read('apps/ios/LogYourBody/Components/PersonalBodyStage.swift');
+  const model =
+    read('apps/ios/LogYourBody/Components/PhotographicAppearance.swift') +
+    read('apps/ios/LogYourBody/Components/PhotographicAppearanceSupport.swift');
+  const stage = read('apps/ios/LogYourBody/Components/PhotographicAppearanceCanvas.swift');
   const hero = read('apps/ios/LogYourBody/Views/HomeV2/HomeV2TimelineHero.swift');
   const surface = read('apps/ios/LogYourBody/Views/HomeV2/HomeV2Surface.swift');
   const deletion = read('apps/ios/LogYourBody/Views/DeleteAccountView.swift');

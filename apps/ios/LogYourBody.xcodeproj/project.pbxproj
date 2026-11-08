@@ -234,6 +234,8 @@
 		B317A11A000000000000000C /* PersonalBodyViewKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A000000000000000B /* PersonalBodyViewKind.swift */; };
 		B317A11A000000000000000E /* ProgressPhotoAttachSheet+PersonalBody.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A000000000000000D /* ProgressPhotoAttachSheet+PersonalBody.swift */; };
 		B319A11A0000000000000002 /* PhotographicAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = B319A11A0000000000000001 /* PhotographicAppearance.swift */; };
+		B319A11A000000000000000A /* PhotographicAppearanceCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = B319A11A0000000000000009 /* PhotographicAppearanceCanvas.swift */; };
+		B319A11A0000000000000008 /* PhotographicAppearanceSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B319A11A0000000000000007 /* PhotographicAppearanceSupport.swift */; };
 		B319A11A0000000000000004 /* PhotographicAppearanceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B319A11A0000000000000003 /* PhotographicAppearanceStore.swift */; };
 		B319A11A0000000000000006 /* PhotographicAppearanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B319A11A0000000000000005 /* PhotographicAppearanceTests.swift */; };
 		AD3145E22F0A030100ABCDEF /* DashboardMetricsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */; };
@@ -890,6 +892,8 @@
 		B317A11A000000000000000B /* PersonalBodyViewKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PersonalBodyViewKind.swift; path = Components/PersonalBodyViewKind.swift; sourceTree = "<group>"; };
 		B317A11A0000000000000009 /* PersonalBodyEstimateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalBodyEstimateTests.swift; sourceTree = "<group>"; };
 		B319A11A0000000000000001 /* PhotographicAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhotographicAppearance.swift; path = Components/PhotographicAppearance.swift; sourceTree = "<group>"; };
+		B319A11A0000000000000009 /* PhotographicAppearanceCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhotographicAppearanceCanvas.swift; path = Components/PhotographicAppearanceCanvas.swift; sourceTree = "<group>"; };
+		B319A11A0000000000000007 /* PhotographicAppearanceSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhotographicAppearanceSupport.swift; path = Components/PhotographicAppearanceSupport.swift; sourceTree = "<group>"; };
 		B319A11A0000000000000003 /* PhotographicAppearanceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhotographicAppearanceStore.swift; path = Components/PhotographicAppearanceStore.swift; sourceTree = "<group>"; };
 		B319A11A0000000000000005 /* PhotographicAppearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotographicAppearanceTests.swift; sourceTree = "<group>"; };
 		AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricsSection.swift; sourceTree = "<group>"; };
@@ -1422,6 +1426,8 @@
 				B317A11A0000000000000007 /* PersonalBodyStage.swift */,
 				B317A11A000000000000000B /* PersonalBodyViewKind.swift */,
 				B319A11A0000000000000001 /* PhotographicAppearance.swift */,
+				B319A11A0000000000000009 /* PhotographicAppearanceCanvas.swift */,
+				B319A11A0000000000000007 /* PhotographicAppearanceSupport.swift */,
 				B319A11A0000000000000003 /* PhotographicAppearanceStore.swift */,
 				ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */,
 				ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */,
@@ -2839,6 +2845,8 @@
 				B317A11A0000000000000008 /* PersonalBodyStage.swift in Sources */,
 				B317A11A000000000000000C /* PersonalBodyViewKind.swift in Sources */,
 				B319A11A0000000000000002 /* PhotographicAppearance.swift in Sources */,
+				B319A11A000000000000000A /* PhotographicAppearanceCanvas.swift in Sources */,
+				B319A11A0000000000000008 /* PhotographicAppearanceSupport.swift in Sources */,
 				B319A11A0000000000000004 /* PhotographicAppearanceStore.swift in Sources */,
 				AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */,
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
