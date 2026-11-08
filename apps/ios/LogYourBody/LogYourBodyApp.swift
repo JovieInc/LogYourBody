@@ -467,7 +467,7 @@ struct LogYourBodyApp: App {
             arguments.contains("-lybUITestBodyScoreFirstPhotoFixture")
         let usesDailyReminderPromptFixture = arguments.contains("-lybUITestDailyReminderPromptFixture")
 
-        guard RealtimeSyncManager.argumentsForceUITestOffline(arguments) else { return false }
+        guard !RealtimeSyncManager.online(true, arguments) else { return false }
 
         let isSubscribed = usesPaidFixture ||
             usesWeightLoggerFixture ||

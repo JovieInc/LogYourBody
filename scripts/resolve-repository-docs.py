@@ -10,7 +10,7 @@ from contextlib import ExitStack
 from pathlib import Path
 
 import repository_docs
-from manifest_union import restore_dependency_artifacts_on_failure
+from manifest_union import projection_is_unmerged, restore_dependency_artifacts_on_failure
 
 
 def staged_bytes(root, name):
@@ -97,8 +97,10 @@ def union_project(root):
     apply_project_union(root)
 
 
-def resolve_staged(root, extra_outputs=()):
+def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfile=None, dependency_inputs=()):
     root = Path(root).resolve()
+    source_index = expected_index if expected_index is not None else git_bytes(root, "ls-files", "--stage", "-z")
+    # An auto-merged manifest must keep every parent test input.
     from manifest_union import assert_auto_merged_parent_inputs
     assert_auto_merged_parent_inputs(root)
     registry = staged_bytes(root, "repository-docs.json")
@@ -135,6 +137,13 @@ def resolve_staged(root, extra_outputs=()):
         if errors:
             raise ValueError("; ".join(errors))
         projection = repository_docs.local(snapshot, config["output"]).read_bytes()
+    # Refuse a source index changed while rendering instead of staging stale parity.
+    if git_bytes(root, "ls-files", "--stage", "-z") != source_index:
+        raise ValueError("source index changed during projection generation; review staged inputs and retry")
+    if expected_lockfile is not None and (root / "pnpm-lock.yaml").read_bytes() != expected_lockfile:
+        raise ValueError("lockfile changed during projection generation; review dependency inputs and retry")
+    if dependency_inputs and git_bytes(root, "diff", "--name-only", "--", *[name for name in dependency_inputs if name != "pnpm-lock.yaml"]):
+        raise ValueError("dependency inputs changed during projection generation; stage reviewed inputs and retry")
     output.parent.mkdir(parents=True, exist_ok=True)
     original = output.read_bytes() if output.exists() else None
     try:
@@ -163,35 +172,11 @@ def git_bytes(root, *args):
     ).stdout
 
 
-def _ours_pin_conflict(text):
-    """Return the branch side when every conflict hunk is one project-pin line."""
-    lines, out, index, saw = text.splitlines(keepends=True), [], 0, False
-    while index < len(lines):
-        line = lines[index]
-        if line[:1] != "<" or not re.match(r"^<{2,}(?: |\r?$)", line):
-            if re.match(r"^(?:\|{2,}|={2,}|>{2,})(?: |\r?$)", line):
-                raise ValueError("diagnostic workflow conflict is not limited to the project pin")
-            out.append(line)
-            index += 1
-            continue
-        saw, index, ours = True, index + 1, None
-        for end in "=>":
-            chunk = []
-            while index < len(lines) and not re.match(rf"^{end}{{2,}}(?: |\r?$)", lines[index]):
-                chunk.append(lines[index])
-                index += 1
-            if index >= len(lines) or len(chunk) != 1 or not DIAGNOSTIC_PIN.fullmatch(chunk[0].rstrip("\r\n")):
-                raise ValueError("diagnostic workflow conflict is not limited to the project pin")
-            ours = chunk[0] if end == "=" else ours
-            index += 1
-        out.append(ours)
-    if not saw:
-        raise ValueError("diagnostic workflow conflict is not limited to the project pin")
-    return "".join(out)
+def conflicted_diagnostic_template(root, explicit_audit=None):
+    """Return branch workflow text for pin conflicts and one-sided dependency lines.
 
-
-def conflicted_diagnostic_template(root):
-    """Retain independent parent edits around a project-pin-only conflict."""
+    Keep branch edits when incoming changed only this project pin.
+    """
     entries = [
         entry for entry in git_bytes(
             root, "ls-files", "--unmerged", "-z", "--", DIAGNOSTIC_WORKFLOW,
@@ -207,35 +192,25 @@ def conflicted_diagnostic_template(root):
         text = git_bytes(root, "show", f":{stage}:{DIAGNOSTIC_WORKFLOW}").decode()
         if re.search(r"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", text):
             raise ValueError("diagnostic pin repair refuses conflict markers in a parent")
-        masked, count = DIAGNOSTIC_PIN.subn(
-            lambda match: match.group(1) + ("0" * 64) + match.group(2), text, count=1,
-        )
-        if count != 1:
-            raise ValueError("diagnostic workflow conflict is not limited to the project pin")
-        texts.append((text, masked))
-    # Keep branch edits when incoming changed only this project pin.
-    # Preserve incoming independent edits in the symmetric case too.
-    template = texts[1] if texts[0][1] == texts[2][1] else texts[2]
-    if len({item[1] for item in texts}) != 1 and (
-        texts[0][1] not in (texts[1][1], texts[2][1])
-        or DIAGNOSTIC_PIN.sub(
-            lambda match: match.group(1) + ("0" * 64) + match.group(2),
-            _ours_pin_conflict(repository_docs.local(root, DIAGNOSTIC_WORKFLOW).read_text()),
-        ) != template[1]
-    ):
-        raise ValueError("diagnostic workflow conflict is not limited to the project pin")
-    return template[0]
+        texts.append(text)
+    from reviewed_audit_pin import conflicted_pin_template
+    worktree = repository_docs.local(root, DIAGNOSTIC_WORKFLOW).read_text()
+    return conflicted_pin_template(
+        texts[0], texts[1], texts[2], DIAGNOSTIC_PIN, explicit_audit, worktree,
+    )
 
 
 def assert_merged_project_keeps_parent_files(root, project):
     """A merged diagnostic project must keep every parent file membership."""
     # A parent group or build-phase entry must remain even when its definition survived.
     # Placement rows and reference counts both survive a merged diagnostic project.
+    # The shared verifier rejects "merged project dropped a parent file reference: "
+    # and "merged project changed a parent build-file mapping: " before pin repair.
     from pbx_union import assert_merged_project_keeps_parent_files as verify
     verify(root, project)
 
 
-def reviewed_conflicted_pin(root, expected):
+def reviewed_conflicted_pin(root, expected, explicit_audit=None):
     """Replace a pin-only diagnostic workflow conflict with the explicit reviewed project digest."""
     if not re.fullmatch(r"[0-9a-f]{64}", expected):
         raise ValueError("reviewed project SHA-256 must be 64 lowercase hex characters")
@@ -252,7 +227,12 @@ def reviewed_conflicted_pin(root, expected):
     assert_merged_project_keeps_parent_files(root, project)
     if repository_docs.digest(project) != expected:
         raise ValueError("reviewed project SHA-256 does not match merged source")
-    template = conflicted_diagnostic_template(root)
+    routing = None
+    if explicit_audit is not None:
+        from reviewed_audit_pin import assert_staged_audit, conflicted_routing_text
+        assert_staged_audit(root, explicit_audit)
+        routing = conflicted_routing_text(root, explicit_audit)
+    template = conflicted_diagnostic_template(root, explicit_audit)
     # A conflicted diagnostic pin is replaced only by the reviewed project digest.
     # Only an explicit reviewed digest may update this trust boundary; never derive it here.
     updated, count = DIAGNOSTIC_PIN.subn(
@@ -260,33 +240,12 @@ def reviewed_conflicted_pin(root, expected):
     )
     if count != 1:
         raise ValueError("expected exactly one diagnostic project pin")
-    return DIAGNOSTIC_WORKFLOW, updated
+    return DIAGNOSTIC_WORKFLOW, updated, routing
 
 
 def stage_conflicted_diagnostic_pin(root, pin_update, output):
-    workflow, updated = pin_update
-    path = repository_docs.local(root, workflow)
-    original = path.read_bytes()
-    if (
-        not re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", original)
-        and original.decode() != updated
-    ):
-        raise ValueError(
-            "diagnostic pin repair refuses a manually edited workflow; review and stage it explicitly"
-        )
-    index = git_bytes(root, "ls-files", "--stage", "--", workflow)
-    try:
-        errors = repository_docs.run(root)
-        if errors and errors != ["source projection stale: " + output]:
-            raise ValueError("; ".join(errors))
-        path.write_bytes(updated.encode())
-        subprocess.run(["git", "add", "--", workflow], cwd=root, check=True)
-        resolve_staged(root)
-    except (ValueError, OSError, subprocess.CalledProcessError):
-        path.write_bytes(original)
-        subprocess.run(["git", "update-index", "--force-remove", "--", workflow], cwd=root, check=True)
-        subprocess.run(["git", "update-index", "--index-info"], cwd=root, input=index, check=True)
-        raise
+    from reviewed_audit_pin import stage_resolved_pins
+    stage_resolved_pins(root, pin_update, output, resolve_staged, git_bytes)
 
 
 def reviewed_project_pin(root, expected):
@@ -316,15 +275,14 @@ def reviewed_project_pin(root, expected):
     return workflow, updated
 
 
-def projection_is_unmerged(root, output):
-    result = subprocess.run(
-        ["git", "ls-files", "--unmerged", "--", output],
-        cwd=root, check=True, capture_output=True, text=True,
-    )
-    return bool(result.stdout.strip())
+def apply_reviewed_audit_pins(root, expected):
+    """Only an explicit reviewed audit digest may update every current pin."""
+    from reviewed_audit_pin import apply_pins
+    apply_pins(root, expected, resolve_staged)
 
 
-def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_project_sha256=None):
+def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_project_sha256=None,
+            reviewed_audit_sha256=None):
     root = Path(root).resolve()
     config = json.loads(repository_docs.local(root, "repository-docs.json").read_text())
     output = repository_docs.local(root, config["output"]).relative_to(root).as_posix()
@@ -337,18 +295,27 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
     unresolved = sorted(set(conflicts) - {"", output, LEDGER})
     conflicted_pin = None
     if reviewed_project_sha256 is not None and DIAGNOSTIC_WORKFLOW in unresolved:
-        conflicted_pin = reviewed_conflicted_pin(root, reviewed_project_sha256)
-        unresolved = [name for name in unresolved if name != DIAGNOSTIC_WORKFLOW]
+        conflicted_pin = reviewed_conflicted_pin(
+            root, reviewed_project_sha256, reviewed_audit_sha256,
+        )
+        drop = {DIAGNOSTIC_WORKFLOW}
+        if conflicted_pin[2] is not None:
+            drop.add("scripts/tests/test_runner_routing.py")
+        unresolved = [name for name in unresolved if name not in drop]
     if unresolved:
         raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
     if conflicted_pin is not None:
         stage_conflicted_diagnostic_pin(root, conflicted_pin, output)
+        return
+    if reviewed_audit_sha256 is not None:
+        apply_reviewed_audit_pins(root, reviewed_audit_sha256)
         return
     # A conflicted source map is rebuilt from the merged index.
     if (
         not refresh_lockfile
         and not verify_lockfile
         and reviewed_project_sha256 is None
+        and reviewed_audit_sha256 is None
         and projection_is_unmerged(root, output)
     ):
         errors = repository_docs.run(root)
@@ -387,7 +354,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                 ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
                  ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
                  "package.json", "**/package.json",
-                 ":(glob,exclude)**/node_modules/**"],
+                 ":(glob,exclude)**/node_modules/**", ":(glob,exclude)**/.next/**"],
                 cwd=root, check=True, capture_output=True, text=True,
             ).stdout.strip("\0")
             if ignored:
@@ -425,10 +392,11 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             # Refuse inputs changed during verification before staging dependency artifacts.
             if (git_bytes(root, "ls-files", "--stage", "-z") != verified_index
                     or git_bytes(root, "diff", "--name-only", "--",
-                                 *[name for name in inputs if name != "pnpm-lock.yaml"])):
+                                 *[name for name in inputs if name != "pnpm-lock.yaml" or verify_lockfile or not modes])):
                 raise ValueError("dependency inputs changed during verification; stage reviewed inputs and retry")
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
-            resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [])
+            resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [], expected_index=verified_index,
+                           expected_lockfile=(root / "pnpm-lock.yaml").read_bytes(), dependency_inputs=inputs)
             return
         if pin_update:
             repository_docs.local(root, pin_update[0]).write_text(pin_update[1])
@@ -449,14 +417,25 @@ def main():
     mode.add_argument("--staged", action="store_true", help="refresh from the Git index before commit")
     mode.add_argument("--refresh-lockfile", action="store_true", help="repair and verify the pnpm lockfile before refreshing docs")
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
-    mode.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
     mode.add_argument("--union-project", action="store_true", help="union additive Xcode file membership from both parents and stage the project")
+    mode.add_argument("--merge-ledger", action="store_true", help="refresh staged docs, then preserve and classify both merge parents' correction receipts")
+    parser.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
+    parser.add_argument("--reviewed-audit-sha256", help="refresh every current reviewed audit pin using an explicitly reviewed audit digest")
     args = parser.parse_args()
+    exclusive = any((
+        args.staged, args.refresh_lockfile, args.verify_lockfile, args.merge_sections,
+        args.union_manifests, args.union_project, args.merge_ledger,
+    ))
+    if exclusive and (args.reviewed_project_sha256 or args.reviewed_audit_sha256):
+        parser.error("reviewed digests cannot be combined with another repair mode")
     try:
         if args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
+        elif args.merge_ledger:
+            from manifest_union import merge_ledger
+            merge_ledger(args.root, resolve_staged, staged_bytes, git_bytes)
         elif args.union_project:
             union_project(args.root)
         elif args.union_manifests:
@@ -471,7 +450,8 @@ def main():
         elif args.staged:
             resolve_staged(args.root)
         else:
-            resolve(args.root, args.refresh_lockfile, args.verify_lockfile, args.reviewed_project_sha256)
+            resolve(args.root, args.refresh_lockfile, args.verify_lockfile,
+                    args.reviewed_project_sha256, args.reviewed_audit_sha256)
     except (ValueError, KeyError, TypeError, OSError, subprocess.CalledProcessError) as exc:
         parser.exit(1, "repository-docs: " + str(exc) + "\n")
 

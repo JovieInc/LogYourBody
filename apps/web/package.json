@@ -26,8 +26,8 @@
     "test:e2e:update": "playwright test --update-snapshots"
   },
   "dependencies": {
-    "@ai-sdk/elevenlabs": "^3.0.76",
-    "@ai-sdk/gateway": "^4.0.96",
+    "@ai-sdk/elevenlabs": "^3.0.80",
+    "@ai-sdk/gateway": "^4.0.137",
     "@headlessui/react": "^2.2.10",
     "@hookform/resolvers": "^5.9.1",
     "@jovie/ui": "workspace:*",
@@ -105,7 +105,7 @@
     "tailwind-merge": "^3.7.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
-    "ws": "8.21.0",
+    "ws": "8.22.1",
     "zod": "^4.6.7"
   },
   "engines": {
@@ -113,7 +113,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
-    "@next/bundle-analyzer": "^15.5.26",
+    "@next/bundle-analyzer": "^16.4.3",
     "@playwright/test": "^1.63.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.9.1",
@@ -125,7 +125,7 @@
     "@types/node": "^20.19.43",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@types/ws": "8.18.1",
+    "@types/ws": "8.18.2",
     "autoprefixer": "^10.6.2",
     "dotenv": "^17.4.2",
     "eslint": "^9.39.5",

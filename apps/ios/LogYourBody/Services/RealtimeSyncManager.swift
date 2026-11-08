@@ -23,6 +23,7 @@ class RealtimeSyncManager: ObservableObject {
     @Published var unsyncedGlp1Count = 0
     @Published var unsyncedDexaCount = 0
     @Published var isOnline = true
+
     @Published var realtimeConnected = false
     @Published var error: String?
 
@@ -48,16 +49,12 @@ class RealtimeSyncManager: ObservableObject {
 
     func handleNetworkPathUpdate(isOnline: Bool) {
         // A queued path callback can outlive monitor cancellation.
-        if Self.argumentsForceUITestOffline(ProcessInfo.processInfo.arguments) {
-            applyNetworkPathStatus(.unsatisfied)
-            return
-        }
         #if DEBUG
         guard !usesOfflineUITestFixture else { return }
         #endif
         let wasOffline = !self.isOnline
-        self.isOnline = isOnline
-        if isOnline {
+        self.isOnline = Self.online(isOnline)
+        if self.isOnline {
             syncStatus = .idle
             if wasOffline { syncAll() }
         } else {
@@ -158,47 +155,27 @@ class RealtimeSyncManager: ObservableObject {
         self.analyticsService = analyticsService
     }
 
-    /// UI fixtures force offline once. A later satisfied path must not clear it,
-    /// or a stale reading replaces "Retry sync" with "Record a fresh measurement".
-    static func argumentsForceUITestOffline(_ arguments: [String]) -> Bool {
-        let markers = [
-            "-lybUITestPaidMVPFixture",
-            "-lybUITestWeightLoggerMVPFixture",
-            "-lybUITestPaywallFixture",
-            "-lybUITestPaywallPlansFixture",
-            "-lybUITestFullDashboardFixture",
-            "-lybUITestPhotoTimelineHUDFixture",
-            "-lybUITestBodyScoreOnboardingFixture",
-            "-lybUITestBodyScoreFirstPhotoFixture"
-        ]
-        return markers.contains { arguments.contains($0) }
+    /// Paid UI fixtures force offline before the first snapshot. A satisfied
+    /// path must not replace that, or an empty Stats launch classifies as no-data.
+    static func online(
+        _ pathSatisfied: Bool,
+        _ arguments: [String] = ProcessInfo.processInfo.arguments
+    ) -> Bool {
+        guard pathSatisfied else { return false }
+        let fixtureForcesOffline = offlineUITestFixtures.contains { arguments.contains($0) }
+        return !fixtureForcesOffline
     }
 
-    func applyNetworkPathStatus(
-        _ status: NWPath.Status,
-        arguments: [String] = ProcessInfo.processInfo.arguments
-    ) {
-        #if DEBUG
-        if usesOfflineUITestFixture { return }
-        #endif
-        if Self.argumentsForceUITestOffline(arguments) {
-            isOnline = false
-            syncStatus = .offline
-            disconnectRealtime()
-            return
-        }
-        let wasOffline = !isOnline
-        isOnline = status == .satisfied
-        if isOnline {
-            syncStatus = .idle
-            if wasOffline {
-                syncAll()
-            }
-        } else {
-            syncStatus = .offline
-            disconnectRealtime()
-        }
-    }
+    static let offlineUITestFixtures = [
+        "-lybUITestPaidMVPFixture",
+        "-lybUITestWeightLoggerMVPFixture",
+        "-lybUITestPaywallFixture",
+        "-lybUITestPaywallPlansFixture",
+        "-lybUITestFullDashboardFixture",
+        "-lybUITestPhotoTimelineHUDFixture",
+        "-lybUITestBodyScoreOnboardingFixture",
+        "-lybUITestBodyScoreFirstPhotoFixture"
+    ]
 }
 
 extension PendingBodyMetricSyncItem {

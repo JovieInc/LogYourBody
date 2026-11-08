@@ -182,6 +182,15 @@ def assert_merged_project_keeps_parent_files(root, project):
         if len(re.findall(r"\b" + re.escape(identifier) + r"\b", merged))
         < max(len(re.findall(r"\b" + re.escape(identifier) + r"\b", source)) for source in parent_sources)
     ]
+    # Identifier counts cannot detect a build entry rewired to the wrong file.
+    build_file = re.compile(
+        r"(?m)^\t\t([A-Za-z0-9]+) /\* .*? \*/ = \{isa = PBXBuildFile; fileRef = ([A-Za-z0-9]+)\b"
+    )
+    merged_edges = dict(build_file.findall(merged))
+    for source in parent_sources:
+        for identifier, file_ref in build_file.findall(source):
+            if identifier in added_defs and merged_edges.get(identifier) != file_ref:
+                raise ValueError("merged project changed a parent build-file mapping: " + identifier)
     # Placement rows and reference counts both survive a merged diagnostic project.
     if missing or references:
         detail = []

@@ -128,10 +128,10 @@ def check_ui_test_offline_fixture(root: Path, violations: list, violation) -> No
     fixture = text_for(app).split("func applyPaidMVPUITestFixtureIfNeeded", 1)[-1].split(
         "func writeHomeV2FixturePhoto", 1
     )[0]
-    policy = sync_text.split("func argumentsForceUITestOffline", 1)[-1].split(
-        "func applyNetworkPathStatus", 1
+    policy = sync_text.split("static func online", 1)[-1]
+    applicator = sync_text.split("func handleNetworkPathUpdate", 1)[-1].split(
+        "var syncTimer", 1
     )[0]
-    applicator = sync_text.split("func applyNetworkPathStatus", 1)[-1]
     helper = ""
     if "func applyOfflineUITestFixture" in sync_text:
         helper = sync_text.split("func applyOfflineUITestFixture", 1)[1].split("#endif", 1)[0]
@@ -152,13 +152,14 @@ def check_ui_test_offline_fixture(root: Path, violations: list, violation) -> No
         "-lybUITestBodyScoreOnboardingFixture",
         "-lybUITestBodyScoreFirstPhotoFixture",
     )
-    held = applicator.find("argumentsForceUITestOffline")
-    assigned = applicator.find("isOnline = status ==")
+    held = applicator.find("guard !usesOfflineUITestFixture")
+    assigned = applicator.find("self.isOnline = Self.online(isOnline)")
     if (any(token not in fixture or token not in policy for token in required)
-            or "argumentsForceUITestOffline(arguments)" not in fixture
+            or "!RealtimeSyncManager.online(true, arguments)" not in fixture
+            or "return !fixtureForcesOffline" not in policy
             or not offline_pinned
             or held < 0 or assigned < 0 or "return" not in applicator[held:assigned]
-            or "applyNetworkPathStatus(path.status)" not in handler
+            or "handleNetworkPathUpdate(isOnline: path.status == .satisfied)" not in handler
             or "isOnline = path.status" in handler):
         violations.append(violation(
             check="sync.ui_test_offline_survives_path",

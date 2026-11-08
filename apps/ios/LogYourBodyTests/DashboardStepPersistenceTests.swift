@@ -365,7 +365,8 @@ final class DashboardStepPersistenceTests: XCTestCase {
         let sync = ownedSync()
         sync.isOnline = true
         sync.syncStatus = .idle
-        sync.applyNetworkPathStatus(.satisfied, arguments: ["-lybUITestPhotoTimelineHUDFixture"])
+        sync.applyOfflineUITestFixture()
+        sync.handleNetworkPathUpdate(isOnline: true)
         XCTAssertFalse(sync.isOnline)
         XCTAssertEqual(sync.syncStatus, .offline)
     }
@@ -373,7 +374,7 @@ final class DashboardStepPersistenceTests: XCTestCase {
     func testSatisfiedPathStaysIdleWhenTheFixtureIsAlreadyOnline() {
         let sync = ownedSync()
         sync.isOnline = true
-        sync.applyNetworkPathStatus(.satisfied, arguments: [])
+        sync.handleNetworkPathUpdate(isOnline: true)
         XCTAssertTrue(sync.isOnline)
         XCTAssertEqual(sync.syncStatus, .idle)
     }
@@ -381,7 +382,7 @@ final class DashboardStepPersistenceTests: XCTestCase {
     func testUnsatisfiedPathForcesOfflineWithoutTheUITestFixture() {
         let sync = ownedSync()
         sync.isOnline = true
-        sync.applyNetworkPathStatus(.unsatisfied, arguments: [])
+        sync.handleNetworkPathUpdate(isOnline: false)
         XCTAssertFalse(sync.isOnline)
         XCTAssertEqual(sync.syncStatus, .offline)
     }

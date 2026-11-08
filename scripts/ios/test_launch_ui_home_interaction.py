@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 import shutil
+from launch_ui_offline_pin_audit import check_ui_test_offline_pin
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -86,8 +87,8 @@ class HomeInteractionAuditTests:
         self.assertEqual(self.run_audit()[0], 0)
         cases = [
             (sync, original_sync, '"-lybUITestPhotoTimelineHUDFixture",\n', ""),
-            (sync, original_sync, "disconnectRealtime()\n            return", "disconnectRealtime()"),
-            (monitor, original_monitor, "self?.applyNetworkPathStatus(path.status)",
+            (sync, original_sync, "return !fixtureForcesOffline", "return pathSatisfied"),
+            (monitor, original_monitor, "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)",
              "self?.isOnline = path.status == .satisfied"),
             (app, original_app, "realtimeSyncManager.applyOfflineUITestFixture()\n", ""),
             (sync, original_sync, "networkMonitor.cancel()\n        isOnline = false",
@@ -99,6 +100,49 @@ class HomeInteractionAuditTests:
                 path.write_text(original.replace(before, after, 1))
                 self.assert_rejected("sync.ui_test_offline_survives_path")
                 path.write_text(original)
+
+
+    def test_satisfied_path_cannot_clear_a_ui_test_offline_pin(self):
+        sync = self.app / "Services/RealtimeSyncManager+Part01.swift"
+        manager = self.app / "Services/RealtimeSyncManager.swift"
+        app = self.app / "LogYourBodyApp.swift"
+        originals = {path: path.read_text() for path in (sync, manager, app)}
+        def checks():
+            texts = {path: path.read_text() for path in originals}
+            found = []
+            check_ui_test_offline_pin(self.root, [], found, texts)
+            return [item.check for item in found]
+        self.assertEqual(checks(), [])
+        cases = (
+            (sync, "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)", "self.isOnline = path.status == .satisfied"),
+            (manager, "guard !usesOfflineUITestFixture else { return }", "guard usesOfflineUITestFixture else { return }"),
+            (app, "realtimeSyncManager.applyOfflineUITestFixture()", "realtimeSyncManager.isOnline = false"),
+        )
+        for path, before, after in cases:
+            with self.subTest(path=path.name):
+                path.write_text(originals[path].replace(before, after, 1))
+                self.assertEqual(checks(), ["sync.ui_test_offline_pin"])
+                path.write_text(originals[path])
+
+    def test_dated_stats_fixture_survives_path_and_account_change(self):
+        self.assertEqual(self.run_audit()[0], 0)
+        cases = [
+            ("Services/RealtimeSyncManager+Part01.swift", "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)", "self.isOnline = path.status == .satisfied", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "self.isOnline = Self.online(isOnline)", "self.isOnline = isOnline", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "guard !usesOfflineUITestFixture else { return }", "", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "return !fixtureForcesOffline", "return pathSatisfied", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", '"-lybUITestPhotoTimelineHUDFixture"', '"-not-an-offline-fixture"', "dated_stats.offline_survives_path"),
+            ("Views/DashboardViewLiquid.swift", "selectedPhotoTimelineRootPage = Self.pageAfterAccountChange()", "selectedPhotoTimelineRootPage = .timeline", "dated_stats.analytics_survives_account"),
+            ("Services/DatedTimelineUI.swift", "return .analytics", "return .timeline", "dated_stats.analytics_survives_account"),
+        ]
+        for relative, before, after, check in cases:
+            with self.subTest(before=before):
+                path = self.app / relative
+                source = path.read_text()
+                self.assertIn(before, source)
+                path.write_text(source.replace(before, after, 1))
+                self.assert_rejected(check)
+                path.write_text(source)
 
 
 def launch_ui_audit():
@@ -129,6 +173,8 @@ class CheckSiblingDiscoveryTests(unittest.TestCase):
                 "launch_ui_timeline_day",
                 "launch_ui_opacity_audit",
                 "launch_ui_timeline_gesture_audit",
+                "launch_ui_offline_pin_audit",
+                "launch_ui_dated_stats_audit",
                 "launch_ui_regression_report",
             ],
         )

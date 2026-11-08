@@ -91,6 +91,10 @@ it('checks Stats composition, card styling and provenance dismissal through the 
     '$TURBO_ROOT$/packages/shared-lib/scripts/company-size-ratchet.mjs',
     '$TURBO_ROOT$/packages/shared-lib/scripts/company-size-ratchet.behavior.mjs',
     '$TURBO_ROOT$/.company-guards/size-baseline.json',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_opacity_audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_timeline_gesture_audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_offline_pin_audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_dated_stats_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-report.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_home_interaction.py',
@@ -111,6 +115,9 @@ it('checks Stats composition, card styling and provenance dismissal through the 
   expect(audit).toContain('launch_ui_timeline_day.py');
   expect(audit).toContain('launch_ui_opacity_audit.py');
   expect(audit).toContain('launch_ui_timeline_gesture_audit.py');
+  expect(audit).toContain('launch_ui_offline_pin_audit.py');
+  expect(audit).toContain('check_ui_test_offline_pin');
+  expect(audit).toContain('launch_ui_dated_stats_audit.py');
   expect(audit).toContain('launch-ui-regression-report.py');
   expect(audit).not.toMatch(/^def write_outputs\(/m);
   expect(audit).not.toMatch(/^def check_timeline_calendar_day\(/m);
@@ -131,6 +138,8 @@ it('checks Stats composition, card styling and provenance dismissal through the 
     'utf8',
   );
   expect(gesture).toContain('def contribute');
+  expect(audit).not.toMatch(/^def check_ui_test_offline_pin\(/m);
+  expect(audit).not.toMatch(/^def check_dated_stats_fixture\(/m);
   // The parent audit stays within the company 500-line ratchet.
   const parentLines = audit.endsWith('\n') ? audit.slice(0, -1).split('\n') : audit.split('\n');
   expect(parentLines.length).toBeLessThanOrEqual(500);
