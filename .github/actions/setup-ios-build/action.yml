@@ -44,6 +44,8 @@ runs:
 
     - name: Install SwiftLint and xcbeautify
       shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         # Pin SwiftLint to a known-good version instead of Homebrew's
         # floating latest: an unpinned `brew install swiftlint` silently
@@ -58,18 +60,10 @@ runs:
           if [[ ! -x "$SWIFTLINT_DIR/swiftlint" ]]; then
             echo "Installing SwiftLint ${SWIFTLINT_VERSION}..."
             mkdir -p "$SWIFTLINT_DIR"
-            if ! curl --fail --silent --show-error --location \
-              --retry 3 --retry-all-errors --retry-delay 2 \
-              --connect-timeout 30 --max-time 120 \
-              "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip; then
-              # The asset API serves the same pinned archive when the release URL times out.
-              curl --fail --silent --show-error --location \
-                --retry 3 --retry-all-errors --retry-delay 2 \
-                --connect-timeout 30 --max-time 120 \
-                --header 'Accept: application/octet-stream' \
-                "https://api.github.com/repos/realm/SwiftLint/releases/assets/430524024" -o swiftlint.zip
-            fi
-            printf '%s  %s\n' "$SWIFTLINT_SHA256" swiftlint.zip | shasum -a 256 --check --strict
+            bash "$GITHUB_WORKSPACE/scripts/download-release-asset.sh" \
+              "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" \
+              "https://api.github.com/repos/realm/SwiftLint/releases/assets/430524024" \
+              "$SWIFTLINT_SHA256" swiftlint.zip
             unzip -o swiftlint.zip -d "$SWIFTLINT_DIR"
             chmod +x "$SWIFTLINT_DIR/swiftlint"
           fi

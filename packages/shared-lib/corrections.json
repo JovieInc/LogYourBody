@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "fix-red-81061e944d",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42468669321",
+    "correction": "LYB-319 PR #1709 repair, occurrence 2 in 14 days: merge origin/main without rebasing and repair red checks without weakening gates. Static Audits failed on a SwiftLint HTTP 504 download; Launch Quality exhausted primary HTTP 504 retries and anonymous API HTTP 403 retries before native execution. Shared Gitleaks run 42468669245 also exhausted archive HTTP 504 retries, without executing the scanner.",
+    "mechanization": "Extract the existing pinned release downloader into scripts/download-release-asset.sh and use it for both macOS setup and Linux Static Audits. Preserve bounded HTTP retries, authenticate only the asset API request with the existing job token when available, and verify each platform archive against the official release SHA-256 before extraction. Extend the existing required routing suite to exercise both actual installer steps with real curl, HTTP 504/403 refusal and recovery, authenticated and anonymous fallback, corrupt archives, and checksum mismatch on both routes. Three regressions fail against the prior steps: macOS authenticated fallback, Linux fallback, and Linux checksum rejection. Preserve the pinned shared Gitleaks scanner; its upstream download failure needs a successful required rerun or a repair in JovieInc/ci, whose current main still has the failing release URL. The harness owns pushing and PR edits and should include: Machine: built scripts/download-release-asset.sh.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One shared download boundary prevents platform installers from diverging on retry, API authentication and checksum verification. Both native callers must verify the pinned bytes before extracting them; failed HTTP responses and substituted archives remain hard failures."
+      }
+    },
+    "guard": {
+      "path": "scripts/download-release-asset.sh",
+      "anchor": "# Neither HTTP error content nor substituted archives may reach extraction."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-a510b9a468",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1709",
     "correction": "LYB-319 PR #1709 repair: CI Summary and Launch Quality failed before native execution because the pinned SwiftLint download returned HTTP 504 even after the bounded retries added in 1a18bfd0. Shared Gitleaks also exhausted its retries on HTTP 504 on the prior head and now passes unchanged. Merge origin/main without rebasing and preserve the photographic feature and required gates.",
@@ -11,7 +29,7 @@
       }
     },
     "guard": {
-      "path": ".github/actions/setup-ios-build/action.yml",
+      "path": "scripts/download-release-asset.sh",
       "anchor": "curl --fail --silent --show-error --location"
     },
     "level": "codebase",
