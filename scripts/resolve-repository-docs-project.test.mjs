@@ -169,4 +169,3 @@ test('reviewed digest refuses a merged project that dropped a parent group entry
   assert.match(f.git('show', `:${WORKFLOW}`), new RegExp(createHash('sha256').update(kept).digest('hex')));
   assert.equal(f.git('diff', '--name-only', '--diff-filter=U'), '');
 });
-

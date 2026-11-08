@@ -90,6 +90,12 @@ class HomeInteractionAuditTests:
             (sync, original_sync, "return !fixtureForcesOffline", "return pathSatisfied"),
             (monitor, original_monitor, "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)",
              "self?.isOnline = path.status == .satisfied"),
+            (monitor, original_monitor, "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)",
+             "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)\n"
+             "                self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)"),
+            (monitor, original_monitor, "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)",
+             "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)\n"
+             "                self?.applyNetworkPathStatus(path.status)"),
             (app, original_app, "realtimeSyncManager.applyOfflineUITestFixture()\n", ""),
             (sync, original_sync, "networkMonitor.cancel()\n        isOnline = false",
              "networkMonitor.cancel()"),

@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42401937834/job/128491764859",
+    "correction": "PR #1699 / LYB-312, fix-red-5df69c1e5f occurrence 30 in 14 days: merge origin/main without rebasing, preserve the weekly photo check-in, and repair CI Summary and Launch Quality. The old combined timeline XCTest called two complete dated journeys and failed terminating the app at 199 seconds. The automatic source merge also dispatched both parent network-path handlers for every callback.",
+    "mechanization": "Retain this recurring fingerprint's existing codebase-owned shell deadlines and process-group cleanup without changing its annotation or weakening any gate. Supplement that retained control for this occurrence: Retain main's independent native selectors and existing no-nested-XCTest guard, then extend the existing launch UI audit to require exactly one canonical network-path callback and reject the legacy parallel handler after merges. Preserve both parents' discovered audit siblings, Turbo inputs, project references, resolver safeguards and correction receipts. A duplicate-callback mutation escapes the old audit and fails the new regression; the extended audit rejects both duplicate canonical calls and the actual two-parent merge shape. All 51 behavior cases pass without skipping or increasing timeouts. The harness owns pushing and PR edits; keep exactly one PR-body line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py. Native launch execution and exact-head coverage still require the real Mac runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture launcher owns deadlines, diagnostics and descendant lifetime for every shell contract case, preventing opaque timeouts and orphan pipelines by construction without changing product behavior or native qualification gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "os.killpg(process.pid, signal.SIGKILL)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-81061e944d",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42468669321",
     "correction": "LYB-319 PR #1709 repair, occurrence 2 in 14 days: merge origin/main without rebasing and repair red checks without weakening gates. Static Audits failed on a SwiftLint HTTP 504 download; Launch Quality exhausted primary HTTP 504 retries and anonymous API HTTP 403 retries before native execution. Shared Gitleaks run 42468669245 also exhausted archive HTTP 504 retries, without executing the scanner.",

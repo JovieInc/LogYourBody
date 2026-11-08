@@ -160,6 +160,9 @@ def check_ui_test_offline_fixture(root: Path, violations: list, violation) -> No
             or not offline_pinned
             or held < 0 or assigned < 0 or "return" not in applicator[held:assigned]
             or "handleNetworkPathUpdate(isOnline: path.status == .satisfied)" not in handler
+            # A merge must not dispatch both parent implementations for one path.
+            or handler.count("handleNetworkPathUpdate(") != 1
+            or "applyNetworkPathStatus(" in handler
             or "isOnline = path.status" in handler):
         violations.append(violation(
             check="sync.ui_test_offline_survives_path",
