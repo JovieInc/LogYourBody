@@ -14,6 +14,8 @@ from typing import Any, Optional
 
 import pytest
 
+from _setup_ios_build_cases import test_swiftlint_download_handles_http_failures
+
 from _runner_routing_fixture import (
     _AWAIT_SCRIPT,
     _DISPATCH_GUARD_SCRIPT,

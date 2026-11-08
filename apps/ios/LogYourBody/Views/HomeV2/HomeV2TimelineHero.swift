@@ -140,6 +140,8 @@ struct HomeV2TimelinePager: View {
     var isNavigating = false
     var bodyDisplays: [String: PersonalBodyDisplay] = [:]
     var bodyEstimateEnabled = false
+    var appearanceDisplays: [String: PhotographicAppearanceDisplay] = [:]
+    var appearanceEnabled = false
     @State private var bodyYaw = 0.0
     @State private var bodyScale = 1.0
     @AppStorage("personal_body_stage_mode") private var bodyMode = "photo"
@@ -218,7 +220,9 @@ struct HomeV2TimelinePager: View {
             bodyYaw: $bodyYaw,
             bodyScale: bodyScale,
             bodyDisplays: bodyDisplays,
-            bodyEstimateEnabled: bodyEstimateEnabled
+            bodyEstimateEnabled: bodyEstimateEnabled,
+            appearanceDisplays: appearanceDisplays,
+            appearanceEnabled: appearanceEnabled
         )
     }
 }
@@ -238,11 +242,23 @@ private struct HomeV2TimelinePage: View {
     let bodyScale: Double
     let bodyDisplays: [String: PersonalBodyDisplay]
     let bodyEstimateEnabled: Bool
+    let appearanceDisplays: [String: PhotographicAppearanceDisplay]
+    let appearanceEnabled: Bool
     @State private var editorialPhoto: (key: String, image: UIImage?)?
     @State private var showsRetry = false
 
     private var selectedOutline: PersonalBodyDisplay? {
         bodyDisplays[PersonalBodyDay.key(metric.date)]
+    }
+
+    private var drawableAppearance: PhotographicAppearanceDisplay? {
+        guard appearanceEnabled else { return nil }
+        return appearanceDisplays[PersonalBodyDay.key(metric.date)]
+    }
+
+    private var stageMode: String {
+        if bodyMode == "appearance", drawableAppearance == nil { return "photo" }
+        return bodyMode
     }
 
     private var drawableOutline: PersonalBodyShape? {
@@ -272,7 +288,9 @@ private struct HomeV2TimelinePage: View {
 
     @ViewBuilder
     private var estimateCanvas: some View {
-        if bodyMode == "estimate", let shape = drawableOutline {
+        if stageMode == "appearance", let appearance = drawableAppearance {
+            PhotographicAppearanceCanvas(display: appearance, yaw: $bodyYaw)
+        } else if stageMode == "estimate", let shape = drawableOutline {
             PersonalBodyCanvas(
                 shape: shape,
                 label: selectedOutline?.label ?? "Saved date",
@@ -284,15 +302,15 @@ private struct HomeV2TimelinePage: View {
 
     @ViewBuilder
     private var estimateMode: some View {
-        if drawableOutline != nil {
-            PersonalBodyModeControl(mode: bodyMode) { bodyMode = $0 }
+        if drawableOutline != nil || drawableAppearance != nil {
+            PersonalBodyModeControl(mode: stageMode, showsAppearance: drawableAppearance != nil) { bodyMode = $0 }
                 .padding(8)
         }
     }
 
     @ViewBuilder
     private var estimateFallback: some View {
-        if bodyEstimateEnabled, bodyMode == "estimate", drawableOutline == nil {
+        if bodyEstimateEnabled, stageMode == "estimate", drawableOutline == nil {
             Text(selectedOutline?.label ?? "Estimate unavailable for this date")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(HomeV2Tokens.Colors.ink)

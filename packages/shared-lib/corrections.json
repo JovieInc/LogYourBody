@@ -1,5 +1,63 @@
 [
   {
+    "fingerprint": "fix-red-81061e944d",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42468669321",
+    "correction": "LYB-319 PR #1709 repair, occurrence 2 in 14 days: merge origin/main without rebasing and repair red checks without weakening gates. Static Audits failed on a SwiftLint HTTP 504 download; Launch Quality exhausted primary HTTP 504 retries and anonymous API HTTP 403 retries before native execution. Shared Gitleaks run 42468669245 also exhausted archive HTTP 504 retries, without executing the scanner.",
+    "mechanization": "Extract the existing pinned release downloader into scripts/download-release-asset.sh and use it for both macOS setup and Linux Static Audits. Preserve bounded HTTP retries, authenticate only the asset API request with the existing job token when available, and verify each platform archive against the official release SHA-256 before extraction. Extend the existing required routing suite to exercise both actual installer steps with real curl, HTTP 504/403 refusal and recovery, authenticated and anonymous fallback, corrupt archives, and checksum mismatch on both routes. Three regressions fail against the prior steps: macOS authenticated fallback, Linux fallback, and Linux checksum rejection. Preserve the pinned shared Gitleaks scanner; its upstream download failure needs a successful required rerun or a repair in JovieInc/ci, whose current main still has the failing release URL. The harness owns pushing and PR edits and should include: Machine: built scripts/download-release-asset.sh.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One shared download boundary prevents platform installers from diverging on retry, API authentication and checksum verification. Both native callers must verify the pinned bytes before extracting them; failed HTTP responses and substituted archives remain hard failures."
+      }
+    },
+    "guard": {
+      "path": "scripts/download-release-asset.sh",
+      "anchor": "# Neither HTTP error content nor substituted archives may reach extraction."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-a510b9a468",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1709",
+    "correction": "LYB-319 PR #1709 repair: CI Summary and Launch Quality failed before native execution because the pinned SwiftLint download returned HTTP 504 even after the bounded retries added in 1a18bfd0. Shared Gitleaks also exhausted its retries on HTTP 504 on the prior head and now passes unchanged. Merge origin/main without rebasing and preserve the photographic feature and required gates.",
+    "mechanization": "Extend the shared iOS setup action with a fallback to the exact GitHub release asset API after bounded release-URL retries, and verify either download against the published SHA-256 before extraction. The asset API archive was downloaded and its digest and ZIP integrity verified. The existing required Mac Runner Routing Tests job imports real-curl installer regressions for success, transient 504 recovery, persistent primary 504 recovery through the asset API, refusal when both routes fail even with valid ZIP bodies, corrupt archive refusal, and checksum rejection on both routes. The fallback and checksum cases fail against 1a18bfd0 and pass after this change. Reuse the action across native workflows; do not duplicate or weaken the shared Gitleaks scanner. The harness owns pushing and PR updates and should include: Machine: built .github/actions/setup-ios-build/action.yml.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared installer owns the download and extraction boundary. A second route to the same pinned asset recovers persistent release-URL failures, while bounded retries, HTTP failure propagation and checksum verification prevent callers from extracting unverified error or substituted content by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/download-release-asset.sh",
+      "anchor": "curl --fail --silent --show-error --location"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-89c44c062f",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1709",
+    "correction": "LYB-319 PR #1709 repair: merge origin/main without rebasing, preserve gated on-device photographic appearance, fix three size-500 violations, the XCTest geometry argument order, and the stale reviewed Xcode project fingerprint. Tently failed because its AI provider was unreachable.",
+    "mechanization": "Reuse the existing whole-declaration splitter and required size/call-shape ratchet instead of adding a parallel repair system. The existing static audit reproduced all four source violations before the repair and passes after extraction and call-order correction. Retain all extracted Swift declarations in the app target, preserve TypeScript exports and behavioral tests, and refresh the project fingerprint through the existing explicit reviewed-pin resolver. No gates or baselines are weakened. The harness owns pushing and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Splitting these files and ordering this call fixes the current sources but cannot prevent future file growth or misordered calls; the existing deterministic source ratchet is the preventive boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required static audit checks repository-wide source size and declared Swift argument order, and the routing tests reject a project fingerprint that differs from the actual project bytes."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_split_size_ratchet.py",
+      "anchor": "self.assertEqual(check_repo(ROOT), [])"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "dependency-repair-worktree-change-during-projection",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1756",
     "correction": "PR #1756, fix-red-1423773703 occurrence 58: merge origin/main without rebasing and preserve the ElevenLabs 3.0.80 bump. Detect Changes and parity reject its stale source projection, causing CI Summary to fail. Dependency repair must also refuse tracked manifest or resolver-configuration edits made during rendering after frozen verification.",
