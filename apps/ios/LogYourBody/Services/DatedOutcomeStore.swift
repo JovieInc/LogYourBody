@@ -6,7 +6,7 @@ import Foundation
 @MainActor
 final class DatedOutcomeStore {
     static let featureGate = "dated_outcome_v1"
-    private let context: NSManagedObjectContext
+    nonisolated private let context: NSManagedObjectContext
     private let currentOwner: () -> String?
     private let enabled: () -> Bool
     private let didSave: (DatedOutcomeEdit) -> Void
@@ -31,6 +31,41 @@ final class DatedOutcomeStore {
         }
     }
 
+    /// UI callers suspend while the private context fetches and decodes the journal.
+    func loadForPresentation(isCurrent: () -> Bool) async throws -> DatedOutcomeSnapshot? {
+        guard isCurrent() else { throw DatedOutcomeError.unauthenticated }
+        let owner = try requireOwner()
+        let value = try await context.perform {
+            try self.rows(owner: owner).first.map(self.snapshot)
+        }
+        guard isCurrent(), currentOwner() == owner else { throw DatedOutcomeError.unauthenticated }
+        return value
+    }
+
+    func saveForPresentation(_ value: DatedOutcome, isCurrent: () -> Bool) async throws {
+        guard isCurrent() else { throw DatedOutcomeError.unauthenticated }
+        let owner = try requireOwner()
+        let edit = try await context.perform {
+            try value.validate()
+            return try self.saveValue(value, owner: owner)
+        }
+        guard isCurrent(), currentOwner() == owner else { throw DatedOutcomeError.unauthenticated }
+        if let edit { didSave(edit) }
+    }
+
+    /// Freeze the first comparable baseline in the existing owner-scoped journal.
+    /// This metadata emits no sync edit and cannot replace an edited revision.
+    func retainPlanBaselineForPresentation(
+        _ baseline: DatedOutcome.PlanBaseline, revision: UUID, isCurrent: () -> Bool
+    ) async throws {
+        guard isCurrent() else { throw DatedOutcomeError.unauthenticated }
+        let owner = try requireOwner()
+        try await context.perform {
+            try self.retainBaseline(baseline, revision: revision, owner: owner)
+        }
+        guard isCurrent(), currentOwner() == owner else { throw DatedOutcomeError.unauthenticated }
+    }
+
     /// A single Save action emits one durable recompute request even if several fields changed.
     /// A no-op Save emits none. A failed save publishes nothing and restores the context.
     @discardableResult
@@ -39,12 +74,7 @@ final class DatedOutcomeStore {
         let owner = try requireOwner()
         try value.validate()
         let edit: DatedOutcomeEdit? = try context.performAndWait {
-            let prior = try rows(owner: owner).first
-            let previous = try prior.map(snapshot)
-            guard previous?.value != value else { return nil }
-            let edit = DatedOutcomeEdit(requestId: UUID(), previousRevision: previous?.revision, value: value)
-            try persist(edit, owner: owner, sequence: (prior?.value(forKey: "sequence") as? Int64 ?? 0) + 1, pending: true)
-            return edit
+            try saveValue(value, owner: owner)
         }
         if let edit { didSave(edit) }
         return edit
@@ -82,11 +112,16 @@ final class DatedOutcomeStore {
         try context.performAndWait {
             let owned = try rows(owner: owner)
             guard !owned.contains(where: { $0.value(forKey: "pending") as? Bool == true }) else { return }
-            if let latest = owned.first, try snapshot(latest) == remote { return }
+            if let latest = owned.first {
+                let current = try snapshot(latest)
+                if current.revision == remote.revision && current.value == remote.value { return }
+            }
             let sequence = (owned.first?.value(forKey: "sequence") as? Int64 ?? 0) + 1
             let edit = DatedOutcomeEdit(requestId: remote.revision, previousRevision: nil, value: remote.value)
+            let previous = try owned.first.map(snapshot)
+            let baseline = previous?.value.outcome.metric == remote.value.outcome.metric ? previous?.planBaseline : nil
             for row in owned { context.delete(row) }
-            try persist(edit, owner: owner, sequence: sequence, pending: false)
+            try persist(edit, owner: owner, sequence: sequence, pending: false, baseline: baseline)
         }
     }
 
@@ -113,25 +148,66 @@ final class DatedOutcomeStore {
         return owner
     }
 
-    private func rows(owner: String) throws -> [NSManagedObject] {
+    nonisolated private func saveValue(_ value: DatedOutcome, owner: String) throws -> DatedOutcomeEdit? {
+        let prior = try rows(owner: owner).first
+        let previous = try prior.map(snapshot)
+        guard previous?.value != value else { return nil }
+        let edit = DatedOutcomeEdit(requestId: UUID(), previousRevision: previous?.revision, value: value)
+        let baseline = previous?.value.outcome.metric == value.outcome.metric ? previous?.planBaseline : nil
+        try persist(edit, owner: owner, sequence: (prior?.value(forKey: "sequence") as? Int64 ?? 0) + 1,
+                    pending: true, baseline: baseline)
+        return edit
+    }
+
+    nonisolated private func retainBaseline(_ baseline: DatedOutcome.PlanBaseline, revision: UUID, owner: String) throws {
+        guard let row = try rows(owner: owner).first else { return }
+        let current = try snapshot(row)
+        guard current.revision == revision, current.planBaseline == nil,
+              current.value.outcome.metric == baseline.metric else { return }
+        guard baseline.date.timeIntervalSinceReferenceDate.isFinite,
+              baseline.value.isFinite, baseline.value > 0 else { throw DatedOutcomeError.invalidValue }
+        let payload = try JSONEncoder().encode(LocalPayload(edit: decode(row), planBaseline: baseline))
+        row.setValue(payload, forKey: "payload")
+        try commit()
+    }
+
+    nonisolated private func rows(owner: String) throws -> [NSManagedObject] {
         let request = NSFetchRequest<NSManagedObject>(entityName: "CachedDatedOutcome")
         request.predicate = NSPredicate(format: "ownerId == %@", owner)
         request.sortDescriptors = [NSSortDescriptor(key: "sequence", ascending: false)]
         return try context.fetch(request)
     }
 
-    private func decode(_ row: NSManagedObject) throws -> DatedOutcomeEdit {
+    nonisolated private func decode(_ row: NSManagedObject) throws -> DatedOutcomeEdit {
         guard let data = row.value(forKey: "payload") as? Data else { throw DatedOutcomeError.invalidValue }
         return try JSONDecoder().decode(DatedOutcomeEdit.self, from: data)
     }
 
-    private func snapshot(_ row: NSManagedObject) throws -> DatedOutcomeSnapshot {
+    nonisolated private func snapshot(_ row: NSManagedObject) throws -> DatedOutcomeSnapshot {
         let edit = try decode(row)
-        return DatedOutcomeSnapshot(revision: edit.requestId, value: edit.value)
+        let data = row.value(forKey: "payload") as? Data ?? Data()
+        let baseline = try JSONDecoder().decode(BaselineField.self, from: data).planBaseline
+        return DatedOutcomeSnapshot(revision: edit.requestId, value: edit.value, planBaseline: baseline)
     }
 
-    private func persist(_ edit: DatedOutcomeEdit, owner: String, sequence: Int64, pending: Bool) throws {
-        let payload = try JSONEncoder().encode(edit)
+    private struct BaselineField: Decodable { var planBaseline: DatedOutcome.PlanBaseline? }
+
+    private struct LocalPayload: Encodable {
+        var edit: DatedOutcomeEdit
+        var planBaseline: DatedOutcome.PlanBaseline?
+        enum CodingKeys: String, CodingKey { case planBaseline }
+        func encode(to encoder: Encoder) throws {
+            try edit.encode(to: encoder)
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(planBaseline, forKey: .planBaseline)
+        }
+    }
+
+    nonisolated private func persist(
+        _ edit: DatedOutcomeEdit, owner: String, sequence: Int64, pending: Bool,
+        baseline: DatedOutcome.PlanBaseline? = nil
+    ) throws {
+        let payload = try JSONEncoder().encode(LocalPayload(edit: edit, planBaseline: baseline))
         let row = NSEntityDescription.insertNewObject(forEntityName: "CachedDatedOutcome", into: context)
         row.setValue(owner, forKey: "ownerId")
         row.setValue(edit.requestId, forKey: "revision")
@@ -141,7 +217,7 @@ final class DatedOutcomeStore {
         try commit()
     }
 
-    private func commit() throws {
+    nonisolated private func commit() throws {
         do { try context.save() } catch {
             context.rollback()
             throw error

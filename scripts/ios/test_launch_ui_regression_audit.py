@@ -100,6 +100,20 @@ class StatsCardCompositionTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertIn(check, "\n".join(path.read_text() for path in output.glob("*.json")))
 
+    def test_empty_timeline_keeps_its_photo_button_accessible(self):
+        findings = []
+        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        self.assertEqual(findings, [])
+        self.replace("Services/DatedTimelineUI.swift", ".accessibilityElement(children: .contain)", "")
+        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
+
+    def test_empty_timeline_requires_the_photo_action_identifier(self):
+        self.replace("Services/DatedTimelineUI.swift", '"launch_timeline_add_photo"', '"wrong_photo_action"')
+        findings = []
+        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
+
     def test_geometry_requires_typed_nonfinite_arguments_in_every_native_tree(self):
         cases = [
             "CGPoint(x: .infinity, y: 0)",
@@ -295,6 +309,54 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                     self.assert_rejected("timeline.header_swipe_excludes_buttons")
                     path.write_text(source)
 
+    def test_edge_swipe_cannot_share_the_menu_button(self):
+        self.assertEqual(self.run_audit()[0], 0)
+        path = self.app / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
+        source = path.read_text()
+        content_overlay = """                .overlay(alignment: .leading) {
+                    Color.clear
+                        .frame(width: 20)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(photoTimelineSwipe)
+                        .accessibilityHidden(true)
+                }
+"""
+        self.assertIn(content_overlay, source)
+        detached = source.replace(content_overlay, "", 1)
+        header_end = """        .onChange(of: selectedPhotoTimelineRootPage) { _, _ in
+            isHomeChatExpanded = false
+        }
+"""
+        parent_overlay = header_end + """        .overlay(alignment: .leading) {
+            Color.clear
+                .frame(width: 20)
+                .padding(.top, 56)
+                .contentShape(Rectangle())
+                .highPriorityGesture(photoTimelineSwipe)
+                .accessibilityHidden(true)
+        }
+"""
+        self.assertIn(header_end, detached)
+        path.write_text(detached.replace(header_end, parent_overlay, 1))
+        self.assert_rejected("timeline.edge_swipe_excludes_header")
+
+        padded = source.replace(
+            """.frame(width: 20)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(photoTimelineSwipe)""",
+            """.frame(width: 20)
+                        .padding(.top, 56)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(photoTimelineSwipe)""",
+            1,
+        )
+        self.assertNotEqual(padded, source)
+        path.write_text(padded)
+        self.assert_rejected("timeline.edge_swipe_excludes_header")
+        path.write_text(source)
+
     def test_header_title_cannot_lose_navigation_or_its_hit_region(self):
         for token in (".gesture(photoTimelineSwipe)", ".contentShape(Rectangle())",
                       ", minHeight: JovieTokens.minimumHitTarget"):
@@ -318,6 +380,14 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 self.assert_rejected("dashboard.checkin_card_hit_region")
                 path.write_text(source)
 
+    def test_parent_audit_stays_within_the_company_size_ratchet(self):
+        # The parent audit stays within the company 500-line ratchet.
+        count = len(Path(AUDIT.__file__).read_text().splitlines())
+        self.assertLessEqual(
+            count, 500, "extract a sibling before the company size guard",
+        )
+        self.assertNotIn("def check_timeline_gestures", Path(AUDIT.__file__).read_text())
+
     def test_every_size_ratchet_sibling_loads_or_the_audit_fails_closed(self):
         loaded = [
             AUDIT._load_sibling(module_name, filename, export)
@@ -326,9 +396,8 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         self.assertEqual(
             [item[0] for item in AUDIT._AUDIT_SIBLINGS],
             [
-                "launch_ui_timeline_day",
-                "launch_ui_opacity_audit",
-                "launch_ui_regression_report",
+                "launch_ui_timeline_day", "launch_ui_opacity_audit",
+                "launch_ui_timeline_gesture_audit", "launch_ui_dated_stats_audit", "launch_ui_regression_report",
             ],
         )
         for export in loaded:
@@ -390,6 +459,34 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         calculator.write_text(original.replace("now: Date = Date(),\n        ", "", 1))
         self.assert_rejected("timeline.injected_calendar_day")
 
+    def test_dated_stats_fixture_survives_path_and_account_change(self):
+        self.assertEqual(self.run_audit()[0], 0)
+        cases = [
+            ("Services/RealtimeSyncManager+Part01.swift",
+             "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)",
+             "self.isOnline = path.status == .satisfied", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "self.isOnline = Self.online(isOnline)",
+             "self.isOnline = isOnline", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "guard !usesOfflineUITestFixture else { return }",
+             "", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "return !fixtureForcesOffline",
+             "return pathSatisfied", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", '"-lybUITestPhotoTimelineHUDFixture"',
+             '"-not-an-offline-fixture"', "dated_stats.offline_survives_path"),
+            ("Views/DashboardViewLiquid.swift",
+             "selectedPhotoTimelineRootPage = Self.pageAfterAccountChange()",
+             "selectedPhotoTimelineRootPage = .timeline", "dated_stats.analytics_survives_account"),
+            ("Services/DatedTimelineUI.swift", "return .analytics", "return .timeline",
+             "dated_stats.analytics_survives_account"),
+        ]
+        for relative, before, after, check in cases:
+            with self.subTest(before=before):
+                path = self.app / relative
+                source = path.read_text()
+                self.assertIn(before, source)
+                path.write_text(source.replace(before, after, 1))
+                self.assert_rejected(check)
+                path.write_text(source)
 
 def run_behavior_suite(suite):
     expected = suite.countTestCases()

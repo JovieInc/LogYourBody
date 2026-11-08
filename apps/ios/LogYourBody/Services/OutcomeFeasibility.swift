@@ -6,6 +6,26 @@ struct OutcomeFeasibility {
         case ok, unsafe, impossible, expired, noData
     }
 
+    enum WeightRateCheck: Equatable {
+        case withinCeiling, exceedsCeiling, unavailable
+    }
+
+    /// LYB-273, adopted 2026-10-30: an outer rejection limit, never admission
+    /// policy, a recommended pace, or a safety/outcome claim. Other metrics
+    /// require their own reviewed policy. Use current weight and elapsed weeks.
+    func weightRateCheck(outcome: DatedOutcome, history: [Measurement]) -> WeightRateCheck {
+        guard outcome.outcome.metric == .weightKg, now.timeIntervalSinceReferenceDate.isFinite,
+              let deadline = DatedOutcome.calendarDate(outcome.outcomeDate), deadline > now,
+              outcome.outcome.targetValue.isFinite, outcome.outcome.targetValue > 0,
+              let current = latestMeasurement(in: history, metric: .weightKg) else { return .unavailable }
+        let weeks = deadline.timeIntervalSince(now) / (7 * 24 * 60 * 60)
+        let denominator = current.value * weeks
+        let percentPerWeek = 100 * abs(outcome.outcome.targetValue - current.value) / denominator
+        guard weeks.isFinite, weeks > 0, denominator.isFinite, denominator > 0,
+              percentPerWeek.isFinite else { return .unavailable }
+        return percentPerWeek > 1 ? .exceedsCeiling : .withinCeiling
+    }
+
     /// Values must be comparable measurements in the target metric's canonical units.
     struct Measurement: Equatable, Sendable {
         let date: Date

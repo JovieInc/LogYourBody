@@ -78,6 +78,8 @@ enum LaunchJourney {
         var thresholds: [DatedOutcome.Metric: OutcomeFeasibility.Thresholds] = [:]
         /// Nil means no approved kilogram rate. The weight planner then fails closed.
         var safeWeeklyChangeKg: ClosedRange<Double>?
+        var planBaseline: DatedOutcome.PlanBaseline?
+        var usesLatestConflictOnly = false
         var glp1Disclosed = false
         var dexaPresent = false
     }
@@ -144,7 +146,7 @@ enum LaunchJourney {
                 detail: "This date cannot be reached safely. \(outcome.outcomeDate) was not moved."
             ))
         case .noData, .ok:
-            if conflicts(metricReadings) {
+            if conflicts(metricReadings, latestOnly: input.usesLatestConflictOnly) {
                 return (.conflicting, Action(
                     title: "Record one new measurement",
                     detail: "Two values share a time. Record one measurement for \(outcome.outcomeDate)."
@@ -181,20 +183,7 @@ enum LaunchJourney {
     private static func weightPlan(
         _ outcome: DatedOutcome, readings: [Reading], input: Input
     ) -> (state: RouteState, action: Action) {
-        guard let start = readings.min(by: { $0.date < $1.date }),
-              let deadline = DatedOutcome.calendarDate(outcome.outcomeDate) else {
-            return unsafe(outcome)
-        }
-        let plan = BackwardPlanner(safeWeeklyChangeKg: input.safeWeeklyChangeKg).plan(
-            outcome: .init(
-                startDate: start.date,
-                startingWeightKg: start.value,
-                targetWeightKg: outcome.outcome.targetValue,
-                targetDate: deadline
-            ),
-            history: readings.map { .init(date: $0.date, weightKg: $0.value) },
-            now: input.now
-        )
+        guard let plan = weightPlanResult(outcome, readings: readings, input: input) else { return unsafe(outcome) }
         switch plan.status {
         case .onTrack, .ahead:
             return (.ready, Action(title: "Hold the plan", detail: "The date stays \(outcome.outcomeDate)."))
@@ -228,6 +217,26 @@ enum LaunchJourney {
         }
     }
 
+    /// Shared original-baseline projection for the directive and goal-relative stats.
+    /// A new check-in never becomes a replacement baseline.
+    static func weightPlanResult(_ outcome: DatedOutcome, readings: [Reading], input: Input) -> BackwardPlanner.Plan? {
+        let baseline = input.planBaseline.map { Reading(date: $0.date, metric: $0.metric, value: $0.value) }
+        guard let start = baseline ?? readings.min(by: { $0.date < $1.date }),
+              start.metric == outcome.outcome.metric, readings.contains(start),
+              !readings.contains(where: { $0.date == start.date && $0.value != start.value }),
+              let deadline = DatedOutcome.calendarDate(outcome.outcomeDate) else { return nil }
+        return BackwardPlanner(safeWeeklyChangeKg: input.safeWeeklyChangeKg).plan(
+            outcome: .init(
+                startDate: start.date,
+                startingWeightKg: start.value,
+                targetWeightKg: outcome.outcome.targetValue,
+                targetDate: deadline
+            ),
+            history: readings.map { .init(date: $0.date, weightKg: $0.value) },
+            now: input.now
+        )
+    }
+
     private static func unsafe(_ outcome: DatedOutcome) -> (state: RouteState, action: Action) {
         (.unsafeDate, Action(
             title: "Revise the outcome",
@@ -235,22 +244,23 @@ enum LaunchJourney {
         ))
     }
 
-    private static func conflicts(_ readings: [Reading]) -> Bool {
+    static func conflicts(_ readings: [Reading], latestOnly: Bool = false) -> Bool {
+        let latest = latestOnly ? readings.map(\.date).max() : nil
         var seen: [Date: Double] = [:]
-        for reading in readings {
+        for reading in readings where latest == nil || reading.date == latest {
             if let prior = seen[reading.date], prior != reading.value { return true }
             seen[reading.date] = reading.value
         }
         return false
     }
 
-    private static func stale(_ readings: [Reading], now: Date, window: TimeInterval?) -> Bool {
+    static func stale(_ readings: [Reading], now: Date, window: TimeInterval?) -> Bool {
         guard let latest = readings.map(\.date).max() else { return false }
         guard let window else { return true }
         return SignalFreshness(measuredAt: latest, now: now, window: window, isUsable: true) != .fresh
     }
 
-    private static func maintenanceCovers(_ outcome: DatedOutcome, now: Date) -> Bool {
+    static func maintenanceCovers(_ outcome: DatedOutcome, now: Date) -> Bool {
         let today = day(now)
         return outcome.constraints.maintenance.contains { $0.start <= today && today <= $0.end }
     }
@@ -294,18 +304,32 @@ struct HealthMemoryClaim: Equatable {
 }
 
 struct HealthMemoryStore {
+    /// Partition fields. A read matches every field, so dropping one allows a cross read.
+    static let isolationKeyFields = ["userId", "productId"]
+    /// Result code when the safety check cannot run. That result has no memory payload.
+    static let failClosedCode = "safetyUnavailable"
+
     private(set) var claims: [HealthMemoryClaim] = []
 
     enum Retrieval: Equatable {
         case records([HealthMemoryClaim])
         case safetyUnavailable
         case isolated
+
+        var code: String {
+            switch self {
+            case .records: return "records"
+            case .safetyUnavailable: return HealthMemoryStore.failClosedCode
+            case .isolated: return "isolated"
+            }
+        }
     }
 
     @discardableResult
-    mutating func remember(_ claim: HealthMemoryClaim) -> Bool {
+    mutating func remember(_ claim: HealthMemoryClaim, safetyAvailable: Bool) -> Bool {
+        guard safetyAvailable else { return false }
         let text = claim.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !claim.userId.isEmpty, claim.productId == LaunchJourney.productId, !text.isEmpty else { return false }
+        guard Self.complete(userId: claim.userId, productId: claim.productId), !text.isEmpty else { return false }
         claims.append(HealthMemoryClaim(
             userId: claim.userId, productId: claim.productId, text: text,
             provenance: claim.provenance, recordedAt: claim.recordedAt
@@ -315,11 +339,29 @@ struct HealthMemoryStore {
 
     func retrieve(userId: String, productId: String, safetyAvailable: Bool) -> Retrieval {
         guard safetyAvailable else { return .safetyUnavailable }
-        guard !userId.isEmpty, productId == LaunchJourney.productId else { return .isolated }
-        return .records(claims.filter { $0.userId == userId && $0.productId == productId })
+        guard Self.complete(userId: userId, productId: productId) else { return .isolated }
+        return .records(claims.filter { Self.matches($0, userId: userId, productId: productId) })
     }
 
     mutating func clearUser(_ userId: String) {
         claims.removeAll { $0.userId == userId }
+    }
+
+    private static func fields(userId: String, productId: String) -> [String: String] {
+        ["userId": userId, "productId": productId]
+    }
+
+    private static func complete(userId: String, productId: String) -> Bool {
+        let values = fields(userId: userId, productId: productId)
+        return isolationKeyFields.allSatisfy { !(values[$0] ?? "").isEmpty }
+    }
+
+    private static func matches(_ claim: HealthMemoryClaim, userId: String, productId: String) -> Bool {
+        let stored = fields(userId: claim.userId, productId: claim.productId)
+        let requested = fields(userId: userId, productId: productId)
+        return isolationKeyFields.allSatisfy { field in
+            guard let left = stored[field], let right = requested[field] else { return false }
+            return left == right
+        }
     }
 }

@@ -3,6 +3,7 @@ import { CATALOG_EQUIPMENT, EXERCISE_CATALOG } from './catalog';
 import { eligibleForProgram } from './delegated-planning';
 import { effectiveTrainingFeedback } from './engine';
 import { hasSelectionSymptoms, suggestAlternatives } from './alternatives';
+import { CONCERNING_PAIN_MESSAGE } from './pain-policy';
 import type { TrainingRecordsSnapshot } from './service';
 import type { ExerciseSelectionContext, Session } from './types';
 
@@ -107,7 +108,7 @@ export function reviewExerciseSelection(
     preferredContext,
     message:
       suggestions.status === 'symptom_safety'
-        ? 'Pause this movement. Do not train through pain. Seek medical evaluation for persistent, worsening or neurologic symptoms.'
+        ? CONCERNING_PAIN_MESSAGE
         : 'Supported options may reduce trunk demands; individual response is unknown. Check clearance, cable line and comfortable ROM. A belt does not establish tolerance. Approval tries this setup today; repeated positive feedback can retain it in this block.',
   };
 }

@@ -5,13 +5,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const manifestPath = path.join(root, 'apps/web/src/generated/marketing-product-assets.json');
-let previousManifest = {};
-try {
-  previousManifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-} catch (error) {
-  if (error.code !== 'ENOENT') throw error;
-}
 
 const assets = {
   weightLog: {
@@ -47,64 +40,77 @@ function pngDimensions(buffer) {
   };
 }
 
-function capturedAtFor(id, source, sourceBuffer) {
+function capturedAtFor(source, sourceSha256, previous) {
   // Capture provenance follows the image bytes, never checkout or synthetic merge time.
   const latestCaptureTime = Date.now();
-  const previous = previousManifest[id];
-  if (
-    previous?.source === source &&
-    previous.sourceSha256 === sha256(sourceBuffer) &&
-    Number.isFinite(Date.parse(previous.capturedAt)) &&
-    Date.parse(previous.capturedAt) <= latestCaptureTime
-  ) {
-    return previous.capturedAt;
+  // Unchanged image bytes retain their capture age, including in shallow CI clones.
+  if (previous?.source === source && previous.sourceSha256 === sourceSha256) {
+    if (!Number.isFinite(Date.parse(previous.capturedAt))) {
+      throw new Error(`Invalid capture timestamp in capture provenance: ${source}`);
+    }
+    if (Date.parse(previous.capturedAt) <= latestCaptureTime) return previous.capturedAt;
   }
 
+  const git = (...args) =>
+    execFileSync('git', args, {
+      cwd: root,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 10_000,
+      maxBuffer: 16 * 1024 * 1024,
+    });
   try {
-    const options = { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] };
+    if (git('rev-parse', '--is-shallow-repository').toString().trim() !== 'false') {
+      throw new Error('Fetch complete history before syncing a changed capture');
+    }
+    const [commit, timestamp] = git('log', '-1', '--format=%H%n%cI', '--', source)
+      .toString()
+      .trim()
+      .split('\n');
     if (
-      execFileSync('git', ['rev-parse', '--is-shallow-repository'], options).toString().trim() !==
-      'false'
+      !Number.isFinite(Date.parse(timestamp)) ||
+      Date.parse(timestamp) > latestCaptureTime ||
+      sha256(git('show', `${commit}:${source}`)) !== sourceSha256
     ) {
-      throw new Error('Shallow history cannot establish capture provenance');
+      throw new Error('The capture must match committed source bytes');
     }
-    const committed = execFileSync('git', ['show', `HEAD:${source}`], options);
-    if (sha256(committed) !== sha256(sourceBuffer)) {
-      throw new Error('Uncommitted asset has no capture provenance');
-    }
-    const value = execFileSync('git', ['log', '-1', '--format=%cI', '--', source], {
-      ...options,
-      encoding: 'utf8',
-    }).trim();
-    if (Number.isFinite(Date.parse(value)) && Date.parse(value) <= latestCaptureTime) return value;
-  } catch {
-    // Extraction time and shallow merge commits are not evidence of a new capture.
+    return timestamp;
+  } catch (error) {
+    throw new Error(
+      `Cannot establish capture timestamp; missing capture provenance for ${source}: ${error.message}`,
+    );
   }
-  throw new Error(
-    `Cannot establish capture timestamp for ${source}; restore a hash-matching manifest or regenerate from complete, committed asset history.`,
-  );
 }
 
+const manifestPath = path.join(root, 'apps/web/src/generated/marketing-product-assets.json');
+const previous = await readFile(manifestPath, 'utf8')
+  .then(JSON.parse)
+  .catch((error) => {
+    if (error.code === 'ENOENT') return {};
+    throw error;
+  });
 const manifest = {};
 
 for (const [id, asset] of Object.entries(assets)) {
-  const sourcePath = path.join(root, asset.source);
-  const outputPath = path.join(root, asset.output);
-  const sourceBuffer = await readFile(sourcePath);
-  const capturedAt = capturedAtFor(id, asset.source, sourceBuffer);
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await copyFile(sourcePath, outputPath);
-  const outputBuffer = await readFile(outputPath);
-  const { width, height } = pngDimensions(outputBuffer);
+  const sourceBuffer = await readFile(path.join(root, asset.source));
+  const sourceSha256 = sha256(sourceBuffer);
+  const { width, height } = pngDimensions(sourceBuffer);
 
   manifest[id] = {
     ...asset,
     width,
     height,
-    sourceSha256: sha256(sourceBuffer),
-    outputSha256: sha256(outputBuffer),
-    capturedAt,
+    sourceSha256,
+    outputSha256: sourceSha256,
+    capturedAt: capturedAtFor(asset.source, sourceSha256, previous[id]),
   };
+}
+
+// Validate every asset's provenance before updating any public output or receipt.
+for (const asset of Object.values(manifest)) {
+  const outputPath = path.join(root, asset.output);
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await copyFile(path.join(root, asset.source), outputPath);
+  asset.outputSha256 = sha256(await readFile(outputPath));
 }
 
 await mkdir(path.dirname(manifestPath), { recursive: true });

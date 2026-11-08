@@ -13,13 +13,15 @@ import re
 import subprocess
 from pathlib import Path
 
+from split_swift_types import (
+    apply_rehome, apply_split, line_count, pack, rehome_suite_extension,
+    source_lines, split_namesake, stranded_suite_extensions,
+    _import_header, _type_name, declaration_chunks, top_level_braces,
+)
+
 LIMIT = 500
 CODE = re.compile(r"\.(ts|tsx|js|jsx|mjs|cjs|py|swift|ex|exs|sh|rb|go|rs)$")
 SKIP = re.compile(r"(^|/)(node_modules|vendor|dist|build|\.next|Pods)/|\.gen\.|\.generated\.|\.min\.|\.d\.ts$|lock")
-TYPE_RE = re.compile(
-    r"^(?:(?:public|open|internal|fileprivate|private|final|nonisolated)\s+)*"
-    r"(?:struct|enum|class|actor|extension|protocol)\s+(\w+)"
-)
 FUNC_RE = re.compile(r"\bfunc\s+([A-Za-z_]\w*)\s*(?:<[^>(]*)>\s*\(|\bfunc\s+([A-Za-z_]\w*)\s*\(")
 CALL_RE = re.compile(r"(?<![\w.])([A-Za-z_]\w*)\s*\(")
 LABEL_RE = re.compile(r"(?:([A-Za-z_]\w*)\s+)?([A-Za-z_]\w*)\s*:")
@@ -31,166 +33,56 @@ DEFAULT_REF_RE = re.compile(
 )
 
 
-def source_lines(text):
-    return len(text.split("\n")) - (1 if text.endswith("\n") else 0)
-
-
-def top_level_braces(text):
-    spans = []
-    i, n, depth, start = 0, len(text), 0, None
-    while i < n:
-        c = text[i]
-        if c == "/" and i + 1 < n and text[i + 1] == "/":
-            i = text.find("\n", i)
-            if i < 0:
+def extract_declarations(text, names, owner=None):
+    """Move whole types or computed members; never widen access implicitly."""
+    if not names or len(set(names)) != len(names):
+        raise ValueError("declaration names must be unique")
+    if owner is None:
+        header, chunks = declaration_chunks(text)
+        moved = [chunk for chunk in chunks if _type_name(chunk) in names]
+        if len(moved) != len(names):
+            raise ValueError("missing or ambiguous type declaration")
+        return (header + "".join(c for c in chunks if c not in moved)).rstrip() + "\n", (_import_header(header) + "".join(moved).lstrip("\n")).rstrip() + "\n"
+    pattern = r"(?m)^(?:(?:public|internal|final) +)*(?:struct|class|enum|actor|extension) +" + re.escape(owner) + r"\b[^\n{]*\{"
+    owners = list(re.finditer(pattern, text))
+    if not owners:
+        raise ValueError("missing owner")
+    declaration = owners[0]
+    end = next(b for a, b in top_level_braces(text) if a == declaration.end() - 1)
+    chunk = text[declaration.start():end + 1]
+    opening, closing = top_level_braces(chunk)[0]
+    body = chunk[opening + 1:closing]
+    spans = top_level_braces(body)
+    ranges = []
+    for name in names:
+        pattern = r"(?m)^    (?:(?:public|internal|private|fileprivate|static|mutating) +)*(?:func|var) +" + re.escape(name) + r"\b"
+        matches = list(re.finditer(pattern, body))
+        if len(matches) != 1:
+            raise ValueError("missing or ambiguous member: " + name)
+        match = matches[0]
+        if re.search(r"\b(private|fileprivate)\b", match[0]):
+            raise ValueError("review member access before extraction: " + name)
+        start = match.start()
+        while start > 0:
+            previous = body.rfind("\n", 0, start - 1) + 1
+            if not body[previous:start].strip().startswith(("//", "@")):
                 break
-            continue
-        if c == "/" and i + 1 < n and text[i + 1] == "*":
-            end = text.find("*/", i + 2)
-            i = n if end < 0 else end + 2
-            continue
-        if c == '"':
-            if text.startswith('"""', i):
-                end = text.find('"""', i + 3)
-                i = n if end < 0 else end + 3
-                continue
-            i += 1
-            while i < n and text[i] not in {'"', "\n"}:
-                i += 2 if text[i] == "\\" else 1
-            i += 1
-            continue
-        if c == "{":
-            if depth == 0:
-                start = i
-            depth += 1
-        elif c == "}":
-            depth -= 1
-            if depth == 0 and start is not None:
-                spans.append((start, i))
-                start = None
-            if depth < 0:
-                raise ValueError("unbalanced braces")
-        i += 1
-    if depth != 0:
-        raise ValueError("unbalanced braces")
-    return spans
-
-
-def declaration_chunks(text):
-    lines = text.splitlines(keepends=True)
-    spans = top_level_braces(text)
-    if not spans:
-        raise ValueError("no top-level Swift type to split")
-    starts = []
-    for open_at, _close_at in spans:
-        line_no = text.count("\n", 0, open_at)
-        while line_no > 0 and not TYPE_RE.match(lines[line_no].strip()):
-            line_no -= 1
-        if not TYPE_RE.match(lines[line_no].strip()):
-            raise ValueError("top-level brace is not a type declaration")
-        start = line_no
-        while start > 0 and lines[start - 1].strip().startswith(("///", "//", "@")):
-            start -= 1
-        starts.append(start)
-    chunks = []
-    for index, start in enumerate(starts):
-        end = starts[index + 1] if index + 1 < len(starts) else len(lines)
-        chunks.append("".join(lines[start:end]))
-    return "".join(lines[: starts[0]]), chunks
-
-
-def _type_name(chunk):
-    for line in chunk.splitlines():
-        match = TYPE_RE.match(line.strip())
-        if match:
-            return match.group(1)
-    raise ValueError("split chunk has no top-level type name")
-
-
-def _import_header(header):
-    imports = [line for line in header.splitlines(keepends=True) if line.startswith("import ")]
-    if not imports:
-        return ""
-    text = "".join(imports)
-    return text if text.endswith("\n\n") else text + ("\n" if text.endswith("\n") else "\n\n")
-
-
-def _pack(header, chunks, limit):
-    files = []
-    current = header
-    held = 0
-    extra = _import_header(header)
-    for chunk in chunks:
-        candidate = current + chunk
-        if source_lines(candidate) <= limit:
-            current = candidate
-            held += 1
-            continue
-        if held == 0:
-            raise ValueError(_type_name(chunk) + " is over " + str(limit) + " lines")
-        files.append(current if current.endswith("\n") else current + "\n")
-        current = extra + chunk.lstrip("\n")
-        held = 1
-        if source_lines(current) > limit:
-            raise ValueError(_type_name(chunk) + " is over " + str(limit) + " lines")
-    files.append(current if current.endswith("\n") else current + "\n")
-    return files
-
-
-def split_namesake(text, source_name, limit=LIMIT):
-    """Keep the file-stem type in the original file. Pack the other types beside it."""
-    if source_lines(text) <= limit:
-        return [(source_name, text if text.endswith("\n") else text + "\n")]
-    header, chunks = declaration_chunks(text)
-    stem = Path(source_name).stem
-    namesake_at = next((i for i, chunk in enumerate(chunks) if _type_name(chunk) == stem), None)
-    if namesake_at is None:
-        bodies = _pack(header, chunks, limit)
-        names = [source_name]
-        for body in bodies[1:]:
-            names.append(str(Path(source_name).with_name(_type_name(body) + ".swift")))
-        if len(names) != len(set(names)):
-            raise ValueError("split would overwrite " + source_name)
-        return list(zip(names, bodies))
-    before = chunks[:namesake_at]
-    namesake = [chunks[namesake_at]]
-    after = chunks[namesake_at + 1 :]
-    kept = _pack(header, namesake, limit)
-    if len(kept) != 1:
-        raise ValueError(stem + " is over " + str(limit) + " lines")
-    body = kept[0]
-    for chunk in after:
-        if source_lines(body + chunk) > limit:
-            before.append(chunk)
-            continue
-        body += chunk
-    bodies = _pack(_import_header(header) or header, before, limit) if before else []
-    paths = []
-    for part in bodies:
-        name = str(Path(source_name).with_name(_type_name(part) + ".swift"))
-        if name == source_name or name in paths:
-            raise ValueError("split would overwrite " + name)
-        paths.append((name, part))
-    paths.insert(0, (source_name, body))
-    return paths
-
-
-def apply_split(source, limit=LIMIT, dry_run=False):
-    source = Path(source)
-    parts = split_namesake(source.read_text(), source.name, limit)
-    if len(parts) == 1:
-        return [source]
-    written = [source.with_name(name) if not Path(name).is_absolute() else Path(name) for name, _body in parts]
-    # parts store basenames from split_namesake
-    written = [source.parent / name for name, _body in parts]
-    for path in written[1:]:
-        if path.exists():
-            raise ValueError("refusing to overwrite " + str(path))
-    if dry_run:
-        return written
-    for path, (_name, body) in zip(written, parts):
-        path.write_text(body)
-    return written
+            start = previous
+        block = next(((a, b) for a, b in spans if a >= match.end()), None)
+        if block is None or not re.fullmatch(r"[^{}]*", body[match.end():block[0]]):
+            raise ValueError("member has no complete body: " + name)
+        signature = body[match.end():block[0]]
+        if ("var " in match[0] and "=" in signature) or re.search(r"(?m)^    (?:func|var|let)\b", signature):
+            raise ValueError("member is not computed: " + name)
+        ranges.append((start, block[1] + 1))
+    ranges.sort()
+    if any(end > next_start for (_, end), (next_start, _) in zip(ranges, ranges[1:])):
+        raise ValueError("overlapping members")
+    moved = "\n\n".join(body[a:b] for a, b in ranges)
+    for a, b in reversed(ranges):
+        body = body[:a].rstrip("\n") + "\n\n" + body[b:].lstrip("\n")
+    kept = text.replace(chunk, chunk[:opening + 1] + body + chunk[closing:], 1)
+    return kept, _import_header(text) + "extension " + owner + " {\n" + moved + "\n}\n"
 
 
 def relocate_prefix(text, marker, sibling):
@@ -392,8 +284,23 @@ def main():
     parser.add_argument("--root", type=Path, default=Path("."))
     parser.add_argument("--relocate-prefix", help="move the prefix before this exact line into --sibling")
     parser.add_argument("--sibling", type=Path)
+    parser.add_argument("--rehome-extension", type=Path,
+                        help="move a cross-file XCTestCase extension to an independent superclass")
+    parser.add_argument("--extract", nargs="+", help="move named types or --owner computed members to --sibling")
+    parser.add_argument("--owner", help="type whose computed members are extracted")
     args = parser.parse_args()
     try:
+        if args.extract:
+            if args.source is None or args.sibling is None or args.sibling.exists():
+                raise ValueError("extract needs a source and a new --sibling")
+            kept, moved = extract_declarations(args.source.read_text(), args.extract, args.owner)
+            if source_lines(moved) > args.limit:
+                raise ValueError("extracted sibling exceeds limit")
+            if not args.dry_run:
+                args.sibling.write_text(moved)
+                args.source.write_text(kept)
+            print(str(args.sibling) + ": " + str(source_lines(moved)) + " lines")
+            return
         if args.check:
             fails = check_repo(args.root)
             for fail in fails:
@@ -413,6 +320,16 @@ def main():
                 args.source.write_text(original)
             print(args.sibling.name + ": " + str(source_lines(prefix)) + " lines")
             print(args.source.name + ": " + str(source_lines(original)) + " lines")
+            return
+        if args.rehome_extension:
+            if args.source is None:
+                raise ValueError("--rehome-extension needs a source")
+            suite, companion = rehome_suite_extension(args.source.read_text(), args.rehome_extension.read_text())
+            if not args.dry_run:
+                args.source.write_text(suite)
+                args.rehome_extension.write_text(companion)
+            print(args.source.name + ": " + str(line_count(suite)) + " lines")
+            print(args.rehome_extension.name + ": " + str(line_count(companion)) + " lines")
             return
         if args.source is None:
             raise ValueError("a Swift source or --check is required")

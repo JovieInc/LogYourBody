@@ -9,6 +9,7 @@ import { ROOT } from './correction-coverage.mjs';
 // Product-specific team IDs, client IDs and lesson namespaces must stay separate.
 const teamIdentifier = ['JOVIE', 'TEAM', 'ID'].join('_').toLowerCase();
 const teamId = ['bdc09edc', 'f91c', '4a06', 'b308', '74b4fcf093f8'].join('-');
+const privacyAccessFlag = ['jovie', 'health', 'access'].join('_');
 const sharedIdentifiers = new Set(
   [
     'AUTH_ISSUER',
@@ -37,6 +38,14 @@ export const EXCEPTIONS = {
   'scripts/setup-gbrain.sh': {
     reason: 'AGENTS.md requires retaining GBrain Doppler reads against the shared configuration.',
     identifiers: { [['jovie', 'web'].join('-')]: 2 },
+  },
+  'packages/shared-lib/decisions/photo-privacy-health-isolation.json': {
+    reason: 'LYB-304 records a deny-access policy flag, required to be false by its CI test.',
+    identifiers: { [privacyAccessFlag]: 1 },
+  },
+  'packages/shared-lib/src/photo-privacy-health-isolation.test.ts': {
+    reason: 'LYB-304 regression requires the deny-access policy flag to be present and false.',
+    identifiers: { [privacyAccessFlag]: 1 },
   },
 };
 

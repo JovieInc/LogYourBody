@@ -58,6 +58,109 @@ final class DatedOutcomeStoreTests: XCTestCase {
         }
     }
 
+    func testPresentationSaveAndRelaunchRestoreOwnerScopedContext() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("timeline-\(UUID()).sqlite")
+        defer { removeStore(url) }
+        let first = try coordinator(url: url)
+        let background = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
+        background.persistentStoreCoordinator = first
+        try await store(background).saveForPresentation(value, isCurrent: { true })
+        try close(first)
+        let reopened = try coordinator(url: url)
+        defer { try? close(reopened) }
+        let restored = store(context(reopened))
+        let loaded = try await restored.loadForPresentation(isCurrent: { true })
+        XCTAssertEqual(loaded?.value, value)
+        owner = "owner-b"
+        let other = try await restored.loadForPresentation(isCurrent: { true })
+        XCTAssertNil(other)
+        XCTAssertTrue(try restored.pendingEdits().isEmpty)
+    }
+
+    func testStalePresentationCannotSaveIntoAnotherAccount() async throws {
+        let journal = store(context(try coordinator()))
+        owner = "owner-b"
+        do {
+            try await journal.saveForPresentation(value, isCurrent: { false })
+            XCTFail("A stale editor must be rejected before writing")
+        } catch DatedOutcomeError.unauthenticated { }
+        XCTAssertNil(try journal.load())
+        XCTAssertTrue(try journal.pendingEdits().isEmpty)
+        XCTAssertTrue(emitted.isEmpty)
+    }
+
+    func testPlanBaselineSurvivesEditsAcknowledgementAndRelaunchWithoutWireChanges() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("baseline-\(UUID()).sqlite")
+        defer { removeStore(url) }
+        let first = try coordinator(url: url)
+        let background = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
+        background.persistentStoreCoordinator = first
+        let journal = store(background)
+        var goal = value
+        goal.outcome.metric = .weightKg
+        goal.outcome.targetValue = 76
+        let edit = try XCTUnwrap(journal.save(goal))
+        let baseline = DatedOutcome.PlanBaseline(date: Date(timeIntervalSince1970: 1_793_491_200), metric: .weightKg, value: 80)
+        try await journal.retainPlanBaselineForPresentation(baseline, revision: edit.requestId, isCurrent: { true })
+        XCTAssertEqual(try journal.load()?.planBaseline, baseline)
+        XCTAssertEqual(try journal.pendingEdits(), [edit])
+        XCTAssertEqual(emitted.count, 1, "Baseline metadata is not a user edit or recompute")
+        let wire = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(edit)) as? [String: Any])
+        XCTAssertNil(wire["planBaseline"])
+        goal.outcomeDate = "2027-06-01"
+        let changed = try XCTUnwrap(journal.save(goal))
+        try journal.acknowledge(edit, receipt: .init(revision: edit.requestId, value: edit.value))
+        try journal.acknowledge(changed, receipt: .init(revision: changed.requestId, value: changed.value))
+        XCTAssertEqual(try journal.load()?.planBaseline, baseline)
+        try close(first)
+        let reopened = try coordinator(url: url)
+        defer { try? close(reopened) }
+        let restored = store(context(reopened))
+        XCTAssertEqual(try restored.load()?.planBaseline, baseline)
+        XCTAssertEqual(try restored.load()?.value, goal)
+        owner = "owner-b"
+        XCTAssertNil(try restored.load())
+    }
+
+    func testBaselineCannotReplaceExistingRevisionOrCrossAccountSession() async throws {
+        let journal = store(context(try coordinator()))
+        let edit = try XCTUnwrap(journal.save(value))
+        let baseline = DatedOutcome.PlanBaseline(date: Date(), metric: .bodyFatPercentage, value: 22)
+        try await journal.retainPlanBaselineForPresentation(baseline, revision: UUID(), isCurrent: { true })
+        XCTAssertNil(try journal.load()?.planBaseline)
+        try await journal.retainPlanBaselineForPresentation(baseline, revision: edit.requestId, isCurrent: { true })
+        var replacement = baseline
+        replacement.value = 23
+        try await journal.retainPlanBaselineForPresentation(replacement, revision: edit.requestId, isCurrent: { true })
+        XCTAssertEqual(try journal.load()?.planBaseline, baseline)
+        owner = "owner-b"
+        do {
+            try await journal.retainPlanBaselineForPresentation(baseline, revision: edit.requestId, isCurrent: { false })
+            XCTFail("A late task cannot write into the new session")
+        } catch DatedOutcomeError.unauthenticated { }
+        XCTAssertNil(try journal.load())
+        owner = "owner-a"
+        var changed = value
+        changed.outcome.metric = .ffmi
+        try journal.save(changed)
+        XCTAssertNil(try journal.load()?.planBaseline, "A metric edit requires its own comparable baseline")
+    }
+
+    func testPresentationReadAfterSessionChangeIsDiscarded() async throws {
+        let journal = store(context(try coordinator()))
+        try journal.save(value)
+        var checks = 0
+        do {
+            _ = try await journal.loadForPresentation {
+                checks += 1
+                if checks > 1 { self.owner = "owner-b" }
+                return checks == 1
+            }
+            XCTFail("A delayed read must not publish the previous account's outcome")
+        } catch DatedOutcomeError.unauthenticated { }
+        XCTAssertNil(try journal.load())
+    }
+
     func testOutcomeConstraintsAndPendingRequestSurviveSQLiteReopen() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("outcome-\(UUID()).sqlite")
         defer { removeStore(url) }
