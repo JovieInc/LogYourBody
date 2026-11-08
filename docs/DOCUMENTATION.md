@@ -75,6 +75,8 @@ existing lockfile with pinned Corepack pnpm (frozen, offline, lockfile-only,
 lifecycle scripts disabled) before regenerating and staging only the source map.
 It retains the refusal of unstaged dependency/output edits and pinned-source drift
 without re-resolving unrelated dependencies.
+Both modes refuse an ignored, untracked `pnpm-workspace.yaml` before invoking
+pnpm, so local workspace configuration cannot supply unreviewed resolver inputs.
 Both dependency modes also require staged `repository-docs.json` changes before
 invoking pnpm, keeping parity checks and output selection on reviewed configuration.
 Both dependency modes render the source map from the Git index, preserving

@@ -171,7 +171,7 @@ if not marker.exists():
       assert.equal(f.git('ls-files', '--stage'), repairedIndex);
     });
   }
-  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch', 'apps/local-only/package.json']) {
+  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch', 'apps/local-only/package.json', 'pnpm-workspace.yaml']) {
     test(`dependency repair ${mode} refuses ignored ${input} before invoking pnpm`, (t) => {
       const f = fixture(t, input, 'untracked');
       writeFileSync(join(f.root, '.gitignore'), `${input}\nnode_modules/\n.next/\n`);
@@ -265,7 +265,7 @@ if not marker.exists():
     assert.match(f.git('ls-files', '--stage', '.pnpmfile.cjs'), /^100755 /);
     assert.match(readFileSync(join(f.root, 'pnpm-calls'), 'utf8'), /--frozen-lockfile --offline/);
   });
-  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch']) {
+  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch', 'pnpm-workspace.yaml']) {
     for (const state of ['untracked', 'unstaged']) {
       test(`dependency repair ${mode} refuses ${state} ${input} before invoking pnpm`, (t) => {
         const f = fixture(t, input, state);
