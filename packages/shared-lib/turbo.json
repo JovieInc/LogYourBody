@@ -20,6 +20,7 @@
         "$TURBO_ROOT$/apps/ios/LogYourBody/Resources/PersonalBodyEngine.json",
         "$TURBO_ROOT$/packages/shared-lib/src/wireframe-avatar-family.ts",
         "$TURBO_ROOT$/packages/shared-lib/src/personal-3d-engine.ts",
+        "$TURBO_ROOT$/packages/shared-lib/src/personal-3d-engine-model.ts",
         "$TURBO_ROOT$/docs/product/personal-3d-engine.md",
         "$TURBO_ROOT$/packages/shared-lib/src/personal-body-estimate.ts",
         "$TURBO_ROOT$/packages/shared-lib/src/personal-body-estimate-model.ts",
