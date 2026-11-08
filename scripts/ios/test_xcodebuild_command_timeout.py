@@ -40,6 +40,13 @@ class DeadlineRuleTests(unittest.TestCase):
         self.assertFalse(deadline.is_terminal_result("** TEST EXECUTE SUCCEEDED ** extra"))
         self.assertFalse(deadline.is_terminal_result("prefix ** TEST EXECUTE SUCCEEDED **"))
         self.assertFalse(deadline.is_terminal_result("** TEST FAILED **"))
+        passed = "Test Suite 'Selected tests' passed at 2026-11-07 15:37:49.105."
+        failed = "Test Suite 'Selected tests' failed at 2026-11-07 15:37:49.105."
+        self.assertTrue(deadline.is_terminal_result(passed))
+        self.assertTrue(deadline.is_terminal_result(f"  {failed}  "))
+        self.assertFalse(deadline.is_terminal_result("Test Suite 'Selected tests' started at 2026-11-07 15:37:49.105."))
+        self.assertFalse(deadline.is_terminal_result(passed + " extra"))
+        self.assertFalse(deadline.is_terminal_result("Test Suite 'All tests' passed at 2026-11-07 15:37:49.105."))
 
     def test_early_result_does_not_extend_and_late_result_extends_once(self) -> None:
         self.assertEqual(deadline.next_deadline(10, 1, 3, False), (10, True))
@@ -111,6 +118,24 @@ class DeadlineRuleTests(unittest.TestCase):
         self.assertEqual(result.returncode, 124)
         self.assertGreater(result.elapsed, 1.7)  # type: ignore[attr-defined]
         self.assertLess(result.elapsed, 2.35)  # type: ignore[attr-defined]
+
+    def test_selected_suite_completion_starts_finalization_before_the_execute_line(self) -> None:
+        # Run 42382904905 printed the suite result and was killed before
+        # ** TEST EXECUTE SUCCEEDED **. The hang cap stays fixed.
+        suite = "Test Suite 'Selected tests' passed at 2026-11-07 15:37:49.105."
+        finished = run_watcher("1", "2", python_child(f"import time; print({suite!r}, flush=True); time.sleep(1.3)"))
+        self.assertEqual(finished.returncode, 0, finished.stderr)
+        self.assertGreater(finished.elapsed, 1.15)  # type: ignore[attr-defined]
+        self.assertLess(finished.elapsed, 2.2)  # type: ignore[attr-defined]
+        lookalike = run_watcher(
+            "1",
+            "2",
+            python_child(
+                "import time; print(\"Test Suite 'Selected tests' passed at later\", flush=True); time.sleep(8)"
+            ),
+        )
+        self.assertEqual(lookalike.returncode, 124)
+        self.assertLess(lookalike.elapsed, 1.8)  # type: ignore[attr-defined]
 
     def test_a_lookalike_line_does_not_extend_the_hang_cap(self) -> None:
         result = run_watcher(

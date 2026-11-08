@@ -23,6 +23,7 @@ class RealtimeSyncManager: ObservableObject {
     @Published var unsyncedGlp1Count = 0
     @Published var unsyncedDexaCount = 0
     @Published var isOnline = true
+
     @Published var realtimeConnected = false
     @Published var error: String?
 

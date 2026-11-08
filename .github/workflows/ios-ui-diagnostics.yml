@@ -1,7 +1,7 @@
 name: iOS UI Diagnostics (NONQUALIFYING)
 
 # workflow_dispatch remains for a token that has actions:write. A main push of
-# this file, the pinned audit script, or the seven-case HomeV2 layout UI test,
+# this file, the pinned audit script, its diagnostic-seven sibling, or the seven-case HomeV2 layout UI test,
 # and the daily schedule, start the same job (LYB-200 / #1458). Those events
 # checkout github.sha only.
 on:
@@ -16,6 +16,7 @@ on:
     paths:
       - .github/workflows/ios-ui-diagnostics.yml
       - scripts/ios/launch-quality-audit.sh
+      - scripts/ios/launch-quality-diagnostic-seven.sh
       - apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift
   schedule:
     - cron: '0 16 * * *'
@@ -99,11 +100,12 @@ jobs:
 
           # Intentionally unavailable until the FINAL composed audit and this
           # exact policy hunk are independently reviewed. Never a caller input.
-          REVIEWED_AUDIT_SHA256 = '15928115521f679beeb7ef65218f317af08e112ff4153cb92d88452eb5a7ae4b'
+          REVIEWED_AUDIT_SHA256 = 'dfad750f7194317ea3710684addaa13fb82132c77afb404fab81552bffc1dbc5'
           DEPENDENCIES = {
-              'scripts/ios/xcodebuild-command-timeout.py': '207fc46111a1d86ec3df2e2f60716d9924d27639e1d2920683049b6b93595fea',
+              'scripts/ios/xcodebuild-command-timeout.py': '66abf226c296005bbf50ca277d1e597f90c74269d26cb1afa039e999cbbc35fa',
               'scripts/ios/bootstrap-local-config.sh': 'aad028c0eff7f9d2a043711a8735963dc66b9bd664f11bf98b7ada67a60ab8db',
-              'scripts/ios/resolve-simulator-destination.sh': 'f5b31c0a92c181a5cb025c42d6090e142bc2a2394fa05b5f58e1badd6f2693bc',
+              'scripts/ios/launch-quality-diagnostic-seven.sh': 'cbdffd468d2e430047e2d265efe36ded2a7b40f0750dd26380caafe3a050f5da',
+              'scripts/ios/resolve-simulator-destination.sh': '8a610d8368587da67252065fd46c2937a03f09e9d4c24798a40e669187e61257',
               'apps/ios/Scripts/import-joviekit.mjs': '35555f9ad251a0976a0bd0ee4ebf4293a4b8634ea61e60db254e53b9c196aa4b',
               'apps/ios/Vendor/JovieKit.source.json': 'aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2',
               'apps/ios/LogYourBody.xcodeproj/project.pbxproj': 'f37e9099c76482e6ecdb11883baf546b66bc85bdc0109bc61f4ba75c2dffd45f',

@@ -38,6 +38,7 @@ _AUDIT_SIBLINGS = (
     ("launch_ui_timeline_day", "launch_ui_timeline_day.py", "check_timeline_calendar_day"),
     ("launch_ui_opacity_audit", "launch_ui_opacity_audit.py", "check_optional_cgfloat_opacity"),
     ("launch_ui_timeline_gesture_audit", "launch_ui_timeline_gesture_audit.py", "check_timeline_gestures"),
+    ("launch_ui_offline_pin_audit", "launch_ui_offline_pin_audit.py", "check_ui_test_offline_pin"),
     ("launch_ui_dated_stats_audit", "launch_ui_dated_stats_audit.py", "check_dated_stats_fixture"),
     ("launch_ui_regression_report", "launch-ui-regression-report.py", "write_outputs"),
 )
@@ -45,6 +46,7 @@ _AUDIT_SIBLINGS = (
     check_timeline_calendar_day,
     check_optional_cgfloat_opacity,
     check_timeline_gestures,
+    check_ui_test_offline_pin,
     check_dated_stats_fixture,
     write_outputs,
 ) = [_load_sibling(*sibling) for sibling in _AUDIT_SIBLINGS]
@@ -472,6 +474,7 @@ def main() -> int:
 
     # Timeline positions follow the injected calendar day, not elapsed 86400-second offsets.
     check_timeline_calendar_day(root, violations, AuditViolation, line_number)
+    check_ui_test_offline_pin(root, native_swift_files, violations, texts)
 
     write_outputs(args.artifact_dir, violations)
     if violations:
