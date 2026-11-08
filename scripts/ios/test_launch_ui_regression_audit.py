@@ -54,10 +54,8 @@ class StatsCardCompositionTests(unittest.TestCase):
 
         def passing():
             pass
-
         def failing():
             self.fail("behavior regression")
-
         cases = [
             ("complete", unittest.TestSuite([unittest.FunctionTestCase(passing)]), 0),
             ("empty", unittest.TestSuite(), 1),
@@ -285,9 +283,7 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         source = path.read_text()
         start = source.index("    var hudGlp1WeeklyCheckIn:")
         end = source.index("    var isPhaseInsightEnabled:", start)
-        card = source[start:end]
-        # Run against the original source as well as the repaired card.
-        card = card.replace(".contentShape(Rectangle())", "")
+        card = source[start:end].replace(".contentShape(Rectangle())", "")
         path.write_text(source[:start] + card + source[end:])
         self.assert_rejected("dashboard.checkin_card_hit_region")
 
@@ -340,7 +336,6 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         self.assertIn(header_end, detached)
         path.write_text(detached.replace(header_end, parent_overlay, 1))
         self.assert_rejected("timeline.edge_swipe_excludes_header")
-
         padded = source.replace(
             """.frame(width: 20)
                         .frame(maxHeight: .infinity)
@@ -382,27 +377,19 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
 
     def test_parent_audit_stays_within_the_company_size_ratchet(self):
         # The parent audit stays within the company 500-line ratchet.
-        count = len(Path(AUDIT.__file__).read_text().splitlines())
-        self.assertLessEqual(
-            count, 500, "extract a sibling before the company size guard",
-        )
-        self.assertNotIn("def check_timeline_gestures", Path(AUDIT.__file__).read_text())
+        text = Path(AUDIT.__file__).read_text()
+        self.assertLessEqual(len(text.splitlines()), 500, "extract a sibling before the company size guard")
+        self.assertNotIn("def check_timeline_gestures", text)
 
     def test_every_size_ratchet_sibling_loads_or_the_audit_fails_closed(self):
         loaded = [
             AUDIT._load_sibling(module_name, filename, export)
             for module_name, filename, export in AUDIT._AUDIT_SIBLINGS
         ]
-        self.assertEqual(
-            [item[0] for item in AUDIT._AUDIT_SIBLINGS],
-            [
-                "launch_ui_timeline_day",
-                "launch_ui_opacity_audit",
-                "launch_ui_timeline_gesture_audit",
-                "launch_ui_offline_pin_audit",
-                "launch_ui_regression_report",
-            ],
-        )
+        self.assertEqual([item[0] for item in AUDIT._AUDIT_SIBLINGS], [
+            "launch_ui_timeline_day", "launch_ui_opacity_audit", "launch_ui_timeline_gesture_audit",
+            "launch_ui_offline_pin_audit", "launch_ui_dated_stats_audit", "launch_ui_regression_report",
+        ])
         for export in loaded:
             self.assertTrue(callable(export))
         with self.assertRaises(RuntimeError) as missing_file:
@@ -419,18 +406,16 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         manager = self.app / "Services/RealtimeSyncManager.swift"
         app = self.app / "LogYourBodyApp.swift"
         originals = {path: path.read_text() for path in (sync, manager, app)}
-
         def checks():
             texts = {path: path.read_text() for path in originals}
             found = []
             AUDIT.check_ui_test_offline_pin(self.root, [], found, texts)
             return [item.check for item in found]
-
         self.assertEqual(checks(), [])
         cases = (
-            (sync, "Self.online(after: path.status, pinnedOffline: self.pinsOfflineForUITestFixture)", "path.status == .satisfied"),
-            (manager, "if pinnedOffline { return false }", "if pinnedOffline { return status == .satisfied }"),
-            (app, "pinOfflineForUITestFixture()", "isOnline = false"),
+            (sync, "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)", "self.isOnline = path.status == .satisfied"),
+            (manager, "guard !usesOfflineUITestFixture else { return }", "guard usesOfflineUITestFixture else { return }"),
+            (app, "realtimeSyncManager.applyOfflineUITestFixture()", "realtimeSyncManager.isOnline = false"),
         )
         for path, before, after in cases:
             with self.subTest(path=path.name):
@@ -445,7 +430,6 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         original_compare = compare.read_text()
         self.assertIn("var earlierOpacity: Double", original_policy)
         self.assertEqual(self.run_audit()[0], 0)
-
         policy.write_text(original_policy.replace(
             "var earlierOpacity: Double", "var earlierOpacity: CGFloat", 1
         ))
@@ -470,11 +454,9 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         tests.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / "apps/ios/LogYourBodyTests/TimelineCalculatorTests.swift", tests)
         self.assertEqual(self.run_audit()[0], 0)
-
         tests.write_text("let date = now.addingTimeInterval(-daysAgo * 24 * 60 * 60)\n")
         self.assert_rejected("timeline.elapsed_day_offset")
         self.assert_rejected("timeline.fallback_hour_regression")
-
         tests.unlink()
         calculator.write_text(original.replace(
             "if point.date >= thirtyDaysAgo {",
@@ -482,10 +464,28 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
             1,
         ))
         self.assert_rejected("timeline.injected_calendar_day")
-
         calculator.write_text(original.replace("now: Date = Date(),\n        ", "", 1))
         self.assert_rejected("timeline.injected_calendar_day")
 
+    def test_dated_stats_fixture_survives_path_and_account_change(self):
+        self.assertEqual(self.run_audit()[0], 0)
+        cases = [
+            ("Services/RealtimeSyncManager+Part01.swift", "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)", "self.isOnline = path.status == .satisfied", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "self.isOnline = Self.online(isOnline)", "self.isOnline = isOnline", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "guard !usesOfflineUITestFixture else { return }", "", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", "return !fixtureForcesOffline", "return pathSatisfied", "dated_stats.offline_survives_path"),
+            ("Services/RealtimeSyncManager.swift", '"-lybUITestPhotoTimelineHUDFixture"', '"-not-an-offline-fixture"', "dated_stats.offline_survives_path"),
+            ("Views/DashboardViewLiquid.swift", "selectedPhotoTimelineRootPage = Self.pageAfterAccountChange()", "selectedPhotoTimelineRootPage = .timeline", "dated_stats.analytics_survives_account"),
+            ("Services/DatedTimelineUI.swift", "return .analytics", "return .timeline", "dated_stats.analytics_survives_account"),
+        ]
+        for relative, before, after, check in cases:
+            with self.subTest(before=before):
+                path = self.app / relative
+                source = path.read_text()
+                self.assertIn(before, source)
+                path.write_text(source.replace(before, after, 1))
+                self.assert_rejected(check)
+                path.write_text(source)
 
 def run_behavior_suite(suite):
     expected = suite.countTestCases()
@@ -493,7 +493,6 @@ def run_behavior_suite(suite):
     print(f"Launch UI audit behavior tests executed: {result.testsRun}/{expected}")
     complete = expected > 0 and result.testsRun == expected and not result.skipped
     return 0 if complete and result.wasSuccessful() else 1
-
 
 if __name__ == "__main__":
     sys.exit(run_behavior_suite(unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__])))

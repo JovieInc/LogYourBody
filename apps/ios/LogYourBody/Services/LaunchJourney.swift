@@ -78,6 +78,8 @@ enum LaunchJourney {
         var thresholds: [DatedOutcome.Metric: OutcomeFeasibility.Thresholds] = [:]
         /// Nil means no approved kilogram rate. The weight planner then fails closed.
         var safeWeeklyChangeKg: ClosedRange<Double>?
+        var planBaseline: DatedOutcome.PlanBaseline?
+        var usesLatestConflictOnly = false
         var glp1Disclosed = false
         var dexaPresent = false
     }
@@ -144,7 +146,7 @@ enum LaunchJourney {
                 detail: "This date cannot be reached safely. \(outcome.outcomeDate) was not moved."
             ))
         case .noData, .ok:
-            if conflicts(metricReadings) {
+            if conflicts(metricReadings, latestOnly: input.usesLatestConflictOnly) {
                 return (.conflicting, Action(
                     title: "Record one new measurement",
                     detail: "Two values share a time. Record one measurement for \(outcome.outcomeDate)."
@@ -181,20 +183,7 @@ enum LaunchJourney {
     private static func weightPlan(
         _ outcome: DatedOutcome, readings: [Reading], input: Input
     ) -> (state: RouteState, action: Action) {
-        guard let start = readings.min(by: { $0.date < $1.date }),
-              let deadline = DatedOutcome.calendarDate(outcome.outcomeDate) else {
-            return unsafe(outcome)
-        }
-        let plan = BackwardPlanner(safeWeeklyChangeKg: input.safeWeeklyChangeKg).plan(
-            outcome: .init(
-                startDate: start.date,
-                startingWeightKg: start.value,
-                targetWeightKg: outcome.outcome.targetValue,
-                targetDate: deadline
-            ),
-            history: readings.map { .init(date: $0.date, weightKg: $0.value) },
-            now: input.now
-        )
+        guard let plan = weightPlanResult(outcome, readings: readings, input: input) else { return unsafe(outcome) }
         switch plan.status {
         case .onTrack, .ahead:
             return (.ready, Action(title: "Hold the plan", detail: "The date stays \(outcome.outcomeDate)."))
@@ -228,6 +217,26 @@ enum LaunchJourney {
         }
     }
 
+    /// Shared original-baseline projection for the directive and goal-relative stats.
+    /// A new check-in never becomes a replacement baseline.
+    static func weightPlanResult(_ outcome: DatedOutcome, readings: [Reading], input: Input) -> BackwardPlanner.Plan? {
+        let baseline = input.planBaseline.map { Reading(date: $0.date, metric: $0.metric, value: $0.value) }
+        guard let start = baseline ?? readings.min(by: { $0.date < $1.date }),
+              start.metric == outcome.outcome.metric, readings.contains(start),
+              !readings.contains(where: { $0.date == start.date && $0.value != start.value }),
+              let deadline = DatedOutcome.calendarDate(outcome.outcomeDate) else { return nil }
+        return BackwardPlanner(safeWeeklyChangeKg: input.safeWeeklyChangeKg).plan(
+            outcome: .init(
+                startDate: start.date,
+                startingWeightKg: start.value,
+                targetWeightKg: outcome.outcome.targetValue,
+                targetDate: deadline
+            ),
+            history: readings.map { .init(date: $0.date, weightKg: $0.value) },
+            now: input.now
+        )
+    }
+
     private static func unsafe(_ outcome: DatedOutcome) -> (state: RouteState, action: Action) {
         (.unsafeDate, Action(
             title: "Revise the outcome",
@@ -235,9 +244,10 @@ enum LaunchJourney {
         ))
     }
 
-    static func conflicts(_ readings: [Reading]) -> Bool {
+    static func conflicts(_ readings: [Reading], latestOnly: Bool = false) -> Bool {
+        let latest = latestOnly ? readings.map(\.date).max() : nil
         var seen: [Date: Double] = [:]
-        for reading in readings {
+        for reading in readings where latest == nil || reading.date == latest {
             if let prior = seen[reading.date], prior != reading.value { return true }
             seen[reading.date] = reading.value
         }

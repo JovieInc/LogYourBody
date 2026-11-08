@@ -24,6 +24,10 @@ extension DashboardViewLiquid {
             (currentMetric == nil || datedTimelineEntry != nil)
     }
 
+    var isDatedStatsSurface: Bool {
+        selectedPhotoTimelineRootPage == .analytics || isStatsDestinationActive
+    }
+
     var datedTimelineDirective: some View {
         VStack(alignment: .leading, spacing: 8) {
             if datedTimelineIsOwned, let snapshot = datedTimelineSnapshot {
@@ -36,7 +40,7 @@ extension DashboardViewLiquid {
                     Button("Retry sync") { scheduleDatedTimelineRefresh() }
                         .accessibilityIdentifier("dated_timeline_retry")
                 } else {
-                    LaunchDirectiveCard(presentation: snapshot.presentation) {
+                    LaunchDirectiveCard(presentation: isDatedStatsSurface ? snapshot.stats.presentation : snapshot.presentation) {
                         performDatedTimelineAction()
                     }
                 }
@@ -50,7 +54,9 @@ extension DashboardViewLiquid {
         .padding(.horizontal, JovieTokens.screenInset)
         .sheet(isPresented: $showsDatedTimelineEditor) {
             if let owner = datedTimelineOwner, authManager.ownsAccountSession(owner) {
-                LaunchOutcomeEditor(existing: datedTimelineSnapshot?.outcome, errorText: launchOutcomeError) { outcome in
+                LaunchOutcomeEditor(
+                    existing: datedTimelineSnapshot?.outcome, errorText: launchOutcomeError, allowsMaintenance: true
+                ) { outcome in
                     Task {
                         do {
                             try await realtimeSyncManager.datedOutcomeStore.saveForPresentation(outcome) {
@@ -90,6 +96,10 @@ extension DashboardViewLiquid {
 
     func performDatedTimelineAction() {
         guard datedTimelineIsOwned, let snapshot = datedTimelineSnapshot else { return }
+        if isDatedStatsSurface && snapshot.presentation.state == .maintenance {
+            openDatedTimelineEditor()
+            return
+        }
         switch snapshot.destination {
         case .editor:
             openDatedTimelineEditor()
@@ -148,19 +158,46 @@ extension DashboardViewLiquid {
                 let snapshot = await datedTimelineProjector.project(
                     owner: owner.subject, metrics: metrics,
                     input: LaunchJourney.Input(
-                        now: Date(), outcome: outcome?.value, offline: offline
+                        now: Date(), outcome: outcome?.value, offline: offline, planBaseline: outcome?.planBaseline
                     ), heightCm: height
                 )
+                if outcome?.planBaseline == nil, let baseline = snapshot.planBaseline, let outcome {
+                    try await realtimeSyncManager.datedOutcomeStore.retainPlanBaselineForPresentation(
+                        baseline, revision: outcome.revision
+                    ) { authManager.ownsAccountSession(owner) }
+                }
                 guard !Task.isCancelled, datedTimelineRefreshID == request,
                       authManager.ownsAccountSession(owner) else { return }
                 datedTimelineSnapshot = snapshot
                 datedTimelineOwner = owner
                 datedTimelineLoadFailed = false
+                // One wake at the saved UTC deadline, including while the app
+                // stays foregrounded in a timezone whose day changes later.
+                if let deadline = snapshot.stats.expiresAt, deadline > Date() {
+                    try await Task.sleep(for: .seconds(deadline.timeIntervalSinceNow))
+                    guard !Task.isCancelled, datedTimelineRefreshID == request,
+                          authManager.ownsAccountSession(owner) else { return }
+                    scheduleDatedTimelineRefresh()
+                }
             } catch {
                 guard !Task.isCancelled, datedTimelineRefreshID == request,
                       authManager.ownsAccountSession(owner) else { return }
                 datedTimelineLoadFailed = true
             }
         }
+    }
+
+    /// The analytics fixture opens Stats. Publishing the account must not send it back to Timeline.
+    static func pageAfterAccountChange(
+        _ arguments: [String] = ProcessInfo.processInfo.arguments
+    ) -> PhotoTimelineRootPage {
+        #if DEBUG
+        if arguments.contains("-lybUITestPhotoTimelineAnalyticsFixture") {
+            return .analytics
+        }
+        #else
+        _ = arguments
+        #endif
+        return .timeline
     }
 }

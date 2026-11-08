@@ -527,10 +527,10 @@ source "$AUDIT_SCRIPT"
                          'RUN_SWIFTLINT': 'false', 'RUN_STATIC_UI_REGRESSION_AUDIT': 'false',
                          'RUN_OPTICAL_GRID_AUDIT': 'false', 'PREFLIGHT_STATUS': str(status)})
                 self.assertEqual(result.returncode, status or 73, result.stderr)
-                expected = [f'python:{script.with_name("test_launch_quality_evidence.py")}']
+                order = ['test_launch_quality_evidence.py']
                 if status == 0:
-                    expected += [f'native:{script.with_name(name)}' for name in (
-                        'bootstrap-local-config.sh', 'resolve-simulator-destination.sh')]
+                    order += ['test_xcodebuild_command_timeout.py', 'bootstrap-local-config.sh', 'resolve-simulator-destination.sh']
+                expected = [f"{'python' if name.endswith('.py') else 'native'}:{script.with_name(name)}" for name in order]
                 self.assertEqual(calls.read_text().splitlines(), expected)
 
     def test_shell_rejects_nonempty_artifact_directory(self):

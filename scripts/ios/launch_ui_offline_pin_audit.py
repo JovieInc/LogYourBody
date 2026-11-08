@@ -10,11 +10,8 @@ from launch_ui_timeline_audit import AuditViolation, line_number
 _CHECK = "sync.ui_test_offline_pin"
 # A satisfied path must not clear a UI-test offline pin.
 _DETAIL = "A satisfied path must not clear a UI-test offline pin."
-_ASSIGNMENT = (
-    "self.isOnline = Self.online(after: path.status, "
-    "pinnedOffline: self.pinsOfflineForUITestFixture)"
-)
-_DECISION = "static func online(after status: NWPath.Status, pinnedOffline: Bool)"
+_HANDLER = "self?.handleNetworkPathUpdate(isOnline: path.status == .satisfied)"
+_DIRECT_PATH = "self.isOnline = path.status == .satisfied"
 
 
 def check_ui_test_offline_pin(
@@ -23,7 +20,7 @@ def check_ui_test_offline_pin(
     violations: list[AuditViolation],
     texts: dict[Path, str] | None = None,
 ) -> None:
-    """UI fixtures pin offline; later path updates must leave that pin in place."""
+    """UI fixtures pin offline; a later satisfied path must leave that pin in place."""
     del paths
     texts = texts or {}
     sync = root / "apps/ios/LogYourBody/Services/RealtimeSyncManager+Part01.swift"
@@ -32,14 +29,17 @@ def check_ui_test_offline_pin(
     sync_text = texts.get(sync, "")
     manager_text = texts.get(manager, "")
     app_text = texts.get(app, "")
-    decision = manager_text.split(_DECISION, 1)[-1].split("func pinOfflineForUITestFixture", 1)[0]
-    pinned = "if pinnedOffline { return false }" in decision and "return status == .satisfied" in decision
-    if (
-        _ASSIGNMENT not in sync_text
-        or "self.isOnline = path.status == .satisfied" in sync_text
-        or not pinned
-        or "realtimeSyncManager.pinOfflineForUITestFixture()" not in app_text
-    ):
+    handler = sync_text.split("networkMonitor.pathUpdateHandler", 1)[-1].split("func setupAuthListener", 1)[0]
+    pinned = (
+        _HANDLER in handler
+        and _DIRECT_PATH not in sync_text
+        and "self.isOnline =" not in handler
+        and "guard !usesOfflineUITestFixture else { return }" in manager_text
+        and "self.isOnline = Self.online(isOnline)" in manager_text
+        and "networkMonitor.cancel()" in manager_text
+        and "realtimeSyncManager.applyOfflineUITestFixture()" in app_text
+    )
+    if not pinned:
         violations.append(AuditViolation(
             check=_CHECK,
             file=str(sync.relative_to(root)),

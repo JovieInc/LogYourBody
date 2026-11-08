@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B34320261102000000000008 /* DatedOutcomeStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000007 /* DatedOutcomeStatsTests.swift */; };
+		B34320261102000000000006 /* DatedOutcomeStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000005 /* DatedOutcomeStatsView.swift */; };
+		B34320261102000000000004 /* DatedStatsUITestFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000003 /* DatedStatsUITestFixture.swift */; };
+		B34320261102000000000002 /* DatedOutcomeStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000001 /* DatedOutcomeStats.swift */; };
 		BEEBD28BAE7D75F643B57401 /* LogYourBodyUITests+DatedTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C39AFD0DDC54F0A277E3CB7 /* LogYourBodyUITests+DatedTimeline.swift */; };
 		294043012B1F57D5DB855A4E /* ProgressPhotoAttachPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C7B5D2A98D2FD60B4B552BB /* ProgressPhotoAttachPolicy.swift */; };
 		CDF7E6A48F140BF5E51755F0 /* DashboardViewLiquid+PhotoAttachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 503BB9A884FFFEB9129BEE3A /* DashboardViewLiquid+PhotoAttachment.swift */; };
@@ -117,6 +121,7 @@
 		542F8AAE22D916390F4ACA2D /* ChaosMonkeyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D52CE5E90CEAADACDADD54 /* ChaosMonkeyUITests.swift */; };
 		57EE5D3DE35D32DFC0A60E02 /* KeychainManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA91A028C261AEBF383794D0 /* KeychainManagerTests.swift */; };
 		5803E674F4ACA15635334F15 /* HomeV2Surface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC9C445A5BBDAD9BB34C8E55 /* HomeV2Surface.swift */; };
+		F1B245000000000000000006 /* HomeV2RecentReadings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B245000000000000000005 /* HomeV2RecentReadings.swift */; };
 		F0165C8B0000000000000001 /* HomeV2PhotoScrubber.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0165C8B0000000000000002 /* HomeV2PhotoScrubber.swift */; };
 		FF6016AA00000000000000B1 /* HomeV2TimelineHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6016AA00000000000000F1 /* HomeV2TimelineHero.swift */; };
 		FF6016BB00000000000000B1 /* HomeV2TimelinePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6016BB00000000000000F1 /* HomeV2TimelinePolicyTests.swift */; };
@@ -215,9 +220,12 @@
 		AD3145C32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */; };
 		AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */; };
 		B314A11A0000000000000002 /* WireframeAvatarFamily.swift in Sources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000001 /* WireframeAvatarFamily.swift */; };
+		B318A11A0000000000000002 /* BodyShapeCalibration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B318A11A0000000000000001 /* BodyShapeCalibration.swift */; };
 		B314A11A0000000000000004 /* WireframeAvatarStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000003 /* WireframeAvatarStage.swift */; };
 		B314A11A0000000000000006 /* WireframeAvatarFamily.json in Resources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000005 /* WireframeAvatarFamily.json */; };
 		B314A11A0000000000000008 /* WireframeAvatarFamilyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000007 /* WireframeAvatarFamilyTests.swift */; };
+		B318A11A0000000000000004 /* BodyShapeCalibrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B318A11A0000000000000003 /* BodyShapeCalibrationTests.swift */; };
+		B31820261107000000000004 /* VoiceServiceLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31820261107000000000003 /* VoiceServiceLifecycleTests.swift */; };
 		B317A11A0000000000000002 /* PersonalBodyEstimate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A0000000000000001 /* PersonalBodyEstimate.swift */; };
 		B317A11A0000000000000004 /* PersonalBodyEstimateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A0000000000000003 /* PersonalBodyEstimateStore.swift */; };
 		B317A11A0000000000000006 /* PersonalBodyPoseReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A0000000000000005 /* PersonalBodyPoseReader.swift */; };
@@ -225,6 +233,11 @@
 		B317A11A000000000000000A /* PersonalBodyEstimateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A0000000000000009 /* PersonalBodyEstimateTests.swift */; };
 		B317A11A000000000000000C /* PersonalBodyViewKind.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A000000000000000B /* PersonalBodyViewKind.swift */; };
 		B317A11A000000000000000E /* ProgressPhotoAttachSheet+PersonalBody.swift in Sources */ = {isa = PBXBuildFile; fileRef = B317A11A000000000000000D /* ProgressPhotoAttachSheet+PersonalBody.swift */; };
+		B319A11A0000000000000002 /* PhotographicAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = B319A11A0000000000000001 /* PhotographicAppearance.swift */; };
+		B319A11A000000000000000A /* PhotographicAppearanceCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = B319A11A0000000000000009 /* PhotographicAppearanceCanvas.swift */; };
+		B319A11A0000000000000008 /* PhotographicAppearanceSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B319A11A0000000000000007 /* PhotographicAppearanceSupport.swift */; };
+		B319A11A0000000000000004 /* PhotographicAppearanceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B319A11A0000000000000003 /* PhotographicAppearanceStore.swift */; };
+		B319A11A0000000000000006 /* PhotographicAppearanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B319A11A0000000000000005 /* PhotographicAppearanceTests.swift */; };
 		AD3145E22F0A030100ABCDEF /* DashboardMetricsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */; };
 		AD3145E42F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145E32F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift */; };
 		AD3145F22F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145F12F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift */; };
@@ -316,6 +329,7 @@
 		ADA4B73E2ECFAB0B00F4262A /* DashboardMetricFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B73C2ECFAB0B00F4262A /* DashboardMetricFormatting.swift */; };
 		ADA4B73F2ECFAB0B00F4262A /* TimelineCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B73D2ECFAB0B00F4262A /* TimelineCalculator.swift */; };
 		ADA4B7432ECFB3A100F4262A /* DashboardSyncComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7422ECFB3A100F4262A /* DashboardSyncComponents.swift */; };
+		F1B245000000000000000004 /* HealthSyncStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B245000000000000000003 /* HealthSyncStatusView.swift */; };
 		ADA4B7452ECFE0F300F4262A /* FullMetricChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7442ECFE0F300F4262A /* FullMetricChartView.swift */; };
 		ADA4B7472ECFE34F00F4262A /* DashboardHeaderCompact.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7462ECFE34F00F4262A /* DashboardHeaderCompact.swift */; };
 		ADA4B7492ECFE59C00F4262A /* DashboardMetricsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7482ECFE59C00F4262A /* DashboardMetricsList.swift */; };
@@ -435,6 +449,7 @@
 		ADF1F6BA2ED4C66400745F33 /* GlobalTimelineStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF1F6B92ED4C66400745F33 /* GlobalTimelineStore.swift */; };
 		ADF1F6BC2ED4C69F00745F33 /* UnitConversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF1F6BB2ED4C69F00745F33 /* UnitConversion.swift */; };
 		ADF1F6BE2ED58E3F00745F33 /* HealthSyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF1F6BD2ED58E3F00745F33 /* HealthSyncCoordinator.swift */; };
+		F1B245000000000000000002 /* HealthSyncPresentationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B245000000000000000001 /* HealthSyncPresentationStore.swift */; };
 		ADFC6A2D2E188FD5004FCE40 /* HKRawSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFC6A2C2E188FD5004FCE40 /* HKRawSample.swift */; };
 		ADFF001E313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADFF001D313D59B6006E3A22 /* BodyScoreOnboardingFlowView.swift */; };
 		B0BCDE6BE3E9D61B8CF9F3B5 /* BackgroundPhotoUploadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C616D3012947DD91D1BEF39 /* BackgroundPhotoUploadServiceTests.swift */; };
@@ -472,6 +487,7 @@
 		CD05B6509260D3FC351104B4 /* BodySpecAuthManagerPKCETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F614C8BD21F414268DB7829 /* BodySpecAuthManagerPKCETests.swift */; };
 		CEA13DB06DA2A2D160A48D1D /* LegalDocumentLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89E358ECC97E3F08357502AC /* LegalDocumentLoaderTests.swift */; };
 		D0C0DE000000000000000001 /* VoiceCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0DE000000000000000002 /* VoiceCaptureService.swift */; };
+		B31820261107000000000002 /* VoicePlaybackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31820261107000000000001 /* VoicePlaybackService.swift */; };
 		D177A26F5B272DBE23E6F782 /* SettingsSurfacePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF22A9B239CD955EC68D94E1 /* SettingsSurfacePolicyTests.swift */; };
 		D2184ADBFB25DEB92514F85D /* DSCircularProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C575F720A1D8D1DFDC4F1CEF /* DSCircularProgressTests.swift */; };
 		D47F9BD18CBEE2413DF244FC /* RevenueCatProductConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7899ADA31AC216735A9FE299 /* RevenueCatProductConfigurationTests.swift */; };
@@ -587,6 +603,7 @@
 		26820261025000000000008 /* DatedOutcomeStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26820261025000000000007 /* DatedOutcomeStoreTests.swift */; };
 		F1B241000000000000000002 /* HealthSyncState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B241000000000000000001 /* HealthSyncState.swift */; };
 		F1B241000000000000000004 /* HealthSyncStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B241000000000000000003 /* HealthSyncStateTests.swift */; };
+		F1B245000000000000000008 /* HealthSyncPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B245000000000000000007 /* HealthSyncPresentationTests.swift */; };
 		B27020261029000000000002 /* OutcomeFeasibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27020261029000000000001 /* OutcomeFeasibility.swift */; };
 		B27020261029000000000004 /* OutcomeFeasibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27020261029000000000003 /* OutcomeFeasibilityTests.swift */; };
 /* End PBXBuildFile section */
@@ -630,6 +647,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B34320261102000000000007 /* DatedOutcomeStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStatsTests.swift; sourceTree = "<group>"; };
+		B34320261102000000000005 /* DatedOutcomeStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DatedOutcomeStatsView.swift; path = Components/DatedOutcomeStatsView.swift; sourceTree = "<group>"; };
+		B34320261102000000000003 /* DatedStatsUITestFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedStatsUITestFixture.swift; sourceTree = "<group>"; };
+		B34320261102000000000001 /* DatedOutcomeStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStats.swift; sourceTree = "<group>"; };
 		7C39AFD0DDC54F0A277E3CB7 /* LogYourBodyUITests+DatedTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LogYourBodyUITests+DatedTimeline.swift"; sourceTree = "<group>"; };
 		4C7B5D2A98D2FD60B4B552BB /* ProgressPhotoAttachPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProgressPhotoAttachPolicy.swift"; sourceTree = "<group>"; };
 		503BB9A884FFFEB9129BEE3A /* DashboardViewLiquid+PhotoAttachment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoAttachment.swift"; sourceTree = "<group>"; };
@@ -859,14 +880,22 @@
 		AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineInsights.swift"; sourceTree = "<group>"; };
 		AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AvatarBodyRenderer.swift; path = Components/AvatarBodyRenderer.swift; sourceTree = "<group>"; };
 		B314A11A0000000000000001 /* WireframeAvatarFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WireframeAvatarFamily.swift; path = Components/WireframeAvatarFamily.swift; sourceTree = "<group>"; };
+		B318A11A0000000000000001 /* BodyShapeCalibration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BodyShapeCalibration.swift; path = Components/BodyShapeCalibration.swift; sourceTree = "<group>"; };
 		B314A11A0000000000000003 /* WireframeAvatarStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WireframeAvatarStage.swift; path = Components/WireframeAvatarStage.swift; sourceTree = "<group>"; };
 		B314A11A0000000000000007 /* WireframeAvatarFamilyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WireframeAvatarFamilyTests.swift; sourceTree = "<group>"; };
+		B318A11A0000000000000003 /* BodyShapeCalibrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyShapeCalibrationTests.swift; sourceTree = "<group>"; };
+		B31820261107000000000003 /* VoiceServiceLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceServiceLifecycleTests.swift; sourceTree = "<group>"; };
 		B317A11A0000000000000001 /* PersonalBodyEstimate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PersonalBodyEstimate.swift; path = Components/PersonalBodyEstimate.swift; sourceTree = "<group>"; };
 		B317A11A0000000000000003 /* PersonalBodyEstimateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PersonalBodyEstimateStore.swift; path = Components/PersonalBodyEstimateStore.swift; sourceTree = "<group>"; };
 		B317A11A0000000000000005 /* PersonalBodyPoseReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PersonalBodyPoseReader.swift; path = Components/PersonalBodyPoseReader.swift; sourceTree = "<group>"; };
 		B317A11A0000000000000007 /* PersonalBodyStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PersonalBodyStage.swift; path = Components/PersonalBodyStage.swift; sourceTree = "<group>"; };
 		B317A11A000000000000000B /* PersonalBodyViewKind.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PersonalBodyViewKind.swift; path = Components/PersonalBodyViewKind.swift; sourceTree = "<group>"; };
 		B317A11A0000000000000009 /* PersonalBodyEstimateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalBodyEstimateTests.swift; sourceTree = "<group>"; };
+		B319A11A0000000000000001 /* PhotographicAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhotographicAppearance.swift; path = Components/PhotographicAppearance.swift; sourceTree = "<group>"; };
+		B319A11A0000000000000009 /* PhotographicAppearanceCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhotographicAppearanceCanvas.swift; path = Components/PhotographicAppearanceCanvas.swift; sourceTree = "<group>"; };
+		B319A11A0000000000000007 /* PhotographicAppearanceSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhotographicAppearanceSupport.swift; path = Components/PhotographicAppearanceSupport.swift; sourceTree = "<group>"; };
+		B319A11A0000000000000003 /* PhotographicAppearanceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PhotographicAppearanceStore.swift; path = Components/PhotographicAppearanceStore.swift; sourceTree = "<group>"; };
+		B319A11A0000000000000005 /* PhotographicAppearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotographicAppearanceTests.swift; sourceTree = "<group>"; };
 		AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricsSection.swift; sourceTree = "<group>"; };
 		AD3145E32F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+Glp1MetricCard.swift"; sourceTree = "<group>"; };
 		AD3145F12F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+FullScreenMetricData.swift"; sourceTree = "<group>"; };
@@ -1015,6 +1044,7 @@
 		ADA4B73C2ECFAB0B00F4262A /* DashboardMetricFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricFormatting.swift; sourceTree = "<group>"; };
 		ADA4B73D2ECFAB0B00F4262A /* TimelineCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineCalculator.swift; sourceTree = "<group>"; };
 		ADA4B7422ECFB3A100F4262A /* DashboardSyncComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardSyncComponents.swift; path = Components/DashboardSyncComponents.swift; sourceTree = "<group>"; };
+		F1B245000000000000000003 /* HealthSyncStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HealthSyncStatusView.swift; path = Components/HealthSyncStatusView.swift; sourceTree = "<group>"; };
 		ADA4B7442ECFE0F300F4262A /* FullMetricChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FullMetricChartView.swift; path = Components/FullMetricChartView.swift; sourceTree = "<group>"; };
 		ADA4B7462ECFE34F00F4262A /* DashboardHeaderCompact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardHeaderCompact.swift; path = Components/DashboardHeaderCompact.swift; sourceTree = "<group>"; };
 		ADA4B7482ECFE59C00F4262A /* DashboardMetricsList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardMetricsList.swift; path = Components/DashboardMetricsList.swift; sourceTree = "<group>"; };
@@ -1102,6 +1132,7 @@
 		ADF1F6B92ED4C66400745F33 /* GlobalTimelineStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalTimelineStore.swift; sourceTree = "<group>"; };
 		ADF1F6BB2ED4C69F00745F33 /* UnitConversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitConversion.swift; sourceTree = "<group>"; };
 		ADF1F6BD2ED58E3F00745F33 /* HealthSyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSyncCoordinator.swift; sourceTree = "<group>"; };
+		F1B245000000000000000001 /* HealthSyncPresentationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HealthSyncPresentationStore.swift; path = HealthSyncPresentationStore.swift; sourceTree = "<group>"; };
 		ADF287A72E14AFA900198D6F /* LogYourBody.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LogYourBody.entitlements; sourceTree = "<group>"; };
 		ADF287A82E14AFB000198D6F /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		ADF287AC2E1507AF00198D6F /* setup-xcode-config.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "setup-xcode-config.sh"; sourceTree = "<group>"; };
@@ -1159,6 +1190,7 @@
 		D0211D1493A398942561196F /* DashboardDataVizPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardDataVizPolicyTests.swift; sourceTree = "<group>"; };
 		D03041E8A638B1A252407398 /* UserGreeting.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserGreeting.swift; path = DesignSystem/Molecules/UserGreeting.swift; sourceTree = "<group>"; };
 		D0C0DE000000000000000002 /* VoiceCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCaptureService.swift; sourceTree = "<group>"; };
+		B31820261107000000000001 /* VoicePlaybackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicePlaybackService.swift; sourceTree = "<group>"; };
 		D0D288685A7D97CBCF127A7B /* DSMetricValue.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSMetricValue.swift; path = DesignSystem/Atoms/DSMetricValue.swift; sourceTree = "<group>"; };
 		D18AA7A0EC7327CC6EB9725D /* DSProgressBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSProgressBar.swift; path = DesignSystem/Atoms/DSProgressBar.swift; sourceTree = "<group>"; };
 		D2FAA8408CBA2168F58B80D9 /* HomeV2PhotoJourneyPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2PhotoJourneyPolicyTests.swift; sourceTree = "<group>"; };
@@ -1230,6 +1262,7 @@
 		FB947FE422689993FD02B4F6 /* AuthHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthHeader.swift; path = DesignSystem/Molecules/AuthHeader.swift; sourceTree = "<group>"; };
 		FBDA30F8A24DC3754F3CD216 /* AuthProfileBootstrapPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthProfileBootstrapPolicyTests.swift; sourceTree = "<group>"; };
 		FC9C445A5BBDAD9BB34C8E55 /* HomeV2Surface.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2Surface.swift; sourceTree = "<group>"; };
+		F1B245000000000000000005 /* HomeV2RecentReadings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HomeV2RecentReadings.swift; path = HomeV2RecentReadings.swift; sourceTree = "<group>"; };
 		F0165C8B0000000000000002 /* HomeV2PhotoScrubber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2PhotoScrubber.swift; sourceTree = "<group>"; };
 		FF6016AA00000000000000F1 /* HomeV2TimelineHero.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2TimelineHero.swift; sourceTree = "<group>"; };
 		FD8E482BE1E84E0DEAF9819D /* LegalSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LegalSection.swift; path = DesignSystem/Organisms/LegalSection.swift; sourceTree = "<group>"; };
@@ -1293,6 +1326,7 @@
 		2682026102500000000000A /* LogYourBodyV6.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV6.xcdatamodel; sourceTree = "<group>"; };
 		F1B241000000000000000001 /* HealthSyncState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSyncState.swift; sourceTree = "<group>"; };
 		F1B241000000000000000003 /* HealthSyncStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSyncStateTests.swift; sourceTree = "<group>"; };
+		F1B245000000000000000007 /* HealthSyncPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HealthSyncPresentationTests.swift; path = HealthSyncPresentationTests.swift; sourceTree = "<group>"; };
 		B27020261029000000000001 /* OutcomeFeasibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutcomeFeasibility.swift; sourceTree = "<group>"; };
 		B27020261029000000000003 /* OutcomeFeasibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutcomeFeasibilityTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -1384,19 +1418,26 @@
 				A16800000000000000000002 /* ContextualMetricShare.swift */,
 				AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */,
 				B314A11A0000000000000001 /* WireframeAvatarFamily.swift */,
+				B318A11A0000000000000001 /* BodyShapeCalibration.swift */,
 				B314A11A0000000000000003 /* WireframeAvatarStage.swift */,
 				B317A11A0000000000000001 /* PersonalBodyEstimate.swift */,
 				B317A11A0000000000000003 /* PersonalBodyEstimateStore.swift */,
 				B317A11A0000000000000005 /* PersonalBodyPoseReader.swift */,
 				B317A11A0000000000000007 /* PersonalBodyStage.swift */,
 				B317A11A000000000000000B /* PersonalBodyViewKind.swift */,
+				B319A11A0000000000000001 /* PhotographicAppearance.swift */,
+				B319A11A0000000000000009 /* PhotographicAppearanceCanvas.swift */,
+				B319A11A0000000000000007 /* PhotographicAppearanceSupport.swift */,
+				B319A11A0000000000000003 /* PhotographicAppearanceStore.swift */,
 				ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */,
 				ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */,
 				ADA4B74E2ED0365100F4262A /* DashboardBodyScoreHeroCard.swift */,
+				B34320261102000000000005 /* DatedOutcomeStatsView.swift */,
 				ADA4B7482ECFE59C00F4262A /* DashboardMetricsList.swift */,
 				ADA4B7462ECFE34F00F4262A /* DashboardHeaderCompact.swift */,
 				ADA4B7442ECFE0F300F4262A /* FullMetricChartView.swift */,
 				ADA4B7422ECFB3A100F4262A /* DashboardSyncComponents.swift */,
+				F1B245000000000000000003 /* HealthSyncStatusView.swift */,
 				AD0B7BFA2EC6930D008B29E7 /* PeriodSelector.swift */,
 				AD050C442EBFFEF60082A313 /* MetricChartView.swift */,
 				ADE6D38B2E24A948001F82A8 /* AnimatedTabView.swift */,
@@ -1453,6 +1494,7 @@
 				E442F03731E41EA713BCAE3E /* HomeV2Policy.swift */,
 				AB22C3A99D0B42B73AAAD00E /* HomeV2Tokens.swift */,
 				FC9C445A5BBDAD9BB34C8E55 /* HomeV2Surface.swift */,
+				F1B245000000000000000005 /* HomeV2RecentReadings.swift */,
 				B313F11E0000000000000A31 /* SubjectPlateView.swift */,
 				F0165C8B0000000000000002 /* HomeV2PhotoScrubber.swift */,
 				FF6016AA00000000000000F1 /* HomeV2TimelineHero.swift */,
@@ -1544,6 +1586,7 @@
 				B31520261101000000000009 /* BodyVisualizationSnapshotFixtures.swift */,
 				B18320261101000000000003 /* LaunchJourneyTests.swift */,
 				B34220261102000000000005 /* DatedTimelineTests.swift */,
+				B34320261102000000000007 /* DatedOutcomeStatsTests.swift */,
 				B27020261029000000000003 /* OutcomeFeasibilityTests.swift */,
 				B26920261025000000000005 /* lyb-launch-contract.json */,
 				896E3815B745A313FCD93C78 /* DesignSystem */,
@@ -1593,6 +1636,7 @@
 				18FA96B2F0B80609BBBC0DE1 /* HealthKitFullSyncCompletionPolicyTests.swift */,
 				DDACB9E8EEAB1EBF446F0F02 /* HealthSyncCoordinatorPipelineTests.swift */,
 				F1B241000000000000000003 /* HealthSyncStateTests.swift */,
+				F1B245000000000000000007 /* HealthSyncPresentationTests.swift */,
 				1C662CF613D4755CA2B93A43 /* HealthSyncPipelineTests.swift */,
 				A23800052F23800100ABCDE3 /* HealthAnchorStoreTests.swift */,
 				A4A1C6C2438CB1EDCEC43C67 /* HealthSyncTestDoubles.swift */,
@@ -1760,11 +1804,14 @@
 				B18320261101000000000001 /* LaunchJourney.swift */,
 				B34220261102000000000003 /* DatedTimelineUI.swift */,
 				B34220261102000000000001 /* DatedTimeline.swift */,
+				B34320261102000000000003 /* DatedStatsUITestFixture.swift */,
+				B34320261102000000000001 /* DatedOutcomeStats.swift */,
 				B18320261101000000000005 /* LaunchJourneyUI.swift */,
 				B27020261029000000000001 /* OutcomeFeasibility.swift */,
 				C7A700012F20000000C0A701 /* ChatService.swift */,
 				A26100000000000000000002 /* QuickPillRanker.swift */,
 				D0C0DE000000000000000002 /* VoiceCaptureService.swift */,
+				B31820261107000000000001 /* VoicePlaybackService.swift */,
 				E4172D019C9F4A30A881C001 /* TrainingService.swift */,
 				E17620261031000100000001 /* TrainingSelectionContract.swift */,
 				E11020261025000100000001 /* TrainingProgress.swift */,
@@ -1775,6 +1822,7 @@
 				F00720261007000100000003 /* TrainingSessionDraft.swift */,
 				AD8F12F42ED7C987003C4559 /* BugReportManager.swift */,
 				ADF1F6BD2ED58E3F00745F33 /* HealthSyncCoordinator.swift */,
+				F1B245000000000000000001 /* HealthSyncPresentationStore.swift */,
 				ADF1F6B52ED4C61400745F33 /* GlobalTimelineService.swift */,
 				ADA6003B2ED27D0000088042 /* PreAuthOnboardingStore.swift */,
 				ADA600332ED2602F00088042 /* BodySpecAPI.swift */,
@@ -2068,7 +2116,10 @@
 				3CBF4E377107434EA53A2F1B /* PaidWeightLoggerMVPPolicyTests.swift */,
 				FE07A7A700000000000000F7 /* PhotoTimelineHUDPolicyTests.swift */,
 				B314A11A0000000000000007 /* WireframeAvatarFamilyTests.swift */,
+				B318A11A0000000000000003 /* BodyShapeCalibrationTests.swift */,
+				B31820261107000000000003 /* VoiceServiceLifecycleTests.swift */,
 				B317A11A0000000000000009 /* PersonalBodyEstimateTests.swift */,
+				B319A11A0000000000000005 /* PhotographicAppearanceTests.swift */,
 				FE08A8A800000000000000F8 /* BodyScoreShareCardTests.swift */,
 				B04020261025000000000004 /* BodyScoreShareExportTests.swift */,
 				FE09A9A900000000000000F9 /* ProgressPhotoImagePipelineTests.swift */,
@@ -2542,6 +2593,7 @@
 				B3152026110100000000000A /* BodyVisualizationSnapshotFixtures.swift in Sources */,
 				B18320261101000000000004 /* LaunchJourneyTests.swift in Sources */,
 				B34220261102000000000006 /* DatedTimelineTests.swift in Sources */,
+				B34320261102000000000008 /* DatedOutcomeStatsTests.swift in Sources */,
 				B27020261029000000000004 /* OutcomeFeasibilityTests.swift in Sources */,
 				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
 				E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */,
@@ -2561,7 +2613,10 @@
 				5DB1A0B114B3417EAE9E143B /* PaidWeightLoggerMVPPolicyTests.swift in Sources */,
 				FE07A7A700000000000000B7 /* PhotoTimelineHUDPolicyTests.swift in Sources */,
 				B314A11A0000000000000008 /* WireframeAvatarFamilyTests.swift in Sources */,
+				B318A11A0000000000000004 /* BodyShapeCalibrationTests.swift in Sources */,
+				B31820261107000000000004 /* VoiceServiceLifecycleTests.swift in Sources */,
 				B317A11A000000000000000A /* PersonalBodyEstimateTests.swift in Sources */,
+				B319A11A0000000000000006 /* PhotographicAppearanceTests.swift in Sources */,
 				FE08A8A800000000000000B8 /* BodyScoreShareCardTests.swift in Sources */,
 				B04020261025000000000003 /* BodyScoreShareExportTests.swift in Sources */,
 				FE09A9A900000000000000B9 /* ProgressPhotoImagePipelineTests.swift in Sources */,
@@ -2616,6 +2671,7 @@
 				6200622347BFBBB809890E19 /* HealthKitFullSyncCompletionPolicyTests.swift in Sources */,
 				9BCEB21BE7B69676BCA5C211 /* HealthSyncCoordinatorPipelineTests.swift in Sources */,
 				F1B241000000000000000004 /* HealthSyncStateTests.swift in Sources */,
+				F1B245000000000000000008 /* HealthSyncPresentationTests.swift in Sources */,
 				8FB91216C622624E0F7815CC /* HealthSyncPipelineTests.swift in Sources */,
 				A23800062F23800100ABCDE3 /* HealthAnchorStoreTests.swift in Sources */,
 				C2465BE618C74154F47B1E1F /* HealthSyncTestDoubles.swift in Sources */,
@@ -2753,6 +2809,9 @@
 				B18320261101000000000002 /* LaunchJourney.swift in Sources */,
 				B34220261102000000000004 /* DatedTimelineUI.swift in Sources */,
 				B34220261102000000000002 /* DatedTimeline.swift in Sources */,
+				B34320261102000000000006 /* DatedOutcomeStatsView.swift in Sources */,
+				B34320261102000000000004 /* DatedStatsUITestFixture.swift in Sources */,
+				B34320261102000000000002 /* DatedOutcomeStats.swift in Sources */,
 				B18320261101000000000006 /* LaunchJourneyUI.swift in Sources */,
 				B27020261029000000000002 /* OutcomeFeasibility.swift in Sources */,
 				AD8F12EA2ED6AA76003C4559 /* AnalyticsService.swift in Sources */,
@@ -2778,12 +2837,17 @@
 				AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */,
 				AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */,
 				B314A11A0000000000000002 /* WireframeAvatarFamily.swift in Sources */,
+				B318A11A0000000000000002 /* BodyShapeCalibration.swift in Sources */,
 				B314A11A0000000000000004 /* WireframeAvatarStage.swift in Sources */,
 				B317A11A0000000000000002 /* PersonalBodyEstimate.swift in Sources */,
 				B317A11A0000000000000004 /* PersonalBodyEstimateStore.swift in Sources */,
 				B317A11A0000000000000006 /* PersonalBodyPoseReader.swift in Sources */,
 				B317A11A0000000000000008 /* PersonalBodyStage.swift in Sources */,
 				B317A11A000000000000000C /* PersonalBodyViewKind.swift in Sources */,
+				B319A11A0000000000000002 /* PhotographicAppearance.swift in Sources */,
+				B319A11A000000000000000A /* PhotographicAppearanceCanvas.swift in Sources */,
+				B319A11A0000000000000008 /* PhotographicAppearanceSupport.swift in Sources */,
+				B319A11A0000000000000004 /* PhotographicAppearanceStore.swift in Sources */,
 				AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */,
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
@@ -2793,6 +2857,7 @@
 				C7A700022F20000000C0A702 /* ChatService.swift in Sources */,
 				A26100000000000000000001 /* QuickPillRanker.swift in Sources */,
 				D0C0DE000000000000000001 /* VoiceCaptureService.swift in Sources */,
+				B31820261107000000000002 /* VoicePlaybackService.swift in Sources */,
 				E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */,
 				E17620261031000100000002 /* TrainingSelectionContract.swift in Sources */,
 				E11020261025000100000002 /* TrainingProgress.swift in Sources */,
@@ -2852,6 +2917,7 @@
 				ADDC47AE2E2D89F3003C97E7 /* WeightEntry.swift in Sources */,
 				ADDC47B62E2D89F3003C97E7 /* ImageProcessingService.swift in Sources */,
 				ADA4B7432ECFB3A100F4262A /* DashboardSyncComponents.swift in Sources */,
+				F1B245000000000000000004 /* HealthSyncStatusView.swift in Sources */,
 				ADDC47B72E2D89F3003C97E7 /* VisionOrientationService.swift in Sources */,
 				ADDC47B82E2D89F3003C97E7 /* AppVersionManager.swift in Sources */,
 				ADDC47B92E2D89F3003C97E7 /* BulkImportManager.swift in Sources */,
@@ -2887,6 +2953,7 @@
 				ADA600482ED375EE00088042 /* Glp1Medication.swift in Sources */,
 				ADDC47DE2E2D89F3003C97E7 /* IntegrationsView.swift in Sources */,
 				ADF1F6BE2ED58E3F00745F33 /* HealthSyncCoordinator.swift in Sources */,
+				F1B245000000000000000002 /* HealthSyncPresentationStore.swift in Sources */,
 				F1B241000000000000000002 /* HealthSyncState.swift in Sources */,
 				ADDC47E02E2D89F3003C97E7 /* BulkPhotoImportView.swift in Sources */,
 				ADDC47E12E2D89F3003C97E7 /* DeleteAccountView.swift in Sources */,
@@ -3067,6 +3134,7 @@
 				8C7414EAC6711493183196F3 /* HomeV2Policy.swift in Sources */,
 				C150A3B01D604864A2ECEDF6 /* HomeV2Tokens.swift in Sources */,
 				5803E674F4ACA15635334F15 /* HomeV2Surface.swift in Sources */,
+				F1B245000000000000000006 /* HomeV2RecentReadings.swift in Sources */,
 				F0165C8B0000000000000001 /* HomeV2PhotoScrubber.swift in Sources */,
 				FF6016AA00000000000000B1 /* HomeV2TimelineHero.swift in Sources */,
 				F38F981DE886318E350B7CF8 /* DashboardViewLiquid+HomeV2.swift in Sources */,

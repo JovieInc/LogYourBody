@@ -19,6 +19,24 @@ extension DashboardViewLiquid {
         HomeV2Copy.displayUnit(currentMeasurementSystem)
     }
 
+    var homeV2RecentReadingsSheet: some View {
+        HomeV2RecentReadings(
+            store: healthSyncPresentation,
+            unit: homeV2DisplayUnit,
+            correctionsEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
+                flagKey: MetricCorrectionService.featureGate
+            ),
+            ownsSession: authManager.ownsAccountSession,
+            onChanged: {
+                if let userId = authManager.currentUser?.id {
+                    BodyScoreCache.shared.invalidate(for: userId)
+                    BodyScoreRecalculationService.shared.scheduleRecalculation()
+                }
+                Task { await refreshHomeV2AfterWrite(selecting: nil) }
+            }
+        )
+    }
+
     var homeV2InsightMetrics: [BodyMetrics] {
         bodyMetrics.filter {
             !$0.isExcluded && ($0.weight == nil || HomeV2WeightQuality.isWithinSupportedLoggingRange($0.weight))
@@ -67,6 +85,14 @@ extension DashboardViewLiquid {
             dateText: { formatHUDDate($0.date) },
             loggedSentence: homeV2Logged.map { $0.confirmationText },
             systemState: homeV2SystemState,
+            healthSyncStatus: HealthSyncPresentationPolicy.isEnabled() ? healthSyncPresentation.syncStatus : nil,
+            healthWeightReceipt: healthSyncPresentation.receipt,
+            onRecentReadings: {
+                if let receipt = healthSyncPresentation.receipt {
+                    healthSyncPresentation.dismissReceipt(id: receipt.id)
+                }
+                showsRecentHealthReadings = true
+            },
             onOpenPhoto: { isHomeV2ViewerPresented = true },
             onViewProgress: { openHomeV2Progress() },
             onViewMetric: { openHomeV2Progress(metric: $0) },

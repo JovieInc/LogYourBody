@@ -1892,11 +1892,11 @@ final class LogYourBodyUITests: XCTestCase {
         // Preserve the loaded history and selected snapshot across all three
         // surfaces; a relaunch briefly exposes only the newest measurement.
         try assertAndCaptureTimelineAnalytics(in: app)
+        XCTAssertFalse(app.descendants(matching: .any)["dated_stats_target"].exists,
+                       "The dated-outcome gate is off for this existing stats flow")
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_settings"].exists)
         openSettingsFromPhotoTimelineMenu(in: app)
         app.terminate()
-        try testDatedTimelineManualBaselineAndInterruptedPhotoReturn()
-        try testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation()
     }
 
     func testLaunchQualityGateCapturesBodyScoreShareSheet() throws {

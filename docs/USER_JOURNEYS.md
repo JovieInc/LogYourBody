@@ -38,6 +38,17 @@ Status as of 2026-08-02. **All 113 `LogYourBodyTests` Swift files are registered
 | 12  | GLP-1 dose logging                  | Doses log, format, and surface weekly check-ins correctly                                                                                   | Glp1CardAndCatalogTests; Glp1DoseCoreDataTests; Glp1DoseHistoryFormatterTests; Glp1WeeklyCheckInPolicyTests; PhaseInsightPolicyTests                                                                                                                                                                                                                             | ✅     |
 | 13  | Body composition math               | BF%/FFMI numbers shown to the user are correct                                                                                              | BodyCompositionMathGoldenTests; BodyScoreShareCardTests                                                                                                                                                                                                                                                                                                          | ✅     |
 
+### Body-shape calibration (LYB-318)
+
+The illustrative wireframe stays available. A body-fat percentage does not select
+an avatar, and the share badge does not state a body-fat bucket. Higher tiers
+stay closed until the predeclared consented-sample gates pass.
+`BodyShapeCalibrationTests`, `PhotoTimelineHUDPolicyTests`, and
+`packages/shared-lib/src/body-shape-calibration.test.ts` assert that contract.
+`testEmptyPhotoStageOpensAttachSheetForThatDay` remains the LYB-64 empty-stage
+path. Source tests do not close simulator, device, or distributed-build
+certification.
+
 UI smoke (launch, fixtures for signed-out/paywall/MVP surfaces): `LogYourBodyUITests` — ✅ selected cases run in the Launch Quality Gate.
 
 ## Web (secondary — marketing/support/account until expansion trigger per [product-development-roadmap.md](product-development-roadmap.md))
