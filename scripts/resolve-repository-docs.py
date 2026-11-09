@@ -55,6 +55,40 @@ def merge_sections(root, name):
     for source in (base, ours, theirs):
         if re.search(r"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", source):
             raise ValueError("section merging refuses conflict markers in a parent")
+    # Independent paragraph insertions retain their common-base positions.
+    original = base.splitlines(keepends=True)
+    insertions = []
+    for source in (ours, theirs):
+        incoming = source.splitlines(keepends=True)
+        edits = {}
+        for tag, start, _, first, last in difflib.SequenceMatcher(
+            None, original, incoming, autojunk=False,
+        ).get_opcodes():
+            if tag == "equal":
+                continue
+            block = "".join(incoming[first:last])
+            if block.startswith("\n") and start < len(original) and original[start] == "\n":
+                start += 1
+                block = block[1:] + "\n"
+            prefix = "".join(original[:start])
+            if (tag != "insert" or not block.endswith("\n\n")
+                    or (start and original[start - 1].strip())
+                    or re.search(r"(?m)^(?:#|`{3,}|~{3,})", block)
+                    or len(re.findall(r"(?m)^(?:`{3,}|~{3,})", prefix)) % 2):
+                break
+            edits[start] = block
+        else:
+            insertions.append(edits)
+            continue
+        break
+    if len(insertions) == 2 and any(insertions):
+        left, right = insertions
+        return "".join(
+            left.get(index, "")
+            + (right.get(index, "") if right.get(index) != left.get(index) else "")
+            + (original[index] if index < len(original) else "")
+            for index in range(len(original) + 1)
+        )
     headings = lambda source: [
         " ".join(title.split()).casefold()
         for title in re.findall(r"(?m)^#{1,6} +(.+?) *#*\s*$", source)
@@ -417,7 +451,7 @@ def main():
     mode.add_argument("--staged", action="store_true", help="refresh from the Git index before commit")
     mode.add_argument("--refresh-lockfile", action="store_true", help="repair and verify the pnpm lockfile before refreshing docs")
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
-    mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining the branch plus new incoming sections; review and stage explicitly")
+    mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining additive paragraphs or new incoming sections; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
     mode.add_argument("--union-project", action="store_true", help="union additive Xcode file membership from both parents and stage the project")
     mode.add_argument("--merge-ledger", action="store_true", help="refresh staged docs, then preserve and classify both merge parents' correction receipts")

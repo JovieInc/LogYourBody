@@ -2,6 +2,17 @@
 // Rule summaries use the classifier's rule id; receipt intake also matches
 // normalized text and level. Neither path emits checks or replaces fingerprint counts.
 
+import {
+  classifyCorrection,
+  type CorrectionClassification,
+  type CorrectionLevel,
+} from '../scripts/correction-classification.mjs';
+
+export type {
+  CorrectionClassification,
+  CorrectionLevel,
+} from '../scripts/correction-classification.mjs';
+
 export type ClassifiedCorrection = {
   ruleId: string;
 };
@@ -9,6 +20,21 @@ export type ClassifiedCorrection = {
 export type CorrectionRecord<T extends ClassifiedCorrection = ClassifiedCorrection> = T & {
   recurrence: number;
 };
+
+/** Save the first feasible pyramid level, replacing any stale saved label. */
+export function classifyCorrectionRecords<
+  T extends ClassifiedCorrection & { classification: CorrectionClassification },
+>(
+  ledger: readonly CorrectionRecord<T>[],
+): (Omit<CorrectionRecord<T>, 'level'> & { level: CorrectionLevel })[] {
+  return ledger.map((record) => ({
+    ...record,
+    level: classifyCorrection(
+      { fingerprint: record.ruleId, classification: record.classification },
+      true,
+    ).level,
+  }));
+}
 
 function requiredRuleId(ruleId: string): string {
   if (typeof ruleId !== 'string' || ruleId.trim() === '') {

@@ -18,6 +18,24 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "fix-red-e3b0c44298",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1771",
+    "correction": "PR #1771 / LYB-362 repair, fix-red-e3b0c44298 occurrence 87 in 14 days: merge origin/main without rebasing and retain classification and recurrence behavior when independent additions collide in the ledger documentation and test imports. Vercel reports Deployment was blocked; the exact PR head has no Actions run.",
+    "mechanization": "Retain this recurring fingerprint's existing staged-marker readiness guard and extend the existing documentation merge resolver to propose independent paragraph insertions from both immutable parents at their common-base positions. The new real-Git positive case fails against the old resolver; both blank-line alignments pass with the extension, while fragments, edits, deletions and unsafe parent sources still fail without writing or staging. The existing required Detect Changes pre-commit suite imports these fixtures. Use --merge-sections for the actual ledger documentation conflict and preserve both parent test suites. The harness owns pushing and PR operations and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-5df69c1e5f",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42401937834/job/128491764859",
     "correction": "PR #1699 / LYB-312, fix-red-5df69c1e5f occurrence 30 in 14 days: merge origin/main without rebasing, preserve the weekly photo check-in, and repair CI Summary and Launch Quality. The old combined timeline XCTest called two complete dated journeys and failed terminating the app at 199 seconds. The automatic source merge also dispatched both parent network-path handlers for every callback.",
