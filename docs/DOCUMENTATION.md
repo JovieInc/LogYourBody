@@ -103,6 +103,9 @@ repair and restore the original artifacts; retry uses the reviewed inputs.
 Tracked dependency edits during rendering also refuse repair before artifact
 writes or staging. The edits remain available for review; stage them and retry
 the same command.
+New untracked or ignored dependency inputs created during verification or rendering
+also refuse artifact staging. Review and stage those inputs before retrying;
+installed dependencies and Next.js build output remain excluded.
 Frozen verification also refuses lockfile changes before regenerating or staging
 the source map. Only a confirmed outdated lockfile permits refresh mode to write
 new resolutions; retrying after a refusal uses the original reviewed artifacts.

@@ -7275,5 +7275,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-concurrent-unindexed-inputs",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1767",
+    "correction": "PR #1767, fix-red-1423773703 occurrence 60 in 14 days: merge origin/main without rebasing and preserve the Statsig Node Core 0.24.2 bump. Detect Changes and parity reject the stale generated source map, causing CI Summary to fail. Extend and use the existing dependency-repair machine in this PR. Vercel reports Deployment was blocked without a build failure in the GitHub deployment status.",
+    "mechanization": "Extend the existing dependency repair helper to refuse new untracked or ignored resolution inputs at the final artifact-writing boundary. Thirty-two real-Git negative controls reproduce acceptance by the previous helper across refresh/verify modes, verification/rendering windows, and new hooks, workspace npmrc files, patches and manifests. Each verifies artifact and index preservation, retention of the concurrent input, successful reviewed retry and idempotence. The unchanged required Detect Changes pre-commit-lint entrypoint imports this suite. Use the extended --verify-lockfile mode to retain the frozen bot resolutions and regenerate source parity. Preserve every CI and deployment gate. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper owns dependency verification and artifact staging. Refusing newly created local resolution inputs before writing prevents unreviewed inputs from authorizing generated artifacts by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "New untracked or ignored resolution inputs also invalidate dependency verification."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

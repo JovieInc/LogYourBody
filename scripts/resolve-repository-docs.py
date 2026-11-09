@@ -176,7 +176,10 @@ def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfil
         raise ValueError("source index changed during projection generation; review staged inputs and retry")
     if expected_lockfile is not None and (root / "pnpm-lock.yaml").read_bytes() != expected_lockfile:
         raise ValueError("lockfile changed during projection generation; review dependency inputs and retry")
-    if dependency_inputs and git_bytes(root, "diff", "--name-only", "--", *[name for name in dependency_inputs if name != "pnpm-lock.yaml"]):
+    # New untracked or ignored resolution inputs also invalidate dependency verification.
+    if dependency_inputs and (git_bytes(root, "diff", "--name-only", "--", *[name for name in dependency_inputs if name != "pnpm-lock.yaml"])
+            or git_bytes(root, "ls-files", "--others", "-z", "--", *dependency_inputs,
+                         ":(glob,exclude)**/node_modules/**", ":(glob,exclude)**/.next/**")):
         raise ValueError("dependency inputs changed during projection generation; stage reviewed inputs and retry")
     output.parent.mkdir(parents=True, exist_ok=True)
     original = output.read_bytes() if output.exists() else None
