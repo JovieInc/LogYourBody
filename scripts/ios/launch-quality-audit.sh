@@ -29,13 +29,10 @@ XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
 # missed every Swift package cache and was still compiling test targets at 600s.
 # Allow 15m for compilation; keep test timeouts, retries and the outer step cap.
 BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"
-# Every bounded command below also honors this audit-level deadline. The
-# workflow step kills the whole audit at 52 minutes with zero diagnostics (Mac
-# runs upload no artifacts and job logs are admin-gated), so the audit must
-# always reach its own timeouts first and emit phase evidence as it goes.
-# 2760s (46m) stays above the slowest passing hosted run (38m) and inside the
-# 52-minute step cap. This caps waste, it never extends a bound.
-AUDIT_DEADLINE_SECONDS="${AUDIT_DEADLINE_SECONDS:-2760}"
+# Use the 52-minute step budget while reserving 180s for result finalization.
+# Run 42695073821's 1168s prefix left only 1590s for passing UI cases at 2760s.
+# Per-test limits, the 1800s UI cap and the workflow step cap still apply.
+AUDIT_DEADLINE_SECONDS="${AUDIT_DEADLINE_SECONDS:-2940}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
@@ -65,7 +62,10 @@ AUDIT_STARTED_AT="$(date +%s)"
 # Phase and budget helpers must exist before the first phase_start call below.
 remaining_budget_seconds() {
   local remaining=$(( AUDIT_DEADLINE_SECONDS - $(date +%s) + AUDIT_STARTED_AT ))
-  (( remaining < 60 )) && remaining=60
+  if (( remaining <= 0 )); then
+    echo "launch-quality audit deadline exhausted" >&2
+    return 124
+  fi
   printf '%s\n' "$remaining"
 }
 
@@ -74,7 +74,7 @@ remaining_budget_seconds() {
 # silent runner-side step kill.
 bounded_seconds() {
   local bound="$1" remaining
-  remaining="$(remaining_budget_seconds)"
+  remaining="$(remaining_budget_seconds)" || return "$?"
   (( bound < remaining )) && printf '%s\n' "$bound" || printf '%s\n' "$remaining"
 }
 
@@ -277,6 +277,7 @@ run_xcodebuild_test() {
     fi
 
     echo "Running $label (attempt $attempt)" | tee -a "$log_file"
+    effective_timeout="$(bounded_seconds "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS")" || return "$?"
     start_launch_probe "$label"
     xcodebuild_command=(
       xcodebuild
@@ -288,7 +289,6 @@ run_xcodebuild_test() {
     )
 
     set +e
-    effective_timeout="$(bounded_seconds "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS")"
     XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS="${XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS:-180}" \
     run_with_timeout \
       "$effective_timeout" \
@@ -346,8 +346,8 @@ build_for_testing_once() {
     build-for-testing
   )
 
+  effective_timeout="$(bounded_seconds "$BUILD_FOR_TESTING_TIMEOUT_SECONDS")" || return "$?"
   set +e
-  effective_timeout="$(bounded_seconds "$BUILD_FOR_TESTING_TIMEOUT_SECONDS")"
   run_with_timeout \
     "$effective_timeout" \
     "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"

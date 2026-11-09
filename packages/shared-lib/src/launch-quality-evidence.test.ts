@@ -330,3 +330,13 @@ it('propagates evidence assertion failures and nonzero exits despite passing sui
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+it('runs the audit deadline regressions before native execution', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const output = execFileSync('python3', ['scripts/ios/test_xcodebuild_command_timeout.py'], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  expect(output).toContain('xcodebuild deadline behavior tests executed: 13');
+}, 30_000);

@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "fix-red-f8dba15025",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
+    "correction": "LYB-344 PR #1774, fix-red-f8dba15025 occurrence 3: merge origin/main first without rebasing, retain the dated-outcome coach action and weekly review, and repair Company Guards and CI Summary. DatedOutcomeStoreTests.swift grew to 515 lines; Vercel reports Deployment was blocked without a build error.",
+    "mechanization": "Extend the existing Swift size splitter to require an explicit --internalize list before moving private/fileprivate top-level fixtures across files, preserve member privacy and @testable imports, and refuse unrelated access changes before writing. Use it to extract both store fixtures and register the sibling in the existing test target. Keep every test body and the company size baseline unchanged. The CLI regression fails on the previous unsafe extraction and missing testable import, then passes with the extension; it runs in the existing required iOS Static Audits test_split_size_ratchet.py suite. The fetched origin/main is already an ancestor. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/ios/split_size_ratchet.py. Native execution and exact-head coverage still require the real Mac runner; the Vercel provider block remains externally unverified.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator can prevent inaccessible extracted fixtures by refusing private declarations unless their names are explicitly reviewed for internal access, while retaining attributed test imports and member privacy in every generated sibling."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/split_size_ratchet.py",
+      "anchor": "review type access before extraction: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "correction-receipt-text-level-recurrence",
     "source": "https://linear.app/jovie/issue/LYB-362",
     "correction": "LYB-362: Re-mechanization requires a second receipt with the same normalized correction text and classifier level. First-seen corrections and different text at the same level must not enqueue a request.",
@@ -7293,5 +7311,45 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-audit-expired-budget-fails-closed",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
+    "correction": "PR #1774 / LYB-344, fix-red-5df69c1e5f occurrence 23: merge origin/main first and repair failed checks without removing tests or changing gates. Run 42695073821 passed the native build and 2277 unit cases, then exhausted the 2760s audit budget during the canvas UI journey after a 1168s prefix. Vercel independently reports Deployment was blocked. The fetched origin/main is already an ancestor of this branch; the required merge is a no-op.",
+    "mechanization": "Extend the existing launch-quality audit budget controller to use 2940s within the unchanged 52-minute step, retaining 180s for finalization, all selectors, per-test bounds and the 1800s UI cap. Refuse exhausted budgets instead of granting another minute, and propagate that refusal before starting a build, test command or launch probe. Virtual-clock regressions replay the slow prefix and expired budgets; the old runner fails four assertions and the repaired runner passes. Execute the extended deadline suite in the existing required shared-lib test and native preflight; include its source and the real step policy in Turbo inputs. Refresh the audit-only diagnostic hash and its routing-test copies with the existing explicit-digest pin resolver; retain all trust checks and workflow bounds. The harness owns pushing and PR edits and must add exactly one line to the PR body: Machine: built scripts/ios/launch-quality-audit.sh. Current-head native execution remains for the real macOS runner and the Vercel provider hold remains external.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner owns phase admission and budget propagation. Refusing exhausted budgets before process launch prevents commands from obtaining fresh time after the audit deadline, while the regression suite verifies useful execution and the unchanged outer step reserve."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-audit.sh",
+      "anchor": "echo \"launch-quality audit deadline exhausted\" >&2"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-deadline-fixtures-match-macos-shell",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
+    "correction": "PR #1774 / LYB-344, fix-red-5df69c1e5f occurrence 24: repair the failed native launch preflight without weakening gates. Run 42705530320 fails test_expired_budget_reaches_build_and_test_callers_even_inside_a_condition because Bash 3.2 treats the fixture's empty COMMON_XCODEBUILD_ARGS array as unset under nounset. CI Summary reflects that failure. The requested merge of origin/main is already up to date. Vercel independently reports Deployment was blocked.",
+    "mechanization": "Extend the existing deadline fixture with representative populated command/settings arrays and live, exactly expired and over-budget cases for both build and test callers inside a conditional. Assert the one-second remaining timeout, preserved spaced argument and signing setting, and refusal before any command or probe starts after expiry. The existing required shared-lib suite and launch-quality preflight execute this guard. Replay the original suite and repair with GNU Bash 3.2 built in /tmp: the original reproduces the CI failure and the repair passes all 13 cases; Bash 5 also passes. No workflow, runner budget, selector or product behavior changes. The harness owns pushing and PR-body edits and must add exactly one line: Machine: built scripts/ios/test_xcodebuild_command_timeout.py. Native execution on the repaired head remains for macOS CI; the Vercel provider hold is external.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Production already supplies populated arrays. Changing the runtime budget controller cannot correct the test-only empty-array fixture without introducing unrelated behavior."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing executed shell fixture can represent the production arguments on macOS Bash and assert both useful command execution and deadline refusal before native work starts."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_xcodebuild_command_timeout.py",
+      "anchor": "# Model the runner's populated arrays: Bash 3.2 treats empty arrays as unset."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

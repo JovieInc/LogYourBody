@@ -47,7 +47,7 @@ extension LogYourBodyUITests {
         launch(app, with: [
             "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestPhotoTimelineAnalyticsFixture", "-lybUITestDatedTimelineFixture",
-            "-lybUITestDatedStatsState", state
+            "-lybUITestDatedStatsState", state, "-lybUITestChatFirstFixture"
         ])
         let surface = app.descendants(matching: .any)["dated_stats_\(state)"]
         XCTAssertTrue(surface.waitForExistence(timeout: 15), state)
@@ -78,6 +78,41 @@ extension LogYourBodyUITests {
         default:
             let returned = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: surface)
             XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 8), .completed)
+        }
+        assertDatedCoachRecovery(in: app, state: state)
+    }
+
+    private func assertDatedCoachRecovery(in app: XCUIApplication, state: String) {
+        app.buttons["photo_timeline_root_menu"].tap()
+        let timeline = app.buttons["photo_timeline_root_nav_timeline"]
+        XCTAssertTrue(timeline.waitForExistence(timeout: 5))
+        timeline.tap()
+        let composer = app.textFields["chat_composer"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        composer.tap()
+        composer.typeText("Review my dated outcome")
+        app.buttons["chat_send_button"].tap()
+        let coach = app.descendants(matching: .any)["launch_directive_coach"]
+        XCTAssertTrue(coach.waitForExistence(timeout: 8), state)
+        XCTAssertEqual(app.buttons.matching(identifier: "launch_next_action").count, 1, state)
+        let action = app.buttons["launch_next_action"]
+        if !action.isHittable {
+            app.scrollViews["launch_directive_scroll"].swipeUp()
+        }
+        XCTAssertTrue(action.isHittable, state)
+        attachScreenshot(named: "dated-coach-\(state)", from: app)
+        action.tap()
+        switch state {
+        case "denial", "no-data", "stale", "conflicting":
+            XCTAssertTrue(app.textFields["Weight value"].waitForExistence(timeout: 5), state)
+            app.buttons["Cancel"].tap()
+        case "offline":
+            XCTAssertTrue(coach.waitForExistence(timeout: 5))
+        default:
+            // The arithmetic-only UI fixture owns no persisted outcome revision.
+            // Even ready arithmetic must not produce an unbound saved action.
+            XCTAssertTrue(app.textFields["launch_outcome_date"].waitForExistence(timeout: 5), state)
+            app.buttons["launch_outcome_cancel"].tap()
         }
     }
 

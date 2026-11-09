@@ -52,9 +52,17 @@ final class DatedOutcomeStatsTests: XCTestCase {
         ]
         XCTAssertEqual(Set(cases.map { $0.0 }), Set(LaunchJourney.RouteState.allCases))
         for (state, input, metrics) in cases {
-            let result = await projector.project(owner: "a", metrics: metrics, input: input)
+            let result = await projector.project(owner: "a", metrics: metrics, input: input,
+                                                 savedOutcome: input.outcome.map { .init(revision: UUID(), value: $0) })
             XCTAssertEqual(result.stats.presentation.surface, .stats)
             XCTAssertEqual(result.stats.presentation.state, state)
+            XCTAssertEqual(result.coach.presentation.surface, .coach)
+            XCTAssertEqual(result.coach.presentation.state, state)
+            XCTAssertFalse(result.coach.presentation.action.title.isEmpty)
+            if state != .ready {
+                XCTAssertNil(result.coach.actionToSave, state.rawValue)
+                XCTAssertNil(result.coach.evidence, state.rawValue)
+            }
             XCTAssertFalse(result.stats.presentation.action.title.isEmpty)
             XCTAssertEqual(result.outcome, input.outcome)
             XCTAssertEqual(result.stats.deadline, input.outcome?.outcomeDate)
@@ -129,6 +137,7 @@ final class DatedOutcomeStatsTests: XCTestCase {
                 let rejected = await projector.project(owner: "a", metrics: [metric(weight: 100)], input: missing)
                 XCTAssertEqual(rejected.stats.presentation.state, .unsafeDate)
                 XCTAssertNil(rejected.stats.drift)
+                XCTAssertNil(rejected.coach.actionToSave)
                 XCTAssertEqual(rejected.outcome, boundary)
             }
             var unavailable = input(boundary)
@@ -226,5 +235,134 @@ final class DatedOutcomeStatsTests: XCTestCase {
         XCTAssertNil(replacement.stats.measurement)
         XCTAssertNil(replacement.stats.target)
         XCTAssertNil(replacement.planBaseline)
+    }
+
+    func testCoachFirstActionRestoresOriginalEvidenceAndWeeklyReviewOnReturn() async throws {
+        let saved = DatedOutcomeSnapshot(revision: UUID(), value: outcome)
+        let records = [metric("baseline", weight: 80, date: now.addingTimeInterval(-8 * week)), metric(weight: 78)]
+        var manual = input(outcome)
+        manual.permissionDenied = true
+        let first = await projector.project(owner: "a", metrics: records, input: manual, savedOutcome: saved)
+        let action = try XCTUnwrap(first.coach.actionToSave)
+        XCTAssertEqual(action.nextAction, .hold)
+        XCTAssertEqual(action.outcome, outcome)
+        XCTAssertEqual(action.outcomeRevision, saved.revision)
+        XCTAssertEqual(action.nextCheckIn, now.addingTimeInterval(week))
+        XCTAssertEqual(action.baseline, first.planBaseline)
+        XCTAssertTrue(action.evidence.contains { $0.provenance == .measured && $0.recordedAt == now })
+        XCTAssertTrue(action.evidence.contains { $0.provenance == .engineDerived })
+        let restored = DatedOutcomeSnapshot(
+            revision: saved.revision, value: outcome, planBaseline: action.baseline, coachAction: action)
+        let reopenedProjector = DatedTimelineProjector()
+        let returned = await reopenedProjector.project(
+            owner: "a", metrics: records, input: input(outcome), savedOutcome: restored)
+        XCTAssertNil(returned.coach.actionToSave, "Return restores the receipt instead of claiming another review")
+        XCTAssertEqual(returned.coach.nextCheckIn, action.nextCheckIn)
+        XCTAssertEqual(returned.coach.presentation, first.coach.presentation)
+        XCTAssertEqual(returned.coach.uncertainty, LaunchPromiseCopy.framing)
+    }
+
+    func testCoachWeeklyOnTrackBehindAndAheadHoldOrReviewWithoutTrainingNumbers() async throws {
+        let saved = DatedOutcomeSnapshot(revision: UUID(), value: outcome)
+        let records = [metric("baseline", weight: 80, date: now.addingTimeInterval(-8 * week)), metric(weight: 78)]
+        let first = await projector.project(owner: "a", metrics: records, input: input(outcome), savedOutcome: saved)
+        let action = try XCTUnwrap(first.coach.actionToSave)
+        let restored = DatedOutcomeSnapshot(
+            revision: saved.revision, value: outcome, planBaseline: action.baseline, coachAction: action)
+        for (weight, nextAction) in [(77.75, BackwardPlanner.NextAction.hold), (79, .reviewProgress), (77, .hold)] {
+            var weekly = input(outcome)
+            weekly.now = now.addingTimeInterval(week)
+            weekly.planBaseline = action.baseline
+            let result = await projector.project(
+                owner: "a", metrics: records + [metric("weekly", weight: weight, date: weekly.now)],
+                input: weekly, savedOutcome: restored)
+            let reviewed = try XCTUnwrap(result.coach.actionToSave)
+            XCTAssertEqual(reviewed.nextAction, nextAction)
+            XCTAssertEqual(reviewed.baseline, action.baseline)
+            XCTAssertEqual(reviewed.outcome, action.outcome)
+            XCTAssertEqual(reviewed.nextCheckIn, weekly.now.addingTimeInterval(week))
+            XCTAssertFalse(result.coach.presentation.action.detail.contains("adjusted"))
+            for term in ["sets", "reps", "load", "safe", "guarantee"] {
+                XCTAssertFalse(reviewed.rationale.lowercased().contains(term))
+            }
+        }
+    }
+
+    func testCoachWeeklyFreshnessGapDoesNotChangeActionOrPretendToAdjust() async throws {
+        let saved = DatedOutcomeSnapshot(revision: UUID(), value: outcome)
+        let records = [metric("baseline", weight: 80, date: now.addingTimeInterval(-8 * week)), metric(weight: 78)]
+        let first = await projector.project(owner: "a", metrics: records, input: input(outcome), savedOutcome: saved)
+        let action = try XCTUnwrap(first.coach.actionToSave)
+        var weekly = input(outcome)
+        weekly.now = action.nextCheckIn
+        weekly.planBaseline = action.baseline
+        let restored = DatedOutcomeSnapshot(
+            revision: saved.revision, value: outcome, planBaseline: action.baseline, coachAction: action)
+        let result = await projector.project(owner: "a", metrics: records, input: weekly, savedOutcome: restored)
+        XCTAssertEqual(result.coach.presentation.state, .stale)
+        XCTAssertEqual(result.coach.destination, .measurement)
+        XCTAssertNil(result.coach.actionToSave)
+        XCTAssertEqual(result.coach.nextCheckIn, action.nextCheckIn)
+        XCTAssertEqual(restored.coachAction, action)
+        XCTAssertNil(result.coach.evidence)
+    }
+
+    func testCoachDateEditRecomputesAndRetryDoesNotReplaceBaseline() async throws {
+        let records = [metric("baseline", weight: 80, date: now.addingTimeInterval(-8 * week)), metric(weight: 78)]
+        let first = await projector.project(owner: "a", metrics: records, input: input(outcome), savedOutcome: .init(
+            revision: UUID(), value: outcome))
+        let action = try XCTUnwrap(first.coach.actionToSave)
+        var changed = outcome
+        changed.outcomeDate = "2027-01-10"
+        var edited = input(changed)
+        edited.planBaseline = action.baseline
+        let saved = DatedOutcomeSnapshot(revision: UUID(), value: changed, planBaseline: action.baseline)
+        edited.offline = true
+        let offline = await projector.project(owner: "a", metrics: records, input: edited, savedOutcome: saved)
+        XCTAssertNil(offline.coach.actionToSave)
+        XCTAssertEqual(offline.coach.destination, .retry)
+        edited.offline = false
+        let retry = await projector.project(owner: "a", metrics: records, input: edited, savedOutcome: saved)
+        let recomputed = try XCTUnwrap(retry.coach.actionToSave)
+        XCTAssertEqual(recomputed.outcome, changed)
+        XCTAssertEqual(recomputed.baseline, action.baseline)
+        XCTAssertNotEqual(recomputed.id, action.id)
+        XCTAssertNotEqual(recomputed.outcomeRevision, action.outcomeRevision)
+    }
+
+    func testCoachUnavailablePlannerPolicyAndForeignMemoryFailClosed() async throws {
+        let records = [metric("baseline", weight: 80, date: now.addingTimeInterval(-8 * week)), metric(weight: 78)]
+        let saved = DatedOutcomeSnapshot(revision: UUID(), value: outcome)
+        let first = await projector.project(owner: "a", metrics: records, input: input(outcome), savedOutcome: saved)
+        let action = try XCTUnwrap(first.coach.actionToSave)
+        var missingCheck = input(outcome)
+        missingCheck.safetyAvailable = false
+        var missingRates = input(outcome)
+        missingRates.safeWeeklyChangeKg = nil
+        for unavailable in [LaunchJourney.Input(now: now, outcome: outcome), missingCheck, missingRates] {
+            let result = await projector.project(owner: "a", metrics: records, input: unavailable, savedOutcome: saved)
+            XCTAssertNil(result.coach.actionToSave)
+            XCTAssertNil(result.coach.evidence)
+        }
+        for partition in ["user", "product", "provenance", "claim-user", "claim-product"] {
+            var isolated = action
+            if partition == "user" { isolated.userId = "b" }
+            if partition == "product" { isolated.productId = "other-product" }
+            if partition == "provenance" { isolated.evidence[0].provenance = .coachInferred }
+            if partition == "claim-user" { isolated.evidence[0].userId = "b" }
+            if partition == "claim-product" { isolated.evidence[0].productId = "other-product" }
+            let snapshot = DatedOutcomeSnapshot(revision: saved.revision, value: outcome,
+                                                planBaseline: action.baseline, coachAction: isolated)
+            let result = await projector.project(owner: "a", metrics: records, input: input(outcome), savedOutcome: snapshot)
+            XCTAssertEqual(result.coach.presentation.state, .unsafeDate, partition)
+            XCTAssertNil(result.coach.evidence, partition)
+            XCTAssertNil(result.coach.actionToSave, partition)
+        }
+        let restored = DatedOutcomeSnapshot(
+            revision: saved.revision, value: outcome, planBaseline: action.baseline, coachAction: action)
+        let corrected = await projector.project(
+            owner: "a", metrics: [records[0], metric(weight: 79)], input: input(outcome), savedOutcome: restored)
+        XCTAssertEqual(corrected.coach.presentation.state, .unsafeDate)
+        XCTAssertNil(corrected.coach.evidence, "A corrected reading cannot silently retain the old reviewed evidence")
     }
 }

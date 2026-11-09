@@ -66,6 +66,20 @@ final class DatedOutcomeStore {
         guard isCurrent(), currentOwner() == owner else { throw DatedOutcomeError.unauthenticated }
     }
 
+    /// Commit the reviewed action only against the outcome revision that produced it.
+    /// No sync request, training mutation or date change is created by a review.
+    func retainCoachActionForPresentation(_ action: DatedCoachAction, isCurrent: () -> Bool) async throws {
+        guard isCurrent() else { throw DatedOutcomeError.unauthenticated }
+        let owner = try requireOwner()
+        guard action.userId == owner, action.productId == LaunchJourney.productId else {
+            throw DatedOutcomeError.unauthenticated
+        }
+        try await context.perform {
+            try self.retainCoachAction(action, owner: owner)
+        }
+        guard isCurrent(), currentOwner() == owner else { throw DatedOutcomeError.unauthenticated }
+    }
+
     /// A single Save action emits one durable recompute request even if several fields changed.
     /// A no-op Save emits none. A failed save publishes nothing and restores the context.
     @discardableResult
@@ -166,7 +180,22 @@ final class DatedOutcomeStore {
               current.value.outcome.metric == baseline.metric else { return }
         guard baseline.date.timeIntervalSinceReferenceDate.isFinite,
               baseline.value.isFinite, baseline.value > 0 else { throw DatedOutcomeError.invalidValue }
-        let payload = try JSONEncoder().encode(LocalPayload(edit: decode(row), planBaseline: baseline))
+        let payload = try JSONEncoder().encode(LocalPayload(
+            edit: decode(row), planBaseline: baseline, coachAction: current.coachAction))
+        row.setValue(payload, forKey: "payload")
+        try commit()
+    }
+
+    nonisolated private func retainCoachAction(_ action: DatedCoachAction, owner: String) throws {
+        guard let row = try rows(owner: owner).first else { throw DatedOutcomeError.invalidReceipt }
+        let current = try snapshot(row)
+        guard current.revision == action.outcomeRevision, current.value == action.outcome,
+              current.planBaseline == action.baseline,
+              current.coachAction.map({ $0.id == action.id || $0.reviewedAt < action.reviewedAt }) ?? true else {
+            throw DatedOutcomeError.invalidReceipt
+        }
+        let payload = try JSONEncoder().encode(LocalPayload(
+            edit: decode(row), planBaseline: current.planBaseline, coachAction: action))
         row.setValue(payload, forKey: "payload")
         try commit()
     }
@@ -186,20 +215,26 @@ final class DatedOutcomeStore {
     nonisolated private func snapshot(_ row: NSManagedObject) throws -> DatedOutcomeSnapshot {
         let edit = try decode(row)
         let data = row.value(forKey: "payload") as? Data ?? Data()
-        let baseline = try JSONDecoder().decode(BaselineField.self, from: data).planBaseline
-        return DatedOutcomeSnapshot(revision: edit.requestId, value: edit.value, planBaseline: baseline)
+        let metadata = try JSONDecoder().decode(BaselineField.self, from: data)
+        return DatedOutcomeSnapshot(revision: edit.requestId, value: edit.value,
+                                    planBaseline: metadata.planBaseline, coachAction: metadata.coachAction)
     }
 
-    private struct BaselineField: Decodable { var planBaseline: DatedOutcome.PlanBaseline? }
+    private struct BaselineField: Decodable {
+        var planBaseline: DatedOutcome.PlanBaseline?
+        var coachAction: DatedCoachAction?
+    }
 
     private struct LocalPayload: Encodable {
         var edit: DatedOutcomeEdit
         var planBaseline: DatedOutcome.PlanBaseline?
-        enum CodingKeys: String, CodingKey { case planBaseline }
+        var coachAction: DatedCoachAction?
+        enum CodingKeys: String, CodingKey { case planBaseline, coachAction }
         func encode(to encoder: Encoder) throws {
             try edit.encode(to: encoder)
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encodeIfPresent(planBaseline, forKey: .planBaseline)
+            try container.encodeIfPresent(coachAction, forKey: .coachAction)
         }
     }
 
