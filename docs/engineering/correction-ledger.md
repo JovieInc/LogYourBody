@@ -57,6 +57,13 @@ A different rule id leaves the earlier count unchanged. This step does not emit
 or change checks. Coverage and the recurrence intake still derive repeat counts
 from distinct source URLs per fingerprint.
 
+`classifyCorrectionRecords` in that same module saves one `level` on each ledger
+record using its reviewed `classification` assessments, in the existing order:
+`codebase`, `static` (lint/typecheck/CI), `prose`, then `human`. It returns updated
+records, preserves rule ids and recurrence counts, and replaces stale saved labels
+with the first feasible level. Missing or wholly infeasible assessments fail
+instead of defaulting to human review. This pure operation emits no checks.
+
 For a merge conflict in the ledger, run
 `node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger` before
 staging it. The resolver retains receipts from both Git conflict stages and
