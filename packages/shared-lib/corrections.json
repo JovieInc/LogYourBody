@@ -7311,5 +7311,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-audit-expired-budget-fails-closed",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
+    "correction": "PR #1774 / LYB-344, fix-red-5df69c1e5f occurrence 23: merge origin/main first and repair failed checks without removing tests or changing gates. Run 42695073821 passed the native build and 2277 unit cases, then exhausted the 2760s audit budget during the canvas UI journey after a 1168s prefix. Vercel independently reports Deployment was blocked. The fetched origin/main is already an ancestor of this branch; the required merge is a no-op.",
+    "mechanization": "Extend the existing launch-quality audit budget controller to use 2940s within the unchanged 52-minute step, retaining 180s for finalization, all selectors, per-test bounds and the 1800s UI cap. Refuse exhausted budgets instead of granting another minute, and propagate that refusal before starting a build, test command or launch probe. Virtual-clock regressions replay the slow prefix and expired budgets; the old runner fails four assertions and the repaired runner passes. Execute the extended deadline suite in the existing required shared-lib test and native preflight; include its source and the real step policy in Turbo inputs. Refresh the audit-only diagnostic hash and its routing-test copies with the existing explicit-digest pin resolver; retain all trust checks and workflow bounds. The harness owns pushing and PR edits and must add exactly one line to the PR body: Machine: built scripts/ios/launch-quality-audit.sh. Current-head native execution remains for the real macOS runner and the Vercel provider hold remains external.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner owns phase admission and budget propagation. Refusing exhausted budgets before process launch prevents commands from obtaining fresh time after the audit deadline, while the regression suite verifies useful execution and the unchanged outer step reserve."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-audit.sh",
+      "anchor": "echo \"launch-quality audit deadline exhausted\" >&2"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
