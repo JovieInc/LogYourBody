@@ -203,8 +203,8 @@ importers:
         specifier: ^3.33.7
         version: 3.33.7
       '@statsig/statsig-node-core':
-        specifier: 0.24.0
-        version: 0.24.0
+        specifier: 0.24.2
+        version: 0.24.2
       '@tailwindcss/postcss':
         specifier: ^4.3.3
         version: 4.3.3
@@ -3703,66 +3703,66 @@ packages:
   '@statsig/js-client@3.33.7':
     resolution: {integrity: sha512-xVhjheb7UEqA0HxdO+aztZ0bT7aEE1RTcpu8RcCaM2L+Tm0ebFLzn1NH4VA0pbjfVi+WVBh8KGXolxcYrXVPug==}
 
-  '@statsig/statsig-node-core-darwin-arm64@0.24.0':
-    resolution: {integrity: sha512-wAICPDV2pHEd1UHML1sPpS1MkT7QZs0nW2GVorGKviqE+t3vsd7KU2rusKFMGPllYCRbK3dzRbb8MMJRJ2DvOQ==}
+  '@statsig/statsig-node-core-darwin-arm64@0.24.2':
+    resolution: {integrity: sha512-04UhUJ36+1e+umd5Nt4CMhE/3svlJuKv3sdbEWJ8AnFDrh2Hnm4/zn+bB5twtoqoE5Ld7PuZfzkzKSLU40jlYw==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [darwin]
 
-  '@statsig/statsig-node-core-darwin-x64@0.24.0':
-    resolution: {integrity: sha512-2Ksf6+0pPezEVeq0/JXIaXpmjL2/ZAu76XaL1+TSL8Un50oI31WuMzrFw1kXKXra2VArVKoWZrInvd2zoeZh1Q==}
+  '@statsig/statsig-node-core-darwin-x64@0.24.2':
+    resolution: {integrity: sha512-8K3vrPVEjGs6V2ETUGw6Vy5ogVI+WEJGYyid8IkT0ZJN5H4NtC5CY15+yNGXS/gvklzz1kgU9dU4kcBeOSElDQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [darwin]
 
-  '@statsig/statsig-node-core-linux-arm64-gnu@0.24.0':
-    resolution: {integrity: sha512-HKGOZFT9BbdEHczy1WxHuo1FUCVw+61/G3gayoGM8pfmustN8bgulZVAJdp2WlDm8LiMNZF0VkckDANAiqYxiw==}
+  '@statsig/statsig-node-core-linux-arm64-gnu@0.24.2':
+    resolution: {integrity: sha512-7MR6qzelhj63B6ifaQUf2rhotb4jlMJsfT8kVyofqZYBwI9x1qbF4loUEnVht5acZPYR0Ymd/TeEc51GGjIXOw==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@statsig/statsig-node-core-linux-arm64-musl@0.24.0':
-    resolution: {integrity: sha512-xBR6lFLid6KSiNUQD5rIp3W3n+lP/5d0X2z6lCxS7Un+l6IvXgOvgehb0HR1pl0Ish0rEKzQiXHpuBRsJ36/Zg==}
+  '@statsig/statsig-node-core-linux-arm64-musl@0.24.2':
+    resolution: {integrity: sha512-xnJmHHajrb3Em49g6Z3wqcQyQNRaEW6RhbE51tuAVYbjAkk6cYCI7SJoEXVpztspSTOphbc/BwoUwBTKZneOLg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@statsig/statsig-node-core-linux-x64-gnu@0.24.0':
-    resolution: {integrity: sha512-mCvyI/7PQBkQJfjnOJ6ZN6ulbdROqJH7mNx9B0F/oWn/hOT0KAg+GU/GC/zxfy9y5VUlL7LEyFcccqkVGQu8YA==}
+  '@statsig/statsig-node-core-linux-x64-gnu@0.24.2':
+    resolution: {integrity: sha512-4JXXjob7s1DqYZukFzR+mvhTnRtixMzzTV5AT1As5AimQRjG9rebYgQk59sD7v6zIU81IBg/rtirp7+fx1j8Kw==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@statsig/statsig-node-core-linux-x64-musl@0.24.0':
-    resolution: {integrity: sha512-84AcQXT5+0l7fWxOY3s01zLWyTtoyS0CiFynmU5j99T9RN7rhxTZZM6eEJpBhxsYjjbDkowHH0IpwOC0GhPuuQ==}
+  '@statsig/statsig-node-core-linux-x64-musl@0.24.2':
+    resolution: {integrity: sha512-0maJkJQC3F/nAf2ApNe6A1UTcXNRzExXqxERS6kNHSaixgxUnqNzdynOSqPcwDEdNYTCjjQGLWcGejLpxTPc2Q==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@statsig/statsig-node-core-win32-arm64-msvc@0.24.0':
-    resolution: {integrity: sha512-jApVcswrcqcrKvd2HZEzF5PE9o63cwXIESMpuQlV8opFQq6qeg8U6w5Y3pSZu6w3gLuSneW2R2E8ORGJzP7R1w==}
+  '@statsig/statsig-node-core-win32-arm64-msvc@0.24.2':
+    resolution: {integrity: sha512-Lk0hIdVmaPp3AJXpzVvCa/I5clMvUFDhkxnxsdAvVigCXBJDfU09dxYN/1Vus3YK3koEOOs6J3qr/RpX8o07VQ==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [win32]
 
-  '@statsig/statsig-node-core-win32-ia32-msvc@0.24.0':
-    resolution: {integrity: sha512-ZbQF7iHmOoZdHeUwNNj734rb7/WT6Iwaetje/QNfsZ1b+2oFeNrJCRbidH/kFd1DSFbuM0iXUF7+TVvCZh82IA==}
+  '@statsig/statsig-node-core-win32-ia32-msvc@0.24.2':
+    resolution: {integrity: sha512-cxRFAFPKOz9eTXp+5DBiLjjmlF7Ps+IzFvmdzUhingxrYCTiOtGO7OwzD1FCmagiS2QwzCO2qDdIzNCFVZlquA==}
     engines: {node: '>= 10'}
     cpu: [ia32]
     os: [win32]
 
-  '@statsig/statsig-node-core-win32-x64-msvc@0.24.0':
-    resolution: {integrity: sha512-cqux8Agwz93Z8sNU7ET1COlZE0SwRC0fAzRH1fSpuycxQg3DLdvOABQ0C+qJyEfRRKd8TOwE+fSmwoEidqt0pw==}
+  '@statsig/statsig-node-core-win32-x64-msvc@0.24.2':
+    resolution: {integrity: sha512-UVAQU/qG89Bwm4QpY7STvnelM+nAi53+N2vzVkpjK/cSTKrbDbyMmeI1YU4gWOyv9utS9sVePZxsF69+WPVs3w==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
 
-  '@statsig/statsig-node-core@0.24.0':
-    resolution: {integrity: sha512-SWVYHhyHs3ZUAmPu8GBD1VI4ZR5fj8cbqj1M8d5m9WZGFEYGMoYLgoncBPfCeqENCYtrbclbmFeZoY7OFjxsxA==}
+  '@statsig/statsig-node-core@0.24.2':
+    resolution: {integrity: sha512-I3yPKF7WFUbVdDVH0WrUXyNVg7D8Sx9oPttC9fA6TDJl+rcB9GWoFkaGVZwx0SGEj6nvCM21Y2wRAOk0BhQ5Nw==}
     engines: {node: '>= 6.14.2 < 7 || >= 8.11.2 < 9 || >= 9.11.0 < 10 || >= 10.0.0'}
 
   '@swc/helpers@0.5.15':
@@ -10968,44 +10968,44 @@ snapshots:
     dependencies:
       '@statsig/client-core': 3.33.7
 
-  '@statsig/statsig-node-core-darwin-arm64@0.24.0':
+  '@statsig/statsig-node-core-darwin-arm64@0.24.2':
     optional: true
 
-  '@statsig/statsig-node-core-darwin-x64@0.24.0':
+  '@statsig/statsig-node-core-darwin-x64@0.24.2':
     optional: true
 
-  '@statsig/statsig-node-core-linux-arm64-gnu@0.24.0':
+  '@statsig/statsig-node-core-linux-arm64-gnu@0.24.2':
     optional: true
 
-  '@statsig/statsig-node-core-linux-arm64-musl@0.24.0':
+  '@statsig/statsig-node-core-linux-arm64-musl@0.24.2':
     optional: true
 
-  '@statsig/statsig-node-core-linux-x64-gnu@0.24.0':
+  '@statsig/statsig-node-core-linux-x64-gnu@0.24.2':
     optional: true
 
-  '@statsig/statsig-node-core-linux-x64-musl@0.24.0':
+  '@statsig/statsig-node-core-linux-x64-musl@0.24.2':
     optional: true
 
-  '@statsig/statsig-node-core-win32-arm64-msvc@0.24.0':
+  '@statsig/statsig-node-core-win32-arm64-msvc@0.24.2':
     optional: true
 
-  '@statsig/statsig-node-core-win32-ia32-msvc@0.24.0':
+  '@statsig/statsig-node-core-win32-ia32-msvc@0.24.2':
     optional: true
 
-  '@statsig/statsig-node-core-win32-x64-msvc@0.24.0':
+  '@statsig/statsig-node-core-win32-x64-msvc@0.24.2':
     optional: true
 
-  '@statsig/statsig-node-core@0.24.0':
+  '@statsig/statsig-node-core@0.24.2':
     optionalDependencies:
-      '@statsig/statsig-node-core-darwin-arm64': 0.24.0
-      '@statsig/statsig-node-core-darwin-x64': 0.24.0
-      '@statsig/statsig-node-core-linux-arm64-gnu': 0.24.0
-      '@statsig/statsig-node-core-linux-arm64-musl': 0.24.0
-      '@statsig/statsig-node-core-linux-x64-gnu': 0.24.0
-      '@statsig/statsig-node-core-linux-x64-musl': 0.24.0
-      '@statsig/statsig-node-core-win32-arm64-msvc': 0.24.0
-      '@statsig/statsig-node-core-win32-ia32-msvc': 0.24.0
-      '@statsig/statsig-node-core-win32-x64-msvc': 0.24.0
+      '@statsig/statsig-node-core-darwin-arm64': 0.24.2
+      '@statsig/statsig-node-core-darwin-x64': 0.24.2
+      '@statsig/statsig-node-core-linux-arm64-gnu': 0.24.2
+      '@statsig/statsig-node-core-linux-arm64-musl': 0.24.2
+      '@statsig/statsig-node-core-linux-x64-gnu': 0.24.2
+      '@statsig/statsig-node-core-linux-x64-musl': 0.24.2
+      '@statsig/statsig-node-core-win32-arm64-msvc': 0.24.2
+      '@statsig/statsig-node-core-win32-ia32-msvc': 0.24.2
+      '@statsig/statsig-node-core-win32-x64-msvc': 0.24.2
 
   '@swc/helpers@0.5.15':
     dependencies:
