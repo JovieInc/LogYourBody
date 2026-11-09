@@ -1,0 +1,18 @@
+{
+  "id": "LYB-276",
+  "parent": "LYB-107",
+  "kind": "muscle_priority_axial_fatigue_steering",
+  "status": "accepted",
+  "approvalBasis": "ships-if-unanswered",
+  "recordedOn": "2026-11-09",
+  "question": "May prioritize-muscle, minimize-axial-fatigue, or a pain boundary cap or exclude saved-program movements, or may it only annotate a preference?",
+  "value": {
+    "effect": "cap_or_exclude_matching_movements",
+    "substitutionPath": "LYB-113",
+    "preferenceOnly": false,
+    "storeUserWords": true,
+    "extraClaim": false,
+    "cases": ["prioritize_muscle", "minimize_axial_fatigue", "pain_boundary"]
+  },
+  "boundaries": "Decision record only. Matching movements may be capped or excluded through the existing substitution path. The user's words are stored. Deterministic loads stay on LYB-37. Plan documents stay on LYB-119. Bounded hold and adapt stay on LYB-128. Scenario execution stays on LYB-45. This record does not compute loads or select a movement list."
+}
