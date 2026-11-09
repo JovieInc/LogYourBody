@@ -7275,5 +7275,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-conflicted-source-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1763",
+    "correction": "PR #1763, fix-red-1423773703 occurrence 57 in 14 days: merge origin/main without rebasing, retain the ElevenLabs 3.0.81 bump, and repair stale source-projection failures in Detect Changes and parity. Extend the existing dependency-repair machine and leave push and PR updates to the harness. Vercel separately reports Deployment was blocked.",
+    "mechanization": "Extend both existing dependency repair modes to regenerate a conflicted projection from staged sources only after frozen lockfile verification. Real-Git regressions cover successful merged-source reconstruction, failed verification preserving conflict stages and artifact bytes for retry, and refusal of unresolved source conflicts. Four cases fail before the fix and pass afterward; the two source-conflict controls remain passing. The existing required Detect Changes merge-aware local lint suite imports these tests. Use --verify-lockfile for this already updated lockfile without changing dependency resolutions. The harness must put exactly one machine line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency resolver owns verification and generated-output staging. Separating a regenerable source-map conflict from unresolved dependency inputs permits one verified repair command without requiring manual artifact resolution; frozen failures and actual source conflicts still fail closed."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Rebuild a conflicted projection only after frozen dependency verification."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
