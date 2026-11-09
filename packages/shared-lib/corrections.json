@@ -7221,5 +7221,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "vercel-blocked-production-deploy-fails-fast",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42581415040",
+    "correction": "LYB Owner reports three consecutive main Deploy runs cancelled while Vercel production deployments remain BLOCKED before building. Web must fail fast with a clear owner-action error rather than waiting for cancellation; preserve the Deploy Summary gate.",
+    "mechanization": "Submit the prebuilt production deployment with --no-wait and inspect its exact URL through the team-scoped Vercel API before publishing success output. Fail immediately on BLOCKED and other terminal failures, fail closed on inspection errors, and bound pending-state polling. Required shared-lib tests execute the real workflow step against a fake CLI/API and cover pending, READY, BLOCKED, terminal, timeout and inspection failures. The BLOCKED workflow regression fails before the fix and passes after it. Tim must resolve the external hold; two clean main deploys remain required. The harness owns pushing and PR edits; include Machine: built .github/scripts/wait-vercel-deployment.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The deployment controller can stop waiting in the CLI and verify readiness itself, ensuring BLOCKED becomes an explicit failure by construction. It cannot resolve a provider-side restriction."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/wait-vercel-deployment.mjs",
+      "anchor": "if (state === 'BLOCKED')"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
