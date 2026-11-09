@@ -7221,5 +7221,41 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "vercel-blocked-production-deploy-fails-fast",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42581415040",
+    "correction": "LYB Owner reports three consecutive main Deploy runs cancelled while Vercel production deployments remain BLOCKED before building. Web must fail fast with a clear owner-action error rather than waiting for cancellation; preserve the Deploy Summary gate.",
+    "mechanization": "Submit the prebuilt production deployment with --no-wait and inspect its exact URL through the team-scoped Vercel API before publishing success output. Fail immediately on BLOCKED and other terminal failures, fail closed on inspection errors, and bound pending-state polling. Required shared-lib tests execute the real workflow step against a fake CLI/API and cover pending, READY, BLOCKED, terminal, timeout and inspection failures. The BLOCKED workflow regression fails before the fix and passes after it. Tim must resolve the external hold; two clean main deploys remain required. The harness owns pushing and PR edits; include Machine: built .github/scripts/wait-vercel-deployment.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The deployment controller can stop waiting in the CLI and verify readiness itself, ensuring BLOCKED becomes an explicit failure by construction. It cannot resolve a provider-side restriction."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/wait-vercel-deployment.mjs",
+      "anchor": "if (state === 'BLOCKED')"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-conflicted-source-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1763",
+    "correction": "PR #1763, fix-red-1423773703 occurrence 57 in 14 days: merge origin/main without rebasing, retain the ElevenLabs 3.0.81 bump, and repair stale source-projection failures in Detect Changes and parity. Extend the existing dependency-repair machine and leave push and PR updates to the harness. Vercel separately reports Deployment was blocked.",
+    "mechanization": "Extend both existing dependency repair modes to regenerate a conflicted projection from staged sources only after frozen lockfile verification. Real-Git regressions cover successful merged-source reconstruction, failed verification preserving conflict stages and artifact bytes for retry, and refusal of unresolved source conflicts. Four cases fail before the fix and pass afterward; the two source-conflict controls remain passing. The existing required Detect Changes merge-aware local lint suite imports these tests. Use --verify-lockfile for this already updated lockfile without changing dependency resolutions. The harness must put exactly one machine line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency resolver owns verification and generated-output staging. Separating a regenerable source-map conflict from unresolved dependency inputs permits one verified repair command without requiring manual artifact resolution; frozen failures and actual source conflicts still fail closed."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Rebuild a conflicted projection only after frozen dependency verification."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

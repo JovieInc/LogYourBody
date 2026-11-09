@@ -2,6 +2,17 @@
 // Identity is the rule id the classifier already assigned. This update does
 // not emit checks and does not replace fingerprint repeat counts.
 
+import {
+  classifyCorrection,
+  type CorrectionClassification,
+  type CorrectionLevel,
+} from '../scripts/correction-classification.mjs';
+
+export type {
+  CorrectionClassification,
+  CorrectionLevel,
+} from '../scripts/correction-classification.mjs';
+
 export type ClassifiedCorrection = {
   ruleId: string;
 };
@@ -9,6 +20,21 @@ export type ClassifiedCorrection = {
 export type CorrectionRecord<T extends ClassifiedCorrection = ClassifiedCorrection> = T & {
   recurrence: number;
 };
+
+/** Save the first feasible pyramid level, replacing any stale saved label. */
+export function classifyCorrectionRecords<
+  T extends ClassifiedCorrection & { classification: CorrectionClassification },
+>(
+  ledger: readonly CorrectionRecord<T>[],
+): (Omit<CorrectionRecord<T>, 'level'> & { level: CorrectionLevel })[] {
+  return ledger.map((record) => ({
+    ...record,
+    level: classifyCorrection(
+      { fingerprint: record.ruleId, classification: record.classification },
+      true,
+    ).level,
+  }));
+}
 
 function requiredRuleId(ruleId: string): string {
   if (typeof ruleId !== 'string' || ruleId.trim() === '') {

@@ -81,4 +81,19 @@ The target cross-repo shape is:
 
 Vercel GitHub auto-deploys are disabled for this repository. GitHub Actions owns production web deployment with `vercel build` and `vercel deploy --prebuilt` after `main` has passed deterministic validation. Pull requests should not wait on Vercel preview installs.
 
+Production submission uses `--no-wait`, then
+`.github/scripts/wait-vercel-deployment.mjs` inspects that deployment's
+`readyState` through the team-scoped Vercel API. Only `READY` permits the URL
+output and production smoke step. `BLOCKED`, `ERROR`, `CANCELED`, inspection
+errors and unknown states fail Web immediately; pending states have a three-minute
+deadline with a ten-second cap per request. Deploy Summary still requires a
+successful selected Web job.
+
+For `BLOCKED` (LYB-359), Tim must inspect the deployment and project/team settings,
+usage and billing at <https://vercel.com/jovie/log-your-body>. The state alone does
+not establish which restriction applies, and CI cannot clear an account hold.
+After the restriction is resolved, verify a main push with green Deploy and a
+production deployment in `READY`, followed by a second clean push. A passing
+local readiness test does not establish production recovery.
+
 Repository-specific release gates stay local: LogYourBody owns Fastlane, RevenueCat, App Store, and iOS signing gates; Jovie owns its web deployment, Sentry, and product-specific smoke gates.
