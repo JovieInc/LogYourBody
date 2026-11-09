@@ -13,6 +13,7 @@ actor DatedTimelineProjector {
         var containsOnlyOwnerRecords: Bool
         var stats: DatedOutcomeStats
         var planBaseline: DatedOutcome.PlanBaseline?
+        var coach: DatedCoachReview
     }
 
     struct Entry {
@@ -30,7 +31,8 @@ actor DatedTimelineProjector {
     }
 
     func project(
-        owner: String, metrics: [BodyMetrics], input original: LaunchJourney.Input, heightCm: Double? = nil
+        owner: String, metrics: [BodyMetrics], input original: LaunchJourney.Input, heightCm: Double? = nil,
+        savedOutcome: DatedOutcomeSnapshot? = nil
     ) -> Snapshot {
         var input = original
         var metrics = metrics
@@ -61,6 +63,10 @@ actor DatedTimelineProjector {
             $0.metric == input.outcome?.outcome.metric
         }) { destination = .measurement }
         if needsHeight && destination == .measurement { destination = .profile }
+        var coach = DatedCoachReview.project(owner: owner, input: input, decision: decision, saved: savedOutcome)
+        if decision.state != .ready {
+            coach.destination = decision.state == .maintenance ? .editor : destination
+        }
         return Snapshot(
             outcome: input.outcome,
             outcomeText: input.outcome.map(Self.outcomeText),
@@ -71,7 +77,8 @@ actor DatedTimelineProjector {
             containsOnlyOwnerRecords: metrics.allSatisfy { $0.userId == owner },
             stats: DatedOutcomeStats.project(
                 input: input, state: decision.state, action: decision.action, entries: entries, metrics: metrics),
-            planBaseline: input.planBaseline
+            planBaseline: input.planBaseline,
+            coach: coach
         )
     }
 
