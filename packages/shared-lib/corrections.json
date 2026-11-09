@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "fix-red-f8dba15025",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
+    "correction": "LYB-344 PR #1774, fix-red-f8dba15025 occurrence 3: merge origin/main first without rebasing, retain the dated-outcome coach action and weekly review, and repair Company Guards and CI Summary. DatedOutcomeStoreTests.swift grew to 515 lines; Vercel reports Deployment was blocked without a build error.",
+    "mechanization": "Extend the existing Swift size splitter to require an explicit --internalize list before moving private/fileprivate top-level fixtures across files, preserve member privacy and @testable imports, and refuse unrelated access changes before writing. Use it to extract both store fixtures and register the sibling in the existing test target. Keep every test body and the company size baseline unchanged. The CLI regression fails on the previous unsafe extraction and missing testable import, then passes with the extension; it runs in the existing required iOS Static Audits test_split_size_ratchet.py suite. The fetched origin/main is already an ancestor. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/ios/split_size_ratchet.py. Native execution and exact-head coverage still require the real Mac runner; the Vercel provider block remains externally unverified.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator can prevent inaccessible extracted fixtures by refusing private declarations unless their names are explicitly reviewed for internal access, while retaining attributed test imports and member privacy in every generated sibling."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/split_size_ratchet.py",
+      "anchor": "review type access before extraction: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "correction-receipt-text-level-recurrence",
     "source": "https://linear.app/jovie/issue/LYB-362",
     "correction": "LYB-362: Re-mechanization requires a second receipt with the same normalized correction text and classifier level. First-seen corrections and different text at the same level must not enqueue a request.",
