@@ -219,6 +219,11 @@ checks retain their own invocations; guards with finding-baseline ratchets must
 use the existing ratchet runner and cannot be wrapped by this emitter. The normal
 shared-lib test task runs the CLI regression fixtures and emitter coverage gate.
 
+The single [warn-to-ratchet promotion decision (LYB-361)](../../packages/shared-lib/correction-promotion-rule.json)
+records the recommended default for the auto-mechanize child. It is inactive,
+reserves a default-off feature gate, and leaves the current emitter behavior
+above unchanged. That child owns implementation and flag wiring.
+
 The JSON report and existing CI/owner tables expose sources, lessons, selected
 levels, guards and recurrence. Required coverage CI compares against the exact
 Git base and rejects lost sources as well as lost rules or guards. It permits
