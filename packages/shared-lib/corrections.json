@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "correction-receipt-text-level-recurrence",
+    "source": "https://linear.app/jovie/issue/LYB-362",
+    "correction": "LYB-362: Re-mechanization requires a second receipt with the same normalized correction text and classifier level. First-seen corrections and different text at the same level must not enqueue a request.",
+    "mechanization": "Record receipts through recordCorrectionReceipt, which derives recurrence from normalized text and level, marks the new receipt and invokes the internal mechanize queue exactly once for a repeat. Retain regression cases in the existing required shared-lib suite for first-seen, exact and normalized repeats, different text and different levels. The harness owns pushing and PR operations. Machine: built packages/shared-lib/src/correction-ledger.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The receipt-recording boundary owns both matching and internal queue dispatch, preventing unrelated corrections from triggering re-mechanization by construction."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/correction-ledger.ts",
+      "anchor": "if (receipt.isRecurrence) enqueueMechanize({ type: 'mechanize', correction: receipt });"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-5df69c1e5f",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42401937834/job/128491764859",
     "correction": "PR #1699 / LYB-312, fix-red-5df69c1e5f occurrence 30 in 14 days: merge origin/main without rebasing, preserve the weekly photo check-in, and repair CI Summary and Launch Quality. The old combined timeline XCTest called two complete dated journeys and failed terminating the app at 199 seconds. The automatic source merge also dispatched both parent network-path handlers for every callback.",

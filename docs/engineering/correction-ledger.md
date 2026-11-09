@@ -57,6 +57,19 @@ A different rule id leaves the earlier count unchanged. This step does not emit
 or change checks. Coverage and the recurrence intake still derive repeat counts
 from distinct source URLs per fingerprint.
 
+For receipt intake (LYB-362), call `recordCorrectionReceipt` in the same module
+with the prior receipt list, the new classified correction, and a synchronous
+internal `enqueueMechanize` callback. It appends the receipt with `isRecurrence`
+and a numeric `recurrence` count. Matching uses correction text normalized with
+Unicode NFKC, trimmed and collapsed whitespace, and lowercase, plus the exact
+classifier `level`. Different text at the same level, or the same text at a
+different level, starts at zero. Rule IDs do not determine receipt matching.
+The first matching receipt emits no request; each newly recorded repeat emits
+one `{ type: 'mechanize', correction: receipt }` request. Retain the returned list
+for the next intake. This callback is the internal queue boundary; it performs
+no UI, outbound messaging, check generation, or Linear filing. The tracked Git
+ledger schema and fingerprint/source-based recurrence intake remain unchanged.
+
 For a merge conflict in the ledger, run
 `node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger` before
 staging it. The resolver retains receipts from both Git conflict stages and
