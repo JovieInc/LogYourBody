@@ -86,6 +86,14 @@ once regardless of its recurrence count. This pure metric reads saved levels
 without checking guard files or changing the existing guard-coverage report,
 CI gates, or UI.
 
+The single [coverage-floor decision (LYB-364)](../../packages/shared-lib/correction-coverage-floor.json)
+records the recommended default: no absolute percentage floor; fail only when
+the unrounded `correctionPyramidCoverage.mechanizedShare` is lower than the last
+recorded baseline. Equal or higher shares pass this floor rule. The decision is
+inactive and reserves a default-off feature gate. The guard-coverage CI child
+owns enforcement, baseline recording and flag wiring; this record adds no CI
+job or metric implementation and preserves existing coverage and guard checks.
+
 For a merge conflict in the ledger, run
 `node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger` before
 staging it. The resolver retains receipts from both Git conflict stages and
