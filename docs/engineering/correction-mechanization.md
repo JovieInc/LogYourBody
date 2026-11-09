@@ -109,6 +109,10 @@ start a second PR owner.
 
 For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
 merges and classifies the correction ledger after other conflicts are resolved.
+`python3 scripts/resolve-repository-docs.py --merge-sections docs/<path>.md`
+prints a proposal retaining both parents' independent paragraph insertions, or
+new incoming standalone sections. Review and stage the proposal explicitly;
+it leaves working files and the index untouched.
 `python3 scripts/resolve-repository-docs.py --union-manifests` keeps every parent
 test input while a diagnostic workflow pin conflict remains. The reviewed project
 digest resolver replaces that pin and then rebuilds the source map.
