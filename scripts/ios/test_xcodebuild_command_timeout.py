@@ -90,7 +90,7 @@ class DeadlineRuleTests(unittest.TestCase):
                 self.assertNotIn("command-started", expired.stdout)
                 self.assertIn("audit deadline exhausted", expired.stderr)
 
-    def test_expired_budget_reaches_build_and_test_callers_even_inside_a_condition(self):
+    def test_budget_reaches_build_and_test_callers_even_inside_a_condition(self):
         source = WATCHER.with_name("launch-quality-audit.sh").read_text()
         helpers = source[source.index("remaining_budget_seconds() {"):source.index('\nPHASE_NAME=""')]
         functions = source[source.index("run_xcodebuild_test() {"):source.index("assert_xcresult_evidence() {")]
@@ -98,25 +98,36 @@ class DeadlineRuleTests(unittest.TestCase):
         setup = """
 set -euo pipefail
 AUDIT_STARTED_AT=1000; AUDIT_DEADLINE_SECONDS=60
-date() { echo 1060; }
-COMMON_XCODEBUILD_ARGS=(); XCODEBUILD_SETTINGS_ARRAY=()
+date() { echo "$FIXTURE_NOW"; }
+# Model the runner's populated arrays: Bash 3.2 treats empty arrays as unset.
+COMMON_XCODEBUILD_ARGS=(-project "Fixture Project.xcodeproj")
+XCODEBUILD_SETTINGS_ARRAY=(CODE_SIGNING_ALLOWED=NO)
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS=1800; BUILD_FOR_TESTING_TIMEOUT_SECONDS=900
 cleanup_booted_simulator_apps() { :; }
 start_launch_probe() { echo probe-started; }
-run_with_timeout() { echo command-started; }
+stop_launch_probe() { :; }
+run_with_timeout() { printf 'command-started timeout=%s\\n' "$1"; printf 'arg=%s\\n' "$@"; }
 """
         with tempfile.TemporaryDirectory() as directory:
-            for command in ('build_for_testing_once', 'run_xcodebuild_test fixture "$ARTIFACT_DIR/ui.xcresult" "$ARTIFACT_DIR/ui.log"'):
-                with self.subTest(command=command):
-                    result = subprocess.run(
-                        ["/bin/bash", "-c", setup + helpers + functions
-                         + f'\nif {command}; then exit 0; else exit "$?"; fi'],
-                        env={"PATH": os.defpath, "ARTIFACT_DIR": directory},
-                        capture_output=True, text=True, check=False,
-                    )
-                    self.assertEqual(result.returncode, 124, result.stderr)
-                    self.assertNotIn("command-started", result.stdout)
-                    self.assertNotIn("probe-started", result.stdout)
+            for now in (1059, 1060, 1061):
+                for command in ('build_for_testing_once', 'run_xcodebuild_test fixture "$ARTIFACT_DIR/ui.xcresult" "$ARTIFACT_DIR/ui.log"'):
+                    with self.subTest(now=now, command=command):
+                        result = subprocess.run(
+                            ["/bin/bash", "-c", setup + helpers + functions
+                             + f'\nif {command}; then exit 0; else exit "$?"; fi'],
+                            env={"PATH": os.defpath, "ARTIFACT_DIR": directory, "FIXTURE_NOW": str(now)},
+                            capture_output=True, text=True, check=False,
+                        )
+                        self.assertEqual(result.returncode, 0 if now < 1060 else 124, result.stderr)
+                        if now < 1060:
+                            self.assertIn("command-started timeout=1\n", result.stdout)
+                            self.assertIn("arg=Fixture Project.xcodeproj\n", result.stdout)
+                            self.assertIn("arg=CODE_SIGNING_ALLOWED=NO\n", result.stdout)
+                            self.assertEqual("probe-started" in result.stdout, command.startswith("run_xcodebuild_test"))
+                        else:
+                            self.assertIn("audit deadline exhausted", result.stderr)
+                            self.assertNotIn("command-started", result.stdout)
+                            self.assertNotIn("probe-started", result.stdout)
 
     def test_terminal_lines_are_exact(self) -> None:
         self.assertTrue(deadline.is_terminal_result("** TEST EXECUTE SUCCEEDED **"))

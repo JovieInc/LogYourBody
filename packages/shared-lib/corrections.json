@@ -7329,5 +7329,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-deadline-fixtures-match-macos-shell",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
+    "correction": "PR #1774 / LYB-344, fix-red-5df69c1e5f occurrence 24: repair the failed native launch preflight without weakening gates. Run 42705530320 fails test_expired_budget_reaches_build_and_test_callers_even_inside_a_condition because Bash 3.2 treats the fixture's empty COMMON_XCODEBUILD_ARGS array as unset under nounset. CI Summary reflects that failure. The requested merge of origin/main is already up to date. Vercel independently reports Deployment was blocked.",
+    "mechanization": "Extend the existing deadline fixture with representative populated command/settings arrays and live, exactly expired and over-budget cases for both build and test callers inside a conditional. Assert the one-second remaining timeout, preserved spaced argument and signing setting, and refusal before any command or probe starts after expiry. The existing required shared-lib suite and launch-quality preflight execute this guard. Replay the original suite and repair with GNU Bash 3.2 built in /tmp: the original reproduces the CI failure and the repair passes all 13 cases; Bash 5 also passes. No workflow, runner budget, selector or product behavior changes. The harness owns pushing and PR-body edits and must add exactly one line: Machine: built scripts/ios/test_xcodebuild_command_timeout.py. Native execution on the repaired head remains for macOS CI; the Vercel provider hold is external.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Production already supplies populated arrays. Changing the runtime budget controller cannot correct the test-only empty-array fixture without introducing unrelated behavior."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing executed shell fixture can represent the production arguments on macOS Bash and assert both useful command execution and deadline refusal before native work starts."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_xcodebuild_command_timeout.py",
+      "anchor": "# Model the runner's populated arrays: Bash 3.2 treats empty arrays as unset."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
