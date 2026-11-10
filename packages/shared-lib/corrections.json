@@ -7767,5 +7767,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "release-health-fixture-cold-runtime-preflight",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42914679983/job/130175189984",
+    "correction": "PR #1748 / LYB-341, fix-red-1a39536f40 occurrence 7: merge origin/main first and repair the JavaScript/TypeScript release-health fixture failure without weakening gates. The first Ruby scenario took 5149ms and exceeded the default 5000ms test deadline; the remaining 30 cases passed. The required main merge reports already up to date. Vercel independently reports Deployment was blocked.",
+    "mechanization": "Extend the existing release-health fixture runner with explicit runtime preparation and invoke it through the bounded Vitest beforeAll setup hook. Load the same Ruby dependencies and initialize fixture signing before timed release scenarios. Preserve all 31 cases, assertions, five-second scenario deadlines and ten-second child timeouts. A real child-runner regression injects six seconds into the first Ruby invocation and fails with the old harness, then passes with preparation. Negative controls retain failure for a six-second behavior scenario and refuse scenario execution after preparation fails. The existing required shared-lib test task discovers these regressions. Cold runtime initialization is inferred from the first-only hosted delay; fresh hosted CI must confirm the repair. The harness owns push and PR edits and must add exactly one PR-body line: Machine: built .github/scripts/fixtures/app-store-release-health/run.rb. No Vercel credentials are available on this host to inspect or release its external hold.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture runner can prepare its Ruby runtime once during bounded suite setup, preventing cold initialization from consuming a release-behavior scenario deadline without relaxing release-health decisions or assertions."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/fixtures/app-store-release-health/run.rb",
+      "anchor": "if JSON.parse(ARGV.fetch(0)) == \"preflight\""
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
