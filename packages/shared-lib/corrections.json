@@ -7391,5 +7391,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependabot-rollup-fixture-follows-manifest-range",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1766",
+    "correction": "PR #1766, fix-red-1423773703 occurrence 44: merge origin/main and repair the Rollup dependency checks without weakening gates. Detect Changes and parity reject the stale source projection; CI Summary reflects that failure. Once local checks run, the Dependabot workspace regression also fails because its fake registry only publishes Rollup versions below the new declared minimum. Vercel independently reports Deployment was blocked.",
+    "mechanization": "Extend the existing Dependabot workspace guard to derive its mature Rollup version from the real root manifest and its fresh version from the next patch. Every Rollup bump then exercises the real range against the same controlled release-age boundary. Preserve the actual pnpm negative control, unchanged lockfile after refusal, web dependency update, mature direct and transitive resolutions, and absence of the fresh version. The isolated two-case suite fails before the fixture repair and passes afterward through the existing required shared-lib test suite. Use the existing --verify-lockfile source-map repair on this valid lockfile without changing its resolutions. The harness owns pushing and PR-body updates and must add exactly one line: Machine: built packages/shared-lib/src/dependabot-workspace.test.ts. Vercel provider logs and hosted checks remain unverified without credentials.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The frozen dependency graph already verifies. Product code cannot repair a fake registry that omits every version allowed by the new development dependency minimum."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing executed dependency guard can derive registry versions from the canonical manifest and verify release-age refusal and recovery with real pnpm instead of freezing historical versions."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/dependabot-workspace.test.ts",
+      "anchor": "// Keep registry versions inside the real manifest's range after every bump."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
