@@ -1713,14 +1713,15 @@ def test_focused_diagnostic_actual_actor_guard_fails_before_checkout(tmp_path: P
         assert run(overrides).returncode != 0
 
 
-def _run_diagnostic_dispatch(tmp_path: Path, *, mode: str = '--diagnostic-seven', **overrides: str):
+def _run_diagnostic_dispatch(tmp_path: Path, *, mode: str = '--diagnostic-seven',
+                             catalogue: Optional[dict[str, Any]] = None, **overrides: str):
     import sys
     root, head = _diagnostic_repository(tmp_path)
     binary = tmp_path / 'bin'
     binary.mkdir()
     payload, _ = _diagnostic_payload()
     fixture = tmp_path / 'catalogue.json'
-    fixture.write_text(json.dumps(payload))
+    fixture.write_text(json.dumps(payload if catalogue is None else catalogue))
     fake = '''import json, os, pathlib, subprocess, sys
 name=pathlib.Path(sys.argv[0]).name
 args=sys.argv[1:]
@@ -1836,6 +1837,43 @@ def test_focused_diagnostic_real_dispatcher_builds_once_selects_only_seven_and_n
     assert receipt['unitWitnessCoverageRatchetPerformanceProtectedSignedPhysical'] == 'NOT_EXECUTED_OR_QUALIFIED'
     artifacts = tmp_path / 'artifacts'
     assert not list(artifacts.glob('*.evidence.json')) and not list(artifacts.glob('*.coverage.json'))
+
+
+def test_focused_diagnostic_runtime_warnings_preserve_catalogue_without_becoming_executions(tmp_path: Path) -> None:
+    import copy
+    validate = _diagnostic_receipt_module()['strict_diagnostic_cases']
+    payload, log = _diagnostic_payload()
+    # Run 42772522859 passed all seven cases. Xcode 26.3 attached this metadata
+    # to three passing cases, and the receipt mistook it for repeated execution.
+    warning = {'nodeType': 'Runtime Warning', 'name':
+               'Publishing changes from background threads is not allowed; make sure to publish '
+               'values from the main thread (via operators like receive(on:)) on model updates.'}
+    cases = payload['testNodes'][0]['children']
+    for case in cases[4:]:
+        case['children'] = [copy.deepcopy(warning)]
+    assert len(validate(payload, _diagnostic_ids(), log)) == 7
+    result, _, receipt = _run_diagnostic_dispatch(tmp_path, catalogue=payload)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert receipt['status'] == 'passed' and receipt['errors'] == []
+    assert receipt['officialCatalogue'] == payload  # Retain every warning verbatim.
+    assert len(receipt['tests']) == 7 and receipt['uiCommandAttempts'] == 1
+    assert receipt['qualifying'] is False and receipt['nativeQualification'] is False
+
+    run = {'nodeType': 'Test Case Run', 'result': 'Passed'}
+    for children in ([warning, run], [run, warning], [warning, warning]):
+        cases[4]['children'] = children
+        assert len(validate(payload, _diagnostic_ids(), log)) == 7
+    for children in ([warning, run, run], [warning, {**run, 'result': 'Failed'}],
+                     [{**warning, 'children': [run]}], [{**warning, 'result': 'Failed'}],
+                     [{**warning, 'name': ''}], [{**warning, 'nodeType': 'Unknown warning'}]):
+        cases[4]['children'] = children
+        with pytest.raises(ValueError):
+            validate(payload, _diagnostic_ids(), log)
+    cases[4]['children'] = [warning]
+    for bad_log in [log + log, log.replace('passed', 'failed', 1),
+                    '\n'.join(log.splitlines()[:-1])]:
+        with pytest.raises(ValueError):
+            validate(payload, _diagnostic_ids(), bad_log)
 
 
 def test_focused_diagnostic_cold_compile_survives_past_the_old_ten_minute_cap(tmp_path: Path) -> None:
