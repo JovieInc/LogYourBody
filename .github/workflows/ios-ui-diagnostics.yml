@@ -39,7 +39,8 @@ jobs:
   diagnostic:
     name: Focused UI Diagnostics (NONQUALIFYING)
     runs-on: macos-15
-    timeout-minutes: 50
+    # The diagnostic step is 48m. Leave 7m for checkout, Xcode selection, and upload.
+    timeout-minutes: 55
     steps:
       - name: Validate manual diagnostic source
         shell: bash
@@ -100,7 +101,7 @@ jobs:
 
           # Intentionally unavailable until the FINAL composed audit and this
           # exact policy hunk are independently reviewed. Never a caller input.
-          REVIEWED_AUDIT_SHA256 = 'f83571a98afa3bb18e82740ba3cfeadf1320213b3902b99668c952937063ea5f'
+          REVIEWED_AUDIT_SHA256 = '318b11c32f2333c05ed3fc60f7d975bb7cc45893d379bbd9c3fcabb93edace7e'
           DEPENDENCIES = {
               'scripts/ios/xcodebuild-command-timeout.py': '66abf226c296005bbf50ca277d1e597f90c74269d26cb1afa039e999cbbc35fa',
               'scripts/ios/bootstrap-local-config.sh': 'aad028c0eff7f9d2a043711a8735963dc66b9bd664f11bf98b7ada67a60ab8db',
@@ -147,8 +148,9 @@ jobs:
 
       # No local composite setup, Ruby/Bundler install, dependency cache restore,
       # evidence validator CLI, coverage ratchet or performance invocation here.
+      # 48m holds a 900s cold build, the 1500s UI cap, 180s finalization, and the catalogue read.
       - name: Run fixed seven-case diagnostic
-        timeout-minutes: 43
+        timeout-minutes: 48
         shell: bash
         env:
           DIAGNOSTIC_EXPECTED_SOURCE_SHA: ${{ env.DIAGNOSTIC_SOURCE_SHA }}
