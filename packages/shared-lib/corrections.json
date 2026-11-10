@@ -7597,5 +7597,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "home-sidebar-dismissal-waits-for-stable-hittable-cover",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1781",
+    "correction": "PR #1781 / LYB-214 repair, fix-red-5df69c1e5f occurrence 14 in 14 days: required Launch Quality run 42865347160 passed its unit tests and 42 of 43 UI cases, but testPhotoScrubResetsWhenNavigatingToTheMenuAndBack failed line 51 after the third immediate scrim coordinate tap left the sidebar open. The recording and synthesized events show presentation changes and the same on-screen tap coordinates, supporting a presentation-readiness race rather than an out-of-bounds tap.",
+    "mechanization": "Extend the existing launch UI regression guard to require bounded sidebar readiness, two equal nonempty on-screen native frame samples, one window-anchored tap, and the retained dismissal outcome. Use one shared native dismissal helper for all repeated-menu and header-swipe dismissals in this journey. The new guard rejects the original source and accepts the synchronized helper without retries, skipped assertions, changed selectors or relaxed execution budgets. Preserve the original check-in synchronization intent. origin/main was already an ancestor, so the required merge was a no-op. The harness owns pushes and PR edits and must add exactly one PR-body line: Machine: built packages/shared-lib/src/launch-ui-regression-audit.test.ts. Native execution remains unverified on Linux. Vercel deployment 7689281378 reports Deployment was blocked, with no exposed build error or local Vercel credentials; that provider hold remains external.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The native UI test controls when and where to send the dismissal action. Sharing a bounded stable-frame and hittability check before one window-anchored tap prevents this test from immediately acting on a merely existing cover. The original disappearance and subsequent navigation assertions still determine success."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/HomeV2TimelineIntegrationUITests.swift",
+      "anchor": "!frame.isEmpty && window.frame.contains(frame) && frame == previousFrame"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

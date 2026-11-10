@@ -120,6 +120,41 @@ it('waits for exact metric text and Save readiness before testing Home check-in 
   }
 });
 
+it('waits for a stable hittable sidebar before each single dismissal tap', () => {
+  const source = readFileSync(
+    new URL(
+      '../../../apps/ios/LogYourBodyUITests/HomeV2TimelineIntegrationUITests.swift',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  const helper =
+    source.split('private func dismissSidebar(')[1]?.split('\n    private func ')[0] ?? '';
+  expect(helper).toContain('guard scrim.exists, scrim.isHittable else { return false }');
+  expect(helper).toContain('var previousFrame = CGRect.null');
+  expect(helper).toContain('let frame = scrim.frame');
+  expect(helper).toContain('defer { previousFrame = frame }');
+  expect(helper).toContain(
+    '!frame.isEmpty && window.frame.contains(frame) && frame == previousFrame',
+  );
+  expect(helper).toContain('XCTWaiter.wait(for: [ready], timeout: 5), .completed');
+  expect(helper).toContain(
+    'window.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()',
+  );
+  expect(helper.match(/\.tap\(\)/g)).toHaveLength(1);
+  expect(helper.indexOf('XCTWaiter.wait(')).toBeLessThan(helper.indexOf('.tap()'));
+  expect(helper).toContain('XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))');
+  expect(helper.indexOf('.tap()')).toBeLessThan(helper.indexOf('scrim.waitForNonExistence('));
+  const journey = source
+    .split('func testPhotoScrubResetsWhenNavigatingToTheMenuAndBack()')[1]
+    .split('\n    func ')[0];
+  expect(journey).toContain('for _ in 0..<3 {');
+  expect(journey.match(/dismissSidebar\(scrim, in: app\)/g)).toHaveLength(2);
+  expect(journey).not.toContain('scrim.coordinate(');
+  expect(journey).toContain('"Header swipes must still open the sidebar"');
+  expect(journey).toContain('app.buttons["home_v2_viewer_close"].waitForExistence(timeout: 5)');
+});
+
 it('checks Stats composition, card styling and provenance dismissal through the launch audit with executed coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
