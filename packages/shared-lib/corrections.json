@@ -7351,5 +7351,27 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-reachability-swipe-avoids-wireframe-rotation",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42755703124",
+    "correction": "LYB-214: PR #1776 fixed the 600s cold-build timeout, but diagnostic run 42755703124 on main fails the composition case. Every reachability drag starts at y=643.67 inside the wireframe, rotates it, and leaves FFMI at y=874.33. The other six selected cases pass.",
+    "mechanization": "Move the existing viewport scroll helper's upward start from a 40pt to a 12pt bottom inset, into the visible strip below the 4:5 card, retaining the distance cap, downward start, all six attempts, full containment and hittability assertions. Extend the existing required wireframe suite with the failing run geometry, reading the actual helper offsets and checking the start is outside the avatar and both directions stay inside the viewport. This regression fails on the old helper and all five family cases pass after the repair. Existing Turbo inputs already include native UI test sources. No workflow, product interaction, timeout, selector or qualification change. Native XCTest remains unverified on this Linux host. The harness owns pushing and PR edits and must include Machine: built packages/shared-lib/src/wireframe-avatar-family.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The wireframe intentionally owns vertical rotation, as documented for the body stage. Altering product gesture ownership would change that behavior to compensate for a test issuing its scroll gesture inside the rotation surface."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required wireframe suite can read the real native helper offsets and replay the retained failing viewport and card geometry, rejecting scroll origins inside the rotation surface and endpoints outside the viewport."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/wireframe-avatar-family.test.ts",
+      "anchor": "starts Home reachability swipes below the wireframe rotation surface"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
