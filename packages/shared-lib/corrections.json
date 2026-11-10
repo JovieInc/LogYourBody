@@ -7434,5 +7434,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-81061e944d",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1704",
+    "correction": "PR #1704 / LYB-316 repair, fix-red-81061e944d occurrence 3 in 14 days: merge origin/main without rebasing, retain the personalized 3D engine evaluation, and repair CI Summary, Gitleaks, Launch Quality and Static Audits. Failed logs show release-asset HTTP 504s and a 92-byte SwiftLint response reaching unzip rather than a product-code failure.",
+    "mechanization": "Merge current main and use its pinned SwiftLint release-asset downloader for both installers. Extend that existing downloader to try the official asset API after an HTTP 200 checksum mismatch as well as HTTP failures, retaining the same required digest before extraction. Two real-curl regression cases fail before the extension and pass after it; the existing Mac Runner Routing Tests CI matrix also retains persistent failure, invalid archive, substituted digest and authentication isolation cases. Resolve the project pin explicitly after verifying additive membership, regenerate the source projection, and preserve both parents correction receipts with the existing ledger resolver. The shared Gitleaks workflow still has only retry-based download recovery and requires a successful provider rerun; keep its gate unchanged. The harness owns pushes and PR edits and must add exactly one PR-body line: Machine: built scripts/download-release-asset.sh. Native execution and exact-head coverage require the real macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One shared download boundary prevents platform installers from diverging on retry, API authentication and checksum verification. Both native callers must verify the pinned bytes before extracting them; failed HTTP responses and substituted archives remain hard failures."
+      }
+    },
+    "guard": {
+      "path": "scripts/download-release-asset.sh",
+      "anchor": "# Neither HTTP error content nor substituted archives may reach extraction."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

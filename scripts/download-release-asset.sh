@@ -10,7 +10,9 @@ output="${4:?output path required}"
 if ! curl --fail --silent --show-error --location \
   --retry 3 --retry-all-errors --retry-delay 2 \
   --connect-timeout 30 --max-time 120 \
-  "$release_url" -o "$output"; then
+  "$release_url" -o "$output" ||
+  ! printf '%s  %s\n' "$sha256" "$output" | shasum -a 256 --check --strict; then
+  # HTTP 200 is insufficient: recover invalid bytes through the same pinned digest.
   # Authenticate only the API request, avoiding the shared anonymous rate limit.
   headers=(--header 'Accept: application/octet-stream')
   if [[ -n "${GH_TOKEN:-}" ]]; then
