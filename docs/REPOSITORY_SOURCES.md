@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a09753420cedd570abd43a7121788c683f14bf6dc2e7e5ed708591a088137112`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `41d70abc519bb0c3993b590439a5da72d15edf8b4afe15f4450d2f1d574d9ace`)
 
 ### `apps/web/package.json`: engines
 
@@ -127,7 +127,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "glob": "^14.0.2",
   "idb": "^8.0.4",
   "input-otp": "^1.5.0",
-  "jose": "^6.2.14",
+  "jose": "^6.2.15",
   "js-yaml": "5.4.3",
   "lodash": "^4.18.1",
   "lucide-react": "^1.55.0",
