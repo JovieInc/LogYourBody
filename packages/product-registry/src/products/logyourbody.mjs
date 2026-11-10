@@ -225,6 +225,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-47', reason: 'LYB-47 source evidence for dated metric observations and neutral trend semantics.' },
       { value: 'https://linear.app/jovie/issue/LYB-204', reason: 'LYB-204 source evidence for the correction ledger, retained receipts and recurrence contract.' },
       { value: 'https://linear.app/jovie/issue/LYB-362', reason: 'LYB-362 source evidence for normalized correction-text and classifier-level recurrence matching and internal mechanize requests.' },
+      { value: 'https://linear.app/jovie/issue/LYB-365', reason: 'Tim\'s post-Apple sign-in initialization failure report and retained endpoint regression receipt; not a runtime endpoint.' },
       { value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet', reason: 'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.' },
       { value: 'https://linear.app/jovie/issue/LYB-254', reason: 'LYB-254 source evidence for the guard-reference existence check and shrink-only unguarded baseline.' },
       { value: 'https://linear.app/jovie/issue/LYB-225', reason: 'LYB-225 source evidence for the public waitlist rate-limit correction.' },

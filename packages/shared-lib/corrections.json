@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dce46b3396cd",
+    "source": "https://linear.app/jovie/issue/LYB-365",
+    "correction": "Tim bug report 2026-11-09 17:03Z, founder-thread-2026-11-09-lyb-apple-login-initialize: Apple sign-in succeeds after an app update, then an initialization toast prevents login from reaching onboarding or the app (LYB-365). Cover the post-auth initialization step and identify the actual error wording.",
+    "mechanization": "Extend the existing API configuration boundary to canonicalize the known HTTPS apex alias even when API_BASE_URL overrides the fixed default, keeping bearer session registration on the registry host without a redirect. Normalize the matching expected host in runtime and release generation, preserving unrelated endpoints and host-mismatch rejection. Two executable release-configuration regressions fail before the fix and all nine focused cases pass afterwards in the existing required shared-lib suite. Retain native request and rejection regressions in MobileProfileNamePayloadTests and endpoint policy cases in AuthConfigurationValidationTests; real Mac execution and exact-head coverage remain required. The exact source toast is Your LogYourBody account could not be initialized.; correlation with the reported production session remains unverified because this host has no Sentry credentials or connector. The harness owns push and PR operations. Machine: built apps/ios/LogYourBody/Utils/Configuration.swift.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Normalizing the known legacy alias before URLSession constructs authenticated API requests prevents cross-host redirect header loss by construction, including releases with stale API overrides."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Utils/Configuration.swift",
+      "anchor": "canonicalAPIBaseURL(stringValue(for: \"API_BASE_URL\", default: ProductRegistry.Hosts.api))"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-f8dba15025",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
     "correction": "LYB-344 PR #1774, fix-red-f8dba15025 occurrence 3: merge origin/main first without rebasing, retain the dated-outcome coach action and weekly review, and repair Company Guards and CI Summary. DatedOutcomeStoreTests.swift grew to 515 lines; Vercel reports Deployment was blocked without a build error.",

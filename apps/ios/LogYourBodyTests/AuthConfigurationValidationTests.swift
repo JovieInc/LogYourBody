@@ -8,6 +8,30 @@ import UIKit
 @testable import LogYourBody
 
 final class AuthConfigurationValidationTests: XCTestCase {
+    func testLegacyAPIOverrideUsesCanonicalHostWithoutRedirectingBearerRequests() {
+        XCTAssertEqual(
+            Configuration.canonicalAPIBaseURL("https://logyourbody.com"),
+            ProductRegistry.Hosts.api
+        )
+        XCTAssertEqual(Configuration.canonicalAPIHost("logyourbody.com"), ProductRegistry.Hosts.apiHost)
+        XCTAssertEqual(
+            Configuration.canonicalAPIBaseURL("https://LOGYOURBODY.COM/api/auth/mobile/session?retry=1"),
+            ProductRegistry.Hosts.api + "/api/auth/mobile/session?retry=1"
+        )
+    }
+
+    func testAPIHostRepairPreservesDevelopmentAndUnrelatedEndpoints() {
+        for endpoint in [
+            "http://localhost:3000", "https://api.example.com", ProductRegistry.Hosts.api,
+            "https://logyourbody.com:8443", "https://logyourbody.com.example.com",
+            "http://logyourbody.com"
+        ] {
+            XCTAssertEqual(Configuration.canonicalAPIBaseURL(endpoint), endpoint)
+        }
+        XCTAssertEqual(Configuration.canonicalAPIHost("localhost"), "localhost")
+        XCTAssertEqual(Configuration.canonicalAPIHost("wrong.example.com"), "wrong.example.com")
+    }
+
     func testProductionRejectsWrongIdentityIssuerAndTelemetryConfig() {
         let snapshot = makeSnapshot(
             environment: .production,
