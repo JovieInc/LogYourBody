@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "fix-red-1423773703",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1764",
+    "correction": "PR #1764 repair, fix-red-1423773703 occurrence 44: merge origin/main without rebasing, preserve the jose 6.2.14 to 6.2.15 update, and repair CI Summary, Detect Changes and parity reporting a stale repository source map. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing dependency/source-map resolver to recheck untracked and ignored dependency inputs after frozen lockfile verification and source-map rendering, before writing or staging artifacts. Reuse its preflight scan, retain rollback and retry behavior, and use --verify-lockfile on this jose bump. Eight regressions prove the previous resolver accepted newly created untracked hooks and ignored workspace npmrc files during verification or rendering in both dependency modes. The cases run through the existing required pre-commit-lint.test.mjs suite. The harness must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py. The external Vercel provider block remains unverified; no provider or CI control is relaxed.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency repair boundary can prevent a source-map repair from certifying dependency inputs that appeared after preflight. Sharing the scan at preflight and before artifact writes closes both verification and rendering windows while preserving local edits and generated-artifact rollback."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "assert_no_local_dependency_inputs(root, dependency_inputs)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-f8dba15025",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
     "correction": "LYB-344 PR #1774, fix-red-f8dba15025 occurrence 3: merge origin/main first without rebasing, retain the dated-outcome coach action and weekly review, and repair Company Guards and CI Summary. DatedOutcomeStoreTests.swift grew to 515 lines; Vercel reports Deployment was blocked without a build error.",

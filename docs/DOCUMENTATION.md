@@ -106,6 +106,9 @@ repair and restore the original artifacts; retry uses the reviewed inputs.
 Tracked dependency edits during rendering also refuse repair before artifact
 writes or staging. The edits remain available for review; stage them and retry
 the same command.
+Both modes recheck for new untracked or ignored dependency inputs after verification
+and rendering, before writing artifacts. A newly created hook, npmrc file, patch or
+manifest refuses repair; the local file survives and generated artifacts are restored.
 Frozen verification also refuses lockfile changes before regenerating or staging
 the source map. Only a confirmed outdated lockfile permits refresh mode to write
 new resolutions; retrying after a refusal uses the original reviewed artifacts.
