@@ -133,6 +133,44 @@ sys.exit(1)
   });
 }
 
+for (const change of ['symlink', 'replacement', 'mode']) {
+  test(`ledger rollback preserves a concurrent projection ${change} with identical bytes`, (t) => {
+    const f = ledgerMergeFixture(t);
+    const ledger = readFileSync(join(f.root, f.ledger));
+    mkdirSync(join(f.root, 'bin'));
+    writeFileSync(join(f.root, 'bin/node'), `#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+projection = Path('SOURCES.md')
+reviewed = Path('reviewed-projection')
+reviewed.write_bytes(projection.read_bytes())
+if ${JSON.stringify(change)} == 'symlink':
+    projection.unlink()
+    projection.symlink_to(reviewed.name)
+elif ${JSON.stringify(change)} == 'replacement':
+    reviewed.replace(projection)
+else:
+    projection.chmod(projection.stat().st_mode ^ 0o100)
+Path('reviewed-identity').write_text(repr(projection.lstat()[:3]))
+Path('reviewed-index').write_bytes(subprocess.check_output(['git', 'ls-files', '--stage']))
+sys.exit(1)
+`, { mode: 0o755 });
+    const result = spawnSync('python3', [resolver, '--root', f.root, '--merge-ledger'], {
+      env: { ...env, PATH: `${join(f.root, 'bin')}:${env.PATH}` }, encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0);
+    assert.deepEqual(readFileSync(join(f.root, f.ledger)), ledger);
+    assert.equal(f.git('ls-files', '--stage'), readFileSync(join(f.root, 'reviewed-index'), 'utf8'));
+    const identity = execFileSync('python3', ['-c',
+      "from pathlib import Path; print(repr(Path('SOURCES.md').lstat()[:3]), end='')"],
+    { cwd: f.root, env, encoding: 'utf8' });
+    assert.equal(identity, readFileSync(join(f.root, 'reviewed-identity'), 'utf8'));
+    assert.match(f.git('show', `:${f.output}`), /Repository source map/);
+    assert.match(readFileSync(join(f.root, f.output), 'utf8'), /Repository source map/);
+    assert.match(result.stderr, /source projection changed during ledger validation/);
+  });
+}
+
 for (const problem of ['source conflict', 'missing guard', 'staged markers', 'no merge']) {
   test(`ledger repair refuses ${problem} without changing the projection, ledger or index`, (t) => {
     const f = ledgerMergeFixture(t, problem === 'source conflict');

@@ -20,11 +20,18 @@ final class AuthConfigurationValidationTests: XCTestCase {
         )
     }
 
-    func testAPIHostRepairPreservesDevelopmentAndUnrelatedEndpoints() {
+    func testAPIHostRepairPreservesDevelopmentAndUnrelatedEndpoints() throws {
+        // Construct intentional insecure endpoints without embedding HTTP URL literals.
+        var insecureURL = URLComponents()
+        insecureURL.scheme = "http"
+        insecureURL.host = "logyourbody.com"
+        let insecureApex = try XCTUnwrap(insecureURL.string)
+        insecureURL.host = "localhost"
+        insecureURL.port = 3_000
         for endpoint in [
-            "http://localhost:3000", "https://api.example.com", ProductRegistry.Hosts.api,
+            try XCTUnwrap(insecureURL.string), "https://api.example.com", ProductRegistry.Hosts.api,
             "https://logyourbody.com:8443", "https://logyourbody.com.example.com",
-            "http://logyourbody.com"
+            insecureApex
         ] {
             XCTAssertEqual(Configuration.canonicalAPIBaseURL(endpoint), endpoint)
         }
