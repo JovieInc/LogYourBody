@@ -9,14 +9,24 @@
   "launch.deadline-replan": [
     "LaunchJourneyTests/testDateEditRecomputesWithoutExtendingExpired()",
     "DatedOutcomeStatsTests/testDateEditsAndNewMeasurementsRetainOriginalBaseline()",
-    "DatedOutcomeStoreTests/testPlanBaselineSurvivesEditsAcknowledgementAndRelaunchWithoutWireChanges()"
+    "DatedOutcomeStoreTests/testPlanBaselineSurvivesEditsAcknowledgementAndRelaunchWithoutWireChanges()",
+    "DatedOutcomeStatsTests/testCoachDateEditRecomputesAndRetryDoesNotReplaceBaseline()"
   ],
-  "launch.directive": ["LaunchJourneyTests/testOneNextActionForReadyPlan()"],
+  "launch.directive": [
+    "LaunchJourneyTests/testOneNextActionForReadyPlan()",
+    "DatedOutcomeStatsTests/testCoachFirstActionRestoresOriginalEvidenceAndWeeklyReviewOnReturn()"
+  ],
   "launch.drift": [
     "LaunchJourneyTests/testDriftChangesTheSingleAction()",
-    "DatedOutcomeStatsTests/testDateEditsAndNewMeasurementsRetainOriginalBaseline()"
+    "DatedOutcomeStatsTests/testDateEditsAndNewMeasurementsRetainOriginalBaseline()",
+    "DatedOutcomeStatsTests/testCoachWeeklyOnTrackBehindAndAheadHoldOrReviewWithoutTrainingNumbers()",
+    "DatedOutcomeStatsTests/testCoachWeeklyFreshnessGapDoesNotChangeActionOrPretendToAdjust()"
   ],
-  "launch.memory-isolation": ["LaunchJourneyTests/testHealthMemoryIsolationFailClosed()"],
+  "launch.memory-isolation": [
+    "LaunchJourneyTests/testHealthMemoryIsolationFailClosed()",
+    "DatedOutcomeStatsTests/testCoachUnavailablePlannerPolicyAndForeignMemoryFailClosed()",
+    "DatedOutcomeStoreTests/testCoachActionAndNextCheckInSurviveSQLiteReopenWithoutSyncEdit()"
+  ],
   "launch.navigation": [
     "LaunchJourneyTests/testHiddenSurfaceRecoveryHasAnExit()",
     "DatedOutcomeStoreTests/testStalePresentationCannotSaveIntoAnotherAccount()",
@@ -46,7 +56,9 @@
     "LogYourBodyUITests/testDatedStatsExpiredDateHasOneReachableRecovery()",
     "LogYourBodyUITests/testDatedStatsMaintenanceHasOneReachableRecovery()",
     "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()",
-    "DatedOutcomeStatsTests/testNewAcceptedReadingRecoversLatestConflictWithoutReplacingExistingBaseline()"
+    "DatedOutcomeStatsTests/testNewAcceptedReadingRecoversLatestConflictWithoutReplacingExistingBaseline()",
+    "DatedOutcomeStatsTests/testCoachWeeklyFreshnessGapDoesNotChangeActionOrPretendToAdjust()",
+    "DatedOutcomeStatsTests/testEveryStatsManifestStateHasOneRecoveryAndPreservesConstraints()"
   ],
   "launch.return": [
     "LaunchJourneyTests/testExpiredAndMaintenanceDoNotExtendTheDate()",
@@ -56,7 +68,9 @@
     "DatedOutcomeStatsTests/testExpiryWinsOverDenialOfflineMissingPolicyAndMaintenance()",
     "DatedOutcomeStoreTests/testPlanBaselineSurvivesEditsAcknowledgementAndRelaunchWithoutWireChanges()",
     "LogYourBodyUITests/testDatedStatsManualMeasurementDateEditExpiryAndAccountReturn()",
-    "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()"
+    "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()",
+    "DatedOutcomeStatsTests/testCoachFirstActionRestoresOriginalEvidenceAndWeeklyReviewOnReturn()",
+    "DatedOutcomeStoreTests/testCoachActionAndNextCheckInSurviveSQLiteReopenWithoutSyncEdit()"
   ],
   "launch.safety": [
     "LaunchJourneyTests/testUnavailableSafetyAndUnsafeDatesFailClosed()",
@@ -64,7 +78,8 @@
     "DatedTimelineTests/testSafetyAndMaintenanceWithMissingPolicyRecoverWithoutAdmittingPlan()",
     "DatedOutcomeStatsTests/testRateBoundaryDoesNotBypassTargetEligibilityOrIncompletePolicy()",
     "DatedOutcomeStatsTests/testUnavailablePolicyMaintenanceAndAccountReplacementNeverAdmitAPlan()",
-    "DatedOutcomeStatsTests/testAdoptedCeilingUsesCurrentAcceptedWeightAndElapsedTimeWithoutCompounding()"
+    "DatedOutcomeStatsTests/testAdoptedCeilingUsesCurrentAcceptedWeightAndElapsedTimeWithoutCompounding()",
+    "DatedOutcomeStatsTests/testCoachUnavailablePlannerPolicyAndForeignMemoryFailClosed()"
   ],
   "launch.stats": [
     "LaunchJourneyTests/testStatsSurfaceProjectsEveryState()",

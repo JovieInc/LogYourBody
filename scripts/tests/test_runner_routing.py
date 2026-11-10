@@ -1626,7 +1626,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        'dfad750f7194317ea3710684addaa13fb82132c77afb404fab81552bffc1dbc5'
+        '318b11c32f2333c05ed3fc60f7d975bb7cc45893d379bbd9c3fcabb93edace7e'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -1713,14 +1713,15 @@ def test_focused_diagnostic_actual_actor_guard_fails_before_checkout(tmp_path: P
         assert run(overrides).returncode != 0
 
 
-def _run_diagnostic_dispatch(tmp_path: Path, *, mode: str = '--diagnostic-seven', **overrides: str):
+def _run_diagnostic_dispatch(tmp_path: Path, *, mode: str = '--diagnostic-seven',
+                             catalogue: Optional[dict[str, Any]] = None, **overrides: str):
     import sys
     root, head = _diagnostic_repository(tmp_path)
     binary = tmp_path / 'bin'
     binary.mkdir()
     payload, _ = _diagnostic_payload()
     fixture = tmp_path / 'catalogue.json'
-    fixture.write_text(json.dumps(payload))
+    fixture.write_text(json.dumps(payload if catalogue is None else catalogue))
     fake = '''import json, os, pathlib, subprocess, sys
 name=pathlib.Path(sys.argv[0]).name
 args=sys.argv[1:]
@@ -1825,7 +1826,7 @@ def test_focused_diagnostic_real_dispatcher_builds_once_selects_only_seven_and_n
     assert commands[1][commands[1].index('-default-test-execution-time-allowance') + 1] == '90'
     assert commands[1][commands[1].index('-maximum-test-execution-time-allowance') + 1] == '180'
     timed = _timeout_invocations(calls)
-    assert [item[2] for item in _non_terminate_timeouts(timed)] == ['600s', '60s']
+    assert [item[2] for item in _non_terminate_timeouts(timed)] == ['900s', '60s']
     _assert_bounded_cold_terminates(timed, 2)
     assert all('test-without-building' not in item for item in timed)
     assert 'xcodebuild deadline 1500s finalization-grace 180s' in (
@@ -1836,6 +1837,59 @@ def test_focused_diagnostic_real_dispatcher_builds_once_selects_only_seven_and_n
     assert receipt['unitWitnessCoverageRatchetPerformanceProtectedSignedPhysical'] == 'NOT_EXECUTED_OR_QUALIFIED'
     artifacts = tmp_path / 'artifacts'
     assert not list(artifacts.glob('*.evidence.json')) and not list(artifacts.glob('*.coverage.json'))
+
+
+def test_focused_diagnostic_runtime_warnings_preserve_catalogue_without_becoming_executions(tmp_path: Path) -> None:
+    import copy
+    validate = _diagnostic_receipt_module()['strict_diagnostic_cases']
+    payload, log = _diagnostic_payload()
+    # Run 42772522859 passed all seven cases. Xcode 26.3 attached this metadata
+    # to three passing cases, and the receipt mistook it for repeated execution.
+    warning = {'nodeType': 'Runtime Warning', 'name':
+               'Publishing changes from background threads is not allowed; make sure to publish '
+               'values from the main thread (via operators like receive(on:)) on model updates.'}
+    cases = payload['testNodes'][0]['children']
+    for case in cases[4:]:
+        case['children'] = [copy.deepcopy(warning)]
+    assert len(validate(payload, _diagnostic_ids(), log)) == 7
+    result, _, receipt = _run_diagnostic_dispatch(tmp_path, catalogue=payload)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert receipt['status'] == 'passed' and receipt['errors'] == []
+    assert receipt['officialCatalogue'] == payload  # Retain every warning verbatim.
+    assert len(receipt['tests']) == 7 and receipt['uiCommandAttempts'] == 1
+    assert receipt['qualifying'] is False and receipt['nativeQualification'] is False
+
+    run = {'nodeType': 'Test Case Run', 'result': 'Passed'}
+    for children in ([warning, run], [run, warning], [warning, warning]):
+        cases[4]['children'] = children
+        assert len(validate(payload, _diagnostic_ids(), log)) == 7
+    for children in ([warning, run, run], [warning, {**run, 'result': 'Failed'}],
+                     [{**warning, 'children': [run]}], [{**warning, 'result': 'Failed'}],
+                     [{**warning, 'name': ''}], [{**warning, 'nodeType': 'Unknown warning'}]):
+        cases[4]['children'] = children
+        with pytest.raises(ValueError):
+            validate(payload, _diagnostic_ids(), log)
+    cases[4]['children'] = [warning]
+    for bad_log in [log + log, log.replace('passed', 'failed', 1),
+                    '\n'.join(log.splitlines()[:-1])]:
+        with pytest.raises(ValueError):
+            validate(payload, _diagnostic_ids(), bad_log)
+
+
+def test_focused_diagnostic_cold_compile_survives_past_the_old_ten_minute_cap(tmp_path: Path) -> None:
+    # Run 42724350244 was still Swift-compiling when the 600s diagnostic cap fired.
+    compiling, calls, receipt = _run_diagnostic_dispatch(
+        tmp_path / 'compiling', BUILD_DURATION_SECONDS='650')
+    assert compiling.returncode == 0, compiling.stdout + compiling.stderr
+    assert receipt['status'] == 'passed' and receipt['qualifying'] is False
+    timed = _non_terminate_timeouts(_timeout_invocations(calls))
+    assert timed[0][2] == '900s' and 'build-for-testing' in timed[0]
+    hung, hung_calls, hung_receipt = _run_diagnostic_dispatch(
+        tmp_path / 'hung', BUILD_DURATION_SECONDS='901')
+    assert hung.returncode == 124, hung.stdout + hung.stderr
+    assert hung_receipt['status'] == 'failed' and hung_receipt['qualifying'] is False
+    assert 'timeout' in hung_receipt['errors'] and 'commandOrStageFailure' in hung_receipt['errors']
+    assert not any('test-without-building' in call for call in hung_calls)
 
 
 def test_launch_quality_validator_preflight_finishes_before_simulator_boot_and_failure_stops_native_work(tmp_path: Path) -> None:
@@ -1946,14 +2000,26 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = 'dfad750f7194317ea3710684addaa13fb82132c77afb404fab81552bffc1dbc5'" in source
+    assert "REVIEWED_AUDIT_SHA256 = '318b11c32f2333c05ed3fc60f7d975bb7cc45893d379bbd9c3fcabb93edace7e'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
     assert 'run: bash scripts/ios/launch-quality-audit.sh --diagnostic-seven' in source
     assert 'ios-ui-diagnostic-seven-${{ github.run_id }}-${{ github.run_attempt }}' in source
     assert 'retention-days: 14' in source and 'name: Focused UI Diagnostics (NONQUALIFYING)' in source
-    import re
+    # Run 42724350244: a 900s cold build plus the UI cap, finalization, and catalogue must fit the step.
+    diagnostic_block = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_text().split(
+        'if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then\n', 1)[1].split('\nfi\n', 1)[0]
+    build_seconds = int(re.search(r'(?m)^  BUILD_FOR_TESTING_TIMEOUT_SECONDS=(\d+)$', diagnostic_block).group(1))
+    ui_seconds = int(re.search(
+        r'XCODEBUILD_COMMAND_TIMEOUT_SECONDS=(\d+)',
+        (_REPO_ROOT / 'scripts/ios/launch-quality-diagnostic-seven.sh').read_text()).group(1))
+    job_minutes = int(re.search(r'(?m)^    timeout-minutes: (\d+)\n    steps:', source).group(1))
+    step_minutes = int(re.search(
+        r'- name: Run fixed seven-case diagnostic\n        timeout-minutes: (\d+)', source).group(1))
+    assert build_seconds == 900 and ui_seconds == 1500
+    assert build_seconds + ui_seconds + 180 + 60 <= step_minutes * 60
+    assert step_minutes + 7 == job_minutes
     uses = re.findall(r'uses: ([^\s]+)', source)
     assert len(uses) == 3 and all(re.fullmatch(r'[\w-]+/[\w-]+@[0-9a-f]{40}', value) for value in uses)
 
@@ -2183,7 +2249,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = 'dfad750f7194317ea3710684addaa13fb82132c77afb404fab81552bffc1dbc5'
+    expected = '318b11c32f2333c05ed3fc60f7d975bb7cc45893d379bbd9c3fcabb93edace7e'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 9

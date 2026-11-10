@@ -291,8 +291,8 @@ enum LaunchJourney {
     }
 }
 
-struct HealthMemoryClaim: Equatable {
-    enum Provenance: String, Equatable {
+struct HealthMemoryClaim: Codable, Equatable, Sendable {
+    enum Provenance: String, Codable, Equatable, Sendable {
         case measured, engineDerived, userDeclared, coachInferred
     }
 

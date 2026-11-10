@@ -39,7 +39,8 @@ jobs:
   diagnostic:
     name: Focused UI Diagnostics (NONQUALIFYING)
     runs-on: macos-15
-    timeout-minutes: 50
+    # The diagnostic step is 48m. Leave 7m for checkout, Xcode selection, and upload.
+    timeout-minutes: 55
     steps:
       - name: Validate manual diagnostic source
         shell: bash
@@ -100,15 +101,15 @@ jobs:
 
           # Intentionally unavailable until the FINAL composed audit and this
           # exact policy hunk are independently reviewed. Never a caller input.
-          REVIEWED_AUDIT_SHA256 = 'dfad750f7194317ea3710684addaa13fb82132c77afb404fab81552bffc1dbc5'
+          REVIEWED_AUDIT_SHA256 = '318b11c32f2333c05ed3fc60f7d975bb7cc45893d379bbd9c3fcabb93edace7e'
           DEPENDENCIES = {
               'scripts/ios/xcodebuild-command-timeout.py': '66abf226c296005bbf50ca277d1e597f90c74269d26cb1afa039e999cbbc35fa',
               'scripts/ios/bootstrap-local-config.sh': 'aad028c0eff7f9d2a043711a8735963dc66b9bd664f11bf98b7ada67a60ab8db',
-              'scripts/ios/launch-quality-diagnostic-seven.sh': 'cbdffd468d2e430047e2d265efe36ded2a7b40f0750dd26380caafe3a050f5da',
+              'scripts/ios/launch-quality-diagnostic-seven.sh': 'c50c0af8f80b9649488398c1a4ab6f6a344a51da187c4e64be7b8871f779815b',
               'scripts/ios/resolve-simulator-destination.sh': '8a610d8368587da67252065fd46c2937a03f09e9d4c24798a40e669187e61257',
               'apps/ios/Scripts/import-joviekit.mjs': '35555f9ad251a0976a0bd0ee4ebf4293a4b8634ea61e60db254e53b9c196aa4b',
               'apps/ios/Vendor/JovieKit.source.json': 'aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2',
-              'apps/ios/LogYourBody.xcodeproj/project.pbxproj': 'aad5b4ee6f4b7754189f2fa3e775f7f96e6db3e792706466eb60dbbb269108df',
+              'apps/ios/LogYourBody.xcodeproj/project.pbxproj': 'eb69c6c3a3b1abda2eaf16b6b30744cde38a2de775d97da670b7b70078578d69',
               'apps/ios/LogYourBody.xcodeproj/xcshareddata/xcschemes/LogYourBody.xcscheme': 'f8bd5d22beb90e7a04360b0a6c68d19bddc2a6ae5b076ac347f087540c870d64',
               'apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved': '7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138',
           }
@@ -147,8 +148,9 @@ jobs:
 
       # No local composite setup, Ruby/Bundler install, dependency cache restore,
       # evidence validator CLI, coverage ratchet or performance invocation here.
+      # 48m holds a 900s cold build, the 1500s UI cap, 180s finalization, and the catalogue read.
       - name: Run fixed seven-case diagnostic
-        timeout-minutes: 43
+        timeout-minutes: 48
         shell: bash
         env:
           DIAGNOSTIC_EXPECTED_SOURCE_SHA: ${{ env.DIAGNOSTIC_SOURCE_SHA }}

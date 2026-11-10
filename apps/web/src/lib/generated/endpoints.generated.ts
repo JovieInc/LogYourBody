@@ -541,6 +541,11 @@ export const endpoints = {
         'LYB-204 source evidence for the correction ledger, retained receipts and recurrence contract.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-362',
+      reason:
+        'LYB-362 source evidence for normalized correction-text and classifier-level recurrence matching and internal mechanize requests.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet',
       reason:
         'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.',
