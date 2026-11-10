@@ -7521,5 +7521,63 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-enclosing-budget-follows-source-caps",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1780",
+    "correction": "PR #1780 / LYB-160 repair, fix-red-d5dac7802d occurrence 4 in 14 days: merge origin/main first without rebasing and fix Detect Changes and CI Summary while retaining the cold-prefix launch-quality budget. Run 42818695019 fails because release-check-budget.test.mjs expects the former 64-minute job cap instead of the 69-minute cap. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR edits.",
+    "mechanization": "Extend the existing required release budget guard to derive enclosing limits from the actual audit deadline, xcodebuild finalization grace, launch and performance step caps, and existing four-minute setup allowance. Replace the stale fixed job-cap assertion with these relationships. Negative controls reject insufficient step/job budgets and a deadline increase without a matching step increase, while a coordinated increase passes. The original guard fails locally with 69 !== 64; the expanded guard passes on this PR and rejects removal of its enclosing checks. The fetched origin/main is already an ancestor. The harness must add exactly one PR-body line: Machine: built .github/scripts/release-check-budget.test.mjs. No native limits, selectors, checks or provider controls are relaxed. Vercel remains externally blocked; macOS execution remains unverified on this Linux host.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "GitHub Actions job and step caps and the audit command deadline belong to separate workflow and shell sources. A repair-local production abstraction would not prevent independently edited configuration from drifting; the existing required static guard can enforce their relationship without introducing another timeout configuration source."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing release-check-budget.test.mjs already runs in required Detect Changes on every diff. Deriving its enclosing-cap assertions from the canonical sources and exercising rejected and permitted changes prevents stale numeric expectations while still rejecting budgets that cancel native evidence."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/release-check-budget.test.mjs",
+      "anchor": "function assertLaunchQualityBudget(quality, audit)"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "launch-quality-cold-prefix-keeps-ui-hang-cap",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42795533093",
+    "correction": "LYB-160: Post-merge Launch Quality on main run 42795533093 exited 124. The cold hosted prefix reached UI tests at 1375s, the 2940s audit deadline left 1565s, and xcodebuild was killed while selected UI cases were still passing. The same SHA's retry finished those UI cases in 1697s and the report job recorded a pass, but the failed first job kept the workflow red.",
+    "mechanization": "Extend the existing launch-quality budget so a 1375s cold prefix keeps the 1800s UI hang cap: audit deadline 3240s, step 57 minutes (deadline plus the existing 180s finalization grace), and job 69 minutes (the existing 4-minute setup allowance plus that step plus the 8-minute performance cap). Per-test allowances, the 1800s UI hang cap, selectors, and evidence checks stay. The virtual-clock regression fails under the 2940s deadline at cap 1565 and passes with cap 1800 after the repair. Refresh the reviewed audit digest with the existing explicit pin resolver. The harness owns pushing and PR edits and must add exactly one line: Machine: built scripts/ios/launch-quality-audit.sh. Native execution of the longer budget remains for macOS CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing audit deadline owns how much of the UI hang cap survives a slow prefix. Raising that deadline to cover the observed cold prefix lets the same passing UI cases finish without dropping selectors, per-test limits, or the 1800s hang cap."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-audit.sh",
+      "anchor": "Keep the 1800s UI hang cap after a cold hosted prefix."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-render-classifier-source-index-handoff",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1780",
+    "correction": "PR #1780 / LYB-160 repair, fix-red-e3b0c44298 occurrence 85 in 14 days: merge origin/main without rebasing, preserve the launch-quality cold-prefix deadline repair, and resolve the correction-ledger conflict with an extended reusable machine. A source edit staged between projection rendering and classifier startup can make ledger validation succeed with stale source fingerprints.",
+    "mechanization": "Extend the existing --merge-ledger helper to retain the source index from before rendering through successful ledger classification, excluding only the ledger and checking the generated projection separately. A real-Git regression stages a source change before classifier startup: the old helper reports success with stale fingerprints, while the extended helper refuses success, preserves the reviewed source and classified parent receipts, and regenerates the correct fingerprint on retry. The existing required Detect Changes suite imports this regression through scripts/pre-commit-lint.test.mjs. Use the extended helper for this merge and verify coverage against both immutable parents. The harness owns push and PR operations and must add exactly one PR-body line: Machine: built scripts/manifest_union.py. GitHub CI and Launch Quality passed on the original PR head; Vercel reports Deployment was blocked without a build failure. No Vercel credentials are available on this host; current-head hosted and native evidence remain for the harness.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing combined resolver owns projection rendering and ledger validation. Retaining and comparing the staged source inputs across that handoff prevents a successful repair verdict for fingerprints generated before another writer staged a source change."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "The classifier may start after a source edit; retain the render's source snapshot."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

@@ -89,6 +89,39 @@ sys.exit(result.returncode)
   assert.equal(f.git('ls-files', '--stage'), index);
 });
 
+test('ledger repair refuses a source index changed between rendering and classification', (t) => {
+  const f = ledgerMergeFixture(t);
+  const nodeBinary = process.execPath;
+  mkdirSync(join(f.root, 'bin'));
+  // Stage a source edit after rendering, before the classifier takes its snapshot.
+  writeFileSync(join(f.root, 'bin/node'), `#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+Path('a.txt').write_text('concurrent reviewed source\\n')
+subprocess.run(['git', 'add', 'a.txt'], check=True)
+Path('rendered-projection').write_bytes(Path('SOURCES.md').read_bytes())
+sys.exit(subprocess.run([${JSON.stringify(nodeBinary)}, *sys.argv[1:]]).returncode)
+`, { mode: 0o755 });
+  const result = spawnSync('python3', [resolver, '--root', f.root, '--merge-ledger'], {
+    env: { ...env, PATH: `${join(f.root, 'bin')}:${env.PATH}` }, encoding: 'utf8',
+  });
+  assert.notEqual(result.status, 0, 'a stale projection must never report a successful repair');
+  assert.match(result.stderr, /source index changed during ledger validation/);
+  assert.equal(f.git('show', ':a.txt'), 'concurrent reviewed source\n');
+  assert.equal(readFileSync(join(f.root, 'a.txt'), 'utf8'), 'concurrent reviewed source\n');
+  assert.deepEqual(readFileSync(join(f.root, f.output)), readFileSync(join(f.root, 'rendered-projection')));
+  assert.deepEqual(JSON.parse(f.git('show', `:${f.ledger}`)).map(({ fingerprint }) => fingerprint),
+    ['base', 'theirs', 'ours']);
+  assert.equal(f.git('ls-files', '--unmerged'), '');
+  const retry = f.resolve();
+  assert.equal(retry.status, 0, retry.stderr);
+  assert.match(f.git('show', `:${f.output}`),
+    new RegExp(createHash('sha256').update('concurrent reviewed source\n').digest('hex')));
+  const index = f.git('ls-files', '--stage');
+  assert.equal(f.resolve().status, 0);
+  assert.equal(f.git('ls-files', '--stage'), index);
+});
+
 for (const staged of [false, true]) {
   test(`ledger refusal preserves concurrent ${staged ? 'staged' : 'working'} projection edits after rendering`, (t) => {
     const f = ledgerMergeFixture(t);

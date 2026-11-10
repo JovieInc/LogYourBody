@@ -179,6 +179,11 @@ retry the same command. Unrelated unstaged edits remain untouched.
 Recursive reconstruction reads each immutable guard blob once per resolution;
 the cache ends with that invocation, so retries never reuse mutable index evidence.
 
+The combined `--merge-ledger` repair also checks that the source index stays
+unchanged between projection rendering and ledger classification. A concurrent
+source change refuses success without reverting the reviewed source or classified
+ledger; rerun the same command to rebuild fingerprints from current staged inputs.
+
 The readiness check forces text inspection even when Git attributes mark a staged
 file as binary, so those attributes cannot conceal unresolved conflict markers.
 It accepts up to 16 MiB of staged diff output, including markers at the end of a

@@ -441,6 +441,8 @@ def merge_ledger(root, resolve_staged, staged_bytes, git_bytes):
     path = repository_docs.local(root, output)
     original = path.read_bytes() if path.exists() else None
     index = git_bytes(root, "ls-files", "--stage", "--", output)
+    source_args = ("ls-files", "--stage", "-z", "--", ".", ":!" + LEDGER, ":!" + output)
+    source_index = git_bytes(root, *source_args)
     # Rendering refusals preserve concurrent projection edits; only roll back our completed render.
     resolve_staged(root)
     rendered = path.read_bytes() if path.exists() else None
@@ -468,3 +470,7 @@ def merge_ledger(root, resolve_staged, staged_bytes, git_bytes):
         subprocess.run(["git", "update-index", "--force-remove", "--", output], cwd=root, check=True)
         subprocess.run(["git", "update-index", "--index-info"], cwd=root, input=index, check=True)
         raise
+    # The classifier may start after a source edit; retain the render's source snapshot.
+    if (git_bytes(root, *source_args) != source_index
+            or git_bytes(root, "ls-files", "--stage", "--", output) != rendered_index):
+        raise ValueError("source index changed during ledger validation; review staged inputs and retry")
