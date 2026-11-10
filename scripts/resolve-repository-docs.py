@@ -131,6 +131,22 @@ def union_project(root):
     apply_project_union(root)
 
 
+def assert_no_local_dependency_inputs(root, inputs):
+    # Ignored hooks, npmrc files and patches are still local-only resolver inputs.
+    # Ignored workspace manifests are still local-only resolver inputs.
+    for options, label, paths in [
+        ([], "untracked", inputs),
+        (["--ignored"], "ignored", [
+            ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
+            "package.json", "**/package.json",
+            ":(glob,exclude)**/node_modules/**", ":(glob,exclude)**/.next/**",
+        ]),
+    ]:
+        found = git_bytes(root, "ls-files", "--others", *options, "--exclude-standard", "-z", "--", *paths)
+        if found:
+            raise ValueError(label + " dependency inputs: " + found.decode().strip("\0").replace("\0", ", "))
+
+
 def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfile=None, dependency_inputs=()):
     root = Path(root).resolve()
     source_index = expected_index if expected_index is not None else git_bytes(root, "ls-files", "--stage", "-z")
@@ -178,6 +194,8 @@ def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfil
         raise ValueError("lockfile changed during projection generation; review dependency inputs and retry")
     if dependency_inputs and git_bytes(root, "diff", "--name-only", "--", *[name for name in dependency_inputs if name != "pnpm-lock.yaml"]):
         raise ValueError("dependency inputs changed during projection generation; stage reviewed inputs and retry")
+    if dependency_inputs:
+        assert_no_local_dependency_inputs(root, dependency_inputs)
     output.parent.mkdir(parents=True, exist_ok=True)
     original = output.read_bytes() if output.exists() else None
     try:
@@ -379,23 +397,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             ).stdout.strip()
             if dirty:
                 raise ValueError("unstaged dependency edits: " + dirty.replace("\n", ", "))
-            untracked = subprocess.run(
-                ["git", "ls-files", "--others", "--exclude-standard", "-z", "--", *inputs],
-                cwd=root, check=True, capture_output=True, text=True,
-            ).stdout.strip("\0")
-            if untracked:
-                raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
-            # Ignored hooks, npmrc files and patches are still local-only resolver inputs.
-            # Ignored workspace manifests are still local-only resolver inputs.
-            ignored = subprocess.run(
-                ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
-                 ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
-                 "package.json", "**/package.json",
-                 ":(glob,exclude)**/node_modules/**", ":(glob,exclude)**/.next/**"],
-                cwd=root, check=True, capture_output=True, text=True,
-            ).stdout.strip("\0")
-            if ignored:
-                raise ValueError("ignored dependency inputs: " + ignored.replace("\0", ", "))
+            assert_no_local_dependency_inputs(root, inputs)
             # Dependency resolution inputs must be regular indexed files, never symlinks.
             for entry in git_bytes(root, "ls-files", "--stage", "-z", "--", *inputs).split(b"\0"):
                 if entry and entry.split(b" ", 1)[0] not in {b"100644", b"100755"}:

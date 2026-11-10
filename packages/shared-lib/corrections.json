@@ -1,18 +1,18 @@
 [
   {
-    "fingerprint": "dce46b3396cd",
-    "source": "https://linear.app/jovie/issue/LYB-365",
-    "correction": "Tim bug report 2026-11-09 17:03Z, founder-thread-2026-11-09-lyb-apple-login-initialize: Apple sign-in succeeds after an app update, then an initialization toast prevents login from reaching onboarding or the app (LYB-365). Cover the post-auth initialization step and identify the actual error wording.",
-    "mechanization": "Extend the existing API configuration boundary to canonicalize the known HTTPS apex alias even when API_BASE_URL overrides the fixed default, keeping bearer session registration on the registry host without a redirect. Normalize the matching expected host in runtime and release generation, preserving unrelated endpoints and host-mismatch rejection. Two executable release-configuration regressions fail before the fix and all nine focused cases pass afterwards in the existing required shared-lib suite. Retain native request and rejection regressions in MobileProfileNamePayloadTests and endpoint policy cases in AuthConfigurationValidationTests; real Mac execution and exact-head coverage remain required. The exact source toast is Your LogYourBody account could not be initialized.; correlation with the reported production session remains unverified because this host has no Sentry credentials or connector. The harness owns push and PR operations. Machine: built apps/ios/LogYourBody/Utils/Configuration.swift.",
+    "fingerprint": "fix-red-1423773703",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1764",
+    "correction": "PR #1764 repair, fix-red-1423773703 occurrence 44: merge origin/main without rebasing, preserve the jose 6.2.14 to 6.2.15 update, and repair CI Summary, Detect Changes and parity reporting a stale repository source map. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing dependency/source-map resolver to recheck untracked and ignored dependency inputs after frozen lockfile verification and source-map rendering, before writing or staging artifacts. Reuse its preflight scan, retain rollback and retry behavior, and use --verify-lockfile on this jose bump. Eight regressions prove the previous resolver accepted newly created untracked hooks and ignored workspace npmrc files during verification or rendering in both dependency modes. The cases run through the existing required pre-commit-lint.test.mjs suite. The harness must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py. The external Vercel provider block remains unverified; no provider or CI control is relaxed.",
     "classification": {
       "codebase": {
         "feasible": true,
-        "rationale": "Normalizing the known legacy alias before URLSession constructs authenticated API requests prevents cross-host redirect header loss by construction, including releases with stale API overrides."
+        "rationale": "The existing dependency repair boundary can prevent a source-map repair from certifying dependency inputs that appeared after preflight. Sharing the scan at preflight and before artifact writes closes both verification and rendering windows while preserving local edits and generated-artifact rollback."
       }
     },
     "guard": {
-      "path": "apps/ios/LogYourBody/Utils/Configuration.swift",
-      "anchor": "canonicalAPIBaseURL(stringValue(for: \"API_BASE_URL\", default: ProductRegistry.Hosts.api))"
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "assert_no_local_dependency_inputs(root, dependency_inputs)"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -7406,6 +7406,24 @@
     "guard": {
       "path": "scripts/ios/launch-quality-diagnostic-seven.sh",
       "anchor": "# Xcode adds named Runtime Warning leaves to passing cases. Keep them"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dce46b3396cd",
+    "source": "https://linear.app/jovie/issue/LYB-365",
+    "correction": "Tim bug report 2026-11-09 17:03Z, founder-thread-2026-11-09-lyb-apple-login-initialize: Apple sign-in succeeds after an app update, then an initialization toast prevents login from reaching onboarding or the app (LYB-365). Cover the post-auth initialization step and identify the actual error wording.",
+    "mechanization": "Extend the existing API configuration boundary to canonicalize the known HTTPS apex alias even when API_BASE_URL overrides the fixed default, keeping bearer session registration on the registry host without a redirect. Normalize the matching expected host in runtime and release generation, preserving unrelated endpoints and host-mismatch rejection. Two executable release-configuration regressions fail before the fix and all nine focused cases pass afterwards in the existing required shared-lib suite. Retain native request and rejection regressions in MobileProfileNamePayloadTests and endpoint policy cases in AuthConfigurationValidationTests; real Mac execution and exact-head coverage remain required. The exact source toast is Your LogYourBody account could not be initialized.; correlation with the reported production session remains unverified because this host has no Sentry credentials or connector. The harness owns push and PR operations. Machine: built apps/ios/LogYourBody/Utils/Configuration.swift.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Normalizing the known legacy alias before URLSession constructs authenticated API requests prevents cross-host redirect header loss by construction, including releases with stale API overrides."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Utils/Configuration.swift",
+      "anchor": "canonicalAPIBaseURL(stringValue(for: \"API_BASE_URL\", default: ProductRegistry.Hosts.api))"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
