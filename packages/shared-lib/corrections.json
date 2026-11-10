@@ -7579,5 +7579,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "home-check-in-waits-for-verified-text-and-save-readiness",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42854027238",
+    "correction": "LYB-214: The seven-case diagnostic built successfully, then testBodyFatCheckInRefreshesDataHeroWithoutSavingWeight failed its immediate Save enabled assertion. The retained screen recording reaches the correct 17.0 reading and an enabled-looking Save after the assertion snapshot. A later app termination failure and runner restart also occurred after the large-text case exceeded its execution allowance.",
+    "mechanization": "Reuse the existing verified prefilled-text replacement helper for both body-fat edits. Wait at most five seconds for exact native field readback and for Save to be enabled and hittable before continuing the weight and body-fat check-in assertions. Extend the existing required launch UI regression source guard across all three edit scenarios; it fails before the synchronization fix and passes afterward. Preserve every test identity, save outcome, provenance and unchanged-weight assertion, per-test allowance, command cap, one-attempt policy and nonqualifying receipt contract. Machine: built apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift. The subsequent native termination failure remains unverified on this Linux host; the harness owns pushing, PR operations and exact-head macOS execution.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing native UI test helper owns replacement and readback. Bounded XCTest predicate expectations synchronize with the actual field and Save state before dependent assertions, preventing a stale immediate snapshot from being treated as the result of the edit without changing product validation."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift",
+      "anchor": "NSPredicate(format: \"enabled == true AND hittable == true\")"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

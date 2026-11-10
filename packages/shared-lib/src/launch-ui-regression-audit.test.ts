@@ -82,6 +82,44 @@ it('requires verified native text entry before testing draft preservation', () =
   expect(action).not.toContain('field.typeText(');
 });
 
+it('waits for exact metric text and Save readiness before testing Home check-in outcomes', () => {
+  const source = readFileSync(
+    new URL('../../../apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift', import.meta.url),
+    'utf8',
+  );
+  const method = (name: string) =>
+    source.split(`func ${name}(`)[1]?.split(/\n {4}(?:private )?func /)[0] ?? '';
+  // Run 42854027238: 17.0 was visible in the recording, but the immediate
+  // enabled snapshot still saw Save disabled after the delete/type transaction.
+  const readiness = method('assertSaveReady');
+  expect(readiness).toContain('NSPredicate(format: "enabled == true AND hittable == true")');
+  expect(readiness).toContain('evaluatedWith: save');
+  expect(readiness).toContain('XCTWaiter.wait(for: [ready], timeout: 5), .completed');
+  const replacement = method('replacePrefilledText');
+  expect(replacement).toContain('XCTAssertTrue(isFieldCleared(field),');
+  expect(replacement.indexOf('XCTAssertTrue(isFieldCleared(field),')).toBeLessThan(
+    replacement.indexOf('field.typeText(replacement)'),
+  );
+  expect(replacement).toContain('NSPredicate(format: "value == %@", replacement)');
+  expect(replacement).toContain('XCTWaiter.wait(for: [entered], timeout: 5), .completed');
+  for (const name of [
+    'testLogSheetEditsUnitsWithKeyboardAndCancelsWithoutChangingHome',
+    'testBodyFatCheckInRefreshesDataHeroWithoutSavingWeight',
+    'testBodyFatEditorAtLargestTextPreservesMethodUntilExplicitSelection',
+  ]) {
+    const body = method(name);
+    expect(body).toContain('replacePrefilledText(');
+    expect(body).toContain('assertSaveReady(save)');
+    expect(body).not.toContain('field.typeText(');
+    expect(body.indexOf('replacePrefilledText(')).toBeLessThan(
+      body.indexOf('assertSaveReady(save)'),
+    );
+    if (body.includes('save.tap()')) {
+      expect(body.indexOf('assertSaveReady(save)')).toBeLessThan(body.indexOf('save.tap()'));
+    }
+  }
+});
+
 it('checks Stats composition, card styling and provenance dismissal through the launch audit with executed coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
