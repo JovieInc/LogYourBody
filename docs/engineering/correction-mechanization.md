@@ -127,6 +127,12 @@ each retry reads the index and guard sources afresh.
 If the staged index changes during projection rendering, refusal preserves the
 other writer's projection bytes and index entries; rollback begins only after
 the resolver completes its own render. Review the inputs and retry.
+If ledger validation then fails, rollback also verifies that the rendered projection
+bytes and index entry are unchanged. Concurrent working or staged projection edits
+remain intact; review and stage the inputs before retrying the same command.
+Rollback also checks the rendered file's mode, inode and device without following
+links. A concurrent replacement, symlink or permission change refuses rollback
+even when the projection bytes match, preserving the other writer's file and index.
 The reviewed diagnostic project-pin resolver also retains each newly added parent
 file's group and build-phase references; retaining a declaration alone is insufficient.
 For a documentation rewrite conflicting with incoming new sections, run

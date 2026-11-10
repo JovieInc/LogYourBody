@@ -49,7 +49,6 @@ struct PreferencesView: View {
     @State var profileImageURL: String?
     @State var profilePhotoErrorMessage = ""
     @State var showingProfilePhotoError = false
-    @State var showingLogoutConfirmation = false
     @State var showingNotificationSettingsAlert = false
     @State var isTriggeringHealthResync = false
     @State var isHealthSyncSetupInProgress = false
