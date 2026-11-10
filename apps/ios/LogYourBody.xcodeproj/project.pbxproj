@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		B34320261102000000000008 /* DatedOutcomeStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000007 /* DatedOutcomeStatsTests.swift */; };
+		B34420261109000000000002 /* DatedOutcomeStoreFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34420261109000000000001 /* DatedOutcomeStoreFixtures.swift */; };
 		B34320261102000000000006 /* DatedOutcomeStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000005 /* DatedOutcomeStatsView.swift */; };
 		B34320261102000000000004 /* DatedStatsUITestFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000003 /* DatedStatsUITestFixture.swift */; };
 		B34320261102000000000002 /* DatedOutcomeStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000001 /* DatedOutcomeStats.swift */; };
@@ -658,6 +659,7 @@
 
 /* Begin PBXFileReference section */
 		B34320261102000000000007 /* DatedOutcomeStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStatsTests.swift; sourceTree = "<group>"; };
+		B34420261109000000000001 /* DatedOutcomeStoreFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStoreFixtures.swift; sourceTree = "<group>"; };
 		B34320261102000000000005 /* DatedOutcomeStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DatedOutcomeStatsView.swift; path = Components/DatedOutcomeStatsView.swift; sourceTree = "<group>"; };
 		B34320261102000000000003 /* DatedStatsUITestFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedStatsUITestFixture.swift; sourceTree = "<group>"; };
 		B34320261102000000000001 /* DatedOutcomeStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStats.swift; sourceTree = "<group>"; };
@@ -1608,6 +1610,7 @@
 				B18320261101000000000003 /* LaunchJourneyTests.swift */,
 				B34220261102000000000005 /* DatedTimelineTests.swift */,
 				B34320261102000000000007 /* DatedOutcomeStatsTests.swift */,
+				B34420261109000000000001 /* DatedOutcomeStoreFixtures.swift */,
 				B27020261029000000000003 /* OutcomeFeasibilityTests.swift */,
 				B26920261025000000000005 /* lyb-launch-contract.json */,
 				896E3815B745A313FCD93C78 /* DesignSystem */,
@@ -2624,6 +2627,7 @@
 				B18320261101000000000004 /* LaunchJourneyTests.swift in Sources */,
 				B34220261102000000000006 /* DatedTimelineTests.swift in Sources */,
 				B34320261102000000000008 /* DatedOutcomeStatsTests.swift in Sources */,
+				B34420261109000000000002 /* DatedOutcomeStoreFixtures.swift in Sources */,
 				B27020261029000000000004 /* OutcomeFeasibilityTests.swift in Sources */,
 				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
 				E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */,

@@ -1,5 +1,59 @@
 [
   {
+    "fingerprint": "fix-red-f8dba15025",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
+    "correction": "LYB-344 PR #1774, fix-red-f8dba15025 occurrence 3: merge origin/main first without rebasing, retain the dated-outcome coach action and weekly review, and repair Company Guards and CI Summary. DatedOutcomeStoreTests.swift grew to 515 lines; Vercel reports Deployment was blocked without a build error.",
+    "mechanization": "Extend the existing Swift size splitter to require an explicit --internalize list before moving private/fileprivate top-level fixtures across files, preserve member privacy and @testable imports, and refuse unrelated access changes before writing. Use it to extract both store fixtures and register the sibling in the existing test target. Keep every test body and the company size baseline unchanged. The CLI regression fails on the previous unsafe extraction and missing testable import, then passes with the extension; it runs in the existing required iOS Static Audits test_split_size_ratchet.py suite. The fetched origin/main is already an ancestor. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/ios/split_size_ratchet.py. Native execution and exact-head coverage still require the real Mac runner; the Vercel provider block remains externally unverified.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator can prevent inaccessible extracted fixtures by refusing private declarations unless their names are explicitly reviewed for internal access, while retaining attributed test imports and member privacy in every generated sibling."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/split_size_ratchet.py",
+      "anchor": "review type access before extraction: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-receipt-text-level-recurrence",
+    "source": "https://linear.app/jovie/issue/LYB-362",
+    "correction": "LYB-362: Re-mechanization requires a second receipt with the same normalized correction text and classifier level. First-seen corrections and different text at the same level must not enqueue a request.",
+    "mechanization": "Record receipts through recordCorrectionReceipt, which derives recurrence from normalized text and level, marks the new receipt and invokes the internal mechanize queue exactly once for a repeat. Retain regression cases in the existing required shared-lib suite for first-seen, exact and normalized repeats, different text and different levels. The harness owns pushing and PR operations. Machine: built packages/shared-lib/src/correction-ledger.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The receipt-recording boundary owns both matching and internal queue dispatch, preventing unrelated corrections from triggering re-mechanization by construction."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/correction-ledger.ts",
+      "anchor": "if (receipt.isRecurrence) enqueueMechanize({ type: 'mechanize', correction: receipt });"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1771",
+    "correction": "PR #1771 / LYB-362 repair, fix-red-e3b0c44298 occurrence 87 in 14 days: merge origin/main without rebasing and retain classification and recurrence behavior when independent additions collide in the ledger documentation and test imports. Vercel reports Deployment was blocked; the exact PR head has no Actions run.",
+    "mechanization": "Retain this recurring fingerprint's existing staged-marker readiness guard and extend the existing documentation merge resolver to propose independent paragraph insertions from both immutable parents at their common-base positions. The new real-Git positive case fails against the old resolver; both blank-line alignments pass with the extension, while fragments, edits, deletions and unsafe parent sources still fail without writing or staging. The existing required Detect Changes pre-commit suite imports these fixtures. Use --merge-sections for the actual ledger documentation conflict and preserve both parent test suites. The harness owns pushing and PR operations and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-5df69c1e5f",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42401937834/job/128491764859",
     "correction": "PR #1699 / LYB-312, fix-red-5df69c1e5f occurrence 30 in 14 days: merge origin/main without rebasing, preserve the weekly photo check-in, and repair CI Summary and Launch Quality. The old combined timeline XCTest called two complete dated journeys and failed terminating the app at 199 seconds. The automatic source merge also dispatched both parent network-path handlers for every callback.",
@@ -7218,6 +7272,122 @@
     "guard": {
       "path": "scripts/pbx_union.py",
       "anchor": "Verify auto-merged projects against the same immutable additive parent union."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "vercel-blocked-production-deploy-fails-fast",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42581415040",
+    "correction": "LYB Owner reports three consecutive main Deploy runs cancelled while Vercel production deployments remain BLOCKED before building. Web must fail fast with a clear owner-action error rather than waiting for cancellation; preserve the Deploy Summary gate.",
+    "mechanization": "Submit the prebuilt production deployment with --no-wait and inspect its exact URL through the team-scoped Vercel API before publishing success output. Fail immediately on BLOCKED and other terminal failures, fail closed on inspection errors, and bound pending-state polling. Required shared-lib tests execute the real workflow step against a fake CLI/API and cover pending, READY, BLOCKED, terminal, timeout and inspection failures. The BLOCKED workflow regression fails before the fix and passes after it. Tim must resolve the external hold; two clean main deploys remain required. The harness owns pushing and PR edits; include Machine: built .github/scripts/wait-vercel-deployment.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The deployment controller can stop waiting in the CLI and verify readiness itself, ensuring BLOCKED becomes an explicit failure by construction. It cannot resolve a provider-side restriction."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/wait-vercel-deployment.mjs",
+      "anchor": "if (state === 'BLOCKED')"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-conflicted-source-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1763",
+    "correction": "PR #1763, fix-red-1423773703 occurrence 57 in 14 days: merge origin/main without rebasing, retain the ElevenLabs 3.0.81 bump, and repair stale source-projection failures in Detect Changes and parity. Extend the existing dependency-repair machine and leave push and PR updates to the harness. Vercel separately reports Deployment was blocked.",
+    "mechanization": "Extend both existing dependency repair modes to regenerate a conflicted projection from staged sources only after frozen lockfile verification. Real-Git regressions cover successful merged-source reconstruction, failed verification preserving conflict stages and artifact bytes for retry, and refusal of unresolved source conflicts. Four cases fail before the fix and pass afterward; the two source-conflict controls remain passing. The existing required Detect Changes merge-aware local lint suite imports these tests. Use --verify-lockfile for this already updated lockfile without changing dependency resolutions. The harness must put exactly one machine line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency resolver owns verification and generated-output staging. Separating a regenerable source-map conflict from unresolved dependency inputs permits one verified repair command without requiring manual artifact resolution; frozen failures and actual source conflicts still fail closed."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Rebuild a conflicted projection only after frozen dependency verification."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-audit-expired-budget-fails-closed",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
+    "correction": "PR #1774 / LYB-344, fix-red-5df69c1e5f occurrence 23: merge origin/main first and repair failed checks without removing tests or changing gates. Run 42695073821 passed the native build and 2277 unit cases, then exhausted the 2760s audit budget during the canvas UI journey after a 1168s prefix. Vercel independently reports Deployment was blocked. The fetched origin/main is already an ancestor of this branch; the required merge is a no-op.",
+    "mechanization": "Extend the existing launch-quality audit budget controller to use 2940s within the unchanged 52-minute step, retaining 180s for finalization, all selectors, per-test bounds and the 1800s UI cap. Refuse exhausted budgets instead of granting another minute, and propagate that refusal before starting a build, test command or launch probe. Virtual-clock regressions replay the slow prefix and expired budgets; the old runner fails four assertions and the repaired runner passes. Execute the extended deadline suite in the existing required shared-lib test and native preflight; include its source and the real step policy in Turbo inputs. Refresh the audit-only diagnostic hash and its routing-test copies with the existing explicit-digest pin resolver; retain all trust checks and workflow bounds. The harness owns pushing and PR edits and must add exactly one line to the PR body: Machine: built scripts/ios/launch-quality-audit.sh. Current-head native execution remains for the real macOS runner and the Vercel provider hold remains external.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner owns phase admission and budget propagation. Refusing exhausted budgets before process launch prevents commands from obtaining fresh time after the audit deadline, while the regression suite verifies useful execution and the unchanged outer step reserve."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-audit.sh",
+      "anchor": "echo \"launch-quality audit deadline exhausted\" >&2"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-deadline-fixtures-match-macos-shell",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
+    "correction": "PR #1774 / LYB-344, fix-red-5df69c1e5f occurrence 24: repair the failed native launch preflight without weakening gates. Run 42705530320 fails test_expired_budget_reaches_build_and_test_callers_even_inside_a_condition because Bash 3.2 treats the fixture's empty COMMON_XCODEBUILD_ARGS array as unset under nounset. CI Summary reflects that failure. The requested merge of origin/main is already up to date. Vercel independently reports Deployment was blocked.",
+    "mechanization": "Extend the existing deadline fixture with representative populated command/settings arrays and live, exactly expired and over-budget cases for both build and test callers inside a conditional. Assert the one-second remaining timeout, preserved spaced argument and signing setting, and refusal before any command or probe starts after expiry. The existing required shared-lib suite and launch-quality preflight execute this guard. Replay the original suite and repair with GNU Bash 3.2 built in /tmp: the original reproduces the CI failure and the repair passes all 13 cases; Bash 5 also passes. No workflow, runner budget, selector or product behavior changes. The harness owns pushing and PR-body edits and must add exactly one line: Machine: built scripts/ios/test_xcodebuild_command_timeout.py. Native execution on the repaired head remains for macOS CI; the Vercel provider hold is external.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Production already supplies populated arrays. Changing the runtime budget controller cannot correct the test-only empty-array fixture without introducing unrelated behavior."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing executed shell fixture can represent the production arguments on macOS Bash and assert both useful command execution and deadline refusal before native work starts."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_xcodebuild_command_timeout.py",
+      "anchor": "# Model the runner's populated arrays: Bash 3.2 treats empty arrays as unset."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-reachability-swipe-avoids-wireframe-rotation",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42755703124",
+    "correction": "LYB-214: PR #1776 fixed the 600s cold-build timeout, but diagnostic run 42755703124 on main fails the composition case. Every reachability drag starts at y=643.67 inside the wireframe, rotates it, and leaves FFMI at y=874.33. The other six selected cases pass.",
+    "mechanization": "Move the existing viewport scroll helper's upward start from a 40pt to a 12pt bottom inset, into the visible strip below the 4:5 card, retaining the distance cap, downward start, all six attempts, full containment and hittability assertions. Extend the existing required wireframe suite with the failing run geometry, reading the actual helper offsets and checking the start is outside the avatar and both directions stay inside the viewport. This regression fails on the old helper and all five family cases pass after the repair. Existing Turbo inputs already include native UI test sources. No workflow, product interaction, timeout, selector or qualification change. Native XCTest remains unverified on this Linux host. The harness owns pushing and PR edits and must include Machine: built packages/shared-lib/src/wireframe-avatar-family.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The wireframe intentionally owns vertical rotation, as documented for the body stage. Altering product gesture ownership would change that behavior to compensate for a test issuing its scroll gesture inside the rotation surface."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required wireframe suite can read the real native helper offsets and replay the retained failing viewport and card geometry, rejecting scroll origins inside the rotation surface and endpoints outside the viewport."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/wireframe-avatar-family.test.ts",
+      "anchor": "starts Home reachability swipes below the wireframe rotation surface"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-runtime-warning-metadata-is-not-test-execution",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42772522859",
+    "correction": "LYB-214: After the cold-build and scroll-origin repairs merged, main run 42772522859 passed all seven selected cases exactly once, but the receipt exited 65 because Xcode 26.3 attached Runtime Warning leaves to three passing cases and the validator counted that metadata as unsupported child executions.",
+    "mechanization": "Extend the existing diagnostic catalogue validator to distinguish named Runtime Warning leaves without a result from execution nodes while retaining the complete official catalogue verbatim. Preserve all seven identities, command exits, one-attempt policy, native start/terminal cross-checks, nonqualifying status and rejection of nested, failed, unknown or repeated executions. Add a real-dispatcher regression using the observed warning schema and negative controls for warnings hiding executions or invalid native events. The regression fails with the prior validator and passes after the repair. Refresh only the diagnostic helper's reviewed dependency digest. Machine: built scripts/ios/launch-quality-diagnostic-seven.sh. Native execution on the final head remains for macOS CI; the harness owns pushing and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing receipt validator owns catalogue interpretation and can distinguish warning metadata from execution evidence without changing product behavior or relaxing test execution requirements."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-diagnostic-seven.sh",
+      "anchor": "# Xcode adds named Runtime Warning leaves to passing cases. Keep them"
     },
     "level": "codebase",
     "ruleId": "code-prevention"

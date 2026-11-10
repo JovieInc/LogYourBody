@@ -32,6 +32,7 @@ jobs:
               - '.github/workflows/deploy.yml'
               - '.github/scripts/web-production-smoke*.mjs'
               - '.github/scripts/verify-public-build-env*.mjs'
+              - '.github/scripts/wait-vercel-deployment.mjs'
             ios:
               - 'apps/ios/**'
 
@@ -113,7 +114,9 @@ jobs:
       - name: Deploy to Vercel
         id: vercel-deploy
         run: |
-          DEPLOYMENT_URL=$(pnpm dlx vercel@latest deploy --prebuilt --prod --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID")
+          DEPLOYMENT_URL=$(pnpm dlx vercel@latest deploy --prebuilt --prod --no-wait --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID")
+          export DEPLOYMENT_URL
+          node .github/scripts/wait-vercel-deployment.mjs
           echo "url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
           echo "Deployed to $DEPLOYMENT_URL"
 
