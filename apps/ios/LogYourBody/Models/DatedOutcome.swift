@@ -14,6 +14,13 @@ struct DatedOutcome: Codable, Equatable, Sendable {
         var targetValue: Double
     }
 
+    /// Local journal metadata. It is never part of the user's target or wire edit.
+    struct PlanBaseline: Codable, Equatable, Sendable {
+        var date: Date
+        var metric: Metric
+        var value: Double
+    }
+
     struct Interval: Codable, Equatable, Sendable {
         var start: String
         var end: String
@@ -134,6 +141,25 @@ struct DatedOutcomeEditorDraft: Sendable {
 struct DatedOutcomeSnapshot: Codable, Equatable, Sendable {
     let revision: UUID
     let value: DatedOutcome
+    var planBaseline: DatedOutcome.PlanBaseline?
+    var coachAction: DatedCoachAction?
+}
+
+/// Local engine receipt, never an outcome edit, training prescription or cloud memory.
+struct DatedCoachAction: Codable, Equatable, Sendable {
+    var id: UUID
+    var userId: String
+    var productId: String
+    var outcomeRevision: UUID
+    var outcome: DatedOutcome
+    var baseline: DatedOutcome.PlanBaseline
+    var measurement: DatedOutcome.PlanBaseline
+    var nextAction: BackwardPlanner.NextAction
+    var rationale: String
+    var evidence: [HealthMemoryClaim]
+    var reviewedAt: Date
+    var evaluatedAt: Date
+    var nextCheckIn: Date
 }
 
 enum DatedOutcomeError: Error {

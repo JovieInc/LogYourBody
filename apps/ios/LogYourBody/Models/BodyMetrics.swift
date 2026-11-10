@@ -129,7 +129,7 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
     private var bodyFatEntryMethod: String?
     private var weightOperationIdStorage: String?
     private var weightRevisionStorage: Int?
-    private var extraFields: [String: ReportedMeasurementJSON] = [:]
+    var extraFields: [String: ReportedMeasurementJSON] = [:]
 
     var weightOperationId: String? { weightOperationIdStorage }
     var weightRevision: Int? { weightRevisionStorage }

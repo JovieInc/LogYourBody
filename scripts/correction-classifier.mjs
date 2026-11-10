@@ -221,7 +221,7 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
       const indexSnapshot = readIndex();
       const index = indexSnapshot.split('\0');
       // Snapshot before readiness checks so an edit during validation cannot be overwritten.
-      working = readSource(LEDGER_PATH, { root });
+      working = readSource(LEDGER_PATH, { root }); // Refuse symlinked output.
       const assertMergeUnchanged = () => {
         assert.ok(
           readIndex() === indexSnapshot,

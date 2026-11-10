@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Union additive shared-lib test wiring during a merge.
+"""Union additive shared-lib test wiring and resolve correction ledgers during a merge.
 
 The repository-docs resolver keeps this sibling so it stays within the company
 500-line ratchet. Unchanged manifest bytes are copied from the branch; only
@@ -9,16 +9,22 @@ import json
 import re
 import subprocess
 from collections import Counter
+from contextlib import contextmanager
 from pathlib import Path
 
 import repository_docs
 
+LAUNCH_BINDINGS = "scripts/fixtures/lyb-launch-route-bindings.json"
+LAUNCH_MANIFEST = "scripts/fixtures/lyb-launch-route-manifest.json"
 MANIFESTS = (
     "packages/shared-lib/package.json",
     "packages/shared-lib/turbo.json",
+    LAUNCH_BINDINGS,
 )
 # The correction ledger has its own resolver and must not deadlock manifest union.
 LEDGER = "packages/shared-lib/corrections.json"
+# A conflicted diagnostic project pin stays for the reviewed digest resolver.
+DIAGNOSTIC_PIN_WORKFLOW = ".github/workflows/ios-ui-diagnostics.yml"
 UNION_REFUSAL = "additive manifest union keeps every parent test input"
 
 
@@ -106,7 +112,7 @@ def _subsequence(needle, haystack):
     return position == len(needle)
 
 
-def union_strings(base, ours, theirs):
+def _union_strings_exact(base, ours, theirs):
     # Preserved repeated inputs, such as a workflow listed twice, stay in branch order.
     for sequence in (ours, theirs):
         if not _subsequence(base, sequence):
@@ -125,6 +131,26 @@ def union_strings(base, ours, theirs):
     if set(result) != set(ours) | set(theirs):
         raise ValueError(UNION_REFUSAL)
     return result
+
+
+def union_strings(base, ours, theirs):
+    try:
+        return _union_strings_exact(base, ours, theirs)
+    except ValueError:
+        # A parent may replace enumerated inputs with one new glob that matches them.
+        globs = [
+            token for token in (*ours, *theirs)
+            if token not in base and _replacement_glob(token)
+        ]
+        covered = [
+            item for item in (*base, *ours, *theirs)
+            if any(_covered_by_glob(glob, item) for glob in globs)
+        ]
+        if not globs or not covered:
+            raise ValueError(UNION_REFUSAL) from None
+        return _union_strings_exact(
+            *[_strip_replaced(list(sequence), globs) for sequence in (base, ours, theirs)]
+        )
 
 
 def union_json(base, ours, theirs, path=(), union_arrays=False):
@@ -224,7 +250,7 @@ def apply_manifest_union(root):
             cwd=root, check=True, capture_output=True,
         ).stdout.decode().split("\0") if name
     }
-    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER})
+    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER, DIAGNOSTIC_PIN_WORKFLOW, LAUNCH_MANIFEST})
     if unrelated:
         raise ValueError("manifest union refuses unrelated conflicts: " + ", ".join(unrelated))
     planned = []
@@ -237,7 +263,8 @@ def apply_manifest_union(root):
             node_value(parse_json_spans(base_text)),
             node_value(ours_node),
             node_value(parse_json_spans(theirs_text)),
-            union_arrays=name.endswith("turbo.json"),
+            # Launch bindings retain every parent XCTest selector, just like test inputs.
+            union_arrays=name.endswith("turbo.json") or name == LAUNCH_BINDINGS,
         )
         rendered = render_updated(ours_text, ours_node, merged)
         if json.loads(rendered) != merged:
@@ -271,14 +298,60 @@ def _blob(root, spec):
         raise ValueError(UNION_REFUSAL + ": manifest is not text") from exc
 
 
+def _replacement_glob(token):
+    if token.count("*") != 1 or any(char in token for char in "?[]"):
+        return None
+    prefix, suffix = token.split("*", 1)
+    if not prefix or not suffix:
+        return None
+    return prefix, suffix
+
+
+def _covered_by_glob(token, item):
+    # A new glob does not cover itself or another pattern.
+    if item == token or "*" in item or "?" in item:
+        return False
+    parts = _replacement_glob(token)
+    if parts is None:
+        return False
+    prefix, suffix = parts
+    return item.startswith(prefix) and item.endswith(suffix) and len(item) >= len(prefix) + len(suffix)
+
+
+def _strip_replaced(sequence, globs):
+    return [item for item in sequence if not any(_covered_by_glob(glob, item) for glob in globs)]
+
+
+def _matches_union(expected, ours, theirs, merged):
+    return (
+        Counter(merged) == Counter(expected)
+        and _subsequence(ours, merged)
+        and _subsequence(theirs, merged)
+    )
+
+
 def _require_parent_inputs(base, ours, theirs, merged, path):
-    expected = union_strings(list(base), list(ours), list(theirs))
-    if (
-        Counter(merged) != Counter(expected)
-        or not _subsequence(list(ours), list(merged))
-        or not _subsequence(list(theirs), list(merged))
-    ):
-        location = ".".join(path) or "manifest"
+    location = ".".join(path) or "manifest"
+    base, ours, theirs, merged = list(base), list(ours), list(theirs), list(merged)
+    try:
+        expected = _union_strings_exact(base, ours, theirs)
+    except ValueError:
+        # A parent may replace enumerated inputs with one new glob that matches them.
+        globs = [
+            token for token in ours + theirs
+            if token not in base and token in merged and _replacement_glob(token)
+        ]
+        if not globs:
+            raise ValueError(UNION_REFUSAL + ": auto-merged " + location) from None
+        stripped = [_strip_replaced(seq, globs) for seq in (base, ours, theirs, merged)]
+        try:
+            expected = _union_strings_exact(*stripped[:3])
+        except ValueError:
+            raise ValueError(UNION_REFUSAL + ": auto-merged " + location) from None
+        if not _matches_union(expected, *stripped[1:]):
+            raise ValueError(UNION_REFUSAL + ": auto-merged " + location)
+        return
+    if not _matches_union(expected, ours, theirs, merged):
         raise ValueError(UNION_REFUSAL + ": auto-merged " + location)
 
 
@@ -325,6 +398,8 @@ def assert_auto_merged_parent_inputs(root):
         )
         if None in (ours, theirs, base, merged) or ours == base or theirs == base or ours == theirs:
             continue
+        if name == LAUNCH_BINDINGS and any(set(json.loads(parent)) - set(json.loads(merged)) for parent in (ours, theirs)):
+            raise ValueError(UNION_REFUSAL + ": auto-merged launch path missing")
         _preserved(
             node_value(parse_json_spans(base)),
             node_value(parse_json_spans(ours)),
@@ -332,3 +407,76 @@ def assert_auto_merged_parent_inputs(root):
             node_value(parse_json_spans(merged)),
             (),
         )
+
+
+def projection_is_unmerged(root, output):
+    result = subprocess.run(
+        ["git", "ls-files", "--unmerged", "--", output],
+        cwd=root, check=True, capture_output=True, text=True,
+    )
+    return bool(result.stdout.strip())
+
+
+@contextmanager
+def restore_dependency_artifacts_on_failure(root, output):
+    paths = [repository_docs.local(root, name) for name in ("pnpm-lock.yaml", output)]
+    originals = {path: path.read_bytes() if path.exists() else None for path in paths}
+    try:
+        yield
+    except (ValueError, OSError, subprocess.CalledProcessError):
+        # Failed dependency repairs restore both artifacts, including staging failures.
+        for path, original in originals.items():
+            if original is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(original)
+        raise
+
+
+def merge_ledger(root, resolve_staged, staged_bytes, git_bytes):
+    """Refresh the staged projection before the parent-preserving ledger resolver."""
+    root = Path(root).resolve()
+    git_bytes(root, "rev-parse", "--verify", "MERGE_HEAD")
+    config = json.loads(staged_bytes(root, "repository-docs.json"))
+    output = config["output"]
+    conflicts = set(git_bytes(
+        root, "diff", "--name-only", "--diff-filter=U", "--relative", "-z",
+    ).decode().split("\0")) - {"", output, LEDGER}
+    if conflicts:
+        raise ValueError("resolve source conflicts first: " + ", ".join(sorted(conflicts)))
+    path = repository_docs.local(root, output)
+    original = path.read_bytes() if path.exists() else None
+    index = git_bytes(root, "ls-files", "--stage", "--", output)
+    source_args = ("ls-files", "--stage", "-z", "--", ".", ":!" + LEDGER, ":!" + output)
+    source_index = git_bytes(root, *source_args)
+    # Rendering refusals preserve concurrent projection edits; only roll back our completed render.
+    resolve_staged(root)
+    rendered = path.read_bytes() if path.exists() else None
+    rendered_identity = path.lstat()[:3]  # File mode, inode and device, without following links.
+    rendered_index = git_bytes(root, "ls-files", "--stage", "--", output)
+    try:
+        subprocess.run(
+            ["node", str(Path(__file__).with_name("correction-classifier.mjs")),
+             "--resolve-merge", str(root), "--stage"], cwd=root, check=True,
+        )
+    except (ValueError, OSError, subprocess.CalledProcessError) as error:
+        # Rollback owns only our rendered projection, never another writer's edits.
+        # Identical bytes do not authorize rollback through a replaced file or symlink.
+        current_identity = path.lstat()[:3] if path.exists() or path.is_symlink() else None
+        if current_identity != rendered_identity:
+            raise ValueError("source projection changed during ledger validation; review and retry") from error
+        current = path.read_bytes() if path.exists() else None
+        if current != rendered or git_bytes(root, "ls-files", "--stage", "--", output) != rendered_index:
+            raise ValueError("source projection changed during ledger validation; review and retry") from error
+        # A refused ledger repair restores the projection and its conflict stages.
+        if original is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.write_bytes(original)
+        subprocess.run(["git", "update-index", "--force-remove", "--", output], cwd=root, check=True)
+        subprocess.run(["git", "update-index", "--index-info"], cwd=root, input=index, check=True)
+        raise
+    # The classifier may start after a source edit; retain the render's source snapshot.
+    if (git_bytes(root, *source_args) != source_index
+            or git_bytes(root, "ls-files", "--stage", "--", output) != rendered_index):
+        raise ValueError("source index changed during ledger validation; review staged inputs and retry")

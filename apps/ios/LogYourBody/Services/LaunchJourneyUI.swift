@@ -59,6 +59,7 @@ struct LaunchOutcomeEditor: View {
     var errorText: String?
     var isSaving = false
     var includesDatedControls = false
+    var allowsMaintenance = false
     var onSave: (DatedOutcome) -> Void
 
     @State private var metric: DatedOutcome.Metric
@@ -71,6 +72,7 @@ struct LaunchOutcomeEditor: View {
 
     init(
         existing: DatedOutcome?, errorText: String?, isSaving: Bool = false, includesDatedControls: Bool = false,
+        allowsMaintenance: Bool = false,
         onSave: @escaping (DatedOutcome) -> Void
     ) {
         self.existing = existing
@@ -78,6 +80,7 @@ struct LaunchOutcomeEditor: View {
         self.onSave = onSave
         self.isSaving = isSaving
         self.includesDatedControls = includesDatedControls
+        self.allowsMaintenance = allowsMaintenance
         _metric = State(initialValue: existing?.outcome.metric ?? .weightKg)
         _valueText = State(initialValue: existing.map { String(existingValue($0)) } ?? "")
         _dateText = State(initialValue: existing?.outcomeDate ?? "")
@@ -106,7 +109,21 @@ struct LaunchOutcomeEditor: View {
                             .keyboardType(.numberPad)
                     }
                     intervalSection("Travel", intervals: $constraints.travel)
-                    intervalSection("Maintenance", intervals: $constraints.maintenance)
+                    if !allowsMaintenance {
+                        intervalSection("Maintenance", intervals: $constraints.maintenance)
+                    }
+                }
+                if allowsMaintenance {
+                    Toggle("Maintenance interval", isOn: Binding(
+                        get: { !constraints.maintenance.isEmpty },
+                        set: { enabled in
+                            constraints.maintenance = enabled ? [.init(start: "", end: "")] : []
+                        }
+                    ))
+                    .accessibilityIdentifier("launch_outcome_maintenance")
+                    if !constraints.maintenance.isEmpty {
+                        intervalSection("Maintenance", intervals: $constraints.maintenance)
+                    }
                 }
                 Text(LaunchPromiseCopy.framing)
                     .font(.footnote)
@@ -122,7 +139,7 @@ struct LaunchOutcomeEditor: View {
                         .disabled(isSaving || isPreparingSave)
                         .accessibilityIdentifier("launch_outcome_save")
                 }
-                if includesDatedControls {
+                if includesDatedControls || allowsMaintenance {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") { dismiss() }
                             .disabled(isSaving || isPreparingSave)
@@ -139,7 +156,9 @@ struct LaunchOutcomeEditor: View {
             ForEach(intervals.wrappedValue.indices, id: \.self) { index in
                 VStack {
                     TextField("Start (YYYY-MM-DD)", text: intervals[index].start)
+                        .accessibilityIdentifier(title == "Maintenance" && index == 0 ? "launch_maintenance_start" : "")
                     TextField("End (YYYY-MM-DD)", text: intervals[index].end)
+                        .accessibilityIdentifier(title == "Maintenance" && index == 0 ? "launch_maintenance_end" : "")
                 }
             }
             .onDelete { intervals.wrappedValue.remove(atOffsets: $0) }
@@ -217,7 +236,7 @@ struct DatedOutcomeEditorHost: View {
             }
             LaunchOutcomeEditor(
                 existing: model.snapshot?.value, errorText: model.errorText,
-                isSaving: model.isSaving, includesDatedControls: true
+                isSaving: model.isSaving, includesDatedControls: true, allowsMaintenance: true
             ) { value in
                 Task { if await model.save(value) { onSaved() } }
             }

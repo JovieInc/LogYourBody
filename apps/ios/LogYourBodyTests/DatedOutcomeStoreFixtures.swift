@@ -1,4 +1,5 @@
 import CoreData
+import XCTest
 @testable import LogYourBody
 
 final class FailingOutcomeContext: NSManagedObjectContext {

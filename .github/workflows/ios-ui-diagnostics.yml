@@ -1,7 +1,7 @@
 name: iOS UI Diagnostics (NONQUALIFYING)
 
 # workflow_dispatch remains for a token that has actions:write. A main push of
-# this file, the pinned audit script, or the seven-case HomeV2 layout UI test,
+# this file, the pinned audit script, its diagnostic-seven sibling, or the seven-case HomeV2 layout UI test,
 # and the daily schedule, start the same job (LYB-200 / #1458). Those events
 # checkout github.sha only.
 on:
@@ -16,6 +16,7 @@ on:
     paths:
       - .github/workflows/ios-ui-diagnostics.yml
       - scripts/ios/launch-quality-audit.sh
+      - scripts/ios/launch-quality-diagnostic-seven.sh
       - apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift
   schedule:
     - cron: '0 16 * * *'
@@ -38,7 +39,8 @@ jobs:
   diagnostic:
     name: Focused UI Diagnostics (NONQUALIFYING)
     runs-on: macos-15
-    timeout-minutes: 50
+    # The diagnostic step is 48m. Leave 7m for checkout, Xcode selection, and upload.
+    timeout-minutes: 55
     steps:
       - name: Validate manual diagnostic source
         shell: bash
@@ -99,13 +101,15 @@ jobs:
 
           # Intentionally unavailable until the FINAL composed audit and this
           # exact policy hunk are independently reviewed. Never a caller input.
-          REVIEWED_AUDIT_SHA256 = '74f55060b59802702b16b1aebc2c526ac8f37516c79a891293c796ebaf824568'
+          REVIEWED_AUDIT_SHA256 = 'cbf29ca6fbdc6c521c6206c3e7c9bfceacf1535d76ef6dfd11f62d8dd8377a0c'
           DEPENDENCIES = {
+              'scripts/ios/xcodebuild-command-timeout.py': '66abf226c296005bbf50ca277d1e597f90c74269d26cb1afa039e999cbbc35fa',
               'scripts/ios/bootstrap-local-config.sh': 'aad028c0eff7f9d2a043711a8735963dc66b9bd664f11bf98b7ada67a60ab8db',
-              'scripts/ios/resolve-simulator-destination.sh': 'f5b31c0a92c181a5cb025c42d6090e142bc2a2394fa05b5f58e1badd6f2693bc',
+              'scripts/ios/launch-quality-diagnostic-seven.sh': 'c50c0af8f80b9649488398c1a4ab6f6a344a51da187c4e64be7b8871f779815b',
+              'scripts/ios/resolve-simulator-destination.sh': '8a610d8368587da67252065fd46c2937a03f09e9d4c24798a40e669187e61257',
               'apps/ios/Scripts/import-joviekit.mjs': '35555f9ad251a0976a0bd0ee4ebf4293a4b8634ea61e60db254e53b9c196aa4b',
               'apps/ios/Vendor/JovieKit.source.json': 'aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2',
-              'apps/ios/LogYourBody.xcodeproj/project.pbxproj': '92b3322cfc3cf8c2a82db3038d21a731a4133b513f36a8ba05ae829aaa7e6770',
+              'apps/ios/LogYourBody.xcodeproj/project.pbxproj': 'e26d2cb25863eb086d5123e39138e2390680c10693e833840f27ba5e46f6de6b',
               'apps/ios/LogYourBody.xcodeproj/xcshareddata/xcschemes/LogYourBody.xcscheme': 'f8bd5d22beb90e7a04360b0a6c68d19bddc2a6ae5b076ac347f087540c870d64',
               'apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved': '7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138',
           }
@@ -144,8 +148,9 @@ jobs:
 
       # No local composite setup, Ruby/Bundler install, dependency cache restore,
       # evidence validator CLI, coverage ratchet or performance invocation here.
+      # 48m holds a 900s cold build, the 1500s UI cap, 180s finalization, and the catalogue read.
       - name: Run fixed seven-case diagnostic
-        timeout-minutes: 43
+        timeout-minutes: 48
         shell: bash
         env:
           DIAGNOSTIC_EXPECTED_SOURCE_SHA: ${{ env.DIAGNOSTIC_SOURCE_SHA }}

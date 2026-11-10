@@ -3,61 +3,7 @@ import XCTest
 @testable import LogYourBody
 
 @MainActor
-final class DatedOutcomeStoreTests: XCTestCase {
-    private var owner: String? = "owner-a"
-    private var gate = true
-    private var emitted: [DatedOutcomeEdit] = []
-
-    private var value: DatedOutcome {
-        DatedOutcome(
-            outcome: .init(metric: .bodyFatPercentage, targetValue: 20), outcomeDate: "2027-04-01",
-            constraints: .init(
-                availability: .init(sessionsPerWeek: 3, minutesPerSession: 45, equipment: "dumbbells"),
-                travel: [.init(start: "2027-01-01", end: "2027-01-07")],
-                maintenance: [.init(start: "2027-02-01", end: "2027-02-14")]
-            )
-        )
-    }
-
-    private func store(_ context: NSManagedObjectContext) -> DatedOutcomeStore {
-        DatedOutcomeStore(
-            context: context, currentOwner: { self.owner }, enabled: { self.gate },
-            didSave: { self.emitted.append($0) }
-        )
-    }
-
-    private func coordinator(version: String? = nil, url: URL? = nil) throws -> NSPersistentStoreCoordinator {
-        let model: NSManagedObjectModel
-        if let version {
-            let bundle = try XCTUnwrap(Bundle(for: CoreDataManager.self).url(forResource: "LogYourBody", withExtension: "momd"))
-            model = try XCTUnwrap(NSManagedObjectModel(contentsOf: bundle.appendingPathComponent("\(version).mom")))
-        } else {
-            model = CoreDataManager.makeManagedObjectModel()
-        }
-        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
-        try coordinator.addPersistentStore(
-            ofType: url == nil ? NSInMemoryStoreType : NSSQLiteStoreType, configurationName: nil, at: url,
-            options: [NSMigratePersistentStoresAutomaticallyOption: true, NSInferMappingModelAutomaticallyOption: true]
-        )
-        return coordinator
-    }
-
-    private func context(_ coordinator: NSPersistentStoreCoordinator) -> NSManagedObjectContext {
-        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
-        context.persistentStoreCoordinator = coordinator
-        return context
-    }
-
-    private func close(_ coordinator: NSPersistentStoreCoordinator) throws {
-        for persistentStore in coordinator.persistentStores { try coordinator.remove(persistentStore) }
-    }
-
-    private func removeStore(_ url: URL) {
-        for suffix in ["", "-wal", "-shm"] {
-            try? FileManager.default.removeItem(atPath: url.path + suffix)
-        }
-    }
-
+final class DatedOutcomeStoreTests: DatedOutcomeStoreFixtureCase {
     func testPresentationSaveAndRelaunchRestoreOwnerScopedContext() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("timeline-\(UUID()).sqlite")
         defer { removeStore(url) }
@@ -75,6 +21,29 @@ final class DatedOutcomeStoreTests: XCTestCase {
         let other = try await restored.loadForPresentation(isCurrent: { true })
         XCTAssertNil(other)
         XCTAssertTrue(try restored.pendingEdits().isEmpty)
+    }
+
+    func testReconciliationKeepsBaselineOnlyForComparableMetric() async throws {
+        let journal = store(context(try coordinator()))
+        let edit = try XCTUnwrap(journal.save(value))
+        let baseline = DatedOutcome.PlanBaseline(date: Date(), metric: value.outcome.metric, value: 22)
+        try await journal.retainPlanBaselineForPresentation(baseline, revision: edit.requestId, isCurrent: { true })
+        var revised = value
+        revised.outcomeDate = "2028-01-01"
+        let remote = DatedOutcomeSnapshot(revision: UUID(), value: revised)
+        try await journal.acceptRemoteForPresentation(remote, expectedRevision: edit.requestId, isCurrent: { true })
+        XCTAssertEqual(try journal.load()?.value, revised)
+        XCTAssertEqual(try journal.load()?.revision, remote.revision)
+        XCTAssertEqual(try journal.load()?.planBaseline, baseline)
+        XCTAssertTrue(try journal.pendingEdits().isEmpty)
+        revised.outcome.metric = .weightKg
+        revised.outcome.targetValue = 76
+        try await journal.acceptRemoteForPresentation(
+            .init(revision: UUID(), value: revised), expectedRevision: remote.revision, isCurrent: { true }
+        )
+        XCTAssertNil(try journal.load()?.planBaseline, "A different metric cannot reuse the previous baseline")
+        XCTAssertTrue(try journal.pendingEdits().isEmpty)
+        XCTAssertEqual(emitted, [edit], "Reconciliation cannot enqueue a new user edit")
     }
 
     func testEditorSaveIsAtomicAndUnchangedSaveCreatesNoRequest() async throws {
@@ -228,6 +197,67 @@ final class DatedOutcomeStoreTests: XCTestCase {
         XCTAssertNil(try journal.load())
         XCTAssertTrue(try journal.pendingEdits().isEmpty)
         XCTAssertTrue(emitted.isEmpty)
+    }
+
+    func testCoachActionAndNextCheckInSurviveSQLiteReopenWithoutSyncEdit() async throws {
+        try await assertCoachActionAndNextCheckInSurviveSQLiteReopenWithoutSyncEdit()
+    }
+
+    func testPlanBaselineSurvivesEditsAcknowledgementAndRelaunchWithoutWireChanges() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("baseline-\(UUID()).sqlite")
+        defer { removeStore(url) }
+        let first = try coordinator(url: url)
+        let background = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
+        background.persistentStoreCoordinator = first
+        let journal = store(background)
+        var goal = value
+        goal.outcome.metric = .weightKg
+        goal.outcome.targetValue = 76
+        let edit = try XCTUnwrap(journal.save(goal))
+        let baseline = DatedOutcome.PlanBaseline(date: Date(timeIntervalSince1970: 1_793_491_200), metric: .weightKg, value: 80)
+        try await journal.retainPlanBaselineForPresentation(baseline, revision: edit.requestId, isCurrent: { true })
+        XCTAssertEqual(try journal.load()?.planBaseline, baseline)
+        XCTAssertEqual(try journal.pendingEdits(), [edit])
+        XCTAssertEqual(emitted.count, 1, "Baseline metadata is not a user edit or recompute")
+        let wire = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(edit)) as? [String: Any])
+        XCTAssertNil(wire["planBaseline"])
+        goal.outcomeDate = "2027-06-01"
+        let changed = try XCTUnwrap(journal.save(goal))
+        try journal.acknowledge(edit, receipt: .init(revision: edit.requestId, value: edit.value))
+        try journal.acknowledge(changed, receipt: .init(revision: changed.requestId, value: changed.value))
+        XCTAssertEqual(try journal.load()?.planBaseline, baseline)
+        try close(first)
+        let reopened = try coordinator(url: url)
+        defer { try? close(reopened) }
+        let restored = store(context(reopened))
+        XCTAssertEqual(try restored.load()?.planBaseline, baseline)
+        XCTAssertEqual(try restored.load()?.value, goal)
+        owner = "owner-b"
+        XCTAssertNil(try restored.load())
+    }
+
+    func testBaselineCannotReplaceExistingRevisionOrCrossAccountSession() async throws {
+        let journal = store(context(try coordinator()))
+        let edit = try XCTUnwrap(journal.save(value))
+        let baseline = DatedOutcome.PlanBaseline(date: Date(), metric: .bodyFatPercentage, value: 22)
+        try await journal.retainPlanBaselineForPresentation(baseline, revision: UUID(), isCurrent: { true })
+        XCTAssertNil(try journal.load()?.planBaseline)
+        try await journal.retainPlanBaselineForPresentation(baseline, revision: edit.requestId, isCurrent: { true })
+        var replacement = baseline
+        replacement.value = 23
+        try await journal.retainPlanBaselineForPresentation(replacement, revision: edit.requestId, isCurrent: { true })
+        XCTAssertEqual(try journal.load()?.planBaseline, baseline)
+        owner = "owner-b"
+        do {
+            try await journal.retainPlanBaselineForPresentation(baseline, revision: edit.requestId, isCurrent: { false })
+            XCTFail("A late task cannot write into the new session")
+        } catch DatedOutcomeError.unauthenticated { }
+        XCTAssertNil(try journal.load())
+        owner = "owner-a"
+        var changed = value
+        changed.outcome.metric = .ffmi
+        try journal.save(changed)
+        XCTAssertNil(try journal.load()?.planBaseline, "A metric edit requires its own comparable baseline")
     }
 
     func testPresentationReadAfterSessionChangeIsDiscarded() async throws {
@@ -419,54 +449,6 @@ final class DatedOutcomeStoreTests: XCTestCase {
 
     func testExistingV5StoreMigratesWithoutLosingWorkoutReconciliationOrCreatingOutcome() throws {
         try assertExistingStoreMigrates(version: "LogYourBodyV5")
-    }
-
-    private func assertExistingStoreMigrates(version: String) throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("outcome-migration-\(UUID()).sqlite")
-        defer { removeStore(url) }
-        let legacy = try coordinator(version: version, url: url)
-        let legacyContext = context(legacy)
-        let profile = NSEntityDescription.insertNewObject(forEntityName: "CachedProfile", into: legacyContext)
-        profile.setValue("owner-a", forKey: "id")
-        profile.setValue("synthetic@example.invalid", forKey: "email")
-        for key in ["createdAt", "updatedAt", "lastModified"] { profile.setValue(Date(), forKey: key) }
-        profile.setValue(80, forKey: "goalWeight")
-        let metric = NSEntityDescription.insertNewObject(forEntityName: "CachedBodyMetrics", into: legacyContext)
-        metric.setValue("measurement-a", forKey: "id")
-        metric.setValue("owner-a", forKey: "userId")
-        for key in ["createdAt", "updatedAt", "lastModified", "date"] { metric.setValue(Date(), forKey: key) }
-        metric.setValue(85.5, forKey: "weight")
-        let reconciliationPayload = Data("retained-reconciliation".utf8)
-        if version == "LogYourBodyV5" {
-            XCTAssertNotNil(legacy.managedObjectModel.entitiesByName["CachedWorkoutReconciliationDay"])
-            let day = NSEntityDescription.insertNewObject(
-                forEntityName: "CachedWorkoutReconciliationDay", into: legacyContext
-            )
-            day.setValue("owner-a", forKey: "ownerId")
-            day.setValue("2027-01-01", forKey: "day")
-            day.setValue(reconciliationPayload, forKey: "payload")
-        }
-        try legacyContext.save()
-        try close(legacy)
-        let migrated = try coordinator(url: url)
-        defer { try? close(migrated) }
-        let migratedContext = context(migrated)
-        let profiles = try migratedContext.fetch(NSFetchRequest<NSManagedObject>(entityName: "CachedProfile"))
-        XCTAssertEqual(profiles.first?.value(forKey: "goalWeight") as? Double, 80)
-        let metrics = try migratedContext.fetch(NSFetchRequest<NSManagedObject>(entityName: "CachedBodyMetrics"))
-        XCTAssertEqual(metrics.first?.value(forKey: "weight") as? Double, 85.5)
-        if version == "LogYourBodyV5" {
-            let request = NSFetchRequest<NSManagedObject>(entityName: "CachedWorkoutReconciliationDay")
-            let days = try migratedContext.fetch(request)
-            XCTAssertEqual(days.count, 1)
-            XCTAssertEqual(days.first?.value(forKey: "ownerId") as? String, "owner-a")
-            XCTAssertEqual(days.first?.value(forKey: "day") as? String, "2027-01-01")
-            XCTAssertEqual(days.first?.value(forKey: "payload") as? Data, reconciliationPayload)
-        }
-        let store = store(migratedContext)
-        XCTAssertNil(try store.load())
-        try store.save(value)
-        XCTAssertEqual(try store.load()?.value, value)
     }
 
     func testWireFieldsAndLYB130InputsConsumeExternalContractFixtureWhenSupplied() throws {

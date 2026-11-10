@@ -8,12 +8,15 @@ import CoreImage
 import UIKit
 class BackgroundRemovalService {
     static let shared = BackgroundRemovalService()
+    private let segmentationQueue: DispatchQueue
     private let makeMask: (CGImage, Float) throws -> CVPixelBuffer
 
-    private init() { makeMask = Self.visionMask }
-
-    init(makeMask: @escaping (CGImage, Float) throws -> CVPixelBuffer) {
-        self.makeMask = makeMask
+    init(
+        segmentationQueue: DispatchQueue = DispatchQueue(label: "com.logyourbody.segmentation", qos: .userInitiated),
+        segment: ((CGImage, Float) throws -> CVPixelBuffer)? = nil
+    ) {
+        self.segmentationQueue = segmentationQueue
+        self.makeMask = segment ?? Self.generatePersonMask
     }
 
     enum BackgroundRemovalError: LocalizedError {
@@ -43,20 +46,21 @@ class BackgroundRemovalService {
         return try applySegmentationMask(to: cgImage, mask: mask, quality: quality)
     }
 
-    /// Person mask from Vision. `perform` either throws or fills `results`, so
-    /// there is no completion handler and nothing that can be resumed twice
-    /// (the simulator trap that BackgroundRemovalServiceTests used to document).
+    /// Vision waits for dependent work synchronously. Keep it off Swift's
+    /// cooperative pool so simultaneous photo previews cannot starve UI tasks.
     func personMask(for cgImage: CGImage, quality: Float) async throws -> CVPixelBuffer {
-        // Vision waits synchronously for dependent dispatch work. Concurrent
-        // previews must not occupy Swift's cooperative pool while those jobs wait.
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
+        try Task.checkCancellation()
+        let mask: CVPixelBuffer = try await withCheckedThrowingContinuation { continuation in
+            segmentationQueue.async {
+                // `perform` owns completion; Vision's callback must never resume this again.
                 continuation.resume(with: Result { try self.makeMask(cgImage, quality) })
             }
         }
+        try Task.checkCancellation()
+        return mask
     }
 
-    private static func visionMask(for cgImage: CGImage, quality: Float) throws -> CVPixelBuffer {
+    private static func generatePersonMask(_ cgImage: CGImage, quality: Float) throws -> CVPixelBuffer {
         let request = VNGeneratePersonSegmentationRequest()
         request.qualityLevel = quality > 0.8 ? .accurate : .balanced
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])

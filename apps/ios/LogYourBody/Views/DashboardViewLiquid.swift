@@ -126,6 +126,9 @@ struct DashboardViewLiquid: View {
     @State var isStatsDestinationActive = false
     @State var isProgressPhotoAttachPresented = false
     @State var progressPhotoAttachTarget: BodyMetrics?
+    @State var progressPhotoAttachFallbackOverride: Date?
+    @State var pendingWeeklyPhotoMoment: Date?
+    @State var pendingWeeklyCompare = false
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
     @State var bodyScoreShareCapture = AccountBoundShareCapture()
@@ -311,7 +314,7 @@ struct DashboardViewLiquid: View {
                 homeV2TimelineSelection = nil
                 isMetricDetailActive = false
                 isStatsDestinationActive = false
-                selectedPhotoTimelineRootPage = .timeline
+                selectedPhotoTimelineRootPage = Self.pageAfterAccountChange()
                 isHomeV2MetricProvenancePresented = false
                 metricCacheRefreshTask?.cancel()
                 metricCacheBuildID = UUID()
@@ -356,45 +359,34 @@ struct DashboardViewLiquid: View {
                 loadGlp1WeeklyCheckInDataIfNeeded()
             }
 
-        let withSheetsAndNavigation = withSyncAndState
-            .sheet(isPresented: $showAddEntrySheet) {
-                if !isDatedTimelineEnabled || datedTimelineIsOwned {
-                    AddEntrySheet(
-                        isPresented: $showAddEntrySheet,
-                        initialTab: addEntryInitialTab,
-                        includesGlp1Entry: addEntryIncludesGlp1Entry,
-                        initialDate: addEntryInitialDate,
-                        initialWeight: addEntryInitialWeight,
-                        initialBodyFat: addEntryInitialBodyFat,
-                        initialBodyFatMethod: addEntryInitialBodyFatMethod,
-                        isHomeV2LogEntry: isHomeV2LoggingWeight,
-                        onWeightSaved: handleHomeV2WeightEntrySaved,
-                        onBodyFatSaved: handleHomeV2BodyFatEntrySaved,
-                        presentationOwner: isDatedTimelineEnabled ? datedTimelineOwner : nil
-                    )
+        let withSheetsAndNavigation = weeklyPhotoAttachSheet(
+            on: withSyncAndState
+                .sheet(isPresented: $showAddEntrySheet) {
+                    if !isDatedTimelineEnabled || datedTimelineIsOwned {
+                        AddEntrySheet(
+                            isPresented: $showAddEntrySheet,
+                            initialTab: addEntryInitialTab,
+                            includesGlp1Entry: addEntryIncludesGlp1Entry,
+                            initialDate: addEntryInitialDate,
+                            initialWeight: addEntryInitialWeight,
+                            initialBodyFat: addEntryInitialBodyFat,
+                            initialBodyFatMethod: addEntryInitialBodyFatMethod,
+                            isHomeV2LogEntry: isHomeV2LoggingWeight,
+                            onWeightSaved: handleHomeV2WeightEntrySaved,
+                            onBodyFatSaved: handleHomeV2BodyFatEntrySaved,
+                            presentationOwner: isDatedTimelineEnabled ? datedTimelineOwner : nil
+                        )
                         .environmentObject(authManager)
+                    }
                 }
-            }
-            .sheet(isPresented: $showSyncDetails) {
-                DashboardSyncDetailsSheet(
-                    isPresented: $showSyncDetails,
-                    syncManager: realtimeSyncManager
-                )
-            }
-            .sheet(isPresented: $showsRecentHealthReadings) { homeV2RecentReadingsSheet }
-            .sheet(isPresented: $isProgressPhotoAttachPresented) {
-                if !isDatedTimelineEnabled || datedTimelineIsOwned {
-                    ProgressPhotoAttachSheet(
-                        targetMetric: progressPhotoAttachTarget,
-                        fallbackDate: progressPhotoAttachFallbackDate,
-                        onComplete: {
-                            await handleProgressPhotoAttachComplete()
-                        },
-                        presentationOwner: isDatedTimelineEnabled ? datedTimelineOwner : nil
+                .sheet(isPresented: $showSyncDetails) {
+                    DashboardSyncDetailsSheet(
+                        isPresented: $showSyncDetails,
+                        syncManager: realtimeSyncManager
                     )
-                    .environmentObject(authManager)
                 }
-            }
+                .sheet(isPresented: $showsRecentHealthReadings) { homeV2RecentReadingsSheet }
+        )
             .navigationDestination(isPresented: $isMetricDetailActive) {
                 fullMetricChartView
             }

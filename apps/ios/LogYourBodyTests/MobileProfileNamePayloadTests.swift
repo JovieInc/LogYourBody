@@ -21,6 +21,42 @@ final class MobileProfileNamePayloadTests: XCTestCase {
         super.tearDown()
     }
 
+    func testPostAppleSessionInitializationUsesCanonicalHostAndKeepsBearerToken() async throws {
+        NamePayloadStubURLProtocol.install { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.host, ProductRegistry.Hosts.apiHost)
+            XCTAssertEqual(request.url?.path, "/api/auth/mobile/session")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer apple-oauth-access")
+            return StubbedHTTPResponse(statusCode: 200, body: Data(#"{"user":{"id":"name-user"}}"#.utf8))
+        }
+        let manager = try makeStubbedAuthManager()
+
+        try await manager.registerProductSession(
+            accessToken: "apple-oauth-access", apiBaseURL: "https://logyourbody.com"
+        )
+
+        XCTAssertEqual(NamePayloadStubURLProtocol.requests.count, 1)
+    }
+
+    func testPostAppleSessionInitializationDoesNotIgnoreServerRejection() async throws {
+        let manager = try makeStubbedAuthManager()
+        manager.authSession = nil
+        manager.currentUser = nil
+        for status in [401, 403, 500, 503] {
+            NamePayloadStubURLProtocol.install { _ in
+                StubbedHTTPResponse(statusCode: status, body: Data("{}".utf8))
+            }
+            do {
+                try await manager.registerProductSession(accessToken: "apple-oauth-access")
+                XCTFail("HTTP \(status) must not admit an unregistered account")
+            } catch {
+                XCTAssertEqual(error.localizedDescription, "Your LogYourBody account could not be initialized.")
+            }
+            XCTAssertNil(manager.authSession)
+            XCTAssertNil(manager.currentUser)
+        }
+    }
+
     func testConsolidateNameUpdateSendsCamelCaseFullNameKey() async throws {
         NamePayloadStubURLProtocol.install { request in
             XCTAssertEqual(request.httpMethod, "PATCH")

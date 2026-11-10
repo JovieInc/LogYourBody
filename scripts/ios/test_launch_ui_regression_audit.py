@@ -34,7 +34,11 @@ sys.modules[SPEC.name] = AUDIT
 SPEC.loader.exec_module(AUDIT)
 
 
-class StatsCardCompositionTests(unittest.TestCase):
+from test_launch_ui_home_interaction import CheckSiblingDiscoveryTests, HomeInteractionAuditTests
+from launch_ui_timeline_day import check_timeline_calendar_day
+
+
+class StatsCardCompositionTests(HomeInteractionAuditTests, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._swift_template = tempfile.TemporaryDirectory()
@@ -54,10 +58,8 @@ class StatsCardCompositionTests(unittest.TestCase):
 
         def passing():
             pass
-
         def failing():
             self.fail("behavior regression")
-
         cases = [
             ("complete", unittest.TestSuite([unittest.FunctionTestCase(passing)]), 0),
             ("empty", unittest.TestSuite(), 1),
@@ -100,18 +102,32 @@ class StatsCardCompositionTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertIn(check, "\n".join(path.read_text() for path in output.glob("*.json")))
 
+    def test_audit_reads_each_swift_file_once(self):
+        reads = []
+        original = Path.read_text
+
+        def counted(path, *args, **kwargs):
+            if path.suffix == ".swift":
+                reads.append(path)
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", counted):
+            self.assertEqual(self.run_audit()[0], 0)
+        self.assertGreater(len(reads), 0)
+        self.assertEqual(len(reads), len(set(reads)))
+
     def test_empty_timeline_keeps_its_photo_button_accessible(self):
         findings = []
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual(findings, [])
         self.replace("Services/DatedTimelineUI.swift", ".accessibilityElement(children: .contain)", "")
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
 
     def test_empty_timeline_requires_the_photo_action_identifier(self):
         self.replace("Services/DatedTimelineUI.swift", '"launch_timeline_add_photo"', '"wrong_photo_action"')
         findings = []
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
 
     def test_geometry_requires_typed_nonfinite_arguments_in_every_native_tree(self):
@@ -252,6 +268,22 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                      'LineMark(x: .value("Observation date", date)')
         self.assert_rejected("dashboard.observation_plot")
 
+    def test_observation_chart_cannot_take_the_card_tap(self):
+        self.replace(
+            "DesignSystem/Organisms/MetricSummaryCard.swift",
+            ".accessibilityHidden(true)\n        .allowsHitTesting(false)",
+            ".accessibilityHidden(true)",
+        )
+        self.assert_rejected("dashboard.observation_chart_ignores_hits")
+
+    def test_card_tap_still_opens_detail_when_the_list_drag_takes_the_touch(self):
+        self.replace(
+            "DesignSystem/Organisms/MetricSummaryCard.swift",
+            "button.highPriorityGesture(TapGesture().onEnded { action.handler() })",
+            "button",
+        )
+        self.assert_rejected("dashboard.card_tap_opens_detail")
+
     def test_single_timestamp_cannot_establish_no_change(self):
         self.replace("Helpers/DashboardMetricFormatting.swift",
                      "if requiresComparison && first.date == last.date { return nil }", "")
@@ -285,9 +317,7 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         source = path.read_text()
         start = source.index("    var hudGlp1WeeklyCheckIn:")
         end = source.index("    var isPhaseInsightEnabled:", start)
-        card = source[start:end]
-        # Run against the original source as well as the repaired card.
-        card = card.replace(".contentShape(Rectangle())", "")
+        card = source[start:end].replace(".contentShape(Rectangle())", "")
         path.write_text(source[:start] + card + source[end:])
         self.assert_rejected("dashboard.checkin_card_hit_region")
 
@@ -340,7 +370,6 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         self.assertIn(header_end, detached)
         path.write_text(detached.replace(header_end, parent_overlay, 1))
         self.assert_rejected("timeline.edge_swipe_excludes_header")
-
         padded = source.replace(
             """.frame(width: 20)
                         .frame(maxHeight: .infinity)
@@ -382,26 +411,19 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
 
     def test_parent_audit_stays_within_the_company_size_ratchet(self):
         # The parent audit stays within the company 500-line ratchet.
-        count = len(Path(AUDIT.__file__).read_text().splitlines())
-        self.assertLessEqual(
-            count, 500, "extract a sibling before the company size guard",
-        )
-        self.assertNotIn("def check_timeline_gestures", Path(AUDIT.__file__).read_text())
+        text = Path(AUDIT.__file__).read_text()
+        self.assertLessEqual(len(text.splitlines()), 500, "extract a sibling before the company size guard")
+        self.assertNotIn("def check_timeline_gestures", text)
 
     def test_every_size_ratchet_sibling_loads_or_the_audit_fails_closed(self):
         loaded = [
             AUDIT._load_sibling(module_name, filename, export)
             for module_name, filename, export in AUDIT._AUDIT_SIBLINGS
         ]
-        self.assertEqual(
-            [item[0] for item in AUDIT._AUDIT_SIBLINGS],
-            [
-                "launch_ui_timeline_day",
-                "launch_ui_opacity_audit",
-                "launch_ui_timeline_gesture_audit",
-                "launch_ui_regression_report",
-            ],
-        )
+        self.assertEqual([item[0] for item in AUDIT._AUDIT_SIBLINGS], [
+            "launch_ui_timeline_day", "launch_ui_opacity_audit", "launch_ui_timeline_gesture_audit",
+            "launch_ui_offline_pin_audit", "launch_ui_dated_stats_audit", "launch_ui_regression_report",
+        ])
         for export in loaded:
             self.assertTrue(callable(export))
         with self.assertRaises(RuntimeError) as missing_file:
@@ -420,7 +442,6 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         original_compare = compare.read_text()
         self.assertIn("var earlierOpacity: Double", original_policy)
         self.assertEqual(self.run_audit()[0], 0)
-
         policy.write_text(original_policy.replace(
             "var earlierOpacity: Double", "var earlierOpacity: CGFloat", 1
         ))
@@ -445,11 +466,9 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         tests.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / "apps/ios/LogYourBodyTests/TimelineCalculatorTests.swift", tests)
         self.assertEqual(self.run_audit()[0], 0)
-
         tests.write_text("let date = now.addingTimeInterval(-daysAgo * 24 * 60 * 60)\n")
         self.assert_rejected("timeline.elapsed_day_offset")
         self.assert_rejected("timeline.fallback_hour_regression")
-
         tests.unlink()
         calculator.write_text(original.replace(
             "if point.date >= thirtyDaysAgo {",
@@ -457,10 +476,8 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
             1,
         ))
         self.assert_rejected("timeline.injected_calendar_day")
-
         calculator.write_text(original.replace("now: Date = Date(),\n        ", "", 1))
         self.assert_rejected("timeline.injected_calendar_day")
-
 
 def run_behavior_suite(suite):
     expected = suite.countTestCases()
@@ -468,7 +485,6 @@ def run_behavior_suite(suite):
     print(f"Launch UI audit behavior tests executed: {result.testsRun}/{expected}")
     complete = expected > 0 and result.testsRun == expected and not result.skipped
     return 0 if complete and result.wasSuccessful() else 1
-
 
 if __name__ == "__main__":
     sys.exit(run_behavior_suite(unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__])))

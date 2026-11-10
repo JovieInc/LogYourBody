@@ -90,17 +90,46 @@ final class DatedOutcomeStore {
         try await context.perform {
             try remote.value.validate()
             let owned = try self.rows(owner: owner)
-            guard try owned.first.map(self.snapshot)?.revision == expectedRevision else {
+            let previous = try owned.first.map(self.snapshot)
+            guard previous?.revision == expectedRevision else {
                 throw DatedOutcomeError.conflict
             }
+            let baseline = previous?.value.outcome.metric == remote.value.outcome.metric ? previous?.planBaseline : nil
             for row in owned { self.context.delete(row) }
             try self.persist(
                 .init(requestId: remote.revision, previousRevision: nil, value: remote.value),
-                owner: owner, sequence: 1, pending: false
+                owner: owner, sequence: 1, pending: false, baseline: baseline
             )
         }
         guard isCurrent(), currentOwner() == owner else { throw DatedOutcomeError.unauthenticated }
         syncIssues[owner] = nil
+    }
+
+    /// Freeze the first comparable baseline in the existing owner-scoped journal.
+    /// This metadata emits no sync edit and cannot replace an edited revision.
+    func retainPlanBaselineForPresentation(
+        _ baseline: DatedOutcome.PlanBaseline, revision: UUID, isCurrent: () -> Bool
+    ) async throws {
+        guard isCurrent() else { throw DatedOutcomeError.unauthenticated }
+        let owner = try requireOwner()
+        try await context.perform {
+            try self.retainBaseline(baseline, revision: revision, owner: owner)
+        }
+        guard isCurrent(), currentOwner() == owner else { throw DatedOutcomeError.unauthenticated }
+    }
+
+    /// Commit the reviewed action only against the outcome revision that produced it.
+    /// No sync request, training mutation or date change is created by a review.
+    func retainCoachActionForPresentation(_ action: DatedCoachAction, isCurrent: () -> Bool) async throws {
+        guard isCurrent() else { throw DatedOutcomeError.unauthenticated }
+        let owner = try requireOwner()
+        guard action.userId == owner, action.productId == LaunchJourney.productId else {
+            throw DatedOutcomeError.unauthenticated
+        }
+        try await context.perform {
+            try self.retainCoachAction(action, owner: owner)
+        }
+        guard isCurrent(), currentOwner() == owner else { throw DatedOutcomeError.unauthenticated }
     }
 
     /// A single Save action emits one durable recompute request even if several fields changed.
@@ -155,11 +184,13 @@ final class DatedOutcomeStore {
         try remote.value.validate()
         let owned = try rows(owner: owner)
         guard !owned.contains(where: { $0.value(forKey: "pending") as? Bool == true }) else { return }
-        if let latest = owned.first, try snapshot(latest) == remote { return }
+        let previous = try owned.first.map(snapshot)
+        if previous?.revision == remote.revision && previous?.value == remote.value { return }
+        let baseline = previous?.value.outcome.metric == remote.value.outcome.metric ? previous?.planBaseline : nil
         let sequence = (owned.first?.value(forKey: "sequence") as? Int64 ?? 0) + 1
         let edit = DatedOutcomeEdit(requestId: remote.revision, previousRevision: nil, value: remote.value)
         for row in owned { context.delete(row) }
-        try persist(edit, owner: owner, sequence: sequence, pending: false)
+        try persist(edit, owner: owner, sequence: sequence, pending: false, baseline: baseline)
     }
 
     func synchronize(
@@ -208,8 +239,37 @@ final class DatedOutcomeStore {
         let previous = try prior.map(snapshot)
         guard previous?.value != value else { return nil }
         let edit = DatedOutcomeEdit(requestId: UUID(), previousRevision: previous?.revision, value: value)
-        try persist(edit, owner: owner, sequence: (prior?.value(forKey: "sequence") as? Int64 ?? 0) + 1, pending: true)
+        let baseline = previous?.value.outcome.metric == value.outcome.metric ? previous?.planBaseline : nil
+        try persist(edit, owner: owner, sequence: (prior?.value(forKey: "sequence") as? Int64 ?? 0) + 1,
+                    pending: true, baseline: baseline)
         return edit
+    }
+
+    nonisolated private func retainBaseline(_ baseline: DatedOutcome.PlanBaseline, revision: UUID, owner: String) throws {
+        guard let row = try rows(owner: owner).first else { return }
+        let current = try snapshot(row)
+        guard current.revision == revision, current.planBaseline == nil,
+              current.value.outcome.metric == baseline.metric else { return }
+        guard baseline.date.timeIntervalSinceReferenceDate.isFinite,
+              baseline.value.isFinite, baseline.value > 0 else { throw DatedOutcomeError.invalidValue }
+        let payload = try JSONEncoder().encode(LocalPayload(
+            edit: decode(row), planBaseline: baseline, coachAction: current.coachAction))
+        row.setValue(payload, forKey: "payload")
+        try commit()
+    }
+
+    nonisolated private func retainCoachAction(_ action: DatedCoachAction, owner: String) throws {
+        guard let row = try rows(owner: owner).first else { throw DatedOutcomeError.invalidReceipt }
+        let current = try snapshot(row)
+        guard current.revision == action.outcomeRevision, current.value == action.outcome,
+              current.planBaseline == action.baseline,
+              current.coachAction.map({ $0.id == action.id || $0.reviewedAt < action.reviewedAt }) ?? true else {
+            throw DatedOutcomeError.invalidReceipt
+        }
+        let payload = try JSONEncoder().encode(LocalPayload(
+            edit: decode(row), planBaseline: current.planBaseline, coachAction: action))
+        row.setValue(payload, forKey: "payload")
+        try commit()
     }
 
     nonisolated private func rows(owner: String) throws -> [NSManagedObject] {
@@ -226,11 +286,35 @@ final class DatedOutcomeStore {
 
     nonisolated private func snapshot(_ row: NSManagedObject) throws -> DatedOutcomeSnapshot {
         let edit = try decode(row)
-        return DatedOutcomeSnapshot(revision: edit.requestId, value: edit.value)
+        let data = row.value(forKey: "payload") as? Data ?? Data()
+        let metadata = try JSONDecoder().decode(BaselineField.self, from: data)
+        return DatedOutcomeSnapshot(revision: edit.requestId, value: edit.value,
+                                    planBaseline: metadata.planBaseline, coachAction: metadata.coachAction)
     }
 
-    nonisolated private func persist(_ edit: DatedOutcomeEdit, owner: String, sequence: Int64, pending: Bool) throws {
-        let payload = try JSONEncoder().encode(edit)
+    private struct BaselineField: Decodable {
+        var planBaseline: DatedOutcome.PlanBaseline?
+        var coachAction: DatedCoachAction?
+    }
+
+    private struct LocalPayload: Encodable {
+        var edit: DatedOutcomeEdit
+        var planBaseline: DatedOutcome.PlanBaseline?
+        var coachAction: DatedCoachAction?
+        enum CodingKeys: String, CodingKey { case planBaseline, coachAction }
+        func encode(to encoder: Encoder) throws {
+            try edit.encode(to: encoder)
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(planBaseline, forKey: .planBaseline)
+            try container.encodeIfPresent(coachAction, forKey: .coachAction)
+        }
+    }
+
+    nonisolated private func persist(
+        _ edit: DatedOutcomeEdit, owner: String, sequence: Int64, pending: Bool,
+        baseline: DatedOutcome.PlanBaseline? = nil
+    ) throws {
+        let payload = try JSONEncoder().encode(LocalPayload(edit: edit, planBaseline: baseline))
         let row = NSEntityDescription.insertNewObject(forEntityName: "CachedDatedOutcome", into: context)
         row.setValue(owner, forKey: "ownerId")
         row.setValue(edit.requestId, forKey: "revision")

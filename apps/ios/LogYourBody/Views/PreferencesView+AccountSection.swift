@@ -5,11 +5,11 @@
 import SwiftUI
 
 extension PreferencesView {
-    var accountSection: some View {
+    func accountSection(showingLogoutConfirmation: Binding<Bool>) -> some View {
         SettingsSection(header: "Account") {
             accountEmailRow
             changeProfilePhotoRow
-            logoutRow
+            logoutRow(showingLogoutConfirmation: showingLogoutConfirmation)
         }
     }
 
@@ -34,13 +34,13 @@ extension PreferencesView {
         .disabled(isUploadingPhoto)
     }
 
-    var logoutRow: some View {
+    func logoutRow(showingLogoutConfirmation: Binding<Bool>) -> some View {
         SettingsButtonRow(
             icon: "rectangle.portrait.and.arrow.right",
             title: "Log out",
             role: .destructive
         ) {
-            showingLogoutConfirmation = true
+            showingLogoutConfirmation.wrappedValue = true
         }
         .accessibilityIdentifier("settings_logout_button")
     }

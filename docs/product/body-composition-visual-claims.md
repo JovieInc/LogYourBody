@@ -18,8 +18,10 @@ No. Home, shape controls, and any later 3D view must follow this claims rule:
   claim, and no weekly-sensitivity claim. A rendered shape or visual difference
   must not be presented as proof of week-to-week physical change.
 - Calibrated composition visuals and Gaussian rendering remain unpromoted until
-  their respective evidence gates pass. This decision supplies no validation or
-  approval for either capability or for later accuracy claims.
+  their respective evidence gates pass. LYB-319 can cache an on-device photo
+  texture behind its own gate. That cache is not a measurement, and this
+  decision supplies no validation or approval for either capability or for
+  later accuracy claims.
 
 This follows the [brand ethos](brand-ethos.md),
 [evidence standard](evidence-and-recommendation-standard.md), and
@@ -29,6 +31,13 @@ does not supply additional evidence.
 
 ## Boundary
 
-This records the claims boundary only; it does not implement or verify native
-behavior. Numerical evidence and fusion remain with JOV-6014. Import work in
-LYB-80, LYB-81, and LYB-171, and all other LYB-311 work remain outside this slice.
+This records the claims boundary only. Numerical evidence and fusion remain with
+JOV-6014. Import work in LYB-80, LYB-81, and LYB-171, and all other LYB-311 work
+remain outside this slice.
+
+## Implementation note (LYB-318, 2026-11-02)
+
+[Body-shape calibration](body-shape-calibration.md) keeps this boundary in the
+native wireframe and bucket avatar. The illustrative tier is the only promoted
+tier. Higher tiers stay closed, and a body-fat percentage does not select the
+picture.

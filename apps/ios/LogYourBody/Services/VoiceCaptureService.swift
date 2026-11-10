@@ -29,8 +29,10 @@ enum VoiceCaptureError: LocalizedError {
 @MainActor
 @Observable
 final class VoiceCaptureService {
-    private let recognizer: SFSpeechRecognizer?
-    private let audioEngine = AVAudioEngine()
+    private let locale: Locale
+    private var recognizer: SFSpeechRecognizer?
+    @ObservationIgnored private let makeAudioEngine: () -> AVAudioEngine
+    @ObservationIgnored private lazy var audioEngine = makeAudioEngine()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private var finishContinuation: CheckedContinuation<String, Error>?
@@ -42,8 +44,9 @@ final class VoiceCaptureService {
     private(set) var inputLevel: Double = 0
     private(set) var recordingStartedAt: Date?
 
-    init(locale: Locale = .current) {
-        recognizer = SFSpeechRecognizer(locale: locale) ?? SFSpeechRecognizer()
+    init(locale: Locale = .current, makeAudioEngine: @escaping () -> AVAudioEngine = { AVAudioEngine() }) {
+        self.locale = locale
+        self.makeAudioEngine = makeAudioEngine
     }
 
     func start() async throws {
@@ -61,7 +64,9 @@ final class VoiceCaptureService {
         }
         #endif
         try await requestPermissions()
-        guard let recognizer, recognizer.isAvailable else { throw VoiceCaptureError.unavailable }
+        guard let recognizer = SFSpeechRecognizer(locale: locale) ?? SFSpeechRecognizer(),
+              recognizer.isAvailable else { throw VoiceCaptureError.unavailable }
+        self.recognizer = recognizer
 
         let audioSession = AVAudioSession.sharedInstance()
         do {
@@ -146,8 +151,12 @@ final class VoiceCaptureService {
         isFinishing = false
         inputLevel = 0
         recordingStartedAt = nil
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        // Chat dismissal also cancels unused services. Never open audio hardware for cleanup.
+        if request != nil {
+            audioEngine.stop()
+            audioEngine.inputNode.removeTap(onBus: 0)
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
         request?.endAudio()
         task?.cancel()
         task = nil
@@ -158,7 +167,6 @@ final class VoiceCaptureService {
             self.finishContinuation = nil
             finishContinuation.resume(throwing: CancellationError())
         }
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     private func requestPermissions() async throws {
@@ -512,25 +520,5 @@ enum VoiceSetLogger {
                 rir: proposal.rir
             )
         )
-    }
-}
-
-@MainActor
-final class VoicePlaybackService {
-    private let synthesizer = AVSpeechSynthesizer()
-    private var player: AVAudioPlayer?
-
-    func play(_ audio: Data) throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
-        player = try AVAudioPlayer(data: audio)
-        player?.play()
-    }
-
-    func speakOffline(_ text: String) {
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        synthesizer.speak(utterance)
     }
 }

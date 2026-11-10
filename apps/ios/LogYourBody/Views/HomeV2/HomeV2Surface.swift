@@ -36,12 +36,16 @@ struct HomeV2Surface: View {
     let onDone: () -> Void
     let onUndo: () -> Void
     var onProvenancePresentationChange: (Bool) -> Void = { _ in }
+    var weeklyPhotoPrompt: WeeklyPhotoCheckInPolicy.Prompt?
+    var onAddWeeklyPhoto: () -> Void = {}
     var isPhotoScrubNavigating = false
 
     @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
     @State private var showsProvenance = false
     @State private var personalBodyDisplays: [String: PersonalBodyDisplay] = [:]
     @State private var personalBodyEnabled = false
+    @State private var appearanceDisplays: [String: PhotographicAppearanceDisplay] = [:]
+    @State private var appearanceEnabled = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var isLogged: Bool { loggedSentence != nil }
@@ -58,7 +62,9 @@ struct HomeV2Surface: View {
                         unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto,
                         isNavigating: isPhotoScrubNavigating || showsProvenance,
                         bodyDisplays: personalBodyDisplays,
-                        bodyEstimateEnabled: personalBodyEnabled
+                        bodyEstimateEnabled: personalBodyEnabled,
+                        appearanceDisplays: appearanceDisplays,
+                        appearanceEnabled: appearanceEnabled
                     )
                     photoNumberBlock
                     if hasAnyPhotoInHistory {
@@ -112,6 +118,8 @@ struct HomeV2Surface: View {
     private func reloadPersonalBody() async {
         personalBodyDisplays = [:]
         personalBodyEnabled = false
+        appearanceDisplays = [:]
+        appearanceEnabled = false
         let accountId = metric.userId
         let dates = personalBodyDates
         guard PersonalBodyPolicy.isEnabled() else { return }
@@ -119,6 +127,11 @@ struct HomeV2Surface: View {
         guard !Task.isCancelled else { return }
         personalBodyEnabled = true
         personalBodyDisplays = index.displays
+        guard PhotographicAppearancePolicy.isEnabled() else { return }
+        let appearances = await PhotographicAppearanceStore.shared.index(accountId: accountId, dates: dates)
+        guard !Task.isCancelled else { return }
+        appearanceEnabled = true
+        appearanceDisplays = appearances
     }
 
     @ViewBuilder
@@ -181,6 +194,9 @@ struct HomeV2Surface: View {
 
             if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
                 HomeV2ProvenanceChip(detail: provenance) { showsProvenance = true }
+            }
+            if let weeklyPhotoPrompt {
+                WeeklyPhotoCheckInPrompt(prompt: weeklyPhotoPrompt, onAdd: onAddWeeklyPhoto)
             }
 
             if HomeV2EditorialPolicy.bodyFat(in: metric) == nil {
