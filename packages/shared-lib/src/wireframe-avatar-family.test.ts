@@ -88,6 +88,40 @@ it('rotates only from an explicit drag or front, side, and reset', () => {
   expect(applyDrag(3, 0, 100)).toBeCloseTo(Math.PI);
 });
 
+it('starts Home reachability swipes below the wireframe rotation surface', () => {
+  const source = readFileSync(
+    `${root}/apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift`,
+    'utf8',
+  );
+  const helper = source.split('private func scrollToContain(')[1].split('private func ')[0];
+  const insets = helper.match(
+    /let startY = upward \? viewport.maxY - (\d+) : viewport.minY \+ (\d+)/,
+  );
+  const clearance = helper.match(/min\(viewport.height - (\d+),/);
+  expect(insets).not.toBeNull();
+  expect(clearance).not.toBeNull();
+
+  // Run 42755703124: all six drags at y=643.67 rotated the avatar without
+  // moving FFMI at y=874.33. The visible strip below the 4:5 card scrolls Home.
+  const viewport = { top: 115, bottom: 683.6666870117188, width: 393 };
+  const avatar = { top: viewport.top + 48, height: viewport.width / (4 / 5) };
+  const startY = viewport.bottom - Number(insets?.[1]);
+  expect(startY).toBeGreaterThan(avatar.top + avatar.height);
+  expect(startY).toBeLessThan(viewport.bottom);
+
+  // Both directions and a full-viewport drag must stay clear of pinned chrome.
+  const height = viewport.bottom - viewport.top;
+  const distance = height - Number(clearance?.[1]);
+  expect(distance).toBeGreaterThan(0);
+  expect(startY - distance).toBeGreaterThan(viewport.top);
+  const downwardStart = viewport.top + Number(insets?.[2]);
+  expect(downwardStart).toBeGreaterThan(viewport.top);
+  expect(downwardStart + distance).toBeLessThan(viewport.bottom);
+  expect(helper).toContain('for attempt in 0..<6');
+  expect(source).toContain('XCTAssertTrue(target.isHittable,');
+  expect(source).toContain('XCTAssertTrue(viewport.contains(target.frame),');
+});
+
 it('keeps the wireframe on the existing Home stage without removing the empty-stage repair', () => {
   const stage = readFileSync(stagePath, 'utf8');
   const family = readFileSync(familyPath, 'utf8');

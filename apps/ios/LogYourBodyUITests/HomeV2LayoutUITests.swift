@@ -656,7 +656,7 @@ final class HomeV2LayoutUITests: XCTestCase {
             let upward = below > 0
             let margin = min(CGFloat(12), max(0, (viewport.height - frame.height) / 2))
             let distance = min(viewport.height - 80, (upward ? below : above) + margin)
-            let startY = upward ? viewport.maxY - 40 : viewport.minY + 40
+            let startY = upward ? viewport.maxY - 12 : viewport.minY + 40 // Drag below the rotating avatar.
             let endY = startY + (upward ? -distance : distance)
             attempts.append("distance=\(distance), startY=\(startY), endY=\(endY)")
             let start = origin.withOffset(CGVector(dx: viewport.midX, dy: startY))
