@@ -101,7 +101,7 @@ jobs:
 
           # Intentionally unavailable until the FINAL composed audit and this
           # exact policy hunk are independently reviewed. Never a caller input.
-          REVIEWED_AUDIT_SHA256 = '318b11c32f2333c05ed3fc60f7d975bb7cc45893d379bbd9c3fcabb93edace7e'
+          REVIEWED_AUDIT_SHA256 = 'de03d70ac4cbe934c4b455491d8ac28b3028cfd607fbd376ffecdb69348c1983'
           DEPENDENCIES = {
               'scripts/ios/xcodebuild-command-timeout.py': '66abf226c296005bbf50ca277d1e597f90c74269d26cb1afa039e999cbbc35fa',
               'scripts/ios/bootstrap-local-config.sh': 'aad028c0eff7f9d2a043711a8735963dc66b9bd664f11bf98b7ada67a60ab8db',

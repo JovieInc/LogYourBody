@@ -491,8 +491,8 @@ def test_hosted_ios_jobs_retain_existing_test_quality_and_summary_gates() -> Non
     quality = _job_block('ios-quality.yml', 'quality')
     assert 'launch-quality-audit.sh' in quality
     assert 'performance-audit.sh' in quality
-    assert 'timeout-minutes: 64' in quality
-    assert 'timeout-minutes: 52' in quality
+    assert 'timeout-minutes: 69' in quality
+    assert 'timeout-minutes: 57' in quality
     summary = _job_block('ci.yml', 'ci-summary')
     assert 'assert_expected_result "iOS Launch Quality Gate"' in summary
     assert 'mac-runner-routing-tests' in summary
@@ -1626,7 +1626,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        '318b11c32f2333c05ed3fc60f7d975bb7cc45893d379bbd9c3fcabb93edace7e'
+        'de03d70ac4cbe934c4b455491d8ac28b3028cfd607fbd376ffecdb69348c1983'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -2000,7 +2000,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = '318b11c32f2333c05ed3fc60f7d975bb7cc45893d379bbd9c3fcabb93edace7e'" in source
+    assert "REVIEWED_AUDIT_SHA256 = 'de03d70ac4cbe934c4b455491d8ac28b3028cfd607fbd376ffecdb69348c1983'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -2249,7 +2249,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = '318b11c32f2333c05ed3fc60f7d975bb7cc45893d379bbd9c3fcabb93edace7e'
+    expected = 'de03d70ac4cbe934c4b455491d8ac28b3028cfd607fbd376ffecdb69348c1983'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 9

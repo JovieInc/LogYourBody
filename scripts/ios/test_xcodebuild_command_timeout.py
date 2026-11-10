@@ -63,6 +63,18 @@ class DeadlineRuleTests(unittest.TestCase):
         current = self.audit_budget(1168)
         self.assertEqual(current.returncode, 0, current.stderr)
         self.assertIn("selected-tests-completed", current.stdout)
+        self.assertIn("cap=1800", current.stdout)
+        # Run 42795533093 spent 1375s before UI. Deadline 2940 left 1565s and
+        # killed still-passing UI cases. The retry finished those cases in 1697s,
+        # so the cold prefix must keep the full 1800s hang cap.
+        shrunk = self.audit_budget(1375, override="2940")
+        self.assertEqual(shrunk.returncode, 124)
+        self.assertIn("cap=1565", shrunk.stdout)
+        self.assertNotIn("selected-tests-completed", shrunk.stdout)
+        cold = self.audit_budget(1375)
+        self.assertEqual(cold.returncode, 0, cold.stderr)
+        self.assertIn("cap=1800", cold.stdout)
+        self.assertIn("selected-tests-completed", cold.stdout)
         self.assertIn("cap=1800", self.audit_budget(0).stdout)
         self.assertIn("cap=20", self.audit_budget(40, override="60", duration=19).stdout)
         self.assertEqual(self.audit_budget(40, override="60", duration=21).returncode, 124)

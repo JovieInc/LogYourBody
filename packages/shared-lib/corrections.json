@@ -7431,5 +7431,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "launch-quality-cold-prefix-keeps-ui-hang-cap",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42795533093",
+    "correction": "LYB-160: Post-merge Launch Quality on main run 42795533093 exited 124. The cold hosted prefix reached UI tests at 1375s, the 2940s audit deadline left 1565s, and xcodebuild was killed while selected UI cases were still passing. The same SHA's retry finished those UI cases in 1697s and the report job recorded a pass, but the failed first job kept the workflow red.",
+    "mechanization": "Extend the existing launch-quality budget so a 1375s cold prefix keeps the 1800s UI hang cap: audit deadline 3240s, step 57 minutes (deadline plus the existing 180s finalization grace), and job 69 minutes (the existing 4-minute setup allowance plus that step plus the 8-minute performance cap). Per-test allowances, the 1800s UI hang cap, selectors, and evidence checks stay. The virtual-clock regression fails under the 2940s deadline at cap 1565 and passes with cap 1800 after the repair. Refresh the reviewed audit digest with the existing explicit pin resolver. The harness owns pushing and PR edits and must add exactly one line: Machine: built scripts/ios/launch-quality-audit.sh. Native execution of the longer budget remains for macOS CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing audit deadline owns how much of the UI hang cap survives a slow prefix. Raising that deadline to cover the observed cold prefix lets the same passing UI cases finish without dropping selectors, per-test limits, or the 1800s hang cap."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-audit.sh",
+      "anchor": "Keep the 1800s UI hang cap after a cold hosted prefix."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
