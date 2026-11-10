@@ -19,6 +19,7 @@ def contribute(root: Path, app_dir: Path, violations: list, violation, _line_num
     check(root, app_dir, violations, function_body, violation)
     check_person_mask_executor(root, app_dir, violations, violation)
     check_logout_alert(root, violations, violation)
+    check_profile_logout_presentation(root, violations, violation)
     check_ui_test_offline_fixture(root, violations, violation)
 
 
@@ -114,6 +115,50 @@ def check_logout_alert(root: Path, violations: list, violation) -> None:
         violations.append(violation(
             check="logout.alert_action_identity", file=str(path.relative_to(root)), line=1,
             detail="Collapse identical alert action frames, reject distinct matches, and verify Cancel and Log Out outcomes.",
+        ))
+
+
+def check_profile_logout_presentation(root: Path, violations: list, violation) -> None:
+    """The pushed profile screen owns logout confirmation and fills the row hit target."""
+    button_path = root / "apps/ios/LogYourBody/SettingsComponents.swift"
+    header_path = root / "apps/ios/LogYourBody/Views/PreferencesView+Header.swift"
+    prefs_path = root / "apps/ios/LogYourBody/Views/PreferencesView.swift"
+    account_path = root / "apps/ios/LogYourBody/Views/PreferencesView+AccountSection.swift"
+    if not all(path.is_file() for path in (button_path, header_path, prefs_path, account_path)):
+        return
+    row = text_for(button_path).split("struct SettingsButtonRow", 1)[-1].split(
+        "// MARK: - Picker Row", 1
+    )[0]
+    button = row.split("Button(role: role, action: action) {", 1)
+    inside = button[1].split("\n        }", 1)[0] if len(button) == 2 else ""
+    header = text_for(header_path)
+    screen = header.split("struct ProfileLogoutScreen", 1)
+    screen_body = screen[1] if len(screen) == 2 else ""
+    before_screen = screen[0] if screen_body else header
+    required_inside = (
+        ".frame(maxWidth: .infinity, minHeight: SettingsLayout.rowMinHeight, alignment: .leading)",
+        ".contentShape(Rectangle())",
+    )
+    required_screen = (
+        "@State private var showingLogoutConfirmation = false",
+        '"Log out of LogYourBody?"',
+        "isPresented: $showingLogoutConfirmation",
+        "settings_logout_confirm",
+        "settings_logout_cancel",
+        "await authManager.logout()",
+    )
+    if (any(token not in inside for token in required_inside)
+            or ".frame(minHeight: SettingsLayout.rowMinHeight, alignment: .leading)" in row
+            or "ProfileLogoutScreen { showingLogoutConfirmation in" not in before_screen
+            or "$showingLogoutConfirmation" in before_screen
+            or "@State var showingLogoutConfirmation" in text_for(prefs_path)
+            or "showingLogoutConfirmation.wrappedValue = true" not in text_for(account_path)
+            or any(token not in screen_body for token in required_screen)):
+        violations.append(violation(
+            check="logout.profile_confirmation_hit_target",
+            file=str(header_path.relative_to(root)),
+            line=1,
+            detail="Own logout confirmation on the pushed profile screen and fill the settings button hit target.",
         ))
 
 

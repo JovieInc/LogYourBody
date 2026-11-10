@@ -77,6 +77,41 @@ class HomeInteractionAuditTests:
                 self.assert_rejected("logout.alert_action_identity")
         destination.write_text(source)
 
+    def test_profile_logout_confirmation_stays_on_the_pushed_row(self):
+        self.assertEqual(self.run_audit()[0], 0)
+        cases = [
+            (
+                "SettingsComponents.swift",
+                "settingsButtonLabel\n"
+                "                .frame(maxWidth: .infinity, minHeight: SettingsLayout.rowMinHeight, alignment: .leading)\n"
+                "                .contentShape(Rectangle())",
+                "settingsButtonLabel",
+            ),
+            (
+                "SettingsComponents.swift",
+                ".frame(maxWidth: .infinity, minHeight: SettingsLayout.rowMinHeight, alignment: .leading)",
+                ".frame(minHeight: SettingsLayout.rowMinHeight, alignment: .leading)",
+            ),
+            (
+                "Views/PreferencesView+Header.swift",
+                "@State private var showingLogoutConfirmation = false",
+                "@State private var unusedLogoutConfirmation = false",
+            ),
+            (
+                "Views/PreferencesView+AccountSection.swift",
+                "showingLogoutConfirmation.wrappedValue = true",
+                "showingLogoutConfirmation.wrappedValue = false",
+            ),
+        ]
+        for relative, before, after in cases:
+            with self.subTest(before=before):
+                path = self.app / relative
+                source = path.read_text()
+                self.assertIn(before, source)
+                path.write_text(source.replace(before, after, 1))
+                self.assert_rejected("logout.profile_confirmation_hit_target")
+                path.write_text(source)
+
     def test_ui_test_offline_fixture_survives_a_satisfied_path(self):
         sync = self.app / "Services/RealtimeSyncManager.swift"
         monitor = self.app / "Services/RealtimeSyncManager+Part01.swift"

@@ -7409,5 +7409,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "profile-logout-confirmation-hit-target",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42789771273",
+    "correction": "PR #1779 / LYB-365, fix-red-5df69c1e5f occurrence 13: merge origin/main without rebasing and repair Launch Quality and CI Summary. Run 42789771273 failed testProfileLogoutSignsOutFromPushedDetail at LogYourBodyUITests.swift:730 because tapping the center of settings_logout_button never presented Log out of LogYourBody?. The row hit target was the leading label, and confirmation state lived on the settings parent behind a NavigationLink destination. iOS Static Audits was cancelled after setup-swift produced no output for the rest of the 15-minute job; green runs of the same job finish in about 70 seconds. Vercel reports Deployment was blocked for this head and for the already merged preview a5ce469a7.",
+    "mechanization": "Extend the existing launch UI audit to require logout confirmation state and the alert on ProfileLogoutScreen, the row action to set that binding, and SettingsButtonRow to fill its hit target with contentShape. Removing the shape, shrinking the frame, dropping the screen state, or ignoring the binding fails the audit; the current sources pass. Retain the alert action identity check, both Cancel and Log Out outcomes, and the Apple session host canonicalization. The harness owns pushing and PR edits and must add exactly one line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py. Native execution remains for macOS CI. The Swift toolchain stall is external to the product change, and the Vercel preview block is a provider hold.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing launch UI audit already owns logout confirmation identity. Requiring the pushed screen to own the alert and the row to fill its hit target prevents a center tap from leaving the profile screen without a confirmation."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "The pushed profile screen owns logout confirmation and fills the row hit target."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
