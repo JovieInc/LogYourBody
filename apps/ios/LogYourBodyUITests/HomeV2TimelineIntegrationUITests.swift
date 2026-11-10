@@ -47,16 +47,14 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
                 scrim.waitForExistence(timeout: 5),
                 "Each single menu tap must open the sidebar. Hierarchy: \(app.debugDescription)"
             )
-            scrim.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-            XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))
+            dismissSidebar(scrim, in: app)
             XCTAssertEqual(pager.value as? String, "Entry 1 of 1")
             XCTAssertFalse(app.staticTexts["home_v2_photo_scrub_mode"].exists)
         }
         let start = menu.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 280, dy: 22))
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -220, dy: 0)))
         XCTAssertTrue(scrim.waitForExistence(timeout: 5), "Header swipes must still open the sidebar")
-        scrim.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-        XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))
+        dismissSidebar(scrim, in: app)
         app.buttons["home_v2_context_button"].tap()
         XCTAssertTrue(
             app.staticTexts["home_v2_context"].waitForExistence(timeout: 5),
@@ -185,6 +183,22 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
             XCTAssertFalse(app.buttons["home_v2_viewer_close"].exists)
         }
         XCTAssertEqual(caption.label, firstCaption)
+    }
+
+    private func dismissSidebar(_ scrim: XCUIElement, in app: XCUIApplication) {
+        let window = app.windows.firstMatch
+        var previousFrame = CGRect.null
+        // A cover can exist before presentation settles. Verify two native
+        // frame samples before sending the one dismissal tap from the window.
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            guard scrim.exists, scrim.isHittable else { return false }
+            let frame = scrim.frame
+            defer { previousFrame = frame }
+            return !frame.isEmpty && window.frame.contains(frame) && frame == previousFrame
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))
     }
 
     private func revealTimelineSteps(_ target: XCUIElement, in app: XCUIApplication) {
