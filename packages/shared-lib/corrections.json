@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "launch-quality-enclosing-budget-follows-source-caps",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1780",
+    "correction": "PR #1780 / LYB-160 repair, fix-red-d5dac7802d occurrence 4 in 14 days: merge origin/main first without rebasing and fix Detect Changes and CI Summary while retaining the cold-prefix launch-quality budget. Run 42818695019 fails because release-check-budget.test.mjs expects the former 64-minute job cap instead of the 69-minute cap. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR edits.",
+    "mechanization": "Extend the existing required release budget guard to derive enclosing limits from the actual audit deadline, xcodebuild finalization grace, launch and performance step caps, and existing four-minute setup allowance. Replace the stale fixed job-cap assertion with these relationships. Negative controls reject insufficient step/job budgets and a deadline increase without a matching step increase, while a coordinated increase passes. The original guard fails locally with 69 !== 64; the expanded guard passes on this PR and rejects removal of its enclosing checks. The fetched origin/main is already an ancestor. The harness must add exactly one PR-body line: Machine: built .github/scripts/release-check-budget.test.mjs. No native limits, selectors, checks or provider controls are relaxed. Vercel remains externally blocked; macOS execution remains unverified on this Linux host.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "GitHub Actions job and step caps and the audit command deadline belong to separate workflow and shell sources. A repair-local production abstraction would not prevent independently edited configuration from drifting; the existing required static guard can enforce their relationship without introducing another timeout configuration source."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing release-check-budget.test.mjs already runs in required Detect Changes on every diff. Deriving its enclosing-cap assertions from the canonical sources and exercising rejected and permitted changes prevents stale numeric expectations while still rejecting budgets that cancel native evidence."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/release-check-budget.test.mjs",
+      "anchor": "function assertLaunchQualityBudget(quality, audit)"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
     "fingerprint": "fix-red-1423773703",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1764",
     "correction": "PR #1764 repair, fix-red-1423773703 occurrence 44: merge origin/main without rebasing, preserve the jose 6.2.14 to 6.2.15 update, and repair CI Summary, Detect Changes and parity reporting a stale repository source map. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR updates.",
