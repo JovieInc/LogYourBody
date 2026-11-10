@@ -235,12 +235,20 @@ struct DatedOutcomeEditorHost: View {
                 reconciliation
             }
             LaunchOutcomeEditor(
-                existing: model.snapshot?.value, errorText: model.errorText,
+                existing: existingOutcome, errorText: model.errorText,
                 isSaving: model.isSaving, includesDatedControls: true, allowsMaintenance: true
             ) { value in
                 Task { if await model.save(value) { onSaved() } }
             }
         }
+    }
+
+    private var existingOutcome: DatedOutcome? {
+        #if DEBUG
+        return DatedStatsUITestFixture.editorOutcome(saved: model.snapshot?.value)
+        #else
+        return model.snapshot?.value
+        #endif
     }
 
     private var reconciliation: some View {

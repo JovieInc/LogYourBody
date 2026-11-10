@@ -181,5 +181,4 @@ class DatedOutcomeStoreFixtureCase: XCTestCase {
         } catch DatedOutcomeError.unauthenticated { }
         XCTAssertNil(try restored.load())
     }
-
 }

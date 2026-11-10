@@ -7749,5 +7749,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-341-stats-fixture-editor-draft-parity",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42903358986/job/130136084599",
+    "correction": "PR #1748 / LYB-341 repair, fix-red-c44c8cd09b occurrence 2: the expired, impossible, maintenance and unsafe Stats recovery cases display a synthetic outcome but open the journal-backed editor with an empty date. Static Audits also reports vertical_whitespace_closing_braces in DatedOutcomeStoreFixtureCase.swift. Merge origin/main first without rebasing and retain every native assertion and gate.",
+    "mechanization": "Share the existing DEBUG fixture outcome factory between the arithmetic projection and the unsaved editor draft. Persisted values take precedence; both fixture flags and a valid state are required. Do not fabricate a saved revision or write the journal. Add native parity and invalid-argument cases to the existing Unit-selected DatedOutcomeStatsTests and extend the required shared-lib launch-quality source guard. The new source guard fails against the original editor before the repair. Keep all four failing UI cases and their date assertions unchanged. Remove the single blank line reported by the existing strict SwiftLint gate. Exact-head XCTest execution remains for macOS CI; Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR edits and must retain exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One DEBUG outcome factory supplies the same unsaved value to the projector and editor, preventing fixture drift without changing production journal ownership, revisions or persistence."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/DatedStatsUITestFixture.swift",
+      "anchor": "return selectedState(arguments).map { outcome(for: $0) }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

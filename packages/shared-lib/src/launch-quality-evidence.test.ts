@@ -180,6 +180,29 @@ it('pins shared offline UI fixtures before late network callbacks can replace th
   expect(release).not.toMatch(/usesOfflineUITestFixture|applyOfflineUITestFixture/);
 });
 
+it('prefills the dated Stats editor from its DEBUG fixture without inventing a saved revision', () => {
+  const read = (path: string) =>
+    readFileSync(
+      new URL(`../../../apps/ios/LogYourBody/Services/${path}`, import.meta.url),
+      'utf8',
+    );
+  const host = read('LaunchJourneyUI.swift')
+    .split('struct DatedOutcomeEditorHost: View')[1]
+    .split('extension DashboardViewLiquid')[0];
+  expect(host).toContain('existing: existingOutcome, errorText: model.errorText');
+  expect(host).toMatch(
+    /#if DEBUG\s*return DatedStatsUITestFixture\.editorOutcome\(saved: model\.snapshot\?\.value\)\s*#else\s*return model\.snapshot\?\.value\s*#endif/,
+  );
+  const fixture = read('DatedStatsUITestFixture.swift');
+  expect(fixture.trim()).toMatch(/^#if DEBUG[\s\S]*#endif$/);
+  expect(fixture).toContain('outcome: outcome(for: state)');
+  expect(fixture).toContain('return selectedState(arguments).map { outcome(for: $0) }');
+  expect(fixture).toContain('if let saved { return saved }');
+  expect(fixture).not.toMatch(
+    /DatedOutcomeSnapshot|saveForPresentation|acceptRemoteForPresentation/,
+  );
+});
+
 it('qualifies native scenarios independently instead of sharing another XCTest case budget', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const nestedCalls = (source: string) =>
