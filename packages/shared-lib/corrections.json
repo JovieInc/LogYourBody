@@ -7463,5 +7463,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-rollback-preserves-concurrent-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1779",
+    "correction": "PR #1779 / LYB-365 repair, fix-red-e3b0c44298 occurrence 81 in 14 days: merge origin/main without rebasing, preserve Apple sign-in initialization and profile logout fixes, and resolve the correction-ledger conflict with a reusable machine. A ledger validation refusal after rendering can overwrite concurrent working or staged source-map edits during rollback.",
+    "mechanization": "Extend the existing --merge-ledger helper to snapshot its completed projection and index entry, then refuse rollback when either changed during ledger validation. Two real-Git regressions fail against the old helper because it restores old projection bytes and index stages; the extended helper preserves working-only and index-only changes, leaves the ledger untouched and supports reviewed retries. Existing required Detect Changes runs these cases through scripts/pre-commit-lint.test.mjs. Replay this actual merge with the extended resolver and retain both immutable parent ledgers. The harness owns push and PR operations and must add exactly one PR-body line: Machine: built scripts/manifest_union.py. Vercel reports Deployment was blocked, with no build error. The failed Actions run targets 4e0f283a and its observation-wrapper violation is already fixed by de516afa; current-head native execution and coverage remain for macOS CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper owns artifact rollback. Comparing the completed projection bytes and indexed entry before rollback prevents a refused ledger validation from erasing another writer's source-map changes by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "Rollback owns only our rendered projection, never another writer's edits."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
