@@ -3,12 +3,14 @@
 
 The hang deadline is unchanged. A terminal XCTest result extends the deadline only until observed_at + grace.
 That extension applies only when it is later than the original deadline. A run that never prints a terminal result still dies on the hang cap.
+A completed Selected tests suite starts finalization before the execute line.
 Grace cannot exceed the reviewed cap.
 """
 
 from __future__ import annotations
 
 import os
+import re
 import select
 import signal
 import subprocess
@@ -21,10 +23,16 @@ TERMINAL_RESULT_LINES = (
     "** TEST EXECUTE SUCCEEDED **",
     "** TEST EXECUTE FAILED **",
 )
+# A completed Selected tests suite starts finalization before the execute line.
+SELECTED_SUITE_RESULT = re.compile(
+    r"Test Suite 'Selected tests' (?:passed|failed) at "
+    r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\."
+)
 
 
 def is_terminal_result(line: str) -> bool:
-    return line.strip() in TERMINAL_RESULT_LINES
+    stripped = line.strip()
+    return stripped in TERMINAL_RESULT_LINES or SELECTED_SUITE_RESULT.fullmatch(stripped) is not None
 
 
 def next_deadline(deadline: float, observed_at: float, grace_seconds: float, extended: bool) -> tuple[float, bool]:

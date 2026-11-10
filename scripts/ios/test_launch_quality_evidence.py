@@ -68,7 +68,7 @@ class EvidenceTests(unittest.TestCase):
 
     def test_fixed_diagnostic_selectors_have_native_test_implementations(self):
         root = Path(__file__).resolve().parents[2]
-        source = (root / 'scripts/ios/launch-quality-audit.sh').read_text()
+        source = (root / 'scripts/ios/launch-quality-diagnostic-seven.sh').read_text()
         block = source.split('DIAGNOSTIC_SEVEN_TESTS=(', 1)[1].split('\n)', 1)[0]
         selectors = re.findall(r'"(\w+/\w+)"', block)
         self.assertEqual(len(selectors), 7)
@@ -574,12 +574,12 @@ source "$AUDIT_SCRIPT"
         default = next(line for line in source.splitlines()
                        if line.startswith('BUILD_FOR_TESTING_TIMEOUT_SECONDS='))
         functions = source[source.index('build_for_testing_once() {'):
-                           source.index('# A diagnostic subset never emits')]
+                           source.index('\nif [[ "$AUDIT_MODE" == diagnostic-seven ]]; then\n  source ')]
         command = r"""
 set -euo pipefail
 COMMON_XCODEBUILD_ARGS=(-project fixture.xcodeproj -enableCodeCoverage YES)
 XCODEBUILD_SETTINGS_ARRAY=(CODE_SIGNING_REQUIRED=NO)
-cleanup_booted_simulator_apps() { :; }
+cleanup_booted_simulator_apps() { :; }; bounded_seconds() { printf '%s\n' "$1"; }
 xcodebuild() {
   printf '%s\n' "$@" > "$ARTIFACT_DIR/build-arguments"
   echo 'compiler output'
@@ -626,9 +626,7 @@ echo 'ready for native tests'
 
     def test_shell_preserves_failed_attempt_and_stops_after_two(self):
         # Execute the real function definitions without running the product build.
-        # The extracted range includes the diagnostic launch probe. Its simctl
-        # calls can block longer than this timeout while CoreSimulatorService
-        # is still cold (CI run 38551518501), and they are not the retry contract.
+        # Stub cold CoreSimulator probes outside the retry contract (run 38551518501).
         source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
         functions = source[source.index('is_simulator_infra_failure() {'):source.index('assert_xcresult_evidence() {')]
         result_bundle = self.root / 'retry.xcresult'
@@ -640,6 +638,7 @@ XCODEBUILD_SETTINGS_ARRAY=(fixture)
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS=10
 LQ_LAUNCH_PROBE=false
 cleanup_booted_simulator_apps() { :; }
+bounded_seconds() { printf '%s\n' "$1"; }
 sleep() { :; }
 run_with_timeout() {
   mkdir -p "$RESULT_BUNDLE"
@@ -673,6 +672,7 @@ XCODEBUILD_SETTINGS_ARRAY=(fixture)
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS=10
 LQ_LAUNCH_PROBE=false
 cleanup_booted_simulator_apps() { :; }
+bounded_seconds() { printf '%s\n' "$1"; }
 sleep() { :; }
 run_with_timeout() {
   mkdir -p "$RESULT_BUNDLE"

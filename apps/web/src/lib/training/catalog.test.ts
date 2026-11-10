@@ -15,7 +15,11 @@ import {
   substitutionCandidates,
   variantToleranceTagsSchema,
 } from './catalog';
+import * as catalogPublic from './catalog';
+import * as catalogSchema from './catalog-schema';
 import variantSeed from './catalog-variant-seed.json';
+import { BASE_CATALOG_VARIANTS } from './catalog-variants-base';
+import { REVIEWED_CATALOG_VARIANTS } from './catalog-variants-reviewed';
 import { swapExercise } from './commands';
 import { MemoryTrainingRecords } from './memory-records.testing';
 import { getOrCreateNextWorkout, storeProgramSetup } from './service';
@@ -25,6 +29,19 @@ const dumbbellSet = profileEquipment('dumbbells');
 const fullGymSet = profileEquipment('full_gym');
 
 describe('curated exercise variant contract', () => {
+  it('keeps one schema implementation behind every public catalog export after a source split', () => {
+    for (const name of Object.keys(catalogSchema) as Array<keyof typeof catalogSchema>) {
+      expect(catalogPublic[name]).toBe(catalogSchema[name]);
+    }
+  });
+
+  it('retains every base and reviewed variant through the public catalog', () => {
+    const records = [...BASE_CATALOG_VARIANTS, ...REVIEWED_CATALOG_VARIANTS];
+    expect(EXERCISE_CATALOG.map(({ variantMetadata: _metadata, ...record }) => record)).toEqual(
+      records,
+    );
+  });
+
   it('validates the whole library and attaches all 25 seed records to existing IDs', () => {
     const seed = catalogVariantSeedSchema.parse(variantSeed);
     expect(seed).toHaveLength(25);

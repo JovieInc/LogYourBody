@@ -14,6 +14,8 @@ from typing import Any, Optional
 
 import pytest
 
+from _setup_ios_build_cases import test_swiftlint_download_handles_http_failures
+
 from _runner_routing_fixture import (
     _AWAIT_SCRIPT,
     _DISPATCH_GUARD_SCRIPT,
@@ -1100,6 +1102,9 @@ def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_d
             if scenario == 'already-booted' or (scenario == 'restart-boot-failure' and restarted):
                 sys.exit(149)
         elif args == ['simctl', 'bootstatus', 'selected', '-b']:
+            if scenario == 'bootstatus-timeout':
+                import time
+                time.sleep(30)
             if scenario == 'bootstatus-failure' or (scenario == 'restart-status-failure' and restarted):
                 sys.exit(71)
         elif args == ['simctl', 'getenv', 'selected', 'TESTMANAGERD_SIM_SOCK']:
@@ -1126,7 +1131,7 @@ def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_d
     regular.write_text('A regular file is not a testmanagerd socket.')
     scenarios = {'stale-persistent': 70, 'healthy': 0, 'already-booted': 0,
                  'stale-recovered': 0, 'empty-socket': 70, 'getenv-failure': 70,
-                 'regular-file': 70, 'bootstatus-failure': 71, 'shutdown-failure': 73,
+                 'regular-file': 70, 'bootstatus-failure': 71, 'bootstatus-timeout': 70, 'shutdown-failure': 73,
                  'restart-boot-failure': 149, 'restart-status-failure': 71,
                  'discovered': 0, 'created': 0, 'no-destination': 70,
                  'inventory-failure': 1, 'inventory-malformed': 1}
@@ -1156,6 +1161,8 @@ def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_d
             ['bash', str(_REPO_ROOT / 'scripts/ios/resolve-simulator-destination.sh')],
             env={**os.environ, 'PATH': f'{binaries}:{os.environ["PATH"]}', 'IOS_DIR': str(tmp_path),
                  'NATIVE_CALLS': str(calls), 'NATIVE_SCENARIO': scenario,
+                 **({'SIM_BOOT_TIMEOUT_SECONDS': '1', 'SIM_SHUTDOWN_TIMEOUT_SECONDS': '1'}
+                    if scenario == 'bootstatus-timeout' else {}),
                  'SIMULATOR_INVENTORY': (
                      'invalid-json' if scenario == 'inventory-malformed' else
                      '{"runtimes": [], "devices": {}}' if scenario in ['created', 'no-destination'] else
@@ -1507,13 +1514,16 @@ def _diagnostic_python(marker: str, source: str) -> dict[str, Any]:
     return namespace
 
 
+def _diagnostic_seven_source() -> str:
+    return (_REPO_ROOT / 'scripts/ios/launch-quality-diagnostic-seven.sh').read_text()
+
+
 def _diagnostic_receipt_module() -> dict[str, Any]:
-    return _diagnostic_python('DIAGNOSTIC_RECEIPT_PY',
-        (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_text())
+    return _diagnostic_python('DIAGNOSTIC_RECEIPT_PY', _diagnostic_seven_source())
 
 
 def _diagnostic_ids() -> list[str]:
-    source = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_text()
+    source = _diagnostic_seven_source()
     block = source.split('DIAGNOSTIC_SEVEN_TESTS=(\n', 1)[1].split('\n)', 1)[0]
     return [line.strip().strip('"') + '()' for line in block.splitlines()]
 
@@ -1585,6 +1595,8 @@ def _diagnostic_repository(tmp_path: Path) -> tuple[Path, str]:
     (root / 'scripts/ios').mkdir(parents=True)
     (root / 'apps/ios').mkdir(parents=True)
     (root / 'scripts/ios/launch-quality-audit.sh').write_bytes((_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes())
+    (root / 'scripts/ios/launch-quality-diagnostic-seven.sh').write_bytes(
+        (_REPO_ROOT / 'scripts/ios/launch-quality-diagnostic-seven.sh').read_bytes())
     (root / 'scripts/ios/xcodebuild-command-timeout.py').write_bytes(
         (_REPO_ROOT / 'scripts/ios/xcodebuild-command-timeout.py').read_bytes())
     (root / 'scripts/ios/test_xcodebuild_command_timeout.py').write_text('raise SystemExit(0)\n')
@@ -1614,7 +1626,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        '15928115521f679beeb7ef65218f317af08e112ff4153cb92d88452eb5a7ae4b'
+        '318b11c32f2333c05ed3fc60f7d975bb7cc45893d379bbd9c3fcabb93edace7e'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -1813,7 +1825,7 @@ def test_focused_diagnostic_real_dispatcher_builds_once_selects_only_seven_and_n
     assert commands[1][commands[1].index('-default-test-execution-time-allowance') + 1] == '90'
     assert commands[1][commands[1].index('-maximum-test-execution-time-allowance') + 1] == '180'
     timed = _timeout_invocations(calls)
-    assert [item[2] for item in _non_terminate_timeouts(timed)] == ['600s', '60s']
+    assert [item[2] for item in _non_terminate_timeouts(timed)] == ['900s', '60s']
     _assert_bounded_cold_terminates(timed, 2)
     assert all('test-without-building' not in item for item in timed)
     assert 'xcodebuild deadline 1500s finalization-grace 180s' in (
@@ -1824,6 +1836,22 @@ def test_focused_diagnostic_real_dispatcher_builds_once_selects_only_seven_and_n
     assert receipt['unitWitnessCoverageRatchetPerformanceProtectedSignedPhysical'] == 'NOT_EXECUTED_OR_QUALIFIED'
     artifacts = tmp_path / 'artifacts'
     assert not list(artifacts.glob('*.evidence.json')) and not list(artifacts.glob('*.coverage.json'))
+
+
+def test_focused_diagnostic_cold_compile_survives_past_the_old_ten_minute_cap(tmp_path: Path) -> None:
+    # Run 42724350244 was still Swift-compiling when the 600s diagnostic cap fired.
+    compiling, calls, receipt = _run_diagnostic_dispatch(
+        tmp_path / 'compiling', BUILD_DURATION_SECONDS='650')
+    assert compiling.returncode == 0, compiling.stdout + compiling.stderr
+    assert receipt['status'] == 'passed' and receipt['qualifying'] is False
+    timed = _non_terminate_timeouts(_timeout_invocations(calls))
+    assert timed[0][2] == '900s' and 'build-for-testing' in timed[0]
+    hung, hung_calls, hung_receipt = _run_diagnostic_dispatch(
+        tmp_path / 'hung', BUILD_DURATION_SECONDS='901')
+    assert hung.returncode == 124, hung.stdout + hung.stderr
+    assert hung_receipt['status'] == 'failed' and hung_receipt['qualifying'] is False
+    assert 'timeout' in hung_receipt['errors'] and 'commandOrStageFailure' in hung_receipt['errors']
+    assert not any('test-without-building' in call for call in hung_calls)
 
 
 def test_launch_quality_validator_preflight_finishes_before_simulator_boot_and_failure_stops_native_work(tmp_path: Path) -> None:
@@ -1930,18 +1958,30 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert source.count('      checkout-ref:\n') == 1
     for forbidden in ['  pull_request:', '  pull_request_target:', '  workflow_call:', '  workflow_run:', 'uses: ./', 'mac-lane', 'secrets.']:
         assert forbidden not in source
-    assert '  push:\n    branches: [main]\n    paths:\n      - .github/workflows/ios-ui-diagnostics.yml\n      - scripts/ios/launch-quality-audit.sh\n      - apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift\n' in source
+    assert '  push:\n    branches: [main]\n    paths:\n      - .github/workflows/ios-ui-diagnostics.yml\n      - scripts/ios/launch-quality-audit.sh\n      - scripts/ios/launch-quality-diagnostic-seven.sh\n      - apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift\n' in source
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = '15928115521f679beeb7ef65218f317af08e112ff4153cb92d88452eb5a7ae4b'" in source
+    assert "REVIEWED_AUDIT_SHA256 = '318b11c32f2333c05ed3fc60f7d975bb7cc45893d379bbd9c3fcabb93edace7e'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
     assert 'run: bash scripts/ios/launch-quality-audit.sh --diagnostic-seven' in source
     assert 'ios-ui-diagnostic-seven-${{ github.run_id }}-${{ github.run_attempt }}' in source
     assert 'retention-days: 14' in source and 'name: Focused UI Diagnostics (NONQUALIFYING)' in source
-    import re
+    # Run 42724350244: a 900s cold build plus the UI cap, finalization, and catalogue must fit the step.
+    diagnostic_block = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_text().split(
+        'if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then\n', 1)[1].split('\nfi\n', 1)[0]
+    build_seconds = int(re.search(r'(?m)^  BUILD_FOR_TESTING_TIMEOUT_SECONDS=(\d+)$', diagnostic_block).group(1))
+    ui_seconds = int(re.search(
+        r'XCODEBUILD_COMMAND_TIMEOUT_SECONDS=(\d+)',
+        (_REPO_ROOT / 'scripts/ios/launch-quality-diagnostic-seven.sh').read_text()).group(1))
+    job_minutes = int(re.search(r'(?m)^    timeout-minutes: (\d+)\n    steps:', source).group(1))
+    step_minutes = int(re.search(
+        r'- name: Run fixed seven-case diagnostic\n        timeout-minutes: (\d+)', source).group(1))
+    assert build_seconds == 900 and ui_seconds == 1500
+    assert build_seconds + ui_seconds + 180 + 60 <= step_minutes * 60
+    assert step_minutes + 7 == job_minutes
     uses = re.findall(r'uses: ([^\s]+)', source)
     assert len(uses) == 3 and all(re.fullmatch(r'[\w-]+/[\w-]+@[0-9a-f]{40}', value) for value in uses)
 
@@ -2171,10 +2211,10 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = '15928115521f679beeb7ef65218f317af08e112ff4153cb92d88452eb5a7ae4b'
+    expected = '318b11c32f2333c05ed3fc60f7d975bb7cc45893d379bbd9c3fcabb93edace7e'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
-    assert len(dependencies) == 8
+    assert len(dependencies) == 9
     project_name = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj'
     # Admission must exercise current source bytes, as the real main diagnostic does.
     # Refreshing the policy digest remains an explicit review of the project diff.

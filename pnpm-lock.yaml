@@ -92,8 +92,8 @@ importers:
   apps/web:
     dependencies:
       '@ai-sdk/elevenlabs':
-        specifier: ^3.0.80
-        version: 3.0.80(zod@4.6.7)
+        specifier: ^3.0.81
+        version: 3.0.81(zod@4.6.7)
       '@ai-sdk/gateway':
         specifier: ^4.0.137
         version: 4.0.137(zod@4.6.7)
@@ -517,8 +517,8 @@ packages:
   '@adobe/css-tools@4.5.0':
     resolution: {integrity: sha512-6OzddxPio9UiWTCemp4N8cYLV2ZN1ncRnV1cVGtve7dhPOtRkleRyx32GQCYSwDYgaHU3USMm84tNsvKzRCa1Q==}
 
-  '@ai-sdk/elevenlabs@3.0.80':
-    resolution: {integrity: sha512-2j+WBX0cyGe5WCTrWI2ropZRJVV4blPc6kMlnd41KhWkDjEZUVCPnh+A9kU4+EUYmJSmEvBMlKcUvL/zAHQxlA==}
+  '@ai-sdk/elevenlabs@3.0.81':
+    resolution: {integrity: sha512-v5e7baVtX8S5VTiSEPHFav+lsAuhBpFiWJK60y9X2sN0f73penjIj8Z1HCqp8bwtPkRo6HJeQhZ8ZZzwZ5Sw7Q==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -547,12 +547,22 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/provider-utils@5.0.76':
+    resolution: {integrity: sha512-76QcCmVtSunSAbQBJtgQTTE8e+Yaz4rJJe1MRWnJ3GAQYUvNPHJejKx4jZTbhGGTdSSLaYcMBT62SISNgnGq9w==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider@4.0.18':
     resolution: {integrity: sha512-+GZJIgz1jk86pwEbb3f1BD2bdoSKyWE4Jg4YUc7NMnMozbWemSKYZcw2F4nMaO5qwsL5A8RmioAKW81YktRpIQ==}
     engines: {node: '>=22'}
 
   '@ai-sdk/provider@4.0.36':
     resolution: {integrity: sha512-GqvWZSZdBelCGughlBdOoupT258rgM3YMbaLAS9WSZJ0vlt8c9vm3My+ZT31mYhiReMCMCF2qF2axnGbILpk1A==}
+    engines: {node: '>=22'}
+
+  '@ai-sdk/provider@4.0.37':
+    resolution: {integrity: sha512-4uPgZ3qiX/JaQFr0dQoibUzHImZit9u05ro2BxGUnJwU4fV28BOAbKUa2OjQvqtM1tMac3bTKkaXdyzGovQXqg==}
     engines: {node: '>=22'}
 
   '@alloc/quick-lru@5.3.0':
@@ -8090,10 +8100,10 @@ snapshots:
 
   '@adobe/css-tools@4.5.0': {}
 
-  '@ai-sdk/elevenlabs@3.0.80(zod@4.6.7)':
+  '@ai-sdk/elevenlabs@3.0.81(zod@4.6.7)':
     dependencies:
-      '@ai-sdk/provider': 4.0.36
-      '@ai-sdk/provider-utils': 5.0.75(zod@4.6.7)
+      '@ai-sdk/provider': 4.0.37
+      '@ai-sdk/provider-utils': 5.0.76(zod@4.6.7)
       zod: 4.6.7
 
   '@ai-sdk/gateway@4.0.137(zod@4.6.7)':
@@ -8128,11 +8138,24 @@ snapshots:
       undici: 8.12.4
       zod: 4.6.7
 
+  '@ai-sdk/provider-utils@5.0.76(zod@4.6.7)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.37
+      '@standard-schema/spec': 1.1.0
+      '@workflow/serde': 4.1.0
+      eventsource-parser: 3.1.1
+      undici: 8.12.4
+      zod: 4.6.7
+
   '@ai-sdk/provider@4.0.18':
     dependencies:
       json-schema: 0.4.0
 
   '@ai-sdk/provider@4.0.36':
+    dependencies:
+      json-schema: 0.4.0
+
+  '@ai-sdk/provider@4.0.37':
     dependencies:
       json-schema: 0.4.0
 

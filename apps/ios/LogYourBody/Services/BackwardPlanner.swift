@@ -21,7 +21,7 @@ struct BackwardPlanner {
         case needsMeasurement, conflictingMeasurements, invalidOutcome, unavailableRates, unsafeRate
     }
 
-    enum NextAction: Equatable {
+    enum NextAction: String, Codable, Equatable, Sendable {
         case hold, reviewProgress, reviewOutcome, recordMeasurement
     }
 

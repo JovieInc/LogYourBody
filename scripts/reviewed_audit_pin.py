@@ -1,4 +1,5 @@
 """Move every current reviewed launch-audit pin from one explicit digest."""
+import difflib
 import re
 import subprocess
 
@@ -276,10 +277,25 @@ def conflicted_pin_template(base, ours, theirs, project_pin, explicit_audit=None
         if count != 1:
             raise ValueError("diagnostic workflow conflict is not limited to the project pin")
         project_masked.append(masked_project)
-    if project_masked[0] == project_masked[2]:
-        if worktree is None or _project_hunk_text(worktree, project_pin) != ours:
+    unchanged = 2 if project_masked[0] == project_masked[2] else 1
+    if project_masked[0] == project_masked[unchanged]:
+        retained = 1 if unchanged == 2 else 2
+        if retained == 2 and any(
+            tag not in ("equal", "insert")
+            for tag, *_ in difflib.SequenceMatcher(
+                a=project_masked[0].splitlines(), b=project_masked[2].splitlines(), autojunk=False,
+            ).get_opcodes()
+        ):
             raise ValueError("diagnostic workflow conflict is not limited to the project pin")
-        return ours
+        if worktree is None:
+            raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+        actual = _project_hunk_text(worktree, project_pin)
+        masked_actual, _ = project_pin.subn(
+            lambda match: match.group(1) + ("0" * 64) + match.group(2), actual, count=1,
+        )
+        if masked_actual != project_masked[retained]:
+            raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+        return (base, ours, theirs)[retained]
     raise ValueError("diagnostic workflow conflict is not limited to the project pin")
 
 
@@ -329,6 +345,10 @@ def stage_resolved_pins(root, pin_update, output, resolve_staged, git_bytes):
     workflow, updated, routing_text = pin_update
     path = repository_docs.local(root, workflow)
     original = path.read_bytes()
+    if not _MARKER.search(original) and original.decode() != updated:
+        raise ValueError(
+            "diagnostic pin repair refuses a manually edited workflow; review and stage it explicitly"
+        )
     index = git_bytes(root, "ls-files", "--stage", "--", workflow)
     routing_name = DIAGNOSTIC_ROUTING_TESTS
     routing_path = repository_docs.local(root, routing_name)

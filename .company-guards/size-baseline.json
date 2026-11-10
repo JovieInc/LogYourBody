@@ -62,7 +62,7 @@
   "apps/ios/LogYourBody/Views/IntegrationsView.swift": 553,
   "apps/ios/LogYourBody/Views/MainTabView.swift": 2744,
   "apps/ios/LogYourBody/Views/MesocycleCanvas.swift": 817,
-  "apps/ios/LogYourBody/Views/ProgressPhotoAttachSheet.swift": 686,
+  "apps/ios/LogYourBody/Views/ProgressPhotoAttachSheet.swift": 499,
   "apps/ios/LogYourBody/Views/TrainingViews.swift": 2130,
   "apps/ios/LogYourBodyTests/AuthManagerSessionTests.swift": 1044,
   "apps/ios/LogYourBodyTests/BenefitEventsContractTests.swift": 582,

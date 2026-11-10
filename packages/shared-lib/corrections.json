@@ -1,5 +1,135 @@
 [
   {
+    "fingerprint": "fix-red-f8dba15025",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
+    "correction": "LYB-344 PR #1774, fix-red-f8dba15025 occurrence 3: merge origin/main first without rebasing, retain the dated-outcome coach action and weekly review, and repair Company Guards and CI Summary. DatedOutcomeStoreTests.swift grew to 515 lines; Vercel reports Deployment was blocked without a build error.",
+    "mechanization": "Extend the existing Swift size splitter to require an explicit --internalize list before moving private/fileprivate top-level fixtures across files, preserve member privacy and @testable imports, and refuse unrelated access changes before writing. Use it to extract both store fixtures and register the sibling in the existing test target. Keep every test body and the company size baseline unchanged. The CLI regression fails on the previous unsafe extraction and missing testable import, then passes with the extension; it runs in the existing required iOS Static Audits test_split_size_ratchet.py suite. The fetched origin/main is already an ancestor. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/ios/split_size_ratchet.py. Native execution and exact-head coverage still require the real Mac runner; the Vercel provider block remains externally unverified.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator can prevent inaccessible extracted fixtures by refusing private declarations unless their names are explicitly reviewed for internal access, while retaining attributed test imports and member privacy in every generated sibling."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/split_size_ratchet.py",
+      "anchor": "review type access before extraction: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-receipt-text-level-recurrence",
+    "source": "https://linear.app/jovie/issue/LYB-362",
+    "correction": "LYB-362: Re-mechanization requires a second receipt with the same normalized correction text and classifier level. First-seen corrections and different text at the same level must not enqueue a request.",
+    "mechanization": "Record receipts through recordCorrectionReceipt, which derives recurrence from normalized text and level, marks the new receipt and invokes the internal mechanize queue exactly once for a repeat. Retain regression cases in the existing required shared-lib suite for first-seen, exact and normalized repeats, different text and different levels. The harness owns pushing and PR operations. Machine: built packages/shared-lib/src/correction-ledger.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The receipt-recording boundary owns both matching and internal queue dispatch, preventing unrelated corrections from triggering re-mechanization by construction."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/correction-ledger.ts",
+      "anchor": "if (receipt.isRecurrence) enqueueMechanize({ type: 'mechanize', correction: receipt });"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1771",
+    "correction": "PR #1771 / LYB-362 repair, fix-red-e3b0c44298 occurrence 87 in 14 days: merge origin/main without rebasing and retain classification and recurrence behavior when independent additions collide in the ledger documentation and test imports. Vercel reports Deployment was blocked; the exact PR head has no Actions run.",
+    "mechanization": "Retain this recurring fingerprint's existing staged-marker readiness guard and extend the existing documentation merge resolver to propose independent paragraph insertions from both immutable parents at their common-base positions. The new real-Git positive case fails against the old resolver; both blank-line alignments pass with the extension, while fragments, edits, deletions and unsafe parent sources still fail without writing or staging. The existing required Detect Changes pre-commit suite imports these fixtures. Use --merge-sections for the actual ledger documentation conflict and preserve both parent test suites. The harness owns pushing and PR operations and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42401937834/job/128491764859",
+    "correction": "PR #1699 / LYB-312, fix-red-5df69c1e5f occurrence 30 in 14 days: merge origin/main without rebasing, preserve the weekly photo check-in, and repair CI Summary and Launch Quality. The old combined timeline XCTest called two complete dated journeys and failed terminating the app at 199 seconds. The automatic source merge also dispatched both parent network-path handlers for every callback.",
+    "mechanization": "Retain this recurring fingerprint's existing codebase-owned shell deadlines and process-group cleanup without changing its annotation or weakening any gate. Supplement that retained control for this occurrence: Retain main's independent native selectors and existing no-nested-XCTest guard, then extend the existing launch UI audit to require exactly one canonical network-path callback and reject the legacy parallel handler after merges. Preserve both parents' discovered audit siblings, Turbo inputs, project references, resolver safeguards and correction receipts. A duplicate-callback mutation escapes the old audit and fails the new regression; the extended audit rejects both duplicate canonical calls and the actual two-parent merge shape. All 51 behavior cases pass without skipping or increasing timeouts. The harness owns pushing and PR edits; keep exactly one PR-body line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py. Native launch execution and exact-head coverage still require the real Mac runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture launcher owns deadlines, diagnostics and descendant lifetime for every shell contract case, preventing opaque timeouts and orphan pipelines by construction without changing product behavior or native qualification gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "os.killpg(process.pid, signal.SIGKILL)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-81061e944d",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42468669321",
+    "correction": "LYB-319 PR #1709 repair, occurrence 2 in 14 days: merge origin/main without rebasing and repair red checks without weakening gates. Static Audits failed on a SwiftLint HTTP 504 download; Launch Quality exhausted primary HTTP 504 retries and anonymous API HTTP 403 retries before native execution. Shared Gitleaks run 42468669245 also exhausted archive HTTP 504 retries, without executing the scanner.",
+    "mechanization": "Extract the existing pinned release downloader into scripts/download-release-asset.sh and use it for both macOS setup and Linux Static Audits. Preserve bounded HTTP retries, authenticate only the asset API request with the existing job token when available, and verify each platform archive against the official release SHA-256 before extraction. Extend the existing required routing suite to exercise both actual installer steps with real curl, HTTP 504/403 refusal and recovery, authenticated and anonymous fallback, corrupt archives, and checksum mismatch on both routes. Three regressions fail against the prior steps: macOS authenticated fallback, Linux fallback, and Linux checksum rejection. Preserve the pinned shared Gitleaks scanner; its upstream download failure needs a successful required rerun or a repair in JovieInc/ci, whose current main still has the failing release URL. The harness owns pushing and PR edits and should include: Machine: built scripts/download-release-asset.sh.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One shared download boundary prevents platform installers from diverging on retry, API authentication and checksum verification. Both native callers must verify the pinned bytes before extracting them; failed HTTP responses and substituted archives remain hard failures."
+      }
+    },
+    "guard": {
+      "path": "scripts/download-release-asset.sh",
+      "anchor": "# Neither HTTP error content nor substituted archives may reach extraction."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-a510b9a468",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1709",
+    "correction": "LYB-319 PR #1709 repair: CI Summary and Launch Quality failed before native execution because the pinned SwiftLint download returned HTTP 504 even after the bounded retries added in 1a18bfd0. Shared Gitleaks also exhausted its retries on HTTP 504 on the prior head and now passes unchanged. Merge origin/main without rebasing and preserve the photographic feature and required gates.",
+    "mechanization": "Extend the shared iOS setup action with a fallback to the exact GitHub release asset API after bounded release-URL retries, and verify either download against the published SHA-256 before extraction. The asset API archive was downloaded and its digest and ZIP integrity verified. The existing required Mac Runner Routing Tests job imports real-curl installer regressions for success, transient 504 recovery, persistent primary 504 recovery through the asset API, refusal when both routes fail even with valid ZIP bodies, corrupt archive refusal, and checksum rejection on both routes. The fallback and checksum cases fail against 1a18bfd0 and pass after this change. Reuse the action across native workflows; do not duplicate or weaken the shared Gitleaks scanner. The harness owns pushing and PR updates and should include: Machine: built .github/actions/setup-ios-build/action.yml.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared installer owns the download and extraction boundary. A second route to the same pinned asset recovers persistent release-URL failures, while bounded retries, HTTP failure propagation and checksum verification prevent callers from extracting unverified error or substituted content by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/download-release-asset.sh",
+      "anchor": "curl --fail --silent --show-error --location"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-89c44c062f",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1709",
+    "correction": "LYB-319 PR #1709 repair: merge origin/main without rebasing, preserve gated on-device photographic appearance, fix three size-500 violations, the XCTest geometry argument order, and the stale reviewed Xcode project fingerprint. Tently failed because its AI provider was unreachable.",
+    "mechanization": "Reuse the existing whole-declaration splitter and required size/call-shape ratchet instead of adding a parallel repair system. The existing static audit reproduced all four source violations before the repair and passes after extraction and call-order correction. Retain all extracted Swift declarations in the app target, preserve TypeScript exports and behavioral tests, and refresh the project fingerprint through the existing explicit reviewed-pin resolver. No gates or baselines are weakened. The harness owns pushing and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Splitting these files and ordering this call fixes the current sources but cannot prevent future file growth or misordered calls; the existing deterministic source ratchet is the preventive boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required static audit checks repository-wide source size and declared Swift argument order, and the routing tests reject a project fingerprint that differs from the actual project bytes."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_split_size_ratchet.py",
+      "anchor": "self.assertEqual(check_repo(ROOT), [])"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "dependency-repair-worktree-change-during-projection",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1756",
     "correction": "PR #1756, fix-red-1423773703 occurrence 58: merge origin/main without rebasing and preserve the ElevenLabs 3.0.80 bump. Detect Changes and parity reject its stale source projection, causing CI Summary to fail. Dependency repair must also refuse tracked manifest or resolver-configuration edits made during rendering after frozen verification.",
@@ -1885,7 +2015,7 @@
     "fingerprint": "training-split-weekly-dose",
     "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
     "source": "https://linear.app/jovie/issue/LYB-111",
-    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4\u20136 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2\u20136 days.",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -3524,7 +3654,7 @@
     "fingerprint": "fix-red-5df69c1e5f",
     "correction": "PR #1565 / LYB-240: Launch Quality compared normalized sourceBundleId to an unsaved HealthKit sample's empty bundle identifier and failed nil versus Optional(\"\"). Native provenance fixtures must respect blank-to-nil metadata normalization while preserving real source identifiers.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40408213055/job/121871680195",
-    "mechanization": "Extend the existing healthkit-sync-metadata scanner and its required correction ratchet to reject direct XCTest equality between normalized source fields and raw HealthKit source fields, in either operand order. Run it on the original assertion to reproduce the finding, normalize the fixture expectation, and run it again cleanly. Shared-lib exercises violating and permitted source snapshots; native cases cover nil, empty, whitespace, real bundle IDs and serialization. The existing empty baseline stays strict. Native execution remains required in CI; the lanes harness owns push and PR updates. During the main merge, retain the generic red-check fingerprint with main\u2019s shell-fixture guard; preserve the specific HealthKit rule and its static guard separately under healthkit-source-assertions-normalize-empty-identifiers.",
+    "mechanization": "Extend the existing healthkit-sync-metadata scanner and its required correction ratchet to reject direct XCTest equality between normalized source fields and raw HealthKit source fields, in either operand order. Run it on the original assertion to reproduce the finding, normalize the fixture expectation, and run it again cleanly. Shared-lib exercises violating and permitted source snapshots; native cases cover nil, empty, whitespace, real bundle IDs and serialization. The existing empty baseline stays strict. Native execution remains required in CI; the lanes harness owns push and PR updates. During the main merge, retain the generic red-check fingerprint with main’s shell-fixture guard; preserve the specific HealthKit rule and its static guard separately under healthkit-source-assertions-normalize-empty-identifiers.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -3542,7 +3672,7 @@
     "fingerprint": "fix-red-e3b0c44298",
     "correction": "PR #1565: Recurring main merge repairs must preserve both parents' correction receipts and reject staged conflict markers even when Git attributes classify the affected file as binary.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1565",
-    "mechanization": "Extend the existing assertLedgerMergeReady diff with --text so binary presentation cannot hide unresolved staged source. The required shared-lib classifier suite uses real Git repositories with a -diff attribute: the regression accepts a broken index before the fix and refuses it afterward, preserving the ledger and index. Cover initial resolution, explicit staging, verification, staged retries, all four conflict marker forms and clean retries. Use --resolve-merge . --stage and --check-merge . for this instance; the lanes harness retains push and PR ownership. On the next merge, preserve main\u2019s generated marker matrix and bounded child processes. Extend both existing conflict diagnostics to identify the existing and incoming guard paths as well as their sources. The required coverage behavior regression fails before this extension and passes afterward, and the resolver identifies the actual HealthKit-versus-shell guard collision. Resolve that semantic collision explicitly while retaining its specific HealthKit rule, then verify the staged union against both immutable parents.",
+    "mechanization": "Extend the existing assertLedgerMergeReady diff with --text so binary presentation cannot hide unresolved staged source. The required shared-lib classifier suite uses real Git repositories with a -diff attribute: the regression accepts a broken index before the fix and refuses it afterward, preserving the ledger and index. Cover initial resolution, explicit staging, verification, staged retries, all four conflict marker forms and clean retries. Use --resolve-merge . --stage and --check-merge . for this instance; the lanes harness retains push and PR ownership. On the next merge, preserve main’s generated marker matrix and bounded child processes. Extend both existing conflict diagnostics to identify the existing and incoming guard paths as well as their sources. The required coverage behavior regression fails before this extension and passes afterward, and the resolver identifies the actual HealthKit-versus-shell guard collision. Resolve that semantic collision explicitly while retaining its specific HealthKit rule, then verify the staged union against both immutable parents.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -4406,7 +4536,7 @@
     "fingerprint": "launch-quality-cold-build-budget-and-failure-propagation",
     "correction": "PR #1556 / LYB-241: Launch Quality run 40743494610 killed a cache-miss cold build at 900 seconds while app sources were still compiling; no XCTest cases ran.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1556",
-    "mechanization": "Extend the existing full audit build budget to one bounded 1200-second attempt. Extend the existing virtual-clock and real-dispatcher regressions with a 1050-second successful build and a 1201-second timeout. Both cold-build regressions fail at the old 900-second cap. Preserve compiler failures, overrides, one attempt, the diagnostic 600-second budget, all native selectors, test deadlines, evidence, coverage and the 52-minute outer step. Refresh the exact diagnostic audit digest and reject the prior reviewed bytes through the existing trusted CLI; retain all seven dependency pins. Native execution and exact-head coverage remain unverified on this Linux host. The harness owns pushing and PR edits. Integration disposition: the historical 1200-second proposal above is not adopted. Preserve it in original head eb32b7b56645108f8491b398fd523e87ff4e21cf and the retained proposal artifact. Final integration keeps current main\u2019s 900-second full-build limit, 600-second diagnostic limit, exact reviewed audit and all seven diagnostic dependency pins. Preserve one-attempt compiler/error handling and extend the real-dispatcher elapsed-timeout case to fail at 901 seconds. Cold native scheduling and exact-head execution remain a required CI observation; this restoration does not claim cold-build capacity or runtime improvement.",
+    "mechanization": "Extend the existing full audit build budget to one bounded 1200-second attempt. Extend the existing virtual-clock and real-dispatcher regressions with a 1050-second successful build and a 1201-second timeout. Both cold-build regressions fail at the old 900-second cap. Preserve compiler failures, overrides, one attempt, the diagnostic 600-second budget, all native selectors, test deadlines, evidence, coverage and the 52-minute outer step. Refresh the exact diagnostic audit digest and reject the prior reviewed bytes through the existing trusted CLI; retain all seven dependency pins. Native execution and exact-head coverage remain unverified on this Linux host. The harness owns pushing and PR edits. Integration disposition: the historical 1200-second proposal above is not adopted. Preserve it in original head eb32b7b56645108f8491b398fd523e87ff4e21cf and the retained proposal artifact. Final integration keeps current main’s 900-second full-build limit, 600-second diagnostic limit, exact reviewed audit and all seven diagnostic dependency pins. Preserve one-attempt compiler/error handling and extend the real-dispatcher elapsed-timeout case to fail at 901 seconds. Cold native scheduling and exact-head execution remain a required CI observation; this restoration does not claim cold-build capacity or runtime improvement.",
     "classification": {
       "codebase": {
         "feasible": false,
@@ -4544,7 +4674,7 @@
     "fingerprint": "ledger-staging-failure-preserves-conflict",
     "correction": "PR #1556 / LYB-241 recurring conflict repair: a failed Git staging write must preserve the original correction ledger and index so an unattended retry cannot lose the unresolved conflict state.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1556#staging-retry",
-    "mechanization": "Extend the existing classified ledger resolver to restore the original ledger bytes when Git refuses staging and propagate the staging error. The existing required shared-lib real-Git fixture holds index.lock, proves both ledger and index preservation, removes the lock and retries the same command successfully. The regression fails before the extension and passes afterward without changing any process deadlines, scenario coverage or CI gates. Use the extended --resolve-merge . --stage command for this main merge, preserving all 96 parent receipts. The lanes harness owns push and PR edits; its machine body line is Machine: built scripts/correction-classifier.mjs. Occurrence 33: retain rollback in main's reusable runClassifier after merging the two implementations, and extend the existing locked-index scenario to exercise both in-process and real CLI entrypoints. The merged-main regression rewrites the conflicted ledger before failing; the repaired matrix preserves the original ledger and index, then succeeds after unlocking. Preserve all 178 parent-union receipts, main's indexed-source, symlink, binary/NUL-marker and manual-resolution checks, and branch ordinary-input uniqueness and CRLF-marker checks. The generic compile failure category is explicitly reconciled with main and its specific runner guard retained separately. Use --check-merge and the staged retry on this resolution. Keep main's diagnostic allowlist bytes; the harness supplies exactly Machine: built scripts/correction-classifier.mjs in the PR body. Native exact-head execution remains required in macOS CI. Occurrence 33 integration with main f4ee9ab0b: keep batched guard reads and parent replay consolidation while retaining strict ordinary-input and staged-ledger identities. Extend the locked-index scenario across main\u2019s in-process and CLI runners; both new regressions fail against merged main before restoration. Use the extended resolver on all 197 parent-union receipts and verify the index against both parents. The harness retains PR-body ownership and must add exactly Machine: built scripts/correction-classifier.mjs.",
+    "mechanization": "Extend the existing classified ledger resolver to restore the original ledger bytes when Git refuses staging and propagate the staging error. The existing required shared-lib real-Git fixture holds index.lock, proves both ledger and index preservation, removes the lock and retries the same command successfully. The regression fails before the extension and passes afterward without changing any process deadlines, scenario coverage or CI gates. Use the extended --resolve-merge . --stage command for this main merge, preserving all 96 parent receipts. The lanes harness owns push and PR edits; its machine body line is Machine: built scripts/correction-classifier.mjs. Occurrence 33: retain rollback in main's reusable runClassifier after merging the two implementations, and extend the existing locked-index scenario to exercise both in-process and real CLI entrypoints. The merged-main regression rewrites the conflicted ledger before failing; the repaired matrix preserves the original ledger and index, then succeeds after unlocking. Preserve all 178 parent-union receipts, main's indexed-source, symlink, binary/NUL-marker and manual-resolution checks, and branch ordinary-input uniqueness and CRLF-marker checks. The generic compile failure category is explicitly reconciled with main and its specific runner guard retained separately. Use --check-merge and the staged retry on this resolution. Keep main's diagnostic allowlist bytes; the harness supplies exactly Machine: built scripts/correction-classifier.mjs in the PR body. Native exact-head execution remains required in macOS CI. Occurrence 33 integration with main f4ee9ab0b: keep batched guard reads and parent replay consolidation while retaining strict ordinary-input and staged-ledger identities. Extend the locked-index scenario across main’s in-process and CLI runners; both new regressions fail against merged main before restoration. Use the extended resolver on all 197 parent-union receipts and verify the index against both parents. The harness retains PR-body ownership and must add exactly Machine: built scripts/correction-classifier.mjs.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -4806,7 +4936,7 @@
     "fingerprint": "core-data-model-versions-must-not-be-reused",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1561",
     "correction": "PR #1561 and current main independently added different Core Data V5 schemas. Choosing either side of the same-version conflict would erase a retained schema or lose the dated-outcome entity.",
-    "mechanization": "Preserve every main V1\u2013V5 source byte. Add V6 as exact main V5 plus the original CachedDatedOutcome entity, and select it in both native version groups. Extend the existing required native-project guard with frozen model identities and app/widget graph checks; a real V5 entity rewrite passes the previous guard and fails the repair. One valid additive fixture and eleven adverse model/graph cases execute through the existing fastlane-validation-source suite. Include the exact model/current-version sources in existing Turbo inputs. Native V4 and V5 SQLite migrations retain profiles, measurements and V5 workout-reconciliation payloads; exact-head macOS execution remains required.",
+    "mechanization": "Preserve every main V1–V5 source byte. Add V6 as exact main V5 plus the original CachedDatedOutcome entity, and select it in both native version groups. Extend the existing required native-project guard with frozen model identities and app/widget graph checks; a real V5 entity rewrite passes the previous guard and fails the repair. One valid additive fixture and eleven adverse model/graph cases execute through the existing fastlane-validation-source suite. Include the exact model/current-version sources in existing Turbo inputs. Native V4 and V5 SQLite migrations retain profiles, measurements and V5 workout-reconciliation payloads; exact-head macOS execution remains required.",
     "classification": {
       "codebase": {
         "feasible": false,
@@ -4827,7 +4957,7 @@
   {
     "fingerprint": "ledger-staged-scan-retains-complete-large-merge-output",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1561",
-    "correction": "PR #1561 current-main integration produces 1157593 bytes of staged text. The existing correction-ledger preflight fails with spawnSync git ENOBUFS at Node\u2019s default 1 MiB output limit before it can retain the parent receipts.",
+    "correction": "PR #1561 current-main integration produces 1157593 bytes of staged text. The existing correction-ledger preflight fails with spawnSync git ENOBUFS at Node’s default 1 MiB output limit before it can retain the parent receipts.",
     "mechanization": "Use the same bounded 16 MiB output ceiling already used for batched guard reads for both staged diff scans. Keep complete text scans, binary/source driver defenses, conflict-marker refusal, index preservation and all receipt checks. The real-Git regression fails before the repair; afterward a clean staged payload over 1 MiB succeeds, a marker at its tail is refused, and a 17 MiB payload still fails closed without changing ledger or index. No retry, native deadline, protection or trust grant changes.",
     "classification": {
       "codebase": {
@@ -4846,7 +4976,7 @@
     "fingerprint": "ledger-staged-scan-retains-complete-large-merge-output",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1561#repair-20261029-occurrence38",
     "correction": "PR #1561 recurring conflict repair (fix-red-e3b0c44298 occurrence 38): retain both parents and all dated-outcome storage changes. Main and the branch independently expanded staged-patch capture, but Git check diagnostics can exceed the default buffer even when the staged patch does not.",
-    "mechanization": "Retain both reviewed buffer anchors and the branch\u2019s bounded 16 MiB Git-check capture in the existing shared readiness guard. Extend its required behavior suite with a real staged patch whose whitespace diagnostics exceed 1 MiB, accept clean whitespace, reject all four single-character markers at the diagnostic tail, and preserve ledger, index and unrelated working bytes. The new regression fails with ENOBUFS against main\u2019s default diagnostic buffer and passes with the retained bound. Use --resolve-merge . --stage to preserve all 222 parent receipts, then --check-merge . and the staged retry. Keep marker refusal, oversized failure, all coverage gates and native deadlines. The harness owns pushing and PR edits and must supply exactly Machine: built packages/shared-lib/scripts/correction-coverage.mjs in the PR body.",
+    "mechanization": "Retain both reviewed buffer anchors and the branch’s bounded 16 MiB Git-check capture in the existing shared readiness guard. Extend its required behavior suite with a real staged patch whose whitespace diagnostics exceed 1 MiB, accept clean whitespace, reject all four single-character markers at the diagnostic tail, and preserve ledger, index and unrelated working bytes. The new regression fails with ENOBUFS against main’s default diagnostic buffer and passes with the retained bound. Use --resolve-merge . --stage to preserve all 222 parent receipts, then --check-merge . and the staged retry. Keep marker refusal, oversized failure, all coverage gates and native deadlines. The harness owns pushing and PR edits and must supply exactly Machine: built packages/shared-lib/scripts/correction-coverage.mjs in the PR body.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -4942,9 +5072,9 @@
   },
   {
     "fingerprint": "diagnostic-refusal-fixtures-do-not-follow-candidate",
-    "correction": "PR #1571 main integration: the inherited project digest attempted to follow ordinary native target additions, conflicting with main\u2019s frozen reviewed diagnostic project fixture. Automatic approval review refused a new diagnostic trust grant.",
+    "correction": "PR #1571 main integration: the inherited project digest attempted to follow ordinary native target additions, conflicting with main’s frozen reviewed diagnostic project fixture. Automatic approval review refused a new diagnostic trust grant.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1571",
-    "mechanization": "Retain the current main diagnostic workflow byte-for-byte, including the frozen reviewed project digest, audit digest, six other dependency pins and all refusal checks. Preserve all eight HomeFocusSelector and HomeFocusSelectorTests native registrations. The existing required trusted-CLI regression fails with the inherited 7fb06af project pin against the immutable 5c4f7e2 reviewed fixture, and passes after restoring main\u2019s grant. The opt-in reviewed-project helper is not invoked; ordinary repair and hooks never authorize a new digest. Record this recurrence without altering prior receipts, retry budgets or the held PR #1569 source.",
+    "mechanization": "Retain the current main diagnostic workflow byte-for-byte, including the frozen reviewed project digest, audit digest, six other dependency pins and all refusal checks. Preserve all eight HomeFocusSelector and HomeFocusSelectorTests native registrations. The existing required trusted-CLI regression fails with the inherited 7fb06af project pin against the immutable 5c4f7e2 reviewed fixture, and passes after restoring main’s grant. The opt-in reviewed-project helper is not invoked; ordinary repair and hooks never authorize a new digest. Record this recurrence without altering prior receipts, retry budgets or the held PR #1569 source.",
     "classification": {
       "codebase": {
         "feasible": false,
@@ -4988,7 +5118,7 @@
     "fingerprint": "core-data-parallel-model-version-collision",
     "correction": "Parallel dated-outcome and metric-correction changes each introduced a different Core Data V5, so combining them could discard dated entities or reinterpret an existing store version.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1564",
-    "mechanization": "Historical repair retained dated-outcome V5 and overlay V6 before current main introduced a different V5. Current reconciliation preserves main V1\u2013V5 and the additive dated-outcome V6 byte-for-byte, adds overlays only in V7, and selects V7 in app and widget. The existing required immutable model/graph guard extends to V7; the overlay boundary test fixes both retained V5/V6 identities and the exact two-attribute V7 delta. Native populated V4/V5/V6 migrations preserve imports, workout reconciliation and dated outcomes, plus overlay edits after reopen. All three migration cases are mandatory in the existing launch-quality evidence command, whose regression rejects each missing, failed or skipped case. Exact-head native execution and coverage remain hosted requirements.",
+    "mechanization": "Historical repair retained dated-outcome V5 and overlay V6 before current main introduced a different V5. Current reconciliation preserves main V1–V5 and the additive dated-outcome V6 byte-for-byte, adds overlays only in V7, and selects V7 in app and widget. The existing required immutable model/graph guard extends to V7; the overlay boundary test fixes both retained V5/V6 identities and the exact two-attribute V7 delta. Native populated V4/V5/V6 migrations preserve imports, workout reconciliation and dated outcomes, plus overlay edits after reopen. All three migration cases are mandatory in the existing launch-quality evidence command, whose regression rejects each missing, failed or skipped case. Exact-head native execution and coverage remain hosted requirements.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -5104,7 +5234,7 @@
     "fingerprint": "migration-oracle-checks-retained-schema-plus-exact-overlay-delta",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40815091047/job/123254355965",
     "correction": "The inherited workout V4 migration test equated every old entity hash with the current model. V7 intentionally adds two attributes to CachedBodyMetrics; native CI completed2108tests with only that obsolete full-entity hash assertion failing.",
-    "mechanization": "Keep exact entity hashes for all other retained entities. For CachedBodyMetrics require the exact retained property set plus isExcluded and correctedValueJSON, equal hashes for every retained property, unchanged class/abstract/superentity/hash-modifier/renaming/uniqueness metadata, and exact additive type/optional/default contracts. Keep inferred mapping, actual populated SQLite migration, retained data and reconciliation behavior assertions. Existing frozen model guard still preserves V1\u2013V6 bytes and the exact two-attribute V7 delta; no product schema changed to satisfy a stale test.",
+    "mechanization": "Keep exact entity hashes for all other retained entities. For CachedBodyMetrics require the exact retained property set plus isExcluded and correctedValueJSON, equal hashes for every retained property, unchanged class/abstract/superentity/hash-modifier/renaming/uniqueness metadata, and exact additive type/optional/default contracts. Keep inferred mapping, actual populated SQLite migration, retained data and reconciliation behavior assertions. Existing frozen model guard still preserves V1–V6 bytes and the exact two-attribute V7 delta; no product schema changed to satisfy a stale test.",
     "classification": {
       "codebase": {
         "feasible": false,
@@ -5243,7 +5373,7 @@
     },
     "guard": {
       "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
-      "anchor": "&& !$0.descendants(matching: .button).matching(identifier: identifier).firstMatch.exists"
+      "anchor": "!unique.contains(where: { $0.frame == action.frame })"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -6358,7 +6488,7 @@
       }
     },
     "guard": {
-      "path": "scripts/resolve-repository-docs.py",
+      "path": "scripts/pbx_union.py",
       "anchor": "merged project dropped a parent file reference: "
     },
     "level": "codebase",
@@ -6756,6 +6886,493 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-uitest-offline-pin",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42367688278/job/128389322850",
+    "correction": "PR #1715 / LYB-295, fix-red-5df69c1e5f occurrence 28: Launch Quality run 42367688278 failed testLaunchQualityGateCapturesTimelineSurfaces because the next action was Record a fresh measurement instead of Retry sync. The UI fixture pins sync offline, then a satisfied simulator path clears that pin before the dated outcome is saved.",
+    "mechanization": "Extend the existing launch UI regression audit with a sibling that rejects a path update assigning isOnline from path status, a pin decision that stays online, and a UI fixture that does not call the pin. The dated-timeline fixture keeps using the paid HUD fixture, which now pins offline before any later path update. The new behavior cases fail on each of those three originals and pass on the repaired sources. The existing required shared-lib suite executes the audit. No selector, timeout, retry, evidence, or coverage gate changes. Native execution remains required on macOS CI. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing path handler can keep a UI-test offline pin by construction, so a satisfied simulator path cannot replace Retry sync with the online stale-measurement action."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_offline_pin_audit.py",
+      "anchor": "A satisfied path must not clear a UI-test offline pin."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "xcodebuild-suite-finalization-grace",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42382904905/job/128434411354",
+    "correction": "PR #1715 / LYB-295, fix-red-5df69c1e5f occurrence 30: Launch Quality run 42382904905 printed Test Suite 'Selected tests' passed, then the 1500s hang cap killed xcodebuild (exit 124) before ** TEST EXECUTE SUCCEEDED **. CI Summary failed only because that job failed. Do not raise the hang cap.",
+    "mechanization": "Extend scripts/ios/xcodebuild-command-timeout.py so an exact Selected tests passed or failed line starts the existing 180s finalization grace. Lookalike lines do not extend the deadline. A run with no suite result and no execute line still dies at the hang cap. Wire grace through the existing XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS path on test commands only. Keep the audit deadline, phase evidence, bounded simulator boot, and the 1800s dated-state UI hang cap. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/xcodebuild-command-timeout.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing command deadline owns the xcodebuild test invocation. Treating the completed Selected tests suite as the start of finalization allows the result bundle to close inside the reviewed grace without raising the hang cap."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/xcodebuild-command-timeout.py",
+      "anchor": "A completed Selected tests suite starts finalization before the execute line."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "shared-offline-fixture-pins-before-path",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699#offline-fixture-helper",
+    "correction": "PR #1699 / LYB-312 merge origin/main without rebasing. The launch UI audit required isOnline = false inside the paid MVP fixture, while the launch-quality evidence test requires realtimeSyncManager.applyOfflineUITestFixture() and forbids realtimeSyncManager.isOnline = false in that same fixture. Weekly photo check-in stays.",
+    "mechanization": "Extend the existing launch UI offline-fixture audit so a direct isOnline = false assignment or a call to applyOfflineUITestFixture() whose body still assigns isOnline = false both count. Dropping the call or the helper assignment fails the existing behavior suite; the merged tree passes. The launch-quality evidence test stays unchanged. The harness owns push and PR-body updates and must keep exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The launch UI audit already owns the offline fixture check. Accepting the shared helper only when that helper still assigns offline keeps a satisfied path from clearing the fixture."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "A shared helper counts only when it still pins offline."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "diagnostic-placement-and-reference-counts",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699#placement-and-reference-counts",
+    "correction": "PR #1699 / LYB-312, fix-red-e3b0c44298 occurrence 86: merge origin/main without rebasing. Main's reference-count check and this branch's placement-row check edited the same diagnostic membership function, so a textual merge kept variables from both sides and could not resolve the project pin. Weekly photo check-in stays, including the health readings sheet from main.",
+    "mechanization": "Extend the diagnostic project membership check so a merged project must keep every parent placement row and every parent reference count. Both existing real-Git regressions fail on the opposite parent and pass together after the union. Use the extended resolver with the reviewed digest of this merge's project, then the existing ledger union. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing reviewed-digest resolver already owns merged project membership. Requiring placement rows and reference counts together prevents either parent check from being dropped when those edits conflict."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Placement rows and reference counts both survive a merged diagnostic project."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "diagnostic-pin-union-before-digest",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699#diagnostic-pin-union",
+    "correction": "PR #1699 / LYB-312, fix-red-e3b0c44298 occurrence 86: merge origin/main without rebasing. The weekly photo branch replaced enumerated launch-audit inputs with a glob while main added an explicit gesture sibling and a new diagnostic project pin. Manifest union refused the pin conflict, and exact input union refused the glob replacement, so the generated pin, source map and ledger could not be resolved in order.",
+    "mechanization": "Extend manifest union so a conflicted diagnostic workflow pin stays untouched for the reviewed digest resolver, and so a parent glob that covers the other parent's explicit inputs is kept with every uncovered addition. The new regressions fail while union refuses the pin or the glob and pass after both are admitted. Use that command, then the reviewed project digest and the existing ledger resolver, retaining both parents' receipts. Keep header and edge swipe checks by requiring every listed launch_ui sibling to contribute, including the gesture sibling. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/manifest_union.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing manifest union owns conflicted shared-lib test inputs. Leaving the diagnostic pin conflict for its resolver, and replacing only the explicit inputs a new glob covers, lets the existing pin and ledger resolvers finish the merge without dropping either parent's cache input."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "A conflicted diagnostic project pin stays for the reviewed digest resolver."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42356013316/job/128354430486",
+    "correction": "PR #1699 / LYB-312 (fix-red-1a39536f40 occurrence 8): JavaScript/TypeScript run 42356013316 failed launch-ui-regression-audit.test.ts with spawnSync python3 ETIMEDOUT. The traced behavior suite reread the Swift tree on every full-tree pattern and exceeded the unchanged 30-second deadline. CI Summary failed only because that job failed.",
+    "mechanization": "Extend the existing launch-audit snapshot in launch_ui_timeline_audit.py so each audit reads every Swift file once and applies the full-tree geometry, spacer, and stats-button patterns in one pass, skipping texts that cannot match. Route the audit, opacity, timeline, and home checks through that snapshot and clear it when the audit returns. The new behavior regression fails while repeated reads remain and passes when each Swift path is read once. The traced suite drops from 20.4s to 8.9s on this host with the 30-second deadline, assertions, and coverage trace unchanged. This fingerprint's coverage annotation stays on the existing classifier batch reader. The harness owns push and PR-body updates and must include exactly one line: Machine: built scripts/ios/launch_ui_timeline_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The reusable classifier batches staged and immutable parent guard reads per verification, removing per-guard Git startup by construction while retaining fresh index reads and the same repair semantics."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "// Batch guard blobs per verification; never cache the mutable index across retries."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-alert-action-deduplicates-accessibility-frames",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41419361700/job/125191583472",
+    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 7: merge origin/main first, then repair Launch Quality without weakening gates. The only failing native test is testProfileLogoutSignsOutFromPushedDetail. Its alert hierarchy exposes wrapper and child Buttons with the same action identifier, label and frame, while the descendant-based leaf predicate rejects the available Cancel action. Tently separately reports an AI-provider outage (060e9fa1-fb43-4178-95f3-9e6d424a3e3e).",
+    "mechanization": "Keep alert-scoped identifier, label, enabled and hittable admission, then collapse only identical physical frames before requiring exactly one action. Preserve the five-second wait, Cancel/session assertions and actual Log Out outcome. Extend the existing launch UI audit with mutations rejecting unscoped matching, missing admission, missing frame deduplication, ambiguous selection and missing outcomes. The audit fails against the original helper and passes with the repair. Extract existing interaction mutation cases into an imported mixin so the suite remains under 500 lines, and include that sibling in the existing Turbo test inputs. Update the historical guard anchor to the replacement identity check. Native XCTest execution remains unverified on this Linux host. The harness owns push and PR updates and must retain exactly one line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing native action selector can model one physical action by its alert scope, semantic identity, interactivity and exact frame. Deduplicating accessibility wrappers at that boundary prevents false ambiguity by construction while physically distinct actions still fail closed."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "!unique.contains(where: { $0.frame == action.frame })"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "vision-segmentation-cooperative-pool-starvation",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41406114043/job/125148772785",
+    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 6: repair the native launch-quality hang without weakening selectors or gates. The retained simulator log confirms callback.assigned and sheet.appear; the 07:49:41 stackshot shows all three Swift workers blocked in BackgroundRemovalService.personMask / VNControlledCapacityTasksQueue.dispatchGroupWait while the main thread is idle. Tently separately reports its AI-provider outage (de67d1f1-56fd-40c4-b9c7-806ba1a5635a), with no code findings.",
+    "mechanization": "Move the existing synchronous segmentation operation from Task.detached onto a serial Dispatch queue bridged by one checked throwing continuation. This prevents Vision waits from occupying the cooperative pool and propagates the original operation error exactly once. Extend the existing required launch UI audit with executor mutations rejecting detached tasks, synchronous dispatch, and concurrent queues; the production regression fails against the prior service and passes after the repair. Add native queue-execution, failure/recovery, and cancellation tests, retaining the original Vision integration case and every UI assertion. Current native execution remains unverified on this Linux host. origin/main is already an ancestor, so the required merge reports already up to date. The harness owns pushes and PR updates and must add exactly one line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing segmentation service owns the blocking Vision call. Dispatching that work on its own serial queue prevents cooperative-pool starvation by construction rather than lengthening native timeouts or retrying a hung presentation."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/BackgroundRemovalService.swift",
+      "anchor": "segmentationQueue.async {"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merged-project-keeps-parent-placement",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-95726c4f82 occurrence 22: merge origin/main without rebasing. Both parents added a different ProgressPhotoAttachSheet sibling, so the Xcode group conflict can drop one child while both file references remain. The diagnostic project pin conflicts on the merged digest. Tently reports an AI-provider outage and no source finding; do not bypass that gate.",
+    "mechanization": "Extend the merged-project membership check so a parent group or build-phase row is required even when its object definition survived. The new real-Git regression fails while the resolver accepts a digest of a project that kept the file reference and dropped the group row, and passes after the refusal. Preserve the hand-resolved workflow refusal. Let an auto-merged manifest keep a new glob in place of the enumerated inputs it matches, and still refuse any other dropped parent input. Keep both sheet siblings, record the outline attachment on weekly check-in success, and hold the sheet open while the graduated outline offer is visible. Use the reviewed digest of this merge's project. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The conflicted pin resolver already runs before a merge commit is accepted. Refusing a merged project that lost a parent group or build-phase row prevents that dropped file from becoming the committed diagnostic digest."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "A parent group or build-phase entry must remain even when its definition survived."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-audit-loads-every-check-sibling",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-95726c4f82 occurrence 19: merge origin/main without rebasing. Both parents extracted another launch UI check into a different launch_ui sibling, and a hardcoded pair drops the weekly photo home check or the timeline-day check. Turbo inputs listed each sibling by name, so the next extraction conflicts again. Tently reports an AI-provider outage and no source finding; do not bypass that gate.",
+    "mechanization": "Extend the existing fail-closed sibling loader to import every launch_ui_*.py module that exports contribute, and fail when that hook is missing or no check sibling exists. Point the shared-lib Turbo input at launch_ui_*.py so the next sibling is cached without another manifest line. The launch-audit behavior tests reject a third sibling that is skipped, a sibling without contribute, and an empty directory; they pass once discovery loads home and timeline. Delete the duplicate timeline calendar extraction so the check runs once. Rebuild the source map from the index and union the correction ledger with the existing resolvers. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The audit loader owns which check siblings run. Discovering every launch_ui module that exports contribute keeps the next extraction without editing the parent call list."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "Load every launch_ui check sibling. A missing contribute fails closed."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "diagnostic-pin-conflict-uses-reviewed-merged-digest",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-95726c4f82 occurrence 17: merge origin/main without rebasing. The diagnostic workflow conflicts only on the project.pbxproj pin after weekly photo membership and wireframe membership both land. Tently reports an AI-provider outage and no source finding; do not bypass that gate.",
+    "mechanization": "Extend the existing source-map resolver so --reviewed-project-sha256 replaces a pin-only workflow conflict with the explicit digest of the staged merged project, rebuilds a conflicted projection from the index, and leaves the correction ledger untouched. The real-Git regression fails on the previous resolver, which stops before the digest is applied, and passes after the extension. Wider workflow conflicts, a mismatched digest, a dirty project, a manual workflow edit, and any other unmerged path still fail with the files and index unchanged. The no-flag path still refuses to derive a digest. Use the extended resolver for this merge, then the existing ledger union. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The resolver owns the diagnostic project pin during a merge. It writes only an explicit digest that matches the staged merged project, and only when the workflow conflict is that pin."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Replace a pin-only diagnostic workflow conflict with the explicit reviewed project digest."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "weekly-photo-prompt-keeps-provenance-chip-tappable",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 4: Launch Quality run 41336887265 fails testProgressShareKeepsSelectedMetricAndVisibleValue because the weekly photo prompt sits between the photo pager and the provenance chip, pushing the chip under the dock on a 393 by 852 phone. The tap reaches the dock, so the provenance sheet never appears. Tently reports an AI-provider outage and stays unchanged.",
+    "mechanization": "Render the weekly photo prompt inside the photo number block immediately after the provenance chip, so the chip keeps its pre-prompt position above the dock and the prompt still shows without replacing the check-in dock. Extend the existing launch UI regression audit, through its home-interaction sibling, to reject a prompt that renders before the chip. That mutation fails on the old order and passes after the move. Origin/main is already merged as d28b97ba6. Native XCTest stays unverified on this Linux host. The harness owns push and PR-body edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The home column renders the prompt after the provenance chip, so the chip stays above the dock instead of being pushed into the check-in control."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "Place the weekly photo prompt after the provenance chip so the chip stays above the dock."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "synthetic-chat-typing-refocuses-dropped-keyboard",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 4: Launch Quality run 41336887265 fails testHomeV2AskSyntheticCancelledTurnRecovers because submitSyntheticChatQuestion calls typeText after the keyboard drops. The composer holds only S and event synthesis aborts the test before the retry loop. Tently reports an AI-provider outage and stays unchanged.",
+    "mechanization": "Inside the synthetic character loop, refocus the composer and wait for the keyboard when it is absent, then enter the next character. Stop the loop without sending a partial question if the keyboard never returns. Extend the existing launch UI regression audit so a character loop that enters text before checking keyboard.exists is rejected. The mutation fails when that check is removed and passes with it. The harness owns push and PR-body edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The character loop refocuses and confirms the keyboard before each character, so a dropped keyboard no longer aborts event synthesis on the first unfocused character."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "Refocus the composer when the keyboard drops before each synthetic character."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "stats-truth-card-tap-opens-detail",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-cc900b961c occurrence 6: Launch Quality run 41357153982 fails testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance. The weight card tap is synthesized and the app returns to idle immediately, so metric_detail_headline never appears. The same test passed on run 41336887265 before the wireframe merge. Tently reports an AI-provider outage and no source finding.",
+    "mechanization": "Keep the decorative stats chart from hit-testing, and give the data card a high-priority tap that runs the same detail handler when the list drag takes the button touch. Extend the existing launch UI regression audit so removing either the chart's allowsHitTesting(false) or that tap is rejected. Those mutations fail on the old card and pass after this change. Origin/main is already merged as 5dea9cc3b. Native XCTest stays unverified on this Linux host. The harness owns push and PR-body edits and must add exactly one line: Machine: built scripts/ios/launch-ui-regression-audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The card chart no longer takes the touch, and the card's own tap opens metric detail even when the surrounding drag recognizer claims the button."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "The stats card tap must open details even when the list drag takes the touch."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "company-size-growth-stays-within-baseline",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-355919b0cb occurrence 4: merge origin/main without rebasing. Company guards fail because MetricSummaryCard.swift grew 908 -> 924. Tently reports an AI-provider outage and no source finding; do not bypass that gate.",
+    "mechanization": "Extend the existing correction ratchet with a company size-500 scanner that uses the same count, extensions, skip rules, and size baseline as the company guard. Baselined files may not grow and new files over 500 lines fail. Move the DEBUG metric-card fixture into MetricSummaryCardFixture.swift so the card stays at or under its recorded 908 lines, and register that fixture in the app target. The behavior test fails when the card grows 908 -> 924 and passes when it stays within the baseline. Do not raise the company size baseline. The harness owns push and PR-body updates and must add exactly one line: Machine: built packages/shared-lib/scripts/company-size-ratchet.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Splitting these three files clears the current company size failures, but the product modules cannot stop a later edit from growing another source file past the company size baseline."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The correction ratchet runs the company size scanner on the git snapshot, so a baselined file that grows or a new file over 500 lines fails before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/company-size-ratchet.mjs",
+      "anchor": "Baselined files may not grow.",
+      "ratchet": {
+        "baseline": "packages/shared-lib/company-size-ratchet-baseline.json"
+      }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "correction-ratchet-reports-complete-finding",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41396587009",
+    "correction": "PR #1699 / LYB-312, fix-red-95726c4f82 occurrence 22: merge origin/main first and repair the rejected merge group. Both runs 41396422059 and 41396587009 fail the correction ratchet because the catalog on main grew from its 854-line company baseline to 944 lines. The runner discards the scanner detail, so CI reports only the path. Tently separately reports an AI-provider outage; retain that gate.",
+    "mechanization": "Extend the existing correction-ratchet runner to include the scanner finding key in rejection diagnostics, retaining actual and allowed values for every registered rule. A behavioral regression executes the real company-size scanner: 944 lines against an 854-line baseline must fail with both counts, a source split must pass, and an unbaselined sibling at 501 lines must fail with its limit. Failed checks preserve baselines. The diagnostic regression fails before the runner change and passes after it. Use the strengthened runner to diagnose this instance, then move the unchanged catalog schemas into catalog-schema.ts and re-export them through catalog.ts. Keep the company and correction baselines unchanged. The harness owns pushing and PR-body updates and must add exactly one line: Machine: built packages/shared-lib/scripts/correction-ratchet.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared ratchet runner owns rejection formatting. Including the complete finding key there prevents loss of each scanner's actual and allowed values for all current and future rules."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-ratchet.mjs",
+      "anchor": "${finding.path}: ${finding.key}"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "catalog-split-preserves-public-export-identity",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-95726c4f82 occurrence 22: merge origin/main without rebasing. Concurrent catalog extractions conflict in catalog.ts and the newly added catalog-schema.ts. Keeping the branch loader alongside main's schema loader silently retains two implementations behind the public API. Tently separately reports an AI-provider outage without a code finding; retain that gate.",
+    "mechanization": "Extend the existing required web catalog contract tests to require identical runtime exports through the public catalog and its schema module, and every base and reviewed variant through the public library. The export-identity test fails when the branch catalog is combined with main's schema, even though the existing 19 behavior tests pass. Resolve both files to main's complete source split and run the same regression successfully. Weekly photo code remains intact. The harness owns pushes and PR-body edits and must add exactly one machine line: Machine: built apps/web/src/lib/training/catalog.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A source split alone cannot prevent a later merge from retaining a second implementation in its public barrel; TypeScript permits a local export to shadow a star re-export."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required catalog suite compares every schema runtime export by identity and the complete base/reviewed record list, rejecting duplicated implementations or dropped records after a source split."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/catalog.test.ts",
+      "anchor": "keeps one schema implementation behind every public catalog export after a source split"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "ui-test-offline-fixture-survives-path-update",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42351767035/job/128341499431",
+    "correction": "PR #1699 / LYB-312, fix-red-5df69c1e5f occurrence 23: Launch Quality run 42351767035 fails testLaunchQualityGateCapturesTimelineSurfaces. After saving the 2099-12-27 outcome, launch_next_action is Record a fresh measurement instead of Retry sync. The photo HUD fixture forces offline, then a satisfied NWPath update clears it, and a nil freshness window classifies the seeded readings as stale. CI Summary fails only because Launch Quality failed.",
+    "mechanization": "Keep every UI fixture that already forces offline on that path: applyNetworkPathStatus returns offline and disconnects before it can adopt a satisfied path or call syncAll. The dated-timeline fixture still sets offline at launch. Extend the existing launch UI audit so dropping the photo HUD marker, the early return, or the path delegation is rejected. Those mutations fail on the old handler and pass after the repair. The shared-lib suite executes the audit. Native XCTest remains unverified on this Linux host. origin/main is already merged as 2d7a52e67. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The path handler is the only writer that can clear the fixture offline flag. Returning before it adopts path status keeps Retry sync for the dated-timeline fixture by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "A UI-test offline fixture must survive a satisfied network path."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-ledger-prewrite-sample-refuses-stale-index",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-e3b0c44298 occurrence 83: merge origin/main without rebasing and keep weekly photo check-in, both parents' correction receipts, and the pinned customer-voice privacy scan. The resolver's last index read was also its verdict, so a writer that landed during that read could still authorize a stale ledger replacement.",
+    "mechanization": "Extend the existing correction classifier to sample the index after validation and compare the index, both merge parents, and the working ledger again before replacement. Six real-Git controls for unstaged and staged resolution returned success before the sample and refuse afterward, preserving the other writer and retrying cleanly. The existing twelve concurrency cases still pass. Use the extended --resolve-merge . --stage path for this merge. Keep main's pinned clock, forwarded timestamp, and complete stored-row health sentinel. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The resolver owns the only write of the merged ledger. Sampling the index and comparing it again before replacement refuses a stale resolution and preserves a concurrent edit by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "The sample itself is not a verdict: a writer can land while it is read."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "source-map-repair-regular-index-inputs",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-e3b0c44298 occurrence 84: merge origin/main without rebasing, preserve weekly photo check-in and both parents' test cache inputs, and repair the generated source-map conflict with an extended reusable machine. A staged source-map rebuild must not turn symlink blobs into regular source evidence.",
+    "mechanization": "Extend the existing source-map resolver's staged reader to require regular stage-zero registry, entry-point, fingerprint and imported-source files. Six real-Git symlink regressions fail before the fix and pass afterward, preserving projection bytes and the index on refusal; two executable-file cases still resolve successfully. The existing required Detect Changes merge-aware lint suite imports these cases without workflow changes. Use --staged to resolve this merge's projection. The harness owns pushing and PR-body updates and must replace the existing machine line with exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver owns source snapshot construction before writing and staging the projection. Validating Git index modes prevents symlink blobs from becoming regular source fingerprints by construction, even when regular working files conceal the staged mode."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Source-map snapshots must retain regular stage-zero inputs, never symlink blobs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-project-union-verifies-auto-merged-inputs",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1699",
+    "correction": "PR #1699 / LYB-312, fix-red-e3b0c44298 occurrence 86: merge origin/main without rebasing, preserve weekly photo check-in, and resolve conflicts in the merge-repair tools, diagnostic project pin, generated source map, company-size scanner and correction receipts. The existing project union only admits unmerged index stages even when Git already merged additive membership. Incoming main also updates the diagnostic audit and adds a timeout-helper pin independently of the project pin.",
+    "mechanization": "Extend the existing --union-project path to verify regular stage-zero projects against the same insertion-only union from immutable merge parents and one merge base. Read-only verification refuses a different staged project or unstaged project edits. Three real-Git regressions fail before the extension and pass afterward; use the extended verifier on this merge. Share the existing parent placement/reference guard through pbx_union.py to keep the resolver within 500 lines. Extend pin-only conflict resolution symmetrically so independent incoming workflow additions survive when the branch changed only the project pin, while manual edits and wider conflicts still fail. Retain both parents tests and correction receipts and normalize the shared company-size scanner classification. The existing required Detect Changes merge-aware lint suite imports all new regressions. The harness owns pushing and PR-body updates and must replace the existing machine line with exactly one line: Machine: built scripts/pbx_union.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing merge resolver owns project verification and pin resolution. Comparing staged membership to the immutable additive union prevents dropped parent input by construction before accepting a reviewed diagnostic digest."
+      }
+    },
+    "guard": {
+      "path": "scripts/pbx_union.py",
+      "anchor": "Verify auto-merged projects against the same immutable additive parent union."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "vercel-blocked-production-deploy-fails-fast",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42581415040",
+    "correction": "LYB Owner reports three consecutive main Deploy runs cancelled while Vercel production deployments remain BLOCKED before building. Web must fail fast with a clear owner-action error rather than waiting for cancellation; preserve the Deploy Summary gate.",
+    "mechanization": "Submit the prebuilt production deployment with --no-wait and inspect its exact URL through the team-scoped Vercel API before publishing success output. Fail immediately on BLOCKED and other terminal failures, fail closed on inspection errors, and bound pending-state polling. Required shared-lib tests execute the real workflow step against a fake CLI/API and cover pending, READY, BLOCKED, terminal, timeout and inspection failures. The BLOCKED workflow regression fails before the fix and passes after it. Tim must resolve the external hold; two clean main deploys remain required. The harness owns pushing and PR edits; include Machine: built .github/scripts/wait-vercel-deployment.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The deployment controller can stop waiting in the CLI and verify readiness itself, ensuring BLOCKED becomes an explicit failure by construction. It cannot resolve a provider-side restriction."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/wait-vercel-deployment.mjs",
+      "anchor": "if (state === 'BLOCKED')"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-conflicted-source-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1763",
+    "correction": "PR #1763, fix-red-1423773703 occurrence 57 in 14 days: merge origin/main without rebasing, retain the ElevenLabs 3.0.81 bump, and repair stale source-projection failures in Detect Changes and parity. Extend the existing dependency-repair machine and leave push and PR updates to the harness. Vercel separately reports Deployment was blocked.",
+    "mechanization": "Extend both existing dependency repair modes to regenerate a conflicted projection from staged sources only after frozen lockfile verification. Real-Git regressions cover successful merged-source reconstruction, failed verification preserving conflict stages and artifact bytes for retry, and refusal of unresolved source conflicts. Four cases fail before the fix and pass afterward; the two source-conflict controls remain passing. The existing required Detect Changes merge-aware local lint suite imports these tests. Use --verify-lockfile for this already updated lockfile without changing dependency resolutions. The harness must put exactly one machine line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency resolver owns verification and generated-output staging. Separating a regenerable source-map conflict from unresolved dependency inputs permits one verified repair command without requiring manual artifact resolution; frozen failures and actual source conflicts still fail closed."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Rebuild a conflicted projection only after frozen dependency verification."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-audit-expired-budget-fails-closed",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
+    "correction": "PR #1774 / LYB-344, fix-red-5df69c1e5f occurrence 23: merge origin/main first and repair failed checks without removing tests or changing gates. Run 42695073821 passed the native build and 2277 unit cases, then exhausted the 2760s audit budget during the canvas UI journey after a 1168s prefix. Vercel independently reports Deployment was blocked. The fetched origin/main is already an ancestor of this branch; the required merge is a no-op.",
+    "mechanization": "Extend the existing launch-quality audit budget controller to use 2940s within the unchanged 52-minute step, retaining 180s for finalization, all selectors, per-test bounds and the 1800s UI cap. Refuse exhausted budgets instead of granting another minute, and propagate that refusal before starting a build, test command or launch probe. Virtual-clock regressions replay the slow prefix and expired budgets; the old runner fails four assertions and the repaired runner passes. Execute the extended deadline suite in the existing required shared-lib test and native preflight; include its source and the real step policy in Turbo inputs. Refresh the audit-only diagnostic hash and its routing-test copies with the existing explicit-digest pin resolver; retain all trust checks and workflow bounds. The harness owns pushing and PR edits and must add exactly one line to the PR body: Machine: built scripts/ios/launch-quality-audit.sh. Current-head native execution remains for the real macOS runner and the Vercel provider hold remains external.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner owns phase admission and budget propagation. Refusing exhausted budgets before process launch prevents commands from obtaining fresh time after the audit deadline, while the regression suite verifies useful execution and the unchanged outer step reserve."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-audit.sh",
+      "anchor": "echo \"launch-quality audit deadline exhausted\" >&2"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-deadline-fixtures-match-macos-shell",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1774",
+    "correction": "PR #1774 / LYB-344, fix-red-5df69c1e5f occurrence 24: repair the failed native launch preflight without weakening gates. Run 42705530320 fails test_expired_budget_reaches_build_and_test_callers_even_inside_a_condition because Bash 3.2 treats the fixture's empty COMMON_XCODEBUILD_ARGS array as unset under nounset. CI Summary reflects that failure. The requested merge of origin/main is already up to date. Vercel independently reports Deployment was blocked.",
+    "mechanization": "Extend the existing deadline fixture with representative populated command/settings arrays and live, exactly expired and over-budget cases for both build and test callers inside a conditional. Assert the one-second remaining timeout, preserved spaced argument and signing setting, and refusal before any command or probe starts after expiry. The existing required shared-lib suite and launch-quality preflight execute this guard. Replay the original suite and repair with GNU Bash 3.2 built in /tmp: the original reproduces the CI failure and the repair passes all 13 cases; Bash 5 also passes. No workflow, runner budget, selector or product behavior changes. The harness owns pushing and PR-body edits and must add exactly one line: Machine: built scripts/ios/test_xcodebuild_command_timeout.py. Native execution on the repaired head remains for macOS CI; the Vercel provider hold is external.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Production already supplies populated arrays. Changing the runtime budget controller cannot correct the test-only empty-array fixture without introducing unrelated behavior."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing executed shell fixture can represent the production arguments on macOS Bash and assert both useful command execution and deadline refusal before native work starts."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_xcodebuild_command_timeout.py",
+      "anchor": "# Model the runner's populated arrays: Bash 3.2 treats empty arrays as unset."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-reachability-swipe-avoids-wireframe-rotation",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42755703124",
+    "correction": "LYB-214: PR #1776 fixed the 600s cold-build timeout, but diagnostic run 42755703124 on main fails the composition case. Every reachability drag starts at y=643.67 inside the wireframe, rotates it, and leaves FFMI at y=874.33. The other six selected cases pass.",
+    "mechanization": "Move the existing viewport scroll helper's upward start from a 40pt to a 12pt bottom inset, into the visible strip below the 4:5 card, retaining the distance cap, downward start, all six attempts, full containment and hittability assertions. Extend the existing required wireframe suite with the failing run geometry, reading the actual helper offsets and checking the start is outside the avatar and both directions stay inside the viewport. This regression fails on the old helper and all five family cases pass after the repair. Existing Turbo inputs already include native UI test sources. No workflow, product interaction, timeout, selector or qualification change. Native XCTest remains unverified on this Linux host. The harness owns pushing and PR edits and must include Machine: built packages/shared-lib/src/wireframe-avatar-family.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The wireframe intentionally owns vertical rotation, as documented for the body stage. Altering product gesture ownership would change that behavior to compensate for a test issuing its scroll gesture inside the rotation surface."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required wireframe suite can read the real native helper offsets and replay the retained failing viewport and card geometry, rejecting scroll origins inside the rotation surface and endpoints outside the viewport."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/wireframe-avatar-family.test.ts",
+      "anchor": "starts Home reachability swipes below the wireframe rotation surface"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "company-size-growth-stays-within-baseline",
