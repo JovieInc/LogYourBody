@@ -140,6 +140,8 @@ def check_profile_logout_presentation(root: Path, violations: list, violation) -
         ".contentShape(Rectangle())",
     )
     required_screen = (
+        "private let authManager: AuthManager",
+        "self.authManager = authManager",
         "@State private var showingLogoutConfirmation = false",
         '"Log out of LogYourBody?"',
         "isPresented: $showingLogoutConfirmation",
@@ -149,7 +151,7 @@ def check_profile_logout_presentation(root: Path, violations: list, violation) -
     )
     if (any(token not in inside for token in required_inside)
             or ".frame(minHeight: SettingsLayout.rowMinHeight, alignment: .leading)" in row
-            or "ProfileLogoutScreen { showingLogoutConfirmation in" not in before_screen
+            or "ProfileLogoutScreen(authManager: authManager) { showingLogoutConfirmation in" not in before_screen
             or "$showingLogoutConfirmation" in before_screen
             or "@State var showingLogoutConfirmation" in text_for(prefs_path)
             or "showingLogoutConfirmation.wrappedValue = true" not in text_for(account_path)

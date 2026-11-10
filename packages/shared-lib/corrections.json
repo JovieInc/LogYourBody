@@ -7427,5 +7427,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "profile-logout-injects-existing-auth-manager",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42802181710",
+    "correction": "PR #1779 / LYB-365, fix-red-15a11867bc occurrence 1: merge origin/main first and repair CI Summary, iOS Static Audits and Vercel without weakening gates. The required merge is already up to date at e4732bf41. Run 42802181710 rejects the new @EnvironmentObject in ProfileLogoutScreen as a combine-observation-wrapper violation; CI Summary reflects that failure. Launch Quality passed on the prior head. Vercel independently reports Deployment was blocked.",
+    "mechanization": "Pass the existing PreferencesView auth manager explicitly into ProfileLogoutScreen as a private let; the child only invokes logout and does not read observable properties. Keep the pushed screen state, full row hit target, alert actions, native Cancel/Log Out journey and Apple session canonicalization. Extend the existing required launch audit to retain parent injection, initializer storage and logout dispatch. Mutation cases reject a replacement singleton, an observation wrapper and incorrect logout dispatch. The updated regression and unchanged Swift architecture guard both fail before the product repair and pass afterwards, with no baseline or workflow edits. The harness owns pushing and PR edits and must include Machine: built scripts/ios/launch_ui_home_interaction_audit.py. Native execution on the final head remains for macOS CI; the Vercel provider hold remains external.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Requiring the existing auth manager in the child initializer removes the unnecessary observation dependency by construction and preserves the exact parent session for logout. The existing architecture ratchet and launch audit prevent reintroduction while retaining native outcome checks."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Views/PreferencesView+Header.swift",
+      "anchor": "init(authManager: AuthManager, @ViewBuilder content: @escaping (Binding<Bool>) -> Content)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

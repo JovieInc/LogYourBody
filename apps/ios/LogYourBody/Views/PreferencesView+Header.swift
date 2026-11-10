@@ -19,7 +19,7 @@ extension PreferencesView {
                 accessibilityIdentifier: "settings_profile_link",
                 titleAccessibilityIdentifier: "home_v2_settings_profile"
             ) {
-                ProfileLogoutScreen { showingLogoutConfirmation in
+                ProfileLogoutScreen(authManager: authManager) { showingLogoutConfirmation in
                     accountSection(showingLogoutConfirmation: showingLogoutConfirmation)
                     profileSection
                 }
@@ -315,11 +315,12 @@ extension PreferencesView {
 /// never appears after the row action. confirmationDialog on this screen
 /// presents as a popover and omits Cancel.
 private struct ProfileLogoutScreen<Content: View>: View {
-    @EnvironmentObject private var authManager: AuthManager
+    private let authManager: AuthManager
     @State private var showingLogoutConfirmation = false
     private let content: (Binding<Bool>) -> Content
 
-    init(@ViewBuilder content: @escaping (Binding<Bool>) -> Content) {
+    init(authManager: AuthManager, @ViewBuilder content: @escaping (Binding<Bool>) -> Content) {
+        self.authManager = authManager
         self.content = content
     }
 

@@ -98,6 +98,26 @@ class HomeInteractionAuditTests:
                 "@State private var unusedLogoutConfirmation = false",
             ),
             (
+                "Views/PreferencesView+Header.swift",
+                "ProfileLogoutScreen(authManager: authManager)",
+                "ProfileLogoutScreen(authManager: AuthManager.shared)",
+            ),
+            (
+                "Views/PreferencesView+Header.swift",
+                "self.authManager = authManager",
+                "self.authManager = AuthManager.shared",
+            ),
+            (
+                "Views/PreferencesView+Header.swift",
+                "private let authManager: AuthManager",
+                "@EnvironmentObject private var authManager: AuthManager",
+            ),
+            (
+                "Views/PreferencesView+Header.swift",
+                "await authManager.logout()",
+                "await AuthManager.shared.logout()",
+            ),
+            (
                 "Views/PreferencesView+AccountSection.swift",
                 "showingLogoutConfirmation.wrappedValue = true",
                 "showingLogoutConfirmation.wrappedValue = false",
