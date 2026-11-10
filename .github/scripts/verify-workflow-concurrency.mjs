@@ -2,6 +2,8 @@
 
 import { readFileSync } from 'node:fs';
 
+import { scan as scanAiReviewBoundary } from './verify-ai-review-boundary.mjs';
+
 const workflowFiles = [
   '.github/workflows/ci.yml',
   '.github/workflows/deploy.yml',
@@ -43,6 +45,15 @@ for (const file of workflowFiles) {
   if (/cancel-in-progress:\s*true\b/.test(workflow)) {
     failures.push(`${file} must not use unconditional cancel-in-progress: true.`);
   }
+}
+
+// Merge gates stay deterministic: AI reviewers (Sentry Seer, Warden, ...) stay
+// advisory. Any .github file pairing a model-backed reviewer with a
+// merge-blocking signal fails Detect Changes, which CI Summary requires.
+for (const violation of scanAiReviewBoundary('.')) {
+  failures.push(
+    `${violation.file}: AI reviewer must stay advisory (matched "${violation.signal}").`
+  );
 }
 
 if (failures.length) {
