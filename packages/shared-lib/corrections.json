@@ -7391,5 +7391,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-runtime-warning-metadata-is-not-test-execution",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42772522859",
+    "correction": "LYB-214: After the cold-build and scroll-origin repairs merged, main run 42772522859 passed all seven selected cases exactly once, but the receipt exited 65 because Xcode 26.3 attached Runtime Warning leaves to three passing cases and the validator counted that metadata as unsupported child executions.",
+    "mechanization": "Extend the existing diagnostic catalogue validator to distinguish named Runtime Warning leaves without a result from execution nodes while retaining the complete official catalogue verbatim. Preserve all seven identities, command exits, one-attempt policy, native start/terminal cross-checks, nonqualifying status and rejection of nested, failed, unknown or repeated executions. Add a real-dispatcher regression using the observed warning schema and negative controls for warnings hiding executions or invalid native events. The regression fails with the prior validator and passes after the repair. Refresh only the diagnostic helper's reviewed dependency digest. Machine: built scripts/ios/launch-quality-diagnostic-seven.sh. Native execution on the final head remains for macOS CI; the harness owns pushing and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing receipt validator owns catalogue interpretation and can distinguish warning metadata from execution evidence without changing product behavior or relaxing test execution requirements."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-diagnostic-seven.sh",
+      "anchor": "# Xcode adds named Runtime Warning leaves to passing cases. Keep them"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
