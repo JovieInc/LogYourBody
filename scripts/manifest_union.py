@@ -441,14 +441,27 @@ def merge_ledger(root, resolve_staged, staged_bytes, git_bytes):
     path = repository_docs.local(root, output)
     original = path.read_bytes() if path.exists() else None
     index = git_bytes(root, "ls-files", "--stage", "--", output)
+    source_args = ("ls-files", "--stage", "-z", "--", ".", ":!" + LEDGER, ":!" + output)
+    source_index = git_bytes(root, *source_args)
     # Rendering refusals preserve concurrent projection edits; only roll back our completed render.
     resolve_staged(root)
+    rendered = path.read_bytes() if path.exists() else None
+    rendered_identity = path.lstat()[:3]  # File mode, inode and device, without following links.
+    rendered_index = git_bytes(root, "ls-files", "--stage", "--", output)
     try:
         subprocess.run(
             ["node", str(Path(__file__).with_name("correction-classifier.mjs")),
              "--resolve-merge", str(root), "--stage"], cwd=root, check=True,
         )
-    except (ValueError, OSError, subprocess.CalledProcessError):
+    except (ValueError, OSError, subprocess.CalledProcessError) as error:
+        # Rollback owns only our rendered projection, never another writer's edits.
+        # Identical bytes do not authorize rollback through a replaced file or symlink.
+        current_identity = path.lstat()[:3] if path.exists() or path.is_symlink() else None
+        if current_identity != rendered_identity:
+            raise ValueError("source projection changed during ledger validation; review and retry") from error
+        current = path.read_bytes() if path.exists() else None
+        if current != rendered or git_bytes(root, "ls-files", "--stage", "--", output) != rendered_index:
+            raise ValueError("source projection changed during ledger validation; review and retry") from error
         # A refused ledger repair restores the projection and its conflict stages.
         if original is None:
             path.unlink(missing_ok=True)
@@ -457,3 +470,7 @@ def merge_ledger(root, resolve_staged, staged_bytes, git_bytes):
         subprocess.run(["git", "update-index", "--force-remove", "--", output], cwd=root, check=True)
         subprocess.run(["git", "update-index", "--index-info"], cwd=root, input=index, check=True)
         raise
+    # The classifier may start after a source edit; retain the render's source snapshot.
+    if (git_bytes(root, *source_args) != source_index
+            or git_bytes(root, "ls-files", "--stage", "--", output) != rendered_index):
+        raise ValueError("source index changed during ledger validation; review staged inputs and retry")

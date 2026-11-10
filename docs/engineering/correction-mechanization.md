@@ -127,6 +127,12 @@ each retry reads the index and guard sources afresh.
 If the staged index changes during projection rendering, refusal preserves the
 other writer's projection bytes and index entries; rollback begins only after
 the resolver completes its own render. Review the inputs and retry.
+If ledger validation then fails, rollback also verifies that the rendered projection
+bytes and index entry are unchanged. Concurrent working or staged projection edits
+remain intact; review and stage the inputs before retrying the same command.
+Rollback also checks the rendered file's mode, inode and device without following
+links. A concurrent replacement, symlink or permission change refuses rollback
+even when the projection bytes match, preserving the other writer's file and index.
 The reviewed diagnostic project-pin resolver also retains each newly added parent
 file's group and build-phase references; retaining a declaration alone is insufficient.
 For a documentation rewrite conflicting with incoming new sections, run
@@ -172,6 +178,11 @@ retry the same command. Unrelated unstaged edits remain untouched.
 
 Recursive reconstruction reads each immutable guard blob once per resolution;
 the cache ends with that invocation, so retries never reuse mutable index evidence.
+
+The combined `--merge-ledger` repair also checks that the source index stays
+unchanged between projection rendering and ledger classification. A concurrent
+source change refuses success without reverting the reviewed source or classified
+ledger; rerun the same command to rebuild fingerprints from current staged inputs.
 
 The readiness check forces text inspection even when Git attributes mark a staged
 file as binary, so those attributes cannot conceal unresolved conflict markers.

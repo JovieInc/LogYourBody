@@ -1,27 +1,5 @@
 [
   {
-    "fingerprint": "launch-quality-enclosing-budget-follows-source-caps",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1780",
-    "correction": "PR #1780 / LYB-160 repair, fix-red-d5dac7802d occurrence 4 in 14 days: merge origin/main first without rebasing and fix Detect Changes and CI Summary while retaining the cold-prefix launch-quality budget. Run 42818695019 fails because release-check-budget.test.mjs expects the former 64-minute job cap instead of the 69-minute cap. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR edits.",
-    "mechanization": "Extend the existing required release budget guard to derive enclosing limits from the actual audit deadline, xcodebuild finalization grace, launch and performance step caps, and existing four-minute setup allowance. Replace the stale fixed job-cap assertion with these relationships. Negative controls reject insufficient step/job budgets and a deadline increase without a matching step increase, while a coordinated increase passes. The original guard fails locally with 69 !== 64; the expanded guard passes on this PR and rejects removal of its enclosing checks. The fetched origin/main is already an ancestor. The harness must add exactly one PR-body line: Machine: built .github/scripts/release-check-budget.test.mjs. No native limits, selectors, checks or provider controls are relaxed. Vercel remains externally blocked; macOS execution remains unverified on this Linux host.",
-    "classification": {
-      "codebase": {
-        "feasible": false,
-        "rationale": "GitHub Actions job and step caps and the audit command deadline belong to separate workflow and shell sources. A repair-local production abstraction would not prevent independently edited configuration from drifting; the existing required static guard can enforce their relationship without introducing another timeout configuration source."
-      },
-      "static": {
-        "feasible": true,
-        "rationale": "The existing release-check-budget.test.mjs already runs in required Detect Changes on every diff. Deriving its enclosing-cap assertions from the canonical sources and exercising rejected and permitted changes prevents stale numeric expectations while still rejecting budgets that cancel native evidence."
-      }
-    },
-    "guard": {
-      "path": ".github/scripts/release-check-budget.test.mjs",
-      "anchor": "function assertLaunchQualityBudget(quality, audit)"
-    },
-    "level": "static",
-    "ruleId": "file-pattern-or-string"
-  },
-  {
     "fingerprint": "fix-red-1423773703",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1764",
     "correction": "PR #1764 repair, fix-red-1423773703 occurrence 44: merge origin/main without rebasing, preserve the jose 6.2.14 to 6.2.15 update, and repair CI Summary, Detect Changes and parity reporting a stale repository source map. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR updates.",
@@ -7455,6 +7433,118 @@
     "ruleId": "ci-invariant"
   },
   {
+    "fingerprint": "dce46b3396cd",
+    "source": "https://linear.app/jovie/issue/LYB-365",
+    "correction": "Tim bug report 2026-11-09 17:03Z, founder-thread-2026-11-09-lyb-apple-login-initialize: Apple sign-in succeeds after an app update, then an initialization toast prevents login from reaching onboarding or the app (LYB-365). Cover the post-auth initialization step and identify the actual error wording.",
+    "mechanization": "Extend the existing API configuration boundary to canonicalize the known HTTPS apex alias even when API_BASE_URL overrides the fixed default, keeping bearer session registration on the registry host without a redirect. Normalize the matching expected host in runtime and release generation, preserving unrelated endpoints and host-mismatch rejection. Two executable release-configuration regressions fail before the fix and all nine focused cases pass afterwards in the existing required shared-lib suite. Retain native request and rejection regressions in MobileProfileNamePayloadTests and endpoint policy cases in AuthConfigurationValidationTests; real Mac execution and exact-head coverage remain required. The exact source toast is Your LogYourBody account could not be initialized.; correlation with the reported production session remains unverified because this host has no Sentry credentials or connector. The harness owns push and PR operations. Machine: built apps/ios/LogYourBody/Utils/Configuration.swift.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Normalizing the known legacy alias before URLSession constructs authenticated API requests prevents cross-host redirect header loss by construction, including releases with stale API overrides."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Utils/Configuration.swift",
+      "anchor": "canonicalAPIBaseURL(stringValue(for: \"API_BASE_URL\", default: ProductRegistry.Hosts.api))"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "profile-logout-confirmation-hit-target",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42789771273",
+    "correction": "PR #1779 / LYB-365, fix-red-5df69c1e5f occurrence 13: merge origin/main without rebasing and repair Launch Quality and CI Summary. Run 42789771273 failed testProfileLogoutSignsOutFromPushedDetail at LogYourBodyUITests.swift:730 because tapping the center of settings_logout_button never presented Log out of LogYourBody?. The row hit target was the leading label, and confirmation state lived on the settings parent behind a NavigationLink destination. iOS Static Audits was cancelled after setup-swift produced no output for the rest of the 15-minute job; green runs of the same job finish in about 70 seconds. Vercel reports Deployment was blocked for this head and for the already merged preview a5ce469a7.",
+    "mechanization": "Extend the existing launch UI audit to require logout confirmation state and the alert on ProfileLogoutScreen, the row action to set that binding, and SettingsButtonRow to fill its hit target with contentShape. Removing the shape, shrinking the frame, dropping the screen state, or ignoring the binding fails the audit; the current sources pass. Retain the alert action identity check, both Cancel and Log Out outcomes, and the Apple session host canonicalization. The harness owns pushing and PR edits and must add exactly one line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py. Native execution remains for macOS CI. The Swift toolchain stall is external to the product change, and the Vercel preview block is a provider hold.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing launch UI audit already owns logout confirmation identity. Requiring the pushed screen to own the alert and the row to fill its hit target prevents a center tap from leaving the profile screen without a confirmation."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "The pushed profile screen owns logout confirmation and fills the row hit target."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "profile-logout-injects-existing-auth-manager",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42802181710",
+    "correction": "PR #1779 / LYB-365, fix-red-15a11867bc occurrence 1: merge origin/main first and repair CI Summary, iOS Static Audits and Vercel without weakening gates. The required merge is already up to date at e4732bf41. Run 42802181710 rejects the new @EnvironmentObject in ProfileLogoutScreen as a combine-observation-wrapper violation; CI Summary reflects that failure. Launch Quality passed on the prior head. Vercel independently reports Deployment was blocked.",
+    "mechanization": "Pass the existing PreferencesView auth manager explicitly into ProfileLogoutScreen as a private let; the child only invokes logout and does not read observable properties. Keep the pushed screen state, full row hit target, alert actions, native Cancel/Log Out journey and Apple session canonicalization. Extend the existing required launch audit to retain parent injection, initializer storage and logout dispatch. Mutation cases reject a replacement singleton, an observation wrapper and incorrect logout dispatch. The updated regression and unchanged Swift architecture guard both fail before the product repair and pass afterwards, with no baseline or workflow edits. The harness owns pushing and PR edits and must include Machine: built scripts/ios/launch_ui_home_interaction_audit.py. Native execution on the final head remains for macOS CI; the Vercel provider hold remains external.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Requiring the existing auth manager in the child initializer removes the unnecessary observation dependency by construction and preserves the exact parent session for logout. The existing architecture ratchet and launch audit prevent reintroduction while retaining native outcome checks."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Views/PreferencesView+Header.swift",
+      "anchor": "init(authManager: AuthManager, @ViewBuilder content: @escaping (Binding<Bool>) -> Content)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-rollback-preserves-concurrent-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1779",
+    "correction": "PR #1779 / LYB-365 repair, fix-red-e3b0c44298 occurrence 81 in 14 days: merge origin/main without rebasing, preserve Apple sign-in initialization and profile logout fixes, and resolve the correction-ledger conflict with a reusable machine. A ledger validation refusal after rendering can overwrite concurrent working or staged source-map edits during rollback.",
+    "mechanization": "Extend the existing --merge-ledger helper to snapshot its completed projection and index entry, then refuse rollback when either changed during ledger validation. Two real-Git regressions fail against the old helper because it restores old projection bytes and index stages; the extended helper preserves working-only and index-only changes, leaves the ledger untouched and supports reviewed retries. Existing required Detect Changes runs these cases through scripts/pre-commit-lint.test.mjs. Replay this actual merge with the extended resolver and retain both immutable parent ledgers. The harness owns push and PR operations and must add exactly one PR-body line: Machine: built scripts/manifest_union.py. Vercel reports Deployment was blocked, with no build error. The failed Actions run targets 4e0f283a and its observation-wrapper violation is already fixed by de516afa; current-head native execution and coverage remain for macOS CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper owns artifact rollback. Comparing the completed projection bytes and indexed entry before rollback prevents a refused ledger validation from erasing another writer's source-map changes by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "Rollback owns only our rendered projection, never another writer's edits."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-rollback-preserves-projection-file-identity",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1779",
+    "correction": "PR #1779 / LYB-365, fix-red-e3b0c44298 occurrence 82 in 14 days: merge origin/main without rebasing and repair the correction-ledger conflict with an extended reusable machine. Current-head iOS Static Audits also rejects two intentional HTTP URL literals in AuthConfigurationValidationTests with force_https; Vercel reports Deployment was blocked, without a build error.",
+    "mechanization": "Extend the existing --merge-ledger rollback guard to compare the rendered projection file mode, inode and device without following links before reading or restoring it. Identical bytes must not allow rollback through a concurrent symlink, replacement or permission change. Three real-Git regressions fail before the extension and pass afterward; the existing required Detect Changes suite imports them through scripts/pre-commit-lint.test.mjs. Use the extended resolver for this merge and retain both immutable parent ledgers. Construct the native negative HTTP endpoint cases with URLComponents, preserving both endpoint values and all assertions without changing the HTTPS rule. The harness owns push and PR operations and must add exactly one line to the PR body: Machine: built scripts/manifest_union.py. Current-head native execution and coverage remain for macOS CI; the Vercel deployment block remains external.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper owns rollback and can refuse it when the file identity or mode changed, even if the bytes and index match. This preserves another writer's projection and prevents restoration through a substituted symlink by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "Identical bytes do not authorize rollback through a replaced file or symlink."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-enclosing-budget-follows-source-caps",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1780",
+    "correction": "PR #1780 / LYB-160 repair, fix-red-d5dac7802d occurrence 4 in 14 days: merge origin/main first without rebasing and fix Detect Changes and CI Summary while retaining the cold-prefix launch-quality budget. Run 42818695019 fails because release-check-budget.test.mjs expects the former 64-minute job cap instead of the 69-minute cap. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR edits.",
+    "mechanization": "Extend the existing required release budget guard to derive enclosing limits from the actual audit deadline, xcodebuild finalization grace, launch and performance step caps, and existing four-minute setup allowance. Replace the stale fixed job-cap assertion with these relationships. Negative controls reject insufficient step/job budgets and a deadline increase without a matching step increase, while a coordinated increase passes. The original guard fails locally with 69 !== 64; the expanded guard passes on this PR and rejects removal of its enclosing checks. The fetched origin/main is already an ancestor. The harness must add exactly one PR-body line: Machine: built .github/scripts/release-check-budget.test.mjs. No native limits, selectors, checks or provider controls are relaxed. Vercel remains externally blocked; macOS execution remains unverified on this Linux host.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "GitHub Actions job and step caps and the audit command deadline belong to separate workflow and shell sources. A repair-local production abstraction would not prevent independently edited configuration from drifting; the existing required static guard can enforce their relationship without introducing another timeout configuration source."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing release-check-budget.test.mjs already runs in required Detect Changes on every diff. Deriving its enclosing-cap assertions from the canonical sources and exercising rejected and permitted changes prevents stale numeric expectations while still rejecting budgets that cancel native evidence."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/release-check-budget.test.mjs",
+      "anchor": "function assertLaunchQualityBudget(quality, audit)"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
     "fingerprint": "launch-quality-cold-prefix-keeps-ui-hang-cap",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42795533093",
     "correction": "LYB-160: Post-merge Launch Quality on main run 42795533093 exited 124. The cold hosted prefix reached UI tests at 1375s, the 2940s audit deadline left 1565s, and xcodebuild was killed while selected UI cases were still passing. The same SHA's retry finished those UI cases in 1697s and the report job recorded a pass, but the failed first job kept the workflow red.",
@@ -7468,6 +7558,24 @@
     "guard": {
       "path": "scripts/ios/launch-quality-audit.sh",
       "anchor": "Keep the 1800s UI hang cap after a cold hosted prefix."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-render-classifier-source-index-handoff",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1780",
+    "correction": "PR #1780 / LYB-160 repair, fix-red-e3b0c44298 occurrence 85 in 14 days: merge origin/main without rebasing, preserve the launch-quality cold-prefix deadline repair, and resolve the correction-ledger conflict with an extended reusable machine. A source edit staged between projection rendering and classifier startup can make ledger validation succeed with stale source fingerprints.",
+    "mechanization": "Extend the existing --merge-ledger helper to retain the source index from before rendering through successful ledger classification, excluding only the ledger and checking the generated projection separately. A real-Git regression stages a source change before classifier startup: the old helper reports success with stale fingerprints, while the extended helper refuses success, preserves the reviewed source and classified parent receipts, and regenerates the correct fingerprint on retry. The existing required Detect Changes suite imports this regression through scripts/pre-commit-lint.test.mjs. Use the extended helper for this merge and verify coverage against both immutable parents. The harness owns push and PR operations and must add exactly one PR-body line: Machine: built scripts/manifest_union.py. GitHub CI and Launch Quality passed on the original PR head; Vercel reports Deployment was blocked without a build failure. No Vercel credentials are available on this host; current-head hosted and native evidence remain for the harness.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing combined resolver owns projection rendering and ledger validation. Retaining and comparing the staged source inputs across that handoff prevents a successful repair verdict for fingerprints generated before another writer staged a source change."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "The classifier may start after a source edit; retain the render's source snapshot."
     },
     "level": "codebase",
     "ruleId": "code-prevention"

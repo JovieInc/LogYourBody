@@ -37,6 +37,7 @@ describe('iOS release observability guard', () => {
     });
 
     return {
+      config: readFileSync(join(outputDir, 'LogYourBody', 'Config.xcconfig'), 'utf8'),
       observability: readFileSync(
         join(outputDir, 'LogYourBody', 'release-observability.md'),
         'utf8',
@@ -45,6 +46,30 @@ describe('iOS release observability guard', () => {
       summary: readFileSync(summaryPath, 'utf8'),
     };
   }
+
+  it.each(['https://logyourbody.com', 'https://logyourbody.com/'])(
+    'canonicalizes the legacy %s override before post-auth session registration',
+    (apiBaseURL) => {
+      const result = runReleaseConfig({
+        API_BASE_URL: apiBaseURL,
+        API_EXPECTED_HOST: 'logyourbody.com',
+        SENTRY_DSN: 'https://public@example.ingest.sentry.io/123',
+      });
+      try {
+        expect(result.config).toContain('API_BASE_URL = https:/$()/www.logyourbody.com');
+        expect(result.config).toContain('API_EXPECTED_HOST = www.logyourbody.com');
+      } finally {
+        rmSync(result.outputDir, { force: true, recursive: true });
+      }
+    },
+  );
+
+  it('still rejects an unrelated expected host for the legacy API override', () => {
+    expectReleaseConfigFailure({
+      API_BASE_URL: 'https://logyourbody.com',
+      API_EXPECTED_HOST: 'unexpected.example.com',
+    });
+  });
 
   function expectReleaseConfigFailure(extraEnv: Record<string, string | undefined>) {
     const outputDir = mkdtempSync(join(tmpdir(), 'lyb-release-config-'));
