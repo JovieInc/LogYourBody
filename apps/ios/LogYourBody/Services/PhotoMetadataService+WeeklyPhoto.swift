@@ -64,12 +64,44 @@ extension PhotoMetadataService {
         coreDataManager: CoreDataManager = .shared,
         writeAdmission: CoreDataManager.WriteAdmission? = nil
     ) async throws -> Bool {
+        try await persistWeeklyPhoto(
+            id: id, userId: userId, provenance: provenance, localDisplayURL: localDisplayURL,
+            coreDataManager: coreDataManager, writeAdmission: writeAdmission
+        ) != nil
+    }
+
+    /// A check-in is its own dated photo observation, even when that day already
+    /// has a measurement or photo. A retry keeps the capture's submission id.
+    func createWeeklyPhotoObservation(
+        userId: String,
+        provenance: WeeklyPhotoProvenance,
+        originalURL: URL,
+        coreDataManager: CoreDataManager = .shared,
+        writeAdmission: CoreDataManager.WriteAdmission? = nil
+    ) async throws -> BodyMetrics {
+        guard let saved = try await persistWeeklyPhoto(
+            id: nil, userId: userId, provenance: provenance, localDisplayURL: originalURL.absoluteString,
+            coreDataManager: coreDataManager, writeAdmission: writeAdmission
+        ) else {
+            throw PhotoMetricsEditError.uncommittedWrite
+        }
+        return saved
+    }
+
+    private func persistWeeklyPhoto(
+        id: String?,
+        userId: String,
+        provenance: WeeklyPhotoProvenance,
+        localDisplayURL: String?,
+        coreDataManager: CoreDataManager,
+        writeAdmission: CoreDataManager.WriteAdmission?
+    ) async throws -> BodyMetrics? {
         // WriteAdmission is @MainActor. This method is nonisolated, so the
         // check has to hop to the main actor before the background save.
         if let writeAdmission {
             try await writeAdmission()
         }
-        let saved = try await withCheckedThrowingContinuation { continuation in
+        let saved: BodyMetrics? = try await withCheckedThrowingContinuation { continuation in
             coreDataManager.persistentContainer.performBackgroundTask { context in
                 do {
                     let wrote = try Self.writeWeeklyPhotoCommit(
@@ -151,16 +183,31 @@ extension PhotoMetadataService {
     }
 
     private static func writeWeeklyPhotoCommit(
-        id: String,
+        id: String?,
         userId: String,
         provenance: WeeklyPhotoProvenance,
         localDisplayURL: String?,
         in context: NSManagedObjectContext
-    ) throws -> Bool {
+    ) throws -> BodyMetrics? {
         let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@ AND userId == %@", id, userId)
+        let observationId = id ?? provenance.submissionId
+        request.predicate = NSPredicate(format: "id == %@ AND userId == %@", observationId, userId)
         request.fetchLimit = 1
-        guard let row = try context.fetch(request).first else { return false }
+        let row: CachedBodyMetrics
+        if let existing = try context.fetch(request).first {
+            row = existing
+        } else if id == nil {
+            row = CachedBodyMetrics(context: context)
+            row.id = observationId
+            row.userId = userId
+            row.date = provenance.effectiveAt
+            row.localDate = BodyMetricLocalDate.key(for: provenance.effectiveAt)
+            row.dataSource = BodyMetricSource.photo.rawValue
+            row.createdAt = Date()
+            row.isMarkedDeleted = false
+        } else {
+            return nil
+        }
         let previous = BodyMetricSourceMetadata(jsonString: row.sourceMetadataJSON) ?? BodyMetricSourceMetadata()
         row.sourceMetadataJSON = previous.recordingWeeklyPhoto(provenance).jsonString
         let now = Date()
@@ -179,7 +226,7 @@ extension PhotoMetadataService {
             row.syncStatus = "pending"
         }
         if context.hasChanges { try context.save() }
-        return true
+        return row.toBodyMetrics()
     }
 
     private static func localDigest(_ value: String?) -> (sha256: String, count: Int, contentType: String, orientation: Int)? {

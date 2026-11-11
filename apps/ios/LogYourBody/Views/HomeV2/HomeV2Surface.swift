@@ -67,6 +67,12 @@ struct HomeV2Surface: View {
                         appearanceEnabled: appearanceEnabled
                     )
                     photoNumberBlock
+                    HomeV2DisclosureLink(
+                        title: HomeV2Copy.addPhotoRow,
+                        identifier: "home_v2_add_weekly_photo",
+                        action: onAddWeeklyPhoto
+                    )
+                    .frame(maxWidth: .infinity)
                     if hasAnyPhotoInHistory {
                         HomeV2DisclosureLink(
                             title: HomeV2PhotoCopy.allPhotos,
