@@ -230,6 +230,9 @@
 		AD3145C32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */; };
 		AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */; };
 		B314A11A0000000000000002 /* WireframeAvatarFamily.swift in Sources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000001 /* WireframeAvatarFamily.swift */; };
+		B316A11A0000000000000002 /* PersonalBodyEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B316A11A0000000000000001 /* PersonalBodyEngine.swift */; };
+		B316A11A0000000000000006 /* PersonalBodyEngine.json in Resources */ = {isa = PBXBuildFile; fileRef = B316A11A0000000000000005 /* PersonalBodyEngine.json */; };
+		B316A11A0000000000000008 /* PersonalBodyEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B316A11A0000000000000007 /* PersonalBodyEngineTests.swift */; };
 		B318A11A0000000000000002 /* BodyShapeCalibration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B318A11A0000000000000001 /* BodyShapeCalibration.swift */; };
 		B314A11A0000000000000004 /* WireframeAvatarStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000003 /* WireframeAvatarStage.swift */; };
 		B314A11A0000000000000006 /* WireframeAvatarFamily.json in Resources */ = {isa = PBXBuildFile; fileRef = B314A11A0000000000000005 /* WireframeAvatarFamily.json */; };
@@ -894,9 +897,11 @@
 		AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+PhotoTimelineInsights.swift"; sourceTree = "<group>"; };
 		AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AvatarBodyRenderer.swift; path = Components/AvatarBodyRenderer.swift; sourceTree = "<group>"; };
 		B314A11A0000000000000001 /* WireframeAvatarFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WireframeAvatarFamily.swift; path = Components/WireframeAvatarFamily.swift; sourceTree = "<group>"; };
+		B316A11A0000000000000001 /* PersonalBodyEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PersonalBodyEngine.swift; path = Components/PersonalBodyEngine.swift; sourceTree = "<group>"; };
 		B318A11A0000000000000001 /* BodyShapeCalibration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BodyShapeCalibration.swift; path = Components/BodyShapeCalibration.swift; sourceTree = "<group>"; };
 		B314A11A0000000000000003 /* WireframeAvatarStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WireframeAvatarStage.swift; path = Components/WireframeAvatarStage.swift; sourceTree = "<group>"; };
 		B314A11A0000000000000007 /* WireframeAvatarFamilyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WireframeAvatarFamilyTests.swift; sourceTree = "<group>"; };
+		B316A11A0000000000000007 /* PersonalBodyEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalBodyEngineTests.swift; sourceTree = "<group>"; };
 		B318A11A0000000000000003 /* BodyShapeCalibrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyShapeCalibrationTests.swift; sourceTree = "<group>"; };
 		B31820261107000000000003 /* VoiceServiceLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceServiceLifecycleTests.swift; sourceTree = "<group>"; };
 		B317A11A0000000000000001 /* PersonalBodyEstimate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PersonalBodyEstimate.swift; path = Components/PersonalBodyEstimate.swift; sourceTree = "<group>"; };
@@ -1256,6 +1261,7 @@
 		E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvasUITests.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MesocycleCanvasSequence.json; sourceTree = "<group>"; };
 		B314A11A0000000000000005 /* WireframeAvatarFamily.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = WireframeAvatarFamily.json; sourceTree = "<group>"; };
+		B316A11A0000000000000005 /* PersonalBodyEngine.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = PersonalBodyEngine.json; sourceTree = "<group>"; };
 		E442F03731E41EA713BCAE3E /* HomeV2Policy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2Policy.swift; sourceTree = "<group>"; };
 		E47A7741CF9BBCD0F5DC0D5C /* LaunchSurfacePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchSurfacePolicyTests.swift; sourceTree = "<group>"; };
 		E47CB009DE7EAE53EC20AE72 /* DSAvatar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAvatar.swift; path = DesignSystem/Atoms/DSAvatar.swift; sourceTree = "<group>"; };
@@ -1442,6 +1448,7 @@
 				A16800000000000000000002 /* ContextualMetricShare.swift */,
 				AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */,
 				B314A11A0000000000000001 /* WireframeAvatarFamily.swift */,
+				B316A11A0000000000000001 /* PersonalBodyEngine.swift */,
 				B318A11A0000000000000001 /* BodyShapeCalibration.swift */,
 				B314A11A0000000000000003 /* WireframeAvatarStage.swift */,
 				B317A11A0000000000000001 /* PersonalBodyEstimate.swift */,
@@ -1817,6 +1824,7 @@
 				E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */,
 				E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */,
 				B314A11A0000000000000005 /* WireframeAvatarFamily.json */,
+				B316A11A0000000000000005 /* PersonalBodyEngine.json */,
 				AD723AE12E15FA5C002376C6 /* app-icon-180.png */,
 				AD0054EA2E2197600029E0FF /* Legal */,
 			);
@@ -2151,6 +2159,7 @@
 				3CBF4E377107434EA53A2F1B /* PaidWeightLoggerMVPPolicyTests.swift */,
 				FE07A7A700000000000000F7 /* PhotoTimelineHUDPolicyTests.swift */,
 				B314A11A0000000000000007 /* WireframeAvatarFamilyTests.swift */,
+				B316A11A0000000000000007 /* PersonalBodyEngineTests.swift */,
 				B318A11A0000000000000003 /* BodyShapeCalibrationTests.swift */,
 				B31820261107000000000003 /* VoiceServiceLifecycleTests.swift */,
 				B317A11A0000000000000009 /* PersonalBodyEstimateTests.swift */,
@@ -2579,6 +2588,7 @@
 				E9A811932F40800000C0A701 /* PrivacyInfo.xcprivacy in Resources */,
 				E4C0A5110000000000000008 /* MesocycleCanvasSequence.json in Resources */,
 				B314A11A0000000000000006 /* WireframeAvatarFamily.json in Resources */,
+				B316A11A0000000000000006 /* PersonalBodyEngine.json in Resources */,
 				AD72432A2F01234500ABCDEF /* Assets.xcassets in Resources */,
 				AD72435C2E15FA5E002376C6 /* LaunchScreen.storyboard in Resources */,
 				AD7243322E15FA5D002376C6 /* Preview Assets.xcassets in Resources */,
@@ -2651,6 +2661,7 @@
 				5DB1A0B114B3417EAE9E143B /* PaidWeightLoggerMVPPolicyTests.swift in Sources */,
 				FE07A7A700000000000000B7 /* PhotoTimelineHUDPolicyTests.swift in Sources */,
 				B314A11A0000000000000008 /* WireframeAvatarFamilyTests.swift in Sources */,
+				B316A11A0000000000000008 /* PersonalBodyEngineTests.swift in Sources */,
 				B318A11A0000000000000004 /* BodyShapeCalibrationTests.swift in Sources */,
 				B31820261107000000000004 /* VoiceServiceLifecycleTests.swift in Sources */,
 				B317A11A000000000000000A /* PersonalBodyEstimateTests.swift in Sources */,
@@ -2876,6 +2887,7 @@
 				AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */,
 				AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */,
 				B314A11A0000000000000002 /* WireframeAvatarFamily.swift in Sources */,
+				B316A11A0000000000000002 /* PersonalBodyEngine.swift in Sources */,
 				B318A11A0000000000000002 /* BodyShapeCalibration.swift in Sources */,
 				B314A11A0000000000000004 /* WireframeAvatarStage.swift in Sources */,
 				B317A11A0000000000000002 /* PersonalBodyEstimate.swift in Sources */,

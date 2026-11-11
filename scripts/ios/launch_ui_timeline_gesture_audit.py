@@ -36,6 +36,18 @@ def check_timeline_gestures(root: Path, hud_path: Path, hud: str, violations: li
     content_chain = root_body.split("photoTimelineHomeContent\n", 1)[-1].split(
         "if !isHomeV2CheckIn", 1
     )[0]
+    # Clipping only controls drawing. Bound content hit testing after sizing,
+    # and keep the header above native scroll/pager descendants at that boundary.
+    content_bounds = content_chain.split(".overlay(alignment: .leading)", 1)[0]
+    if (
+        ".zIndex(1)" not in header_call
+        or ".zIndex(0)" not in content_chain
+        or not re.search(r"\.frame\([^\n]+\)\s*\.contentShape\(Rectangle\(\)\)", content_bounds)
+    ):
+        violations.append(violation_cls(
+            check="timeline.header_hit_test_priority", file=str(hud_path.relative_to(root)), line=1,
+            detail="Bound the sized content's hit region and keep the navigation header above its scroll and pager descendants.",
+        ))
     parent_chain = root_body.split("if !isHomeV2CheckIn", 1)[-1]
     edge = ".highPriorityGesture(photoTimelineSwipe)"
     overlay = content_chain.split(".overlay(alignment: .leading)", 1)[-1].split("\n        }", 1)[0]

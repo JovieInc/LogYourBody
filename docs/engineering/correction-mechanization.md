@@ -137,6 +137,13 @@ from staged inputs and invoke that same parent-preserving classifier. It refuses
 other source conflicts and missing merge parents before writing. A classifier
 refusal restores the projection bytes and index stages; resolve the reported
 source or guard problem and retry. Unrelated unstaged source edits stay untouched.
+When the diagnostic project pin also conflicts, combine `--merge-ledger` with
+`--reviewed-project-sha256 <reviewed-merged-project-sha256>` (and an explicit
+`--reviewed-audit-sha256` when needed). The command requires an active merge,
+uses the existing reviewed pin resolver to retain one-sided parent dependency
+hash updates, then preserves both parents' receipts.
+It never derives a trust digest. If receipt validation refuses after pin repair,
+the reviewed pin remains staged; resolve the reported problem and retry.
 Union generation and parent verification share guard snapshots within that command;
 each retry reads the index and guard sources afresh.
 If the staged index changes during projection rendering, refusal preserves the

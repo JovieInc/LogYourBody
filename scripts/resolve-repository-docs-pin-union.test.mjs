@@ -79,6 +79,59 @@ function resolveProject(root, digest, audit) {
   return spawnSync('python3', args, { env, encoding: 'utf8' });
 }
 
+for (const change of ['ours', 'theirs', 'divergent', 'removed', 'hand edited']) {
+  test(`reviewed project repair preserves one-sided dependency updates: ${change}`, (t) => {
+    const f = pinFixture(t, { baseAudit: BASE_AUDIT });
+    const path = join(f.root, DIAGNOSTIC_WORKFLOW);
+    const gap = '# context 1\n# context 2\n# context 3\n# context 4\n';
+    const write = (project, pin, audit) => {
+      f.writeProject(project, 'kept', audit);
+      separateAudit(path);
+      writeFileSync(path, pin + gap + readFileSync(path, 'utf8'));
+    };
+    write('base-project\n', TIMEOUT_PIN, BASE_AUDIT);
+    f.generate();
+    f.commit();
+    f.git('branch', '-f', 'theirs');
+    const oursPin = ['ours', 'divergent'].includes(change)
+      ? TIMEOUT_PIN.replace('a'.repeat(64), 'b'.repeat(64)) : TIMEOUT_PIN;
+    const theirsPin = change === 'removed' ? '' : change === 'ours' ? TIMEOUT_PIN
+      : TIMEOUT_PIN.replace('a'.repeat(64), 'c'.repeat(64));
+    write('ours-project\n', oursPin, BASE_AUDIT);
+    f.generate();
+    f.commit();
+    f.git('switch', '-q', 'theirs');
+    write('theirs-project\n', theirsPin, THEIRS_AUDIT);
+    f.generate();
+    f.commit();
+    f.git('switch', '-q', 'ours');
+    mergePinFixture(f);
+    const project = 'ours-project\ntheirs-project\n';
+    writeFileSync(join(f.root, DIAGNOSTIC_PROJECT), project);
+    f.git('add', '--', DIAGNOSTIC_PROJECT);
+    if (change === 'hand edited') writeFileSync(path, readFileSync(path, 'utf8') + '# local edit\n');
+    const index = f.git('ls-files', '--stage');
+    const original = readFileSync(path);
+    const projection = readFileSync(join(f.root, f.output));
+    const digest = createHash('sha256').update(project).digest('hex');
+    const result = resolveProject(f.root, digest);
+    if (['ours', 'theirs'].includes(change)) {
+      assert.equal(result.status, 0, result.stderr);
+      const workflow = f.git('show', `:${DIAGNOSTIC_WORKFLOW}`);
+      assert.ok(workflow.startsWith((change === 'ours' ? oursPin : theirsPin) + gap));
+      assert.match(workflow, new RegExp(THEIRS_AUDIT));
+      assert.match(workflow, new RegExp(digest));
+      assert.equal(f.git('ls-files', '--unmerged'), '');
+    } else {
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /not limited to the project pin/);
+      assert.equal(f.git('ls-files', '--stage'), index);
+      assert.deepEqual(readFileSync(path), original);
+      assert.deepEqual(readFileSync(join(f.root, f.output)), projection);
+    }
+  });
+}
+
 test('reviewed digest keeps branch workflow edits when incoming changes only the project pin', (t) => {
   const f = pinFixture(t);
   f.writeProject('ours-project\n');

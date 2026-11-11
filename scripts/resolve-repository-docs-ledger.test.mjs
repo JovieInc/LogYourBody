@@ -5,9 +5,10 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { env, resolver, sourceMapFixture } from './resolve-repository-docs.test.mjs';
+import { DIAGNOSTIC_PROJECT, DIAGNOSTIC_WORKFLOW, pinFixture } from './resolve-repository-docs-pin.test.mjs';
 
-function ledgerMergeFixture(t, sourceConflict = false) {
-  const f = sourceMapFixture(t);
+function ledgerMergeFixture(t, sourceConflict = false, projectPins = false) {
+  const f = projectPins ? pinFixture(t) : sourceMapFixture(t);
   const ledger = 'packages/shared-lib/corrections.json';
   const template = JSON.parse(readFileSync(new URL('./fixtures/correction-classifier.json', import.meta.url)))[0];
   const receipt = (name) => ({ ...template, fingerprint: name,
@@ -20,11 +21,13 @@ function ledgerMergeFixture(t, sourceConflict = false) {
   f.commit();
   f.git('branch', '-f', 'theirs');
   writeLedger('ours');
+  if (projectPins) f.writeProject('base-project\nours-project\n');
   writeFileSync(join(f.root, 'a.txt'), 'ours-a\n');
   f.generate();
   f.commit();
   f.git('switch', '-q', 'theirs');
   writeLedger('theirs');
+  if (projectPins) f.writeProject('base-project\ntheirs-project\n');
   writeFileSync(join(f.root, sourceConflict ? 'a.txt' : 'b.txt'), 'theirs-b\n');
   f.generate();
   f.commit();
@@ -35,6 +38,50 @@ function ledgerMergeFixture(t, sourceConflict = false) {
   const resolve = () => spawnSync('python3', [resolver, '--root', f.root, '--merge-ledger'], { env, encoding: 'utf8' });
   return { ...f, ledger, resolve, anchor: template.guard.anchor };
 }
+
+test('reviewed ledger repair resolves pin, projection and receipt conflicts together', (t) => {
+  const f = ledgerMergeFixture(t, false, true);
+  const project = 'base-project\nours-project\ntheirs-project\n';
+  writeFileSync(join(f.root, DIAGNOSTIC_PROJECT), project);
+  f.git('add', '--', DIAGNOSTIC_PROJECT);
+  writeFileSync(join(f.root, 'a.txt'), 'unrelated unstaged source\n');
+  const digest = createHash('sha256').update(project).digest('hex');
+  const repair = (expected) => spawnSync('python3', [
+    resolver, '--root', f.root, '--merge-ledger', '--reviewed-project-sha256', expected,
+  ], { env, encoding: 'utf8' });
+  const index = f.git('ls-files', '--stage');
+  const originals = [DIAGNOSTIC_WORKFLOW, f.output, f.ledger]
+    .map((name) => [name, readFileSync(join(f.root, name))]);
+  const unreviewed = f.resolve();
+  assert.notEqual(unreviewed.status, 0);
+  assert.match(unreviewed.stderr, /resolve source conflicts first/);
+  const wrong = repair('0'.repeat(64));
+  assert.notEqual(wrong.status, 0);
+  assert.match(wrong.stderr, /reviewed project SHA-256 does not match merged source/);
+  assert.equal(f.git('ls-files', '--stage'), index);
+  for (const [name, bytes] of originals) assert.deepEqual(readFileSync(join(f.root, name)), bytes);
+  const result = repair(digest);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(f.git('show', `:${f.ledger}`)).map(({ fingerprint }) => fingerprint),
+    ['base', 'theirs', 'ours']);
+  assert.equal(f.git('show', `:${DIAGNOSTIC_PROJECT}`), project);
+  const workflow = f.git('show', `:${DIAGNOSTIC_WORKFLOW}`);
+  assert.match(workflow, new RegExp(digest));
+  const projection = f.git('show', `:${f.output}`);
+  for (const source of [project, workflow, 'ours-a\n']) {
+    assert.match(projection, new RegExp(createHash('sha256').update(source).digest('hex')));
+  }
+  assert.equal(readFileSync(join(f.root, 'a.txt'), 'utf8'), 'unrelated unstaged source\n');
+  assert.equal(f.git('ls-files', '--unmerged'), '');
+  const resolvedIndex = f.git('ls-files', '--stage');
+  assert.equal(repair(digest).status, 0, 'reviewed repair remains retryable during this merge');
+  assert.equal(f.git('ls-files', '--stage'), resolvedIndex);
+  f.git('commit', '-qm', 'fixture');
+  const outsideMerge = repair(digest);
+  assert.notEqual(outsideMerge.status, 0, 'reviewed ledger repair requires an active merge');
+  assert.equal(f.git('ls-files', '--stage'), resolvedIndex);
+  assert.equal(f.git('show', `:${DIAGNOSTIC_WORKFLOW}`), workflow);
+});
 
 test('ledger repair refreshes staged fingerprints, preserves both parents and is retryable', (t) => {
   const f = ledgerMergeFixture(t);

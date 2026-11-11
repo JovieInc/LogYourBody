@@ -115,7 +115,7 @@ def _choose_audit(base_audit, ours_audit, theirs_audit, explicit_audit):
 
 
 def _dependency_union(base, ours, theirs):
-    """One-sided dependency lines stay; divergent audit pins need an explicit digest."""
+    """Keep one-sided dependency additions and hash updates; refuse deletions or divergence."""
     def skeleton(text):
         return [line for line in text.splitlines() if not _DEP_LINE.fullmatch(line)]
 
@@ -135,7 +135,7 @@ def _dependency_union(base, ours, theirs):
     base_entries, ours_entries, theirs_entries = entries(base), entries(ours), entries(theirs)
     if base_entries is None or ours_entries is None or theirs_entries is None:
         return None
-    extra = []
+    extra, replacements = [], {}
     for key in set(base_entries) | set(ours_entries) | set(theirs_entries):
         base_line = base_entries.get(key)
         ours_line = ours_entries.get(key)
@@ -144,12 +144,17 @@ def _dependency_union(base, ours, theirs):
             if base_line not in (None, ours_line):
                 return None
             continue
-        if base_line == ours_line and theirs_line is not None and ours_line is None:
-            extra.append(theirs_line)
-        elif base_line == theirs_line and ours_line is not None and theirs_line is None:
+        if base_line == ours_line and theirs_line is not None:
+            if ours_line is None:
+                extra.append(theirs_line)
+            else:
+                replacements[ours_line] = theirs_line
+        elif base_line == theirs_line and ours_line is not None:
             continue
         else:
             return None
+    for original, updated in replacements.items():
+        ours = ours.replace(original, updated)
     if not extra:
         return ours
     result = ours.splitlines()

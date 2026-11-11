@@ -463,17 +463,18 @@ def main():
     parser.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     parser.add_argument("--reviewed-audit-sha256", help="refresh every current reviewed audit pin using an explicitly reviewed audit digest")
     args = parser.parse_args()
-    exclusive = any((
-        args.staged, args.refresh_lockfile, args.verify_lockfile, args.merge_sections,
-        args.union_manifests, args.union_project, args.merge_ledger,
-    ))
-    if exclusive and (args.reviewed_project_sha256 or args.reviewed_audit_sha256):
+    if any((args.staged, args.refresh_lockfile, args.verify_lockfile, args.merge_sections,
+            args.union_manifests, args.union_project)) and (
+            args.reviewed_project_sha256 or args.reviewed_audit_sha256):
         parser.error("reviewed digests cannot be combined with another repair mode")
     try:
         if args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
         elif args.merge_ledger:
             from manifest_union import merge_ledger
+            git_bytes(args.root, "rev-parse", "--verify", "MERGE_HEAD")
+            if args.reviewed_project_sha256 or args.reviewed_audit_sha256:
+                resolve(args.root, False, False, args.reviewed_project_sha256, args.reviewed_audit_sha256)
             merge_ledger(args.root, resolve_staged, staged_bytes, git_bytes)
         elif args.union_project:
             union_project(args.root)
