@@ -78,6 +78,14 @@ node --test packages/shared-lib/scripts/correction-ratchet.behavior.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
 
+After reviewing a launch-audit change, stage `scripts/ios/launch-quality-audit.sh`
+and run `python3 scripts/resolve-repository-docs.py --reviewed-audit-sha256 <reviewed-digest>`.
+The existing repair entrypoint updates the diagnostic workflow pin and all routing
+regression pins together. It refuses a digest that differs from the staged audit,
+unstaged inputs, symlinks, conflicts, and missing, duplicate or divergent pins.
+Review and stage its output explicitly; source-map regeneration remains in the
+normal pre-commit path. This command never grants trust from candidate bytes alone.
+
 Merge readiness inspects staged changes as text without external diff or text
 conversion drivers, so binary attributes and presentation filters cannot hide
 unresolved conflict markers.
@@ -107,6 +115,13 @@ apply. When the lanes harness owns pushing and PR creation, hand it the commits
 and validation evidence. Do not enable the retired Codex Auto-Fix workflow or
 start a second PR owner.
 
+For launch-route conflicts, `python3 scripts/resolve-repository-docs.py --union-manifests`
+also unions the canonical launch binding arrays and rejects lost or reordered
+parent selectors. It leaves a conflicted generated manifest untouched. Regenerate
+that manifest with `node scripts/lyb-launch-manifest.mjs scripts/fixtures/lyb-launch-route-bindings.json`,
+review and stage both files, then continue the existing pin and ledger repair.
+The staged source-map check verifies the same parent binding inputs.
+
 For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
 merges and classifies the correction ledger after other conflicts are resolved.
 `python3 scripts/resolve-repository-docs.py --merge-sections docs/<path>.md`
@@ -122,11 +137,24 @@ from staged inputs and invoke that same parent-preserving classifier. It refuses
 other source conflicts and missing merge parents before writing. A classifier
 refusal restores the projection bytes and index stages; resolve the reported
 source or guard problem and retry. Unrelated unstaged source edits stay untouched.
+When the diagnostic project pin also conflicts, combine `--merge-ledger` with
+`--reviewed-project-sha256 <reviewed-merged-project-sha256>` (and an explicit
+`--reviewed-audit-sha256` when needed). The command requires an active merge,
+uses the existing reviewed pin resolver to retain one-sided parent dependency
+hash updates, then preserves both parents' receipts.
+It never derives a trust digest. If receipt validation refuses after pin repair,
+the reviewed pin remains staged; resolve the reported problem and retry.
 Union generation and parent verification share guard snapshots within that command;
 each retry reads the index and guard sources afresh.
 If the staged index changes during projection rendering, refusal preserves the
 other writer's projection bytes and index entries; rollback begins only after
 the resolver completes its own render. Review the inputs and retry.
+If ledger validation then fails, rollback also verifies that the rendered projection
+bytes and index entry are unchanged. Concurrent working or staged projection edits
+remain intact; review and stage the inputs before retrying the same command.
+Rollback also checks the rendered file's mode, inode and device without following
+links. A concurrent replacement, symlink or permission change refuses rollback
+even when the projection bytes match, preserving the other writer's file and index.
 The reviewed diagnostic project-pin resolver also retains each newly added parent
 file's group and build-phase references; retaining a declaration alone is insufficient.
 For a documentation rewrite conflicting with incoming new sections, run
@@ -172,6 +200,11 @@ retry the same command. Unrelated unstaged edits remain untouched.
 
 Recursive reconstruction reads each immutable guard blob once per resolution;
 the cache ends with that invocation, so retries never reuse mutable index evidence.
+
+The combined `--merge-ledger` repair also checks that the source index stays
+unchanged between projection rendering and ledger classification. A concurrent
+source change refuses success without reverting the reviewed source or classified
+ledger; rerun the same command to rebuild fingerprints from current staged inputs.
 
 The readiness check forces text inspection even when Git attributes mark a staged
 file as binary, so those attributes cannot conceal unresolved conflict markers.

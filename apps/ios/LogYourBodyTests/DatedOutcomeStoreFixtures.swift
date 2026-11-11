@@ -15,12 +15,14 @@ final class OutcomeRemoteFixture: DatedOutcomeRemote {
     var requests: [DatedOutcomeEdit] = []
     var latest: DatedOutcomeSnapshot?
     var failNextSave = false
+    var conflicts = false
     var onSave: (() -> Void)?
     var reads = 0
 
     func saveDatedOutcome(_ edit: DatedOutcomeEdit, token: String) async throws -> DatedOutcomeSnapshot {
         requests.append(edit)
         onSave?()
+        if conflicts { throw ProductAPIError.httpError(409) }
         if failNextSave { failNextSave = false; throw DatedOutcomeError.unavailable }
         let receipt = DatedOutcomeSnapshot(revision: edit.requestId, value: edit.value)
         latest = receipt

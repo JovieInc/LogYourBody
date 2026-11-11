@@ -14,9 +14,12 @@ from pathlib import Path
 
 import repository_docs
 
+LAUNCH_BINDINGS = "scripts/fixtures/lyb-launch-route-bindings.json"
+LAUNCH_MANIFEST = "scripts/fixtures/lyb-launch-route-manifest.json"
 MANIFESTS = (
     "packages/shared-lib/package.json",
     "packages/shared-lib/turbo.json",
+    LAUNCH_BINDINGS,
 )
 # The correction ledger has its own resolver and must not deadlock manifest union.
 LEDGER = "packages/shared-lib/corrections.json"
@@ -247,7 +250,7 @@ def apply_manifest_union(root):
             cwd=root, check=True, capture_output=True,
         ).stdout.decode().split("\0") if name
     }
-    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER, DIAGNOSTIC_PIN_WORKFLOW})
+    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER, DIAGNOSTIC_PIN_WORKFLOW, LAUNCH_MANIFEST})
     if unrelated:
         raise ValueError("manifest union refuses unrelated conflicts: " + ", ".join(unrelated))
     planned = []
@@ -260,7 +263,8 @@ def apply_manifest_union(root):
             node_value(parse_json_spans(base_text)),
             node_value(ours_node),
             node_value(parse_json_spans(theirs_text)),
-            union_arrays=name.endswith("turbo.json"),
+            # Launch bindings retain every parent XCTest selector, just like test inputs.
+            union_arrays=name.endswith("turbo.json") or name == LAUNCH_BINDINGS,
         )
         rendered = render_updated(ours_text, ours_node, merged)
         if json.loads(rendered) != merged:
@@ -394,6 +398,8 @@ def assert_auto_merged_parent_inputs(root):
         )
         if None in (ours, theirs, base, merged) or ours == base or theirs == base or ours == theirs:
             continue
+        if name == LAUNCH_BINDINGS and any(set(json.loads(parent)) - set(json.loads(merged)) for parent in (ours, theirs)):
+            raise ValueError(UNION_REFUSAL + ": auto-merged launch path missing")
         _preserved(
             node_value(parse_json_spans(base)),
             node_value(parse_json_spans(ours)),
@@ -441,14 +447,27 @@ def merge_ledger(root, resolve_staged, staged_bytes, git_bytes):
     path = repository_docs.local(root, output)
     original = path.read_bytes() if path.exists() else None
     index = git_bytes(root, "ls-files", "--stage", "--", output)
+    source_args = ("ls-files", "--stage", "-z", "--", ".", ":!" + LEDGER, ":!" + output)
+    source_index = git_bytes(root, *source_args)
     # Rendering refusals preserve concurrent projection edits; only roll back our completed render.
     resolve_staged(root)
+    rendered = path.read_bytes() if path.exists() else None
+    rendered_identity = path.lstat()[:3]  # File mode, inode and device, without following links.
+    rendered_index = git_bytes(root, "ls-files", "--stage", "--", output)
     try:
         subprocess.run(
             ["node", str(Path(__file__).with_name("correction-classifier.mjs")),
              "--resolve-merge", str(root), "--stage"], cwd=root, check=True,
         )
-    except (ValueError, OSError, subprocess.CalledProcessError):
+    except (ValueError, OSError, subprocess.CalledProcessError) as error:
+        # Rollback owns only our rendered projection, never another writer's edits.
+        # Identical bytes do not authorize rollback through a replaced file or symlink.
+        current_identity = path.lstat()[:3] if path.exists() or path.is_symlink() else None
+        if current_identity != rendered_identity:
+            raise ValueError("source projection changed during ledger validation; review and retry") from error
+        current = path.read_bytes() if path.exists() else None
+        if current != rendered or git_bytes(root, "ls-files", "--stage", "--", output) != rendered_index:
+            raise ValueError("source projection changed during ledger validation; review and retry") from error
         # A refused ledger repair restores the projection and its conflict stages.
         if original is None:
             path.unlink(missing_ok=True)
@@ -457,3 +476,7 @@ def merge_ledger(root, resolve_staged, staged_bytes, git_bytes):
         subprocess.run(["git", "update-index", "--force-remove", "--", output], cwd=root, check=True)
         subprocess.run(["git", "update-index", "--index-info"], cwd=root, input=index, check=True)
         raise
+    # The classifier may start after a source edit; retain the render's source snapshot.
+    if (git_bytes(root, *source_args) != source_index
+            or git_bytes(root, "ls-files", "--stage", "--", output) != rendered_index):
+        raise ValueError("source index changed during ledger validation; review staged inputs and retry")

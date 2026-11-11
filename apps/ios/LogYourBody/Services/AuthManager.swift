@@ -670,8 +670,8 @@ final class AuthManager: NSObject, ObservableObject {
         return try JSONDecoder().decode(OAuthUserInfo.self, from: data)
     }
 
-    private func registerProductSession(accessToken: String) async throws {
-        guard let baseURL = URL(string: Configuration.apiBaseURL),
+    func registerProductSession(accessToken: String, apiBaseURL: String? = nil) async throws {
+        guard let baseURL = URL(string: Configuration.canonicalAPIBaseURL(apiBaseURL ?? Configuration.apiBaseURL)),
               let url = URL(string: "/api/auth/mobile/session", relativeTo: baseURL)?.absoluteURL else {
             throw AuthError.providerNotReady
         }

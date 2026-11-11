@@ -840,7 +840,7 @@ struct LogYourBodyApp: App {
             isAuthenticated: authManager.isAuthenticated,
             user: user,
             hasCompletedOnboarding: OnboardingStateManager.shared.hasCompletedCurrentVersion(for: user?.id),
-            isSubscribed: subscriptionManager.isSubscribed
+            isSubscribed: subscriptionManager.isSubscribed, datedOutcomeEnabled: DatedOutcomeEntry.isEnabled()
         )
     }
 }
