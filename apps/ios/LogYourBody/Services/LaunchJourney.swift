@@ -1,11 +1,30 @@
 import Foundation
 
-/// Approved launch copy: JovieInc/Jovie#21838 at 197a96ff21c53cb4ccd8f6c1e3d733058b8c1cf7.
+/// Native copy table (LYB-286). Legacy strings: JovieInc/Jovie#21838
+/// at 197a96ff21c53cb4ccd8f6c1e3d733058b8c1cf7.
 enum LaunchPromiseCopy {
+    // LYB-273 adopted decision, 2026-10-30. The older contract copy remains for gate-off users.
+    static let datedOutcomePromise = "Pick a date. We build the plan backward from it and adjust every week."
     static let headline = "Your body-composition goal, planned around your next date."
     static let explanation =
         "Set an outcome and a date. LogYourBody follows your photos and measurements, spots drift, and gives you one next action."
     static let framing = "Dates guide the plan. They do not guarantee a result."
+
+    @MainActor
+    static var nativeHeadline: String { DatedOutcomeEntry.isEnabled() ? datedOutcomePromise : headline }
+}
+
+enum DatedOutcomeEntry {
+    @MainActor
+    static func isEnabled(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        checkGate: ((String) -> Bool)? = nil
+    ) -> Bool {
+        #if DEBUG
+        if arguments.contains("-lybUITestDatedOutcomeEntryFixture") { return true }
+        #endif
+        return (checkGate ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) })(DatedOutcomeStore.featureGate)
+    }
 }
 
 /// Dated launch decision for timeline, body score, and Jovi. Optional GLP-1 and
@@ -82,6 +101,9 @@ enum LaunchJourney {
         var usesLatestConflictOnly = false
         var glp1Disclosed = false
         var dexaPresent = false
+        /// Gate-on admission also requires positively established eligibility.
+        var enforcesDatedOutcomeDecision = false
+        var isEligible: Bool?
     }
 
     static func presentations(for input: Input) -> [Presentation] {
@@ -128,10 +150,7 @@ enum LaunchJourney {
             return (.noData, Action(title: "Set an outcome and a date", detail: LaunchPromiseCopy.explanation))
         }
         let metricReadings = usable.filter { $0.metric == outcome.outcome.metric }
-        let feasibility = OutcomeFeasibility(now: input.now, thresholds: input.thresholds)
-            .classify(outcome: outcome, history: metricReadings.map {
-                OutcomeFeasibility.Measurement(date: $0.date, metric: $0.metric, value: $0.value)
-            })
+        let feasibility = classify(outcome, input: input, readings: metricReadings)
         switch feasibility {
         case .expired:
             return (.expiredDate, Action(
@@ -143,7 +162,9 @@ enum LaunchJourney {
         case .impossible:
             return (.impossibleDate, Action(
                 title: "Choose a later date or a closer outcome",
-                detail: "This date cannot be reached safely. \(outcome.outcomeDate) was not moved."
+                detail: input.enforcesDatedOutcomeDecision
+                    ? "No plan is available for this date and target. \(outcome.outcomeDate) was not moved."
+                    : "This date cannot be reached safely. \(outcome.outcomeDate) was not moved."
             ))
         case .noData, .ok:
             if conflicts(metricReadings, latestOnly: input.usesLatestConflictOnly) {
@@ -155,7 +176,9 @@ enum LaunchJourney {
             if feasibility == .noData {
                 return (.noData, Action(
                     title: "Add one measurement",
-                    detail: "One measurement starts the plan for \(outcome.outcomeDate)."
+                    detail: input.enforcesDatedOutcomeDecision
+                    ? "One measurement starts tracking for \(outcome.outcomeDate)."
+                    : "One measurement starts the plan for \(outcome.outcomeDate)."
                 ))
             }
             if stale(metricReadings, now: input.now, window: input.freshnessWindow) {
@@ -178,6 +201,26 @@ enum LaunchJourney {
                 detail: "The date stays \(outcome.outcomeDate)."
             ))
         }
+    }
+
+    /// Integration of LYB-273's rejection ceiling, never a replacement for the
+    /// classifier's complete reviewed policy. Callers prepare readings off-main.
+    static func classify(_ outcome: DatedOutcome, input: Input, readings: [Reading]) -> OutcomeFeasibility.Classification {
+        let result = OutcomeFeasibility(now: input.now, thresholds: input.thresholds)
+            .classify(outcome: outcome, history: readings.map {
+                .init(date: $0.date, metric: $0.metric, value: $0.value)
+            })
+        guard input.enforcesDatedOutcomeDecision, result != .expired else { return result }
+        guard input.isEligible == true, input.safetyAvailable else { return .unsafe }
+        guard result == .ok, outcome.outcome.metric == .weightKg else { return result }
+        guard let latest = readings.filter({
+            $0.metric == .weightKg && $0.date <= input.now && $0.value.isFinite && $0.value > 0
+        }).max(by: { $0.date < $1.date }),
+              let deadline = DatedOutcome.calendarDate(outcome.outcomeDate) else { return .unsafe }
+        let weeks = deadline.timeIntervalSince(input.now) / 604_800
+        let percentPerWeek = 100 * abs(outcome.outcome.targetValue - latest.value) / (latest.value * weeks)
+        guard percentPerWeek.isFinite else { return .unsafe }
+        return percentPerWeek > 1 ? .impossible : .ok
     }
 
     private static func weightPlan(
@@ -205,7 +248,9 @@ enum LaunchJourney {
         case .needsMeasurement:
             return (.noData, Action(
                 title: "Add one measurement",
-                detail: "One measurement starts the plan for \(outcome.outcomeDate)."
+                detail: input.enforcesDatedOutcomeDecision
+                    ? "One measurement starts tracking for \(outcome.outcomeDate)."
+                    : "One measurement starts the plan for \(outcome.outcomeDate)."
             ))
         case .conflictingMeasurements:
             return (.conflicting, Action(

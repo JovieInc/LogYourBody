@@ -20,7 +20,7 @@ struct BodyScoreHookView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: LaunchPromiseCopy.headline,
+            title: LaunchPromiseCopy.nativeHeadline,
             subtitle: LaunchPromiseCopy.explanation,
             showsBackButton: false,
             progress: viewModel.progress(for: .hook),
@@ -146,6 +146,131 @@ struct BodyScoreHookView: View {
         )
     ]
     #endif
+}
+
+/// The gated first run collects the dated constraint before any measurement or
+/// optional permission. A manual entry is enough to continue neutral tracking.
+struct DatedOutcomeLaunchView: View {
+    let auth: AuthManager
+    let owner: AuthManager.ProfileSessionOwnership
+    let store: DatedOutcomeStore
+    var onCompleted: () -> Void
+    @State private var showsEditor = false
+    @State private var showsMeasurement = false
+    @State private var showsSavedOutcome = false
+    @State private var model: DatedOutcomeEditorModel
+    @State private var baselineSnapshot: DatedTimelineProjector.Snapshot?
+    private let projector = DatedTimelineProjector()
+
+    init(
+        auth: AuthManager, owner: AuthManager.ProfileSessionOwnership, store: DatedOutcomeStore,
+        onCompleted: @escaping () -> Void
+    ) {
+        self.auth = auth
+        self.owner = owner
+        self.store = store
+        self.onCompleted = onCompleted
+        _model = State(initialValue: DatedOutcomeEditorModel(store: store) { auth.ownsAccountSession(owner) })
+    }
+
+    var body: some View {
+        OnboardingPageTemplate(
+            title: showsSavedOutcome ? "Your outcome and date" : LaunchPromiseCopy.datedOutcomePromise,
+            subtitle: LaunchPromiseCopy.framing,
+            showsBackButton: showsSavedOutcome,
+            onBack: { showsSavedOutcome = false },
+            screen: .bodyScoreIntro,
+            content: {
+                if showsSavedOutcome, let saved = model.snapshot {
+                    Text(baselineSnapshot?.outcomeText ?? saved.value.outcomeDate)
+                        .accessibilityIdentifier("dated_launch_saved_outcome")
+                    if let decision = baselineSnapshot?.presentation { Text(decision.action.detail) }
+                    if model.hasPending {
+                        Text("Saved on this device. Waiting to sync.")
+                            .accessibilityIdentifier("dated_outcome_pending")
+                    }
+                }
+                if let error = model.errorText { Text(error) }
+            }, footer: {
+                VStack(spacing: 12) {
+                    Button(nextActionTitle, action: performNextAction)
+                        .buttonStyle(OnboardingPrimaryButtonStyle())
+                        .accessibilityIdentifier("dated_launch_continue")
+                    if showsSavedOutcome {
+                        if baselineSnapshot?.destination == .editor {
+                            OnboardingTextButton(title: "Enter one measurement") { showsMeasurement = true }
+                        } else {
+                            OnboardingTextButton(title: "Edit outcome and date") { showsEditor = true }
+                        }
+                        OnboardingTextButton(title: "Continue with tracking", action: complete)
+                    }
+                }
+            }
+        )
+        .sheet(isPresented: $showsEditor) {
+            DatedOutcomeEditorHost(store: store, auth: auth, owner: owner) {
+                showsEditor = false
+                Task { await refresh() }
+            }
+        }
+        .sheet(isPresented: $showsMeasurement) {
+            AddEntrySheet(
+                isPresented: $showsMeasurement,
+                initialTab: baselineSnapshot?.baselineTab ?? 0,
+                onWeightSaved: { _ in complete() },
+                onBodyFatSaved: { _ in complete() },
+                presentationOwner: owner
+            )
+            .environmentObject(auth)
+        }
+        .task { await refresh() }
+    }
+
+    private func refresh() async {
+        await model.load(refresh: true)
+        guard auth.ownsAccountSession(owner) else { return }
+        let metrics = await CoreDataManager.shared.fetchVisibleBodyMetrics(for: owner.subject)
+        let snapshot = await projector.project(
+            owner: owner.subject, metrics: metrics,
+            input: .init(
+                now: Date(), outcome: model.snapshot?.value, offline: !RealtimeSyncManager.shared.isOnline,
+                enforcesDatedOutcomeDecision: true
+            ), heightCm: auth.currentUser?.profile?.height
+        )
+        guard !Task.isCancelled, auth.ownsAccountSession(owner) else { return }
+        baselineSnapshot = snapshot
+        showsSavedOutcome = model.snapshot != nil
+    }
+
+    private func performNextAction() {
+        guard auth.ownsAccountSession(owner) else { return }
+        guard showsSavedOutcome else { showsEditor = true; return }
+        if store.syncIssue == .conflict { showsEditor = true; return }
+        if store.syncIssue == .retry {
+            RealtimeSyncManager.shared.syncAll()
+            Task { await refresh() }
+            return
+        }
+        switch baselineSnapshot?.destination {
+        case .editor: showsEditor = true
+        case .retry:
+            RealtimeSyncManager.shared.syncAll()
+            Task { await refresh() }
+        case .measurement, .profile, .timeline, .none: showsMeasurement = true
+        }
+    }
+
+    private var nextActionTitle: String {
+        guard showsSavedOutcome else { return "Choose an outcome and date" }
+        if store.syncIssue == .conflict { return "Review account outcome" }
+        if store.syncIssue == .retry { return "Retry outcome sync" }
+        return baselineSnapshot?.presentation.action.title ?? "Enter one measurement"
+    }
+
+    private func complete() {
+        guard auth.ownsAccountSession(owner) else { return }
+        onCompleted()
+    }
 }
 
 private struct BodyScoreContourField: View {

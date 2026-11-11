@@ -46,12 +46,17 @@ describe('Dependabot pnpm workspace updates (LYB-357)', () => {
     const fixture = mkdtempSync(join(tmpdir(), 'lyb-dependabot-'));
     const mature = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const fresh = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    const rollup = manifest.devDependencies.rollup as string;
+    expect(rollup).toMatch(/^\^4\.\d+\.\d+$/);
+    // Keep registry versions inside the real manifest's range after every bump.
+    const matureRollup = rollup.slice(1);
+    const freshRollup = matureRollup.replace(/\d+$/, (patch) => String(Number(patch) + 1));
     // Model Vite's dependency and Nitro's peer, with a recently locked Rollup.
     const packages: Record<string, Record<string, object>> = {
       leaf: { '1.0.0': {}, '1.1.0': {} },
       tool: { '1.0.0': { peerDependencies: { rollup: '^4.61.1' } } },
       bundler: { '1.0.0': { dependencies: { rollup: '^4.61.1' } } },
-      rollup: { '4.65.0': {}, '4.67.2': {} },
+      rollup: { [matureRollup]: {}, [freshRollup]: {} },
     };
     let registry: string;
     const server = createServer((request, response) => {
@@ -69,7 +74,7 @@ describe('Dependabot pnpm workspace updates (LYB-357)', () => {
           time: Object.fromEntries(
             Object.keys(versions).map((version) => [
               version,
-              name === 'rollup' && version === '4.67.2' ? fresh : mature,
+              name === 'rollup' && version === freshRollup ? fresh : mature,
             ]),
           ),
           versions: Object.fromEntries(
@@ -134,7 +139,7 @@ describe('Dependabot pnpm workspace updates (LYB-357)', () => {
         );
       await pnpm(['install', '--lockfile-only']);
       const initial = readFileSync(join(fixture, 'pnpm-lock.yaml'), 'utf8');
-      expect(initial).toContain('rollup@4.67.2:');
+      expect(initial).toContain(`rollup@${freshRollup}:`);
       const update = [
         'update',
         'leaf@1.1.0',
@@ -148,15 +153,13 @@ describe('Dependabot pnpm workspace updates (LYB-357)', () => {
         stdout: expect.stringContaining('ERR_PNPM_NO_MATURE_MATCHING_VERSION'),
       });
       expect(readFileSync(join(fixture, 'pnpm-lock.yaml'), 'utf8')).toBe(initial);
-      const rollup = manifest.devDependencies.rollup;
-      expect(rollup).toMatch(/^\^4\./);
       writeManifest({ rollup });
       await pnpm(update);
       const lockfile = load(readFileSync(join(fixture, 'pnpm-lock.yaml'), 'utf8'));
       expect(lockfile.importers['apps/web'].dependencies.leaf.version).toBe('1.1.0');
-      expect(lockfile.importers['.'].devDependencies.rollup.version).toBe('4.65.0');
-      expect(lockfile.snapshots['bundler@1.0.0'].dependencies.rollup).toBe('4.65.0');
-      expect(lockfile.packages['rollup@4.67.2']).toBeUndefined();
+      expect(lockfile.importers['.'].devDependencies.rollup.version).toBe(matureRollup);
+      expect(lockfile.snapshots['bundler@1.0.0'].dependencies.rollup).toBe(matureRollup);
+      expect(lockfile.packages[`rollup@${freshRollup}`]).toBeUndefined();
     } finally {
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));

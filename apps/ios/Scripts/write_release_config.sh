@@ -86,6 +86,27 @@ require_value "API_BASE_URL" "$API_BASE_URL"
 require_https_url "AUTH_ISSUER" "$AUTH_ISSUER"
 require_https_url "API_BASE_URL" "$API_BASE_URL"
 
+# Repair legacy release overrides before native bearer requests can redirect and lose auth.
+configured_api_host="$(host_for_url "$API_BASE_URL")"
+API_BASE_URL="$(node --input-type=module - \
+  "$SCRIPT_DIR/../../../packages/product-registry/src/products/logyourbody.mjs" "$API_BASE_URL" <<'JS'
+import { pathToFileURL } from 'node:url';
+const { logYourBody } = await import(pathToFileURL(process.argv[2]).href);
+const url = new URL(process.argv[3]);
+const canonical = new URL(logYourBody.endpoints.hosts.api.url);
+if (canonical.hostname.startsWith('www.') && url.hostname === canonical.hostname.slice(4) &&
+    url.protocol === canonical.protocol && url.port === canonical.port && !url.username && !url.password) {
+  url.hostname = canonical.hostname;
+  process.stdout.write(url.href);
+} else {
+  process.stdout.write(process.argv[3]);
+}
+JS
+)"
+if [ "${API_EXPECTED_HOST:-}" = "$configured_api_host" ]; then
+  API_EXPECTED_HOST="$(host_for_url "$API_BASE_URL")"
+fi
+
 if [ "$AUTH_ISSUER" != "https://jov.ie/api/auth" ]; then
   fail "AUTH_ISSUER must be https://jov.ie/api/auth for iOS production releases."
 fi

@@ -3,61 +3,7 @@ import XCTest
 @testable import LogYourBody
 
 @MainActor
-final class DatedOutcomeStoreTests: XCTestCase {
-    private var owner: String? = "owner-a"
-    private var gate = true
-    private var emitted: [DatedOutcomeEdit] = []
-
-    private var value: DatedOutcome {
-        DatedOutcome(
-            outcome: .init(metric: .bodyFatPercentage, targetValue: 20), outcomeDate: "2027-04-01",
-            constraints: .init(
-                availability: .init(sessionsPerWeek: 3, minutesPerSession: 45, equipment: "dumbbells"),
-                travel: [.init(start: "2027-01-01", end: "2027-01-07")],
-                maintenance: [.init(start: "2027-02-01", end: "2027-02-14")]
-            )
-        )
-    }
-
-    private func store(_ context: NSManagedObjectContext) -> DatedOutcomeStore {
-        DatedOutcomeStore(
-            context: context, currentOwner: { self.owner }, enabled: { self.gate },
-            didSave: { self.emitted.append($0) }
-        )
-    }
-
-    private func coordinator(version: String? = nil, url: URL? = nil) throws -> NSPersistentStoreCoordinator {
-        let model: NSManagedObjectModel
-        if let version {
-            let bundle = try XCTUnwrap(Bundle(for: CoreDataManager.self).url(forResource: "LogYourBody", withExtension: "momd"))
-            model = try XCTUnwrap(NSManagedObjectModel(contentsOf: bundle.appendingPathComponent("\(version).mom")))
-        } else {
-            model = CoreDataManager.makeManagedObjectModel()
-        }
-        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
-        try coordinator.addPersistentStore(
-            ofType: url == nil ? NSInMemoryStoreType : NSSQLiteStoreType, configurationName: nil, at: url,
-            options: [NSMigratePersistentStoresAutomaticallyOption: true, NSInferMappingModelAutomaticallyOption: true]
-        )
-        return coordinator
-    }
-
-    private func context(_ coordinator: NSPersistentStoreCoordinator) -> NSManagedObjectContext {
-        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
-        context.persistentStoreCoordinator = coordinator
-        return context
-    }
-
-    private func close(_ coordinator: NSPersistentStoreCoordinator) throws {
-        for persistentStore in coordinator.persistentStores { try coordinator.remove(persistentStore) }
-    }
-
-    private func removeStore(_ url: URL) {
-        for suffix in ["", "-wal", "-shm"] {
-            try? FileManager.default.removeItem(atPath: url.path + suffix)
-        }
-    }
-
+final class DatedOutcomeStoreTests: DatedOutcomeStoreFixtureCase {
     func testPresentationSaveAndRelaunchRestoreOwnerScopedContext() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("timeline-\(UUID()).sqlite")
         defer { removeStore(url) }
@@ -77,6 +23,170 @@ final class DatedOutcomeStoreTests: XCTestCase {
         XCTAssertTrue(try restored.pendingEdits().isEmpty)
     }
 
+    func testReconciliationKeepsBaselineOnlyForComparableMetric() async throws {
+        let journal = store(context(try coordinator()))
+        let edit = try XCTUnwrap(journal.save(value))
+        let baseline = DatedOutcome.PlanBaseline(date: Date(), metric: value.outcome.metric, value: 22)
+        try await journal.retainPlanBaselineForPresentation(baseline, revision: edit.requestId, isCurrent: { true })
+        var revised = value
+        revised.outcomeDate = "2028-01-01"
+        let remote = DatedOutcomeSnapshot(revision: UUID(), value: revised)
+        try await journal.acceptRemoteForPresentation(remote, expectedRevision: edit.requestId, isCurrent: { true })
+        XCTAssertEqual(try journal.load()?.value, revised)
+        XCTAssertEqual(try journal.load()?.revision, remote.revision)
+        XCTAssertEqual(try journal.load()?.planBaseline, baseline)
+        XCTAssertTrue(try journal.pendingEdits().isEmpty)
+        revised.outcome.metric = .weightKg
+        revised.outcome.targetValue = 76
+        try await journal.acceptRemoteForPresentation(
+            .init(revision: UUID(), value: revised), expectedRevision: remote.revision, isCurrent: { true }
+        )
+        XCTAssertNil(try journal.load()?.planBaseline, "A different metric cannot reuse the previous baseline")
+        XCTAssertTrue(try journal.pendingEdits().isEmpty)
+        XCTAssertEqual(emitted, [edit], "Reconciliation cannot enqueue a new user edit")
+    }
+
+    func testEditorSaveIsAtomicAndUnchangedSaveCreatesNoRequest() async throws {
+        let journal = store(context(try coordinator()))
+        let editor = DatedOutcomeEditorModel(store: journal, isCurrent: { true })
+        await editor.load()
+        let saved = await editor.save(value)
+        XCTAssertTrue(saved)
+        let reopened = DatedOutcomeEditorModel(store: journal, isCurrent: { true })
+        await reopened.load()
+        XCTAssertEqual(reopened.snapshot?.value, value)
+        XCTAssertTrue(reopened.hasPending)
+        let unchanged = await reopened.save(value)
+        XCTAssertTrue(unchanged)
+        XCTAssertEqual(emitted.count, 1)
+        var edit = value
+        edit.outcomeDate = "2027-07-01"
+        edit.constraints.travel = []
+        let changed = await reopened.save(edit)
+        XCTAssertTrue(changed)
+        XCTAssertEqual(try journal.pendingEdits().count, 2)
+        let count = try await journal.pendingCountForPresentation(isCurrent: { true })
+        XCTAssertEqual(count, 2)
+        XCTAssertEqual(try journal.load()?.value, edit)
+    }
+
+    func testRawEditorDraftPreservesConstraintsAndRejectsInvalidTextWithoutFallback() throws {
+        var draft = DatedOutcomeEditorDraft(
+            metric: value.outcome.metric, targetText: "20", dateText: value.outcomeDate,
+            constraints: value.constraints, sessionsText: "3", minutesText: "45"
+        )
+        XCTAssertEqual(draft.resolve(), value)
+        draft.dateText = "2027-02-30"
+        XCTAssertEqual(draft.resolve().outcomeDate, "2027-02-30")
+        XCTAssertThrowsError(try draft.resolve().validate())
+        draft.dateText = value.outcomeDate
+        draft.sessionsText = "invalid"
+        XCTAssertThrowsError(try draft.resolve().validate())
+        draft.sessionsText = ""
+        XCTAssertNil(draft.resolve().constraints.availability.sessionsPerWeek)
+        XCTAssertEqual(draft.resolve().constraints.travel, value.constraints.travel)
+        draft.targetText = "invalid"
+        XCTAssertThrowsError(try draft.resolve().validate())
+    }
+
+    func testEditorInvalidAndFailedSaveKeepOpeningRevisionForRetry() async throws {
+        let failing = FailingOutcomeContext(concurrencyType: .mainQueueConcurrencyType)
+        failing.persistentStoreCoordinator = try coordinator()
+        let journal = store(failing)
+        try journal.save(value)
+        let editor = DatedOutcomeEditorModel(store: journal, isCurrent: { true })
+        await editor.load()
+        let revision = editor.snapshot?.revision
+        var draft = value
+        draft.outcomeDate = "2027-02-30"
+        let invalid = await editor.save(draft)
+        XCTAssertFalse(invalid)
+        XCTAssertNotNil(editor.errorText)
+        draft.outcomeDate = "2027-05-01"
+        failing.failSave = true
+        let failed = await editor.save(draft)
+        XCTAssertFalse(failed)
+        XCTAssertEqual(editor.snapshot?.revision, revision)
+        XCTAssertEqual(emitted.count, 1)
+        failing.failSave = false
+        let retried = await editor.save(draft)
+        XCTAssertTrue(retried)
+        XCTAssertEqual(try journal.load()?.value, draft)
+        XCTAssertEqual(emitted.count, 2)
+    }
+
+    func testStaleEditorCannotReplaceNewerValueOrDuplicateItsPendingRequest() async throws {
+        let journal = store(context(try coordinator()))
+        try journal.save(value)
+        let editor = DatedOutcomeEditorModel(store: journal, isCurrent: { true })
+        await editor.load()
+        var newer = value
+        newer.outcomeDate = "2027-08-01"
+        let pending = try XCTUnwrap(journal.save(newer))
+        await editor.load()
+        XCTAssertEqual(editor.snapshot?.value, value, "A reappearing sheet keeps its opening revision")
+        let saved = await editor.save(value)
+        XCTAssertFalse(saved)
+        XCTAssertTrue(editor.hasLocalConflict)
+        XCTAssertEqual(editor.snapshot?.value, value, "The opening value must not be silently replaced")
+        await editor.reviewAccountValue { XCTFail("Local reconciliation needs no network"); return nil }
+        let reconciled = await editor.useAccountValue()
+        XCTAssertTrue(reconciled)
+        XCTAssertEqual(try journal.load()?.value, newer)
+        XCTAssertEqual(try journal.pendingEdits().last, pending)
+        XCTAssertEqual(emitted.count, 2)
+    }
+
+    func testConflictRetryKeepsIdentityAndExplicitReconciliationEmitsNoRequest() async throws {
+        let journal = store(context(try coordinator()))
+        let first = try XCTUnwrap(journal.save(value))
+        let remote = OutcomeRemoteFixture()
+        remote.conflicts = true
+        for _ in 0..<2 {
+            do {
+                try await journal.synchronize(remote: remote, token: "synthetic", isCurrent: { true })
+                XCTFail("A conflict must remain pending")
+            } catch { }
+        }
+        XCTAssertEqual(journal.syncIssue, .conflict)
+        XCTAssertEqual(remote.requests, [first, first])
+        let editor = DatedOutcomeEditorModel(store: journal, isCurrent: { true })
+        await editor.load()
+        var draft = value
+        draft.outcomeDate = "2028-01-01"
+        let blocked = await editor.save(draft)
+        XCTAssertFalse(blocked, "Saving cannot enqueue more writes onto a conflicting revision")
+        let account = DatedOutcomeSnapshot(revision: UUID(), value: draft)
+        await editor.reviewAccountValue { account }
+        XCTAssertEqual(try journal.load()?.value, value, "Review alone cannot discard the user's input")
+        let reconciled = await editor.useAccountValue()
+        XCTAssertTrue(reconciled)
+        XCTAssertEqual(try journal.load(), account)
+        XCTAssertTrue(try journal.pendingEdits().isEmpty)
+        XCTAssertEqual(emitted, [first])
+    }
+
+    func testEditorAndReconciliationCannotCrossAccountSessions() async throws {
+        let journal = store(context(try coordinator()))
+        try journal.save(value)
+        var current = true
+        let editor = DatedOutcomeEditorModel(store: journal, isCurrent: { current })
+        await editor.load()
+        await editor.reviewAccountValue { .init(revision: UUID(), value: self.value) }
+        owner = "owner-b"
+        current = false
+        XCTAssertFalse(editor.isPresentationCurrent, "A reused sheet must hide its opening account's snapshot")
+        let saved = await editor.save(value)
+        let reconciled = await editor.useAccountValue()
+        XCTAssertFalse(saved)
+        XCTAssertFalse(reconciled)
+        XCTAssertNil(try journal.load())
+        XCTAssertTrue(try journal.pendingEdits().isEmpty)
+        owner = "owner-a"
+        XCTAssertEqual(try journal.load()?.value, value)
+        XCTAssertEqual(emitted.count, 1)
+    }
+
     func testStalePresentationCannotSaveIntoAnotherAccount() async throws {
         let journal = store(context(try coordinator()))
         owner = "owner-b"
@@ -90,79 +200,7 @@ final class DatedOutcomeStoreTests: XCTestCase {
     }
 
     func testCoachActionAndNextCheckInSurviveSQLiteReopenWithoutSyncEdit() async throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("coach-\(UUID()).sqlite")
-        defer { removeStore(url) }
-        let first = try coordinator(url: url)
-        let background = FailingOutcomeContext(concurrencyType: .privateQueueConcurrencyType)
-        background.persistentStoreCoordinator = first
-        let journal = store(background)
-        var goal = value
-        goal.outcome = .init(metric: .weightKg, targetValue: 76)
-        let edit = try XCTUnwrap(journal.save(goal))
-        let now = try XCTUnwrap(DatedOutcome.calendarDate("2026-11-01"))
-        let baseline = DatedOutcome.PlanBaseline(date: now.addingTimeInterval(-8 * 7 * 86_400), metric: .weightKg, value: 80)
-        let records = [("baseline", baseline.date, 80.0), ("latest", now, 78.0)].map { id, date, weight in
-            BodyMetrics(id: id, userId: "owner-a", date: date, weight: weight, weightUnit: "kg",
-                        bodyFatPercentage: nil, bodyFatMethod: nil, muscleMass: nil, boneMass: nil, notes: nil,
-                        photoUrl: nil, dataSource: "manual", createdAt: date, updatedAt: date)
-        }
-        // Arithmetic examples only; production policy remains unavailable.
-        let input = LaunchJourney.Input(
-            now: now, outcome: goal, freshnessWindow: 365 * 86_400,
-            thresholds: [.weightKg: .init(
-                minimumTarget: 40, maximumTarget: 250, minimumWeeklyChange: -1, maximumWeeklyChange: 1)],
-            safeWeeklyChangeKg: -1...1)
-        let projection = await DatedTimelineProjector().project(
-            owner: "owner-a", metrics: records, input: input, savedOutcome: try journal.load())
-        let action = try XCTUnwrap(projection.coach.actionToSave)
-        try await journal.retainPlanBaselineForPresentation(baseline, revision: edit.requestId, isCurrent: { true })
-        try await journal.retainCoachActionForPresentation(action, isCurrent: { true })
-        XCTAssertEqual(try journal.load()?.coachAction, action)
-        await background.perform { background.failSave = true }
-        var failedReview = action
-        failedReview.id = UUID()
-        failedReview.reviewedAt = now.addingTimeInterval(1)
-        failedReview.nextCheckIn = action.nextCheckIn.addingTimeInterval(1)
-        do {
-            try await journal.retainCoachActionForPresentation(failedReview, isCurrent: { true })
-            XCTFail("A failed write must not acknowledge a weekly review")
-        } catch DatedOutcomeError.unavailable { }
-        XCTAssertEqual(try journal.load()?.coachAction, action)
-        await background.perform { background.failSave = false }
-        XCTAssertEqual(try journal.pendingEdits(), [edit])
-        XCTAssertEqual(emitted.count, 1)
-        let wire = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(edit)) as? [String: Any])
-        XCTAssertNil(wire["coachAction"])
-        try journal.acknowledge(edit, receipt: .init(revision: edit.requestId, value: goal))
-        try close(first)
-        let reopened = try coordinator(url: url)
-        defer { try? close(reopened) }
-        let restored = store(context(reopened))
-        XCTAssertEqual(try restored.load()?.coachAction, action)
-        let returned = await DatedTimelineProjector().project(
-            owner: "owner-a", metrics: records, input: input, savedOutcome: try restored.load())
-        XCTAssertNil(returned.coach.actionToSave)
-        XCTAssertEqual(returned.coach.presentation, projection.coach.presentation)
-        XCTAssertEqual(returned.coach.nextCheckIn, action.nextCheckIn)
-        owner = nil
-        XCTAssertThrowsError(try restored.load())
-        owner = "owner-b"
-        XCTAssertNil(try restored.load())
-        owner = "owner-a"
-        var revised = goal
-        revised.outcomeDate = "2027-05-01"
-        try restored.save(revised)
-        XCTAssertNil(try restored.load()?.coachAction, "An edited date must recompute the action")
-        do {
-            try await restored.retainCoachActionForPresentation(action, isCurrent: { true })
-            XCTFail("An old revision cannot restore an action after a date edit")
-        } catch DatedOutcomeError.invalidReceipt { }
-        owner = "owner-b"
-        do {
-            try await restored.retainCoachActionForPresentation(action, isCurrent: { false })
-            XCTFail("An old account presentation cannot save an action")
-        } catch DatedOutcomeError.unauthenticated { }
-        XCTAssertNil(try restored.load())
+        try await assertCoachActionAndNextCheckInSurviveSQLiteReopenWithoutSyncEdit()
     }
 
     func testPlanBaselineSurvivesEditsAcknowledgementAndRelaunchWithoutWireChanges() async throws {
@@ -411,54 +449,6 @@ final class DatedOutcomeStoreTests: XCTestCase {
 
     func testExistingV5StoreMigratesWithoutLosingWorkoutReconciliationOrCreatingOutcome() throws {
         try assertExistingStoreMigrates(version: "LogYourBodyV5")
-    }
-
-    private func assertExistingStoreMigrates(version: String) throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("outcome-migration-\(UUID()).sqlite")
-        defer { removeStore(url) }
-        let legacy = try coordinator(version: version, url: url)
-        let legacyContext = context(legacy)
-        let profile = NSEntityDescription.insertNewObject(forEntityName: "CachedProfile", into: legacyContext)
-        profile.setValue("owner-a", forKey: "id")
-        profile.setValue("synthetic@example.invalid", forKey: "email")
-        for key in ["createdAt", "updatedAt", "lastModified"] { profile.setValue(Date(), forKey: key) }
-        profile.setValue(80, forKey: "goalWeight")
-        let metric = NSEntityDescription.insertNewObject(forEntityName: "CachedBodyMetrics", into: legacyContext)
-        metric.setValue("measurement-a", forKey: "id")
-        metric.setValue("owner-a", forKey: "userId")
-        for key in ["createdAt", "updatedAt", "lastModified", "date"] { metric.setValue(Date(), forKey: key) }
-        metric.setValue(85.5, forKey: "weight")
-        let reconciliationPayload = Data("retained-reconciliation".utf8)
-        if version == "LogYourBodyV5" {
-            XCTAssertNotNil(legacy.managedObjectModel.entitiesByName["CachedWorkoutReconciliationDay"])
-            let day = NSEntityDescription.insertNewObject(
-                forEntityName: "CachedWorkoutReconciliationDay", into: legacyContext
-            )
-            day.setValue("owner-a", forKey: "ownerId")
-            day.setValue("2027-01-01", forKey: "day")
-            day.setValue(reconciliationPayload, forKey: "payload")
-        }
-        try legacyContext.save()
-        try close(legacy)
-        let migrated = try coordinator(url: url)
-        defer { try? close(migrated) }
-        let migratedContext = context(migrated)
-        let profiles = try migratedContext.fetch(NSFetchRequest<NSManagedObject>(entityName: "CachedProfile"))
-        XCTAssertEqual(profiles.first?.value(forKey: "goalWeight") as? Double, 80)
-        let metrics = try migratedContext.fetch(NSFetchRequest<NSManagedObject>(entityName: "CachedBodyMetrics"))
-        XCTAssertEqual(metrics.first?.value(forKey: "weight") as? Double, 85.5)
-        if version == "LogYourBodyV5" {
-            let request = NSFetchRequest<NSManagedObject>(entityName: "CachedWorkoutReconciliationDay")
-            let days = try migratedContext.fetch(request)
-            XCTAssertEqual(days.count, 1)
-            XCTAssertEqual(days.first?.value(forKey: "ownerId") as? String, "owner-a")
-            XCTAssertEqual(days.first?.value(forKey: "day") as? String, "2027-01-01")
-            XCTAssertEqual(days.first?.value(forKey: "payload") as? Data, reconciliationPayload)
-        }
-        let store = store(migratedContext)
-        XCTAssertNil(try store.load())
-        try store.save(value)
-        XCTAssertEqual(try store.load()?.value, value)
     }
 
     func testWireFieldsAndLYB130InputsConsumeExternalContractFixtureWhenSupplied() throws {

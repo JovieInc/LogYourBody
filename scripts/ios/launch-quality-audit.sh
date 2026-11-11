@@ -29,10 +29,13 @@ XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
 # missed every Swift package cache and was still compiling test targets at 600s.
 # Allow 15m for compilation; keep test timeouts, retries and the outer step cap.
 BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"
-# Use the 52-minute step budget while reserving 180s for result finalization.
-# Run 42695073821's 1168s prefix left only 1590s for passing UI cases at 2760s.
-# Per-test limits, the 1800s UI cap and the workflow step cap still apply.
-AUDIT_DEADLINE_SECONDS="${AUDIT_DEADLINE_SECONDS:-2940}"
+# Keep the 1800s UI hang cap after a cold hosted prefix. Run 42695073821's
+# 1168s prefix left only 1590s for passing UI cases at 2760s. Run 42795533093
+# reached UI at 1375s; deadline 2940 left 1565s and killed still-passing UI
+# cases. The same SHA's retry finished those cases in 1697s. 3240s leaves the
+# 1800s cap intact and reserves 180s finalization inside the 57-minute step.
+# Per-test limits and the UI hang cap still apply.
+AUDIT_DEADLINE_SECONDS="${AUDIT_DEADLINE_SECONDS:-3240}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
@@ -461,6 +464,8 @@ LAUNCH_QUALITY_UI_TESTS=(
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces"
+  "LogYourBodyUITests/testDatedOutcomeFirstLaunchCancelBackAndManualBaseline"
+  "LogYourBodyUITests/testDatedOutcomeGateOffKeepsExistingFirstRun"
   "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn"
   "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation"
   "LogYourBodyUITests/testDatedTimelineExpiredOutcomeOpensEditorWithoutExtendingDate"
@@ -504,8 +509,8 @@ done
 UI_RESULT_BUNDLE="$ARTIFACT_DIR/launch-quality-ui.xcresult"
 UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")
 # One UI launch carries the dated-state matrix. Per-test allowances and the
-# 52-minute step cap stay; finalization grace is not part of this hang cap.
-UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1800}" # dated-state matrix; per-test and 52m caps stay
+# 57-minute step cap stay; finalization grace is not part of this hang cap.
+UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1800}" # dated-state matrix; per-test and 57m caps stay
 phase_start ui-tests
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_xcodebuild_test \
   "launch-quality-ui" \

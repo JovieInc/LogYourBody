@@ -104,14 +104,20 @@
         "LaunchJourneyTests/testBaselineDenialAndNoDataRecoverToOneAction()",
         "DatedTimelineTests/testDeniedAndInterruptedOptionalInputsAllowManualBaselineWithoutPolicy()",
         "DatedTimelineTests/testManualBodyFatAndFFMIBaselinesUseExistingInputs()",
-        "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()"
+        "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()",
+        "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()"
       ]
     },
     {
       "id": "launch.deadline",
       "tier": "simulator_interaction",
       "requiredCaptures": ["outcome-date"],
-      "testIds": ["LaunchJourneyTests/testDatedOutcomeSurvivesAndEditRecomputes()"]
+      "testIds": [
+        "LaunchJourneyTests/testDatedOutcomeSurvivesAndEditRecomputes()",
+        "DatedOutcomeStoreTests/testEditorSaveIsAtomicAndUnchangedSaveCreatesNoRequest()",
+        "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()",
+        "DatedOutcomeStoreTests/testRawEditorDraftPreservesConstraintsAndRejectsInvalidTextWithoutFallback()"
+      ]
     },
     {
       "id": "launch.deadline-replan",
@@ -121,7 +127,8 @@
         "LaunchJourneyTests/testDateEditRecomputesWithoutExtendingExpired()",
         "DatedOutcomeStatsTests/testDateEditsAndNewMeasurementsRetainOriginalBaseline()",
         "DatedOutcomeStoreTests/testPlanBaselineSurvivesEditsAcknowledgementAndRelaunchWithoutWireChanges()",
-        "DatedOutcomeStatsTests/testCoachDateEditRecomputesAndRetryDoesNotReplaceBaseline()"
+        "DatedOutcomeStatsTests/testCoachDateEditRecomputesAndRetryDoesNotReplaceBaseline()",
+        "DatedOutcomeStoreTests/testEditorSaveIsAtomicAndUnchangedSaveCreatesNoRequest()"
       ]
     },
     {
@@ -167,14 +174,21 @@
         "DatedTimelineTests/testDelayedSheetActionsRejectReplacementAccountAndSessionGeneration()",
         "DatedOutcomeStoreTests/testBaselineCannotReplaceExistingRevisionOrCrossAccountSession()",
         "LogYourBodyUITests/testDatedStatsManualMeasurementDateEditExpiryAndAccountReturn()",
-        "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()"
+        "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()",
+        "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()",
+        "DatedOutcomeStoreTests/testEditorAndReconciliationCannotCrossAccountSessions()",
+        "LaunchJourneyTests/testDatedManualTrackingCanProceedWithoutAFullProfile()"
       ]
     },
     {
       "id": "launch.promise",
       "tier": "simulator_interaction",
       "requiredCaptures": ["launch-promise"],
-      "testIds": ["LaunchJourneyTests/testPromiseCopyStatesTheDate()"]
+      "testIds": [
+        "LaunchJourneyTests/testPromiseCopyStatesTheDate()",
+        "LaunchJourneyTests/testDatedOutcomeEntryUsesExistingDefaultOffPlatformGate()",
+        "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()"
+      ]
     },
     {
       "id": "launch.recovery",
@@ -199,7 +213,11 @@
         "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()",
         "DatedOutcomeStatsTests/testNewAcceptedReadingRecoversLatestConflictWithoutReplacingExistingBaseline()",
         "DatedOutcomeStatsTests/testCoachWeeklyFreshnessGapDoesNotChangeActionOrPretendToAdjust()",
-        "DatedOutcomeStatsTests/testEveryStatsManifestStateHasOneRecoveryAndPreservesConstraints()"
+        "DatedOutcomeStatsTests/testEveryStatsManifestStateHasOneRecoveryAndPreservesConstraints()",
+        "DatedOutcomeStoreTests/testEditorInvalidAndFailedSaveKeepOpeningRevisionForRetry()",
+        "DatedOutcomeStoreTests/testStaleEditorCannotReplaceNewerValueOrDuplicateItsPendingRequest()",
+        "DatedOutcomeStoreTests/testConflictRetryKeepsIdentityAndExplicitReconciliationEmitsNoRequest()",
+        "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()"
       ]
     },
     {
@@ -230,7 +248,9 @@
         "DatedOutcomeStatsTests/testRateBoundaryDoesNotBypassTargetEligibilityOrIncompletePolicy()",
         "DatedOutcomeStatsTests/testUnavailablePolicyMaintenanceAndAccountReplacementNeverAdmitAPlan()",
         "DatedOutcomeStatsTests/testAdoptedCeilingUsesCurrentAcceptedWeightAndElapsedTimeWithoutCompounding()",
-        "DatedOutcomeStatsTests/testCoachUnavailablePlannerPolicyAndForeignMemoryFailClosed()"
+        "DatedOutcomeStatsTests/testCoachUnavailablePlannerPolicyAndForeignMemoryFailClosed()",
+        "LaunchJourneyTests/testAdoptedWeightCeilingRejectsBothDirectionsWithoutAdmittingPartialPolicy()",
+        "LaunchJourneyTests/testDatedAdmissionKeepsEligibilityUnavailableExpiryAndNoDataDistinct()"
       ]
     },
     {

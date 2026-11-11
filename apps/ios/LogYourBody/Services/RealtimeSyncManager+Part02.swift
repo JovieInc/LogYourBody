@@ -108,24 +108,27 @@ nonisolated func processPendingOperations(
             }
 
             let unsynced: PendingLocalSyncCounts
+            let datedOutcomeCount: Int
             do {
                 unsynced = try await self.coreDataManager.fetchPendingLocalSyncCounts(for: userId)
+                datedOutcomeCount = try await self.pendingDatedOutcomeCount()
             } catch {
                 await MainActor.run {
+                    guard !Task.isCancelled, self.authManager.currentUser?.id == userId else { return }
                     self.pendingSyncCount = max(self.pendingSyncCount, operationsCount + 1)
                 }
                 return
             }
 
             await MainActor.run {
-                guard self.authManager.currentUser?.id == userId else { return }
+                guard !Task.isCancelled, self.authManager.currentUser?.id == userId else { return }
                 self.unsyncedBodyCount = unsynced.bodyMetrics
                 self.unsyncedDailyCount = unsynced.dailyMetrics
                 self.unsyncedProfileCount = unsynced.profiles
                 self.unsyncedGlp1Count = unsynced.glp1DoseLogs
                 self.unsyncedDexaCount = unsynced.dexaResults
                 self.pendingSyncCount = unsynced.total +
-                    operationsCount + self.pendingDatedOutcomeCount
+                    operationsCount + datedOutcomeCount
             }
         }
     }
@@ -137,8 +140,9 @@ func hasPendingSyncOperations() async -> Bool {
 
         do {
             let unsynced = try await coreDataManager.fetchPendingLocalSyncCounts(for: userId)
+            let datedOutcomeCount = try await pendingDatedOutcomeCount()
             return unsynced.total > 0 ||
-                pendingDatedOutcomeCount > 0 ||
+                datedOutcomeCount > 0 ||
                 pendingOperations.contains { $0.userId == userId }
         } catch {
             return true

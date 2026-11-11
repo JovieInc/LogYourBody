@@ -10,6 +10,35 @@ final class DatedOutcomeStatsTests: XCTestCase {
         .init(outcome: .init(metric: .weightKg, targetValue: 76), outcomeDate: "2026-12-27")
     }
 
+    func testStatsFixtureEditorDraftMatchesEveryProjectedOutcome() throws {
+        for state in LaunchJourney.RouteState.allCases {
+            let arguments = ["-lybUITestDatedTimelineFixture", "-lybUITestDatedStatsState", state.rawValue]
+            var input = LaunchJourney.Input(now: now)
+            var metrics: [BodyMetrics] = []
+            DatedStatsUITestFixture.apply(owner: "a", input: &input, metrics: &metrics, arguments: arguments)
+            let draft = try XCTUnwrap(DatedStatsUITestFixture.editorOutcome(saved: nil, arguments: arguments))
+            XCTAssertEqual(draft, input.outcome, state.rawValue)
+            XCTAssertEqual(draft.outcomeDate,
+                           state == .expiredDate ? "2026-10-01" : state == .impossibleDate ? "2026-11-08" : "2026-12-27")
+            XCTAssertEqual(draft.constraints.maintenance.isEmpty, state != .maintenance)
+            var saved = outcome
+            saved.outcomeDate = "2099-12-28"
+            XCTAssertEqual(DatedStatsUITestFixture.editorOutcome(saved: saved, arguments: arguments), saved)
+        }
+    }
+
+    func testStatsFixtureEditorDraftRequiresBothFlagsAndAValidState() {
+        let invalidArguments = [
+            [], ["-lybUITestDatedTimelineFixture"], ["-lybUITestDatedStatsState", "expired-date"],
+            ["-lybUITestDatedTimelineFixture", "-lybUITestDatedStatsState"],
+            ["-lybUITestDatedTimelineFixture", "-lybUITestDatedStatsState", "unknown"]
+        ]
+        for arguments in invalidArguments {
+            XCTAssertNil(DatedStatsUITestFixture.editorOutcome(saved: nil, arguments: arguments))
+            XCTAssertEqual(DatedStatsUITestFixture.editorOutcome(saved: outcome, arguments: arguments), outcome)
+        }
+    }
+
     // Wiring examples only. The current canonical policy supplies no numeric bounds.
     private func input(_ outcome: DatedOutcome) -> LaunchJourney.Input {
         .init(now: now, outcome: outcome, freshnessWindow: 365 * 86_400,

@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const root = fileURLToPath(new URL('../../..', import.meta.url));
-function run(settings: Record<string, unknown> = {}) {
+function run(settings: Record<string, unknown> | 'preflight' = {}) {
   const output = execFileSync(
     'ruby',
     [
@@ -17,6 +17,13 @@ function run(settings: Record<string, unknown> = {}) {
   );
   return JSON.parse(output.trim().split('\n').at(-1)!);
 }
+
+// Prepare the cold Ruby runtime under the hook's bounded setup budget. Each
+// release scenario keeps its default five-second deadline and its assertions.
+beforeAll(() => {
+  expect(run('preflight')).toEqual({ ready: true });
+});
+
 function mutations(result: ReturnType<typeof run>, host = 'api.appstoreconnect.apple.com') {
   return result.requests.filter(
     (r: { host: string; method: string }) => r.host === host && r.method !== 'GET',

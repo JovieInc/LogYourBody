@@ -9,14 +9,14 @@ import UIKit
 class BackgroundRemovalService {
     static let shared = BackgroundRemovalService()
     private let segmentationQueue: DispatchQueue
-    private let segment: (CGImage, Float) throws -> CVPixelBuffer
+    private let makeMask: (CGImage, Float) throws -> CVPixelBuffer
 
     init(
         segmentationQueue: DispatchQueue = DispatchQueue(label: "com.logyourbody.segmentation", qos: .userInitiated),
         segment: ((CGImage, Float) throws -> CVPixelBuffer)? = nil
     ) {
         self.segmentationQueue = segmentationQueue
-        self.segment = segment ?? Self.generatePersonMask
+        self.makeMask = segment ?? Self.generatePersonMask
     }
 
     enum BackgroundRemovalError: LocalizedError {
@@ -53,7 +53,7 @@ class BackgroundRemovalService {
         let mask: CVPixelBuffer = try await withCheckedThrowingContinuation { continuation in
             segmentationQueue.async {
                 // `perform` owns completion; Vision's callback must never resume this again.
-                continuation.resume(with: Result { try self.segment(cgImage, quality) })
+                continuation.resume(with: Result { try self.makeMask(cgImage, quality) })
             }
         }
         try Task.checkCancellation()

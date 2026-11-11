@@ -31,6 +31,90 @@ function timeoutMinutes(section, label) {
   return Number(match[1]);
 }
 
+function stepSection(job, name) {
+  const marker = `      - name: ${name}\n`;
+  assert.ok(job.includes(marker), `missing step ${name}`);
+  return job.split(marker)[1].split('\n      - ')[0];
+}
+
+function assertLaunchQualityBudget(quality, audit) {
+  const deadline = audit.match(/AUDIT_DEADLINE_SECONDS="\$\{AUDIT_DEADLINE_SECONDS:-(\d+)\}"/);
+  assert.ok(deadline, 'missing launch-quality audit deadline');
+  const watcher = source('scripts/ios/xcodebuild-command-timeout.py');
+  const grace = watcher.match(/^MAX_FINALIZATION_GRACE_SECONDS = (\d+)$/m);
+  assert.ok(grace, 'missing xcodebuild finalization grace');
+  const launchMinutes = timeoutMinutes(
+    stepSection(quality, 'Run launch quality audit'),
+    'Launch audit',
+  );
+  const performanceMinutes = timeoutMinutes(
+    stepSection(quality, 'Run performance budget audit'),
+    'Performance audit',
+  );
+  assert.ok(
+    launchMinutes * 60 >= Number(deadline[1]) + Number(grace[1]),
+    'Launch audit step must enclose its deadline plus finalization grace',
+  );
+  // Preserve the existing 4-minute setup allowance around both audit steps.
+  assert.ok(
+    timeoutMinutes(quality, 'Launch Quality') >= 4 + launchMinutes + performanceMinutes,
+    'Launch Quality job must enclose setup and both audit steps',
+  );
+}
+
+function withTimeout(section, minutes) {
+  return section.replace(/timeout-minutes:\s*\d+/, `timeout-minutes: ${minutes}`);
+}
+
+test('launch-quality budget rejects undersized enclosing caps and accepts coordinated growth', () => {
+  const quality = jobSection(source('.github/workflows/ios-quality.yml'), 'quality');
+  const audit = source('scripts/ios/launch-quality-audit.sh');
+  const launch = stepSection(quality, 'Run launch quality audit');
+  const performance = stepSection(quality, 'Run performance budget audit');
+  const launchMinutes = timeoutMinutes(launch, 'Launch audit');
+  const performanceMinutes = timeoutMinutes(performance, 'Performance audit');
+  const deadline = audit.match(/AUDIT_DEADLINE_SECONDS:-(\d+)/)[1];
+  const grace = Number(
+    source('scripts/ios/xcodebuild-command-timeout.py').match(
+      /^MAX_FINALIZATION_GRACE_SECONDS = (\d+)$/m,
+    )[1],
+  );
+  assert.throws(
+    () =>
+      assertLaunchQualityBudget(
+        withTimeout(quality, 3 + launchMinutes + performanceMinutes),
+        audit,
+      ),
+    /job must enclose setup and both audit steps/,
+  );
+  assert.throws(
+    () =>
+      assertLaunchQualityBudget(
+        quality.replace(
+          launch,
+          withTimeout(launch, Math.ceil((Number(deadline) + grace) / 60) - 1),
+        ),
+        audit,
+      ),
+    /step must enclose its deadline plus finalization grace/,
+  );
+  const longerAudit = audit.replace(
+    `AUDIT_DEADLINE_SECONDS:-${deadline}`,
+    `AUDIT_DEADLINE_SECONDS:-${launchMinutes * 60 - grace + 1}`,
+  );
+  const longerStep = quality.replace(launch, withTimeout(launch, launchMinutes + 1));
+  assert.throws(
+    () => assertLaunchQualityBudget(quality, longerAudit),
+    /step must enclose its deadline plus finalization grace/,
+  );
+  assert.doesNotThrow(() =>
+    assertLaunchQualityBudget(
+      withTimeout(longerStep, timeoutMinutes(quality, 'Launch Quality') + 1),
+      longerAudit,
+    ),
+  );
+});
+
 test('enclosing release budget preserves native caps', () => {
   const release = source('.github/workflows/ios-release-loop.yml');
   const ci = source('.github/workflows/ci.yml');
@@ -42,7 +126,7 @@ test('enclosing release budget preserves native caps', () => {
   assert.match(audit, /DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE="\$\{DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE:-90\}"/);
   assert.match(audit, /MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="\$\{MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-180\}"/);
   assert.match(audit, /XCODEBUILD_COMMAND_TIMEOUT_SECONDS="\$\{XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020\}"/);
-  assert.equal(timeoutMinutes(jobSection(qualityWorkflow, 'quality'), 'Launch Quality'), 64);
+  assertLaunchQualityBudget(jobSection(qualityWorkflow, 'quality'), audit);
 
   const storekitMinutes = timeoutMinutes(jobSection(ci, 'ios_storekit'), 'StoreKit');
   assert.ok(
