@@ -9,9 +9,9 @@ import shutil
 import sys
 import unittest
 from unittest.mock import patch
-from launch_ui_timeline_day import check_timeline_calendar_day
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from launch_ui_timeline_day import check_timeline_calendar_day
 import test_launch_ui_audit_support as audit_support  # noqa: E402
 from test_launch_ui_audit_support import AUDIT, ROOT, LaunchUIAuditTests  # noqa: E402
 

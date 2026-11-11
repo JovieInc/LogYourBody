@@ -307,6 +307,17 @@ def check_nested_launch_time_allowance(root, violations, violation):
                 detail="Set executionTimeAllowance = 180 before running other test methods. XCTest rounds the 90s default up to 2 minutes.",
             ))
 
+    helper = text.find("private func launchSyntheticChatReplay(")
+    brace = text.find("{", helper) if helper >= 0 else -1
+    body = text[brace:_balanced_end(text, brace) + 1] if brace >= 0 else ""
+    launch_at = body.find("launch(app, with:")
+    if launch_at < 0 or "executionTimeAllowance = 180" not in body[:launch_at]:
+        violations.append(violation(
+            check="uitest.synthetic_chat_lifecycle_time_allowance",
+            file=str(path.relative_to(root)), line=1,
+            detail="Set the existing 180-second runner allowance before launching synthetic chat lifecycle scenarios.",
+        ))
+
 
 def check_launch_interruption_taps(root, violations, violation):
     """Activating a monitor must not tap an arbitrary control at app center."""

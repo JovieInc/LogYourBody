@@ -8248,5 +8248,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "synthetic-chat-lifecycle-inherits-runner-allowance",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42513359872/job/128831498784",
+    "correction": "The synthetic full-turn relaunch scenario exceeded XCTest's effective two-minute allowance; the subsequent critical-surfaces scenario failed to terminate the app. Preserve lifecycle and persistence assertions and the existing runner maximum and overall deadline.",
+    "mechanization": "Set executionTimeAllowance = 180 at the start of the shared launchSyntheticChatReplay helper so every synthetic chat lifecycle scenario inherits the configured runner maximum. Extend the existing nested-launch source audit to reject a missing, lower or late allowance. Execute real-source mutation cases through the existing required shared-lib launch audit suite. The audit was red on the unmodified helper and green after this change. Native exact-head execution remains a CI responsibility on this Linux host.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared launch helper configures every synthetic lifecycle scenario before app startup, preventing individual scenarios from silently retaining XCTest's shorter default."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "private func launchSyntheticChatReplay("
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

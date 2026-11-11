@@ -3443,8 +3443,6 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     func testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity() throws {
-        // Include failure, retry and persisted relaunch in the audit's existing cap.
-        executionTimeAllowance = 180
         let app = XCUIApplication()
         launchSyntheticChatReplay(app, extra: ["-lybUITestChatErrorFixture"])
         submitSyntheticChatQuestion(in: app)
@@ -3503,6 +3501,7 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     private func launchSyntheticChatReplay(_ app: XCUIApplication, extra: [String] = []) {
+        executionTimeAllowance = 180
         // A unique nonce starts empty; the same launch environment deliberately survives relaunch.
         app.launchEnvironment["LYB_UI_TEST_CHAT_REPLAY_ID"] = UUID().uuidString
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestChatFirstFixture",
@@ -3528,7 +3527,8 @@ final class LogYourBodyUITests: XCTestCase {
                 let keyboard = app.keyboards.firstMatch
                 for character in addition {
                     if !keyboard.exists {
-                        composer.tap()
+                        let insertion = CGVector(dx: prefix.isEmpty ? 0.5 : 0.9, dy: 0.5)
+                        composer.coordinate(withNormalizedOffset: insertion).tap()
                     }
                     let focused = app.descendants(matching: composer.elementType)
                         .matching(identifier: composer.identifier)

@@ -32,7 +32,7 @@ sys.modules[SPEC.name] = AUDIT
 SPEC.loader.exec_module(AUDIT)
 from launch_ui_home_interaction_audit import (
     _balanced_end, check_launch_interruption_taps, check_viewer_history_navigation,
-    check_progress_share_readiness,
+    check_progress_share_readiness, check_nested_launch_time_allowance,
 )  # noqa: E402
 
 
@@ -124,6 +124,13 @@ class PatternScanTests(LaunchUIAuditTests):
                           for path in (self.root / "apps/ios" / directory).rglob("*.swift"))
         rglob = Path.rglob
         visited = []
+        observed = []
+        begin = AUDIT.swift_sources.begin_swift_sources
+
+        def snapshot(root):
+            result = begin(root)
+            observed.extend(result)
+            return result
 
         def tracked_rglob(path, pattern):
             visited.append(path)
@@ -131,11 +138,12 @@ class PatternScanTests(LaunchUIAuditTests):
 
         with patch.object(Path, "rglob", tracked_rglob), \
                 patch.object(Path, "__lt__", side_effect=AssertionError("Sort path parts once")), \
-                patch.object(AUDIT.swift_sources, "begin_swift_sources", wraps=AUDIT.swift_sources.begin_swift_sources) as read:
+                patch.object(AUDIT.swift_sources, "begin_swift_sources", side_effect=snapshot) as read:
             self.assertEqual(self.run_audit()[0], 0)
         self.assertEqual(read.call_args.args[0], self.root)
         self.assertEqual(read.call_count, 1)
-        self.assertEqual(set(expected), set(path for path in self.root.rglob("*.swift")))
+        self.assertEqual(set(observed), set(expected))
+        self.assertEqual(len(observed), len(expected))
         self.assertEqual(visited.count(self.app), 1, "Do not rediscover the same app tree")
 
     def test_full_tree_patterns_skip_irrelevant_sources_without_changing_findings(self):
@@ -190,6 +198,38 @@ class PatternScanTests(LaunchUIAuditTests):
 
 
 class LaunchExecutionAuditTests(unittest.TestCase):
+    def test_synthetic_chat_lifecycle_gets_the_existing_runner_maximum_before_launch(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            relative = "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
+            path = root / relative
+            path.parent.mkdir(parents=True)
+            original = (ROOT / relative).read_text()
+
+            def findings():
+                violations = []
+                check_nested_launch_time_allowance(root, violations, AUDIT.AuditViolation)
+                return [item.check for item in violations]
+
+            self.assertEqual(findings(), [])
+            path.write_text(original)
+            self.assertEqual(findings(), [])
+            prefix, remainder = original.split("private func launchSyntheticChatReplay(", 1)
+            helper, suffix = remainder.split("    private func submitSyntheticChatQuestion(", 1)
+            suffix = "    private func submitSyntheticChatQuestion(" + suffix
+            allowance = "        executionTimeAllowance = 180\n"
+            self.assertEqual(helper.count(allowance), 1)
+            for replacement in ("", "        executionTimeAllowance = 90\n"):
+                with self.subTest(replacement=replacement):
+                    path.write_text(prefix + "private func launchSyntheticChatReplay("
+                                    + helper.replace(allowance, replacement, 1) + suffix)
+                    self.assertIn("uitest.synthetic_chat_lifecycle_time_allowance", findings())
+            late = helper.replace(allowance, "", 1).replace(
+                "        openHomeV2AskForDraftCheck(in: app)",
+                allowance + "        openHomeV2AskForDraftCheck(in: app)", 1)
+            path.write_text(prefix + "private func launchSyntheticChatReplay(" + late + suffix)
+            self.assertIn("uitest.synthetic_chat_lifecycle_time_allowance", findings())
+
     def test_progress_share_waits_for_selection_and_exact_title_before_readback(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

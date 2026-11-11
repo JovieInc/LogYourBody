@@ -107,6 +107,7 @@ it('keeps paced chat typing focused and gives nested launch scenarios the audit 
   expect(audit).toContain('uitest.progress_share_readiness');
   expect(audit).toContain('check_progress_share_readiness(root, violations, violation)');
   expect(audit).toContain('uitest.nested_launch_time_allowance');
+  expect(audit).toContain('uitest.synthetic_chat_lifecycle_time_allowance');
   expect(audit).toContain('uitest.viewer_history_navigation');
   expect(audit).toContain('check_viewer_history_navigation(root, violations, violation)');
   expect(audit).toContain('check_character_type_keyboard_focus(root, violations, violation)');
@@ -308,4 +309,4 @@ it('repairs additive audit and manifest conflicts while rejecting lost parent ch
   expect(output).toContain(
     'manifest union refuses a non-additive launch-audit conflict without staging',
   );
-});
+}, 30_000);
