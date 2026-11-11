@@ -69,7 +69,9 @@ stage the source inputs, then run the same `--staged` command before the ledger
 resolver. Pre-commit uses that order so a conflicted projection cannot make the
 ledger check fail closed before the projection is rebuilt. It rebuilds only the
 conflicted projection from stage-zero inputs and leaves unrelated conflicts
-untouched. A conflicted input still fails without changing the projection or
+untouched. `--union-manifests` also unions additive launch-audit sibling
+registrations in the parent audit, its Python expectation, and the shared-lib
+input list; any other conflict in those files still refuses the merge. A conflicted input still fails without changing the projection or
 index; ordinary unstaged projection edits remain protected.
 
 For dependency bumps with an already updated lockfile, run

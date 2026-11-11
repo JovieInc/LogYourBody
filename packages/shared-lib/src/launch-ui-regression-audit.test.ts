@@ -82,6 +82,38 @@ it('requires verified native text entry before testing draft preservation', () =
   expect(action).not.toContain('field.typeText(');
 });
 
+it('keeps paced chat typing focused and gives nested launch scenarios the audit time cap', () => {
+  const tests = readFileSync(
+    new URL('../../../apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift', import.meta.url),
+    'utf8',
+  );
+  const typing =
+    tests
+      .split('for character in addition {')[1]
+      ?.split('composer.typeText(String(character))')[0] ?? '';
+  expect(typing).toContain('hasKeyboardFocus == true');
+  expect(typing).toContain('if !focused.exists');
+  expect(typing).toContain('guard focused.waitForExistence(timeout: 2) else { break }');
+  const timeline =
+    tests
+      .split('func testLaunchQualityGateCapturesTimelineSurfaces()')[1]
+      ?.split('try testDatedTimelineManualBaselineAndInterruptedPhotoReturn()')[0] ?? '';
+  expect(timeline).toContain('executionTimeAllowance = 180');
+  const audit = readFileSync(
+    new URL('../../../scripts/ios/launch_ui_home_interaction_audit.py', import.meta.url),
+    'utf8',
+  );
+  expect(audit).toContain('uitest.character_type_keyboard_focus');
+  expect(audit).toContain('uitest.progress_share_readiness');
+  expect(audit).toContain('check_progress_share_readiness(root, violations, violation)');
+  expect(audit).toContain('uitest.nested_launch_time_allowance');
+  expect(audit).toContain('uitest.synthetic_chat_lifecycle_time_allowance');
+  expect(audit).toContain('uitest.viewer_history_navigation');
+  expect(audit).toContain('check_viewer_history_navigation(root, violations, violation)');
+  expect(audit).toContain('check_character_type_keyboard_focus(root, violations, violation)');
+  expect(audit).toContain('check_nested_launch_time_allowance(root, violations, violation)');
+});
+
 it('waits for exact metric text and Save readiness before testing Home check-in outcomes', () => {
   const source = readFileSync(
     new URL('../../../apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift', import.meta.url),
@@ -166,10 +198,12 @@ it('checks Stats composition, card styling and provenance dismissal through the 
     '$TURBO_ROOT$/.company-guards/size-baseline.json',
     '$TURBO_ROOT$/scripts/ios/launch_ui_opacity_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_timeline_gesture_audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_home_interaction_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_offline_pin_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_dated_stats_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-report.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
+    '$TURBO_ROOT$/scripts/ios/test_launch_ui_audit_support.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_home_interaction.py',
     '$TURBO_ROOT$/apps/ios/LogYourBodyWidget/**/*.swift',
     '$TURBO_ROOT$/apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift',
@@ -258,4 +292,21 @@ sys.exit(status)
   } finally {
     rmSync(coverage, { recursive: true, force: true });
   }
+}, 30_000);
+
+it('repairs additive audit and manifest conflicts while rejecting lost parent checks', () => {
+  const output = execFileSync(
+    process.execPath,
+    [
+      '--test',
+      'scripts/resolve-repository-docs-manifest.test.mjs',
+      'scripts/resolve-repository-docs-json.test.mjs',
+    ],
+    { cwd: fileURLToPath(new URL('../../..', import.meta.url)), encoding: 'utf8', timeout: 30_000 },
+  );
+  expect(output).toContain('# fail 0');
+  expect(output).toContain('manifest union keeps both launch-audit sibling registrations');
+  expect(output).toContain(
+    'manifest union refuses a non-additive launch-audit conflict without staging',
+  );
 }, 30_000);

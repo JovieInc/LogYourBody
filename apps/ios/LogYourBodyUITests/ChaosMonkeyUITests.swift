@@ -690,7 +690,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         ]
         app.forwardActualXCTestContext()
         app.launch()
-        app.tap()
+        app.activateSystemAlertMonitor()
 
         let start = app.buttons["body_score_onboarding_start_button"]
         XCTAssertTrue(start.waitForExistence(timeout: 15))
@@ -747,7 +747,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         ]
         app.forwardActualXCTestContext()
         app.launch()
-        app.tap()
+        app.activateSystemAlertMonitor()
 
         let start = app.buttons["body_score_onboarding_start_button"]
         XCTAssertTrue(start.waitForExistence(timeout: 15))
@@ -839,7 +839,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         app.launchArguments = config.launchArguments
         app.forwardActualXCTestContext()
         app.launch()
-        app.tap()
+        app.activateSystemAlertMonitor()
         popToRootIfNeeded(in: app)
 
         guard steps > 0, steps <= Int.max / 4 else {
@@ -1128,7 +1128,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         app.launchArguments = config.launchArguments
         app.forwardActualXCTestContext()
         app.launch()
-        app.tap()
+        app.activateSystemAlertMonitor()
         popToRootIfNeeded(in: app)
     }
 

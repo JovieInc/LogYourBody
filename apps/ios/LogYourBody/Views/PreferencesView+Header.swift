@@ -337,8 +337,10 @@ private struct ProfileLogoutScreen<Content: View>: View {
                     await authManager.logout()
                 }
             }
+            .accessibilityElement(children: .combine)
             .accessibilityIdentifier("settings_logout_confirm")
             Button("Cancel", role: .cancel) {}
+                .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("settings_logout_cancel")
         }
     }

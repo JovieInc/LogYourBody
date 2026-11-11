@@ -299,7 +299,8 @@ extension LogYourBodyUITests {
     func testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture", "-lybUITestDatedTimelineFixture"
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture", "-lybUITestDatedTimelineFixture",
+            "-lybUITestHomeV2OfflineFixture"
         ])
         XCTAssertTrue(app.descendants(matching: .any)["dated_timeline_provenance"].waitForExistence(timeout: 15))
         app.buttons["launch_next_action"].tap()
