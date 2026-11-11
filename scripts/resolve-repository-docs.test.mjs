@@ -21,7 +21,7 @@ const base = '# Original\n\nOriginal behavior.\n\nValidation:\n\nRun checks.\n';
 const addition = '## Approval presentation\n\nExplicit approval only.\n\n';
 const ours = '# Native selection\n\n## Review\n\nKeep rollback and feature gates.\n';
 
-function fixture(t, incoming = base.replace('Validation:', `${addition}Validation:`)) {
+function fixture(t, incoming = base.replace('Validation:', `${addition}Validation:`), branch = ours) {
   const root = mkdtempSync(join(tmpdir(), 'lyb-doc-sections-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
@@ -38,7 +38,7 @@ function fixture(t, incoming = base.replace('Validation:', `${addition}Validatio
   git('switch', '-qc', 'incoming');
   commit(incoming);
   git('switch', '-q', 'feature');
-  commit(ours);
+  commit(branch);
   const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: root, env });
   assert.equal(merge.status, 1, 'fixture must contain a real merge conflict');
   const resolve = (target = path) => spawnSync('python3', [
@@ -57,6 +57,34 @@ test('documentation merge preserves the branch and incoming standalone sections 
   assert.equal(f.git('ls-files', '--stage'), index);
   assert.equal(readFileSync(join(f.root, f.path), 'utf8'), 'Unrelated working edits must survive.\n');
   assert.equal(f.resolve().stdout, result.stdout, 'repeated generation uses immutable index stages');
+});
+
+for (const boundary of ['before heading', 'after paragraph']) {
+  test(`documentation merge retains independent paragraphs ${boundary}`, (t) => {
+    const receipt = 'Receipt intake enqueues each recurrence.\n\n';
+    const classification = 'Classification saves the first feasible level.\n\n';
+    const insert = (text) => boundary === 'before heading'
+      ? base.replace('Validation:', `${text}Validation:`)
+      : base.replace('Original behavior.\n', `Original behavior.\n\n${text.trimEnd()}\n`);
+    const f = fixture(t, insert(classification), insert(receipt));
+    const index = f.git('ls-files', '--stage');
+    const working = readFileSync(join(f.root, f.path), 'utf8');
+    const result = f.resolve();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, insert(`${receipt}${classification}`));
+    assert.equal(f.git('ls-files', '--stage'), index);
+    assert.equal(readFileSync(join(f.root, f.path), 'utf8'), working);
+  });
+}
+
+test('documentation merge refuses colliding fragments inserted inside a paragraph', (t) => {
+  const f = fixture(t, base.replace('Original behavior.', 'Original behavior.\nIncoming fragment.'),
+    base.replace('Original behavior.', 'Original behavior.\nBranch fragment.'));
+  const index = f.git('ls-files', '--stage');
+  const working = readFileSync(join(f.root, f.path), 'utf8');
+  assert.notEqual(f.resolve().status, 0);
+  assert.equal(f.git('ls-files', '--stage'), index);
+  assert.equal(readFileSync(join(f.root, f.path), 'utf8'), working);
 });
 
 for (const [name, incoming] of [

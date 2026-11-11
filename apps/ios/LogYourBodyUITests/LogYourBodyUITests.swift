@@ -717,7 +717,7 @@ final class LogYourBodyUITests: XCTestCase {
         logoutButton.tap()
 
         // Native alerts can expose both a wrapper button and its action button.
-        // Require one hittable leaf inside this alert, never a background button.
+        // Require one distinct action frame inside this alert.
         XCTAssertTrue(logoutConfirmation.waitForExistence(timeout: 5), app.debugDescription)
         let cancelLogout = try hittableLogoutAction(
             in: logoutConfirmation, identifier: "settings_logout_cancel", label: "Cancel"
@@ -738,20 +738,21 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     private func hittableLogoutAction(in alert: XCUIElement, identifier: String, label: String) throws -> XCUIElement {
-        let interactive = alert.buttons.matching(identifier: identifier).allElementsBoundByIndex.filter {
-            $0.label == label && $0.isEnabled && $0.isHittable
+        let candidates = alert.buttons.matching(identifier: identifier)
+        func interactiveActions() -> [XCUIElement] {
+            candidates.allElementsBoundByIndex.filter {
+                $0.label == label && $0.isEnabled && $0.isHittable
+            }.reduce(into: [XCUIElement]()) { unique, action in
+                if !unique.contains(where: { $0.frame == action.frame }) {
+                    unique.append(action)
+                }
+            }
         }
-        // Nested alert buttons share one frame. Count child buttons once so a
-        // missing descendant cannot retry until the waiter expires.
-        // XCUIElementQuery exposes count and has no isEmpty.
-        var seen = Set<String>()
-        // swiftlint:disable:next empty_count empty_count_check
-        let leaves = interactive.filter { $0.children(matching: .button).count == 0 }.filter { action in
-            let frame = action.frame
-            let key = "\(frame.minX),\(frame.minY),\(frame.width),\(frame.height)"
-            return seen.insert(key).inserted
-        }
-        let controls = interactive.map {
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            interactiveActions().count == 1
+        }, object: nil)
+        let result = XCTWaiter.wait(for: [ready], timeout: 5)
+        let controls = alert.buttons.allElementsBoundByIndex.map {
             "\($0.identifier)=\($0.label) enabled=\($0.isEnabled) hittable=\($0.isHittable) frame=\($0.frame)"
         }
         XCTContext.runActivity(named: "Logout action \(identifier): \(controls)") { activity in
@@ -759,7 +760,9 @@ final class LogYourBodyUITests: XCTestCase {
             attachment.lifetime = .keepAlways
             activity.add(attachment)
         }
-        return try XCTUnwrap(leaves.count == 1 ? leaves.first : nil, alert.debugDescription)
+        XCTAssertEqual(result, .completed, alert.debugDescription)
+        let actions = interactiveActions()
+        return try XCTUnwrap(actions.count == 1 ? actions.first : nil, alert.debugDescription)
     }
 
     func testProfileEditorProvidesAnEscapeRoute() throws {
@@ -2024,6 +2027,7 @@ final class LogYourBodyUITests: XCTestCase {
         launch(app, with: ["-lybUITestBodyScoreOnboardingFixture"])
 
         try assertAndCaptureOnboardingFixedCTA(in: app)
+        app.terminate()
     }
 
     func testLaunchQualityGateCapturesOnboardingFirstPhotoCTA() throws {
@@ -3517,17 +3521,15 @@ final class LogYourBodyUITests: XCTestCase {
             if current != question {
                 // A center tap in a short draft can leave the caret before the
                 // committed prefix. The trailing edge puts it after that text.
-                if current.isEmpty {
-                    composer.tap()
-                } else {
-                    composer.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
-                }
-                _ = app.keyboards.element.waitForExistence(timeout: 2)
                 let addition = syntheticQuestionInsertion(current: current, question: question)
                 var prefix = current
                 // Acknowledge each prefix while the simulator keyboard connects.
                 // Run 42354066867 kept "S" and then lost keyboard focus before "y".
+                let keyboard = app.keyboards.firstMatch
                 for character in addition {
+                    if !keyboard.exists {
+                        composer.tap()
+                    }
                     let focused = app.descendants(matching: composer.elementType)
                         .matching(identifier: composer.identifier)
                         .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch

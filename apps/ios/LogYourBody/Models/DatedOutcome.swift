@@ -113,12 +113,55 @@ struct DatedOutcomeEdit: Codable, Equatable, Sendable {
     }
 }
 
+/// Raw editor input is resolved off-main. Invalid text remains an invalid
+/// attempt; it never falls back to an accepted value or changes a date.
+struct DatedOutcomeEditorDraft: Sendable {
+    var metric: DatedOutcome.Metric
+    var targetText: String
+    var dateText: String
+    var constraints: DatedOutcome.Constraints
+    var sessionsText: String?
+    var minutesText: String?
+
+    func resolve() -> DatedOutcome {
+        var editedConstraints = constraints
+        if let sessionsText {
+            editedConstraints.availability.sessionsPerWeek = sessionsText.isEmpty ? nil : Int(sessionsText) ?? -1
+        }
+        if let minutesText {
+            editedConstraints.availability.minutesPerSession = minutesText.isEmpty ? nil : Int(minutesText) ?? -1
+        }
+        return DatedOutcome(
+            outcome: .init(metric: metric, targetValue: Double(targetText) ?? .nan),
+            outcomeDate: dateText, constraints: editedConstraints
+        )
+    }
+}
+
 struct DatedOutcomeSnapshot: Codable, Equatable, Sendable {
     let revision: UUID
     let value: DatedOutcome
     var planBaseline: DatedOutcome.PlanBaseline?
+    var coachAction: DatedCoachAction?
+}
+
+/// Local engine receipt, never an outcome edit, training prescription or cloud memory.
+struct DatedCoachAction: Codable, Equatable, Sendable {
+    var id: UUID
+    var userId: String
+    var productId: String
+    var outcomeRevision: UUID
+    var outcome: DatedOutcome
+    var baseline: DatedOutcome.PlanBaseline
+    var measurement: DatedOutcome.PlanBaseline
+    var nextAction: BackwardPlanner.NextAction
+    var rationale: String
+    var evidence: [HealthMemoryClaim]
+    var reviewedAt: Date
+    var evaluatedAt: Date
+    var nextCheckIn: Date
 }
 
 enum DatedOutcomeError: Error {
-    case unavailable, unauthenticated, invalidValue, invalidReceipt
+    case unavailable, unauthenticated, invalidValue, invalidReceipt, conflict
 }

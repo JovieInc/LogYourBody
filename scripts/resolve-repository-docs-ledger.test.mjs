@@ -5,9 +5,10 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { env, resolver, sourceMapFixture } from './resolve-repository-docs.test.mjs';
+import { DIAGNOSTIC_PROJECT, DIAGNOSTIC_WORKFLOW, pinFixture } from './resolve-repository-docs-pin.test.mjs';
 
-function ledgerMergeFixture(t, sourceConflict = false) {
-  const f = sourceMapFixture(t);
+function ledgerMergeFixture(t, sourceConflict = false, projectPins = false) {
+  const f = projectPins ? pinFixture(t) : sourceMapFixture(t);
   const ledger = 'packages/shared-lib/corrections.json';
   const template = JSON.parse(readFileSync(new URL('./fixtures/correction-classifier.json', import.meta.url)))[0];
   const receipt = (name) => ({ ...template, fingerprint: name,
@@ -20,11 +21,13 @@ function ledgerMergeFixture(t, sourceConflict = false) {
   f.commit();
   f.git('branch', '-f', 'theirs');
   writeLedger('ours');
+  if (projectPins) f.writeProject('base-project\nours-project\n');
   writeFileSync(join(f.root, 'a.txt'), 'ours-a\n');
   f.generate();
   f.commit();
   f.git('switch', '-q', 'theirs');
   writeLedger('theirs');
+  if (projectPins) f.writeProject('base-project\ntheirs-project\n');
   writeFileSync(join(f.root, sourceConflict ? 'a.txt' : 'b.txt'), 'theirs-b\n');
   f.generate();
   f.commit();
@@ -35,6 +38,50 @@ function ledgerMergeFixture(t, sourceConflict = false) {
   const resolve = () => spawnSync('python3', [resolver, '--root', f.root, '--merge-ledger'], { env, encoding: 'utf8' });
   return { ...f, ledger, resolve, anchor: template.guard.anchor };
 }
+
+test('reviewed ledger repair resolves pin, projection and receipt conflicts together', (t) => {
+  const f = ledgerMergeFixture(t, false, true);
+  const project = 'base-project\nours-project\ntheirs-project\n';
+  writeFileSync(join(f.root, DIAGNOSTIC_PROJECT), project);
+  f.git('add', '--', DIAGNOSTIC_PROJECT);
+  writeFileSync(join(f.root, 'a.txt'), 'unrelated unstaged source\n');
+  const digest = createHash('sha256').update(project).digest('hex');
+  const repair = (expected) => spawnSync('python3', [
+    resolver, '--root', f.root, '--merge-ledger', '--reviewed-project-sha256', expected,
+  ], { env, encoding: 'utf8' });
+  const index = f.git('ls-files', '--stage');
+  const originals = [DIAGNOSTIC_WORKFLOW, f.output, f.ledger]
+    .map((name) => [name, readFileSync(join(f.root, name))]);
+  const unreviewed = f.resolve();
+  assert.notEqual(unreviewed.status, 0);
+  assert.match(unreviewed.stderr, /resolve source conflicts first/);
+  const wrong = repair('0'.repeat(64));
+  assert.notEqual(wrong.status, 0);
+  assert.match(wrong.stderr, /reviewed project SHA-256 does not match merged source/);
+  assert.equal(f.git('ls-files', '--stage'), index);
+  for (const [name, bytes] of originals) assert.deepEqual(readFileSync(join(f.root, name)), bytes);
+  const result = repair(digest);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(f.git('show', `:${f.ledger}`)).map(({ fingerprint }) => fingerprint),
+    ['base', 'theirs', 'ours']);
+  assert.equal(f.git('show', `:${DIAGNOSTIC_PROJECT}`), project);
+  const workflow = f.git('show', `:${DIAGNOSTIC_WORKFLOW}`);
+  assert.match(workflow, new RegExp(digest));
+  const projection = f.git('show', `:${f.output}`);
+  for (const source of [project, workflow, 'ours-a\n']) {
+    assert.match(projection, new RegExp(createHash('sha256').update(source).digest('hex')));
+  }
+  assert.equal(readFileSync(join(f.root, 'a.txt'), 'utf8'), 'unrelated unstaged source\n');
+  assert.equal(f.git('ls-files', '--unmerged'), '');
+  const resolvedIndex = f.git('ls-files', '--stage');
+  assert.equal(repair(digest).status, 0, 'reviewed repair remains retryable during this merge');
+  assert.equal(f.git('ls-files', '--stage'), resolvedIndex);
+  f.git('commit', '-qm', 'fixture');
+  const outsideMerge = repair(digest);
+  assert.notEqual(outsideMerge.status, 0, 'reviewed ledger repair requires an active merge');
+  assert.equal(f.git('ls-files', '--stage'), resolvedIndex);
+  assert.equal(f.git('show', `:${DIAGNOSTIC_WORKFLOW}`), workflow);
+});
 
 test('ledger repair refreshes staged fingerprints, preserves both parents and is retryable', (t) => {
   const f = ledgerMergeFixture(t);
@@ -88,6 +135,121 @@ sys.exit(result.returncode)
   assert.equal(f.resolve().status, 0);
   assert.equal(f.git('ls-files', '--stage'), index);
 });
+
+test('ledger repair refuses a source index changed between rendering and classification', (t) => {
+  const f = ledgerMergeFixture(t);
+  const nodeBinary = process.execPath;
+  mkdirSync(join(f.root, 'bin'));
+  // Stage a source edit after rendering, before the classifier takes its snapshot.
+  writeFileSync(join(f.root, 'bin/node'), `#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+Path('a.txt').write_text('concurrent reviewed source\\n')
+subprocess.run(['git', 'add', 'a.txt'], check=True)
+Path('rendered-projection').write_bytes(Path('SOURCES.md').read_bytes())
+sys.exit(subprocess.run([${JSON.stringify(nodeBinary)}, *sys.argv[1:]]).returncode)
+`, { mode: 0o755 });
+  const result = spawnSync('python3', [resolver, '--root', f.root, '--merge-ledger'], {
+    env: { ...env, PATH: `${join(f.root, 'bin')}:${env.PATH}` }, encoding: 'utf8',
+  });
+  assert.notEqual(result.status, 0, 'a stale projection must never report a successful repair');
+  assert.match(result.stderr, /source index changed during ledger validation/);
+  assert.equal(f.git('show', ':a.txt'), 'concurrent reviewed source\n');
+  assert.equal(readFileSync(join(f.root, 'a.txt'), 'utf8'), 'concurrent reviewed source\n');
+  assert.deepEqual(readFileSync(join(f.root, f.output)), readFileSync(join(f.root, 'rendered-projection')));
+  assert.deepEqual(JSON.parse(f.git('show', `:${f.ledger}`)).map(({ fingerprint }) => fingerprint),
+    ['base', 'theirs', 'ours']);
+  assert.equal(f.git('ls-files', '--unmerged'), '');
+  const retry = f.resolve();
+  assert.equal(retry.status, 0, retry.stderr);
+  assert.match(f.git('show', `:${f.output}`),
+    new RegExp(createHash('sha256').update('concurrent reviewed source\n').digest('hex')));
+  const index = f.git('ls-files', '--stage');
+  assert.equal(f.resolve().status, 0);
+  assert.equal(f.git('ls-files', '--stage'), index);
+});
+
+for (const staged of [false, true]) {
+  test(`ledger refusal preserves concurrent ${staged ? 'staged' : 'working'} projection edits after rendering`, (t) => {
+    const f = ledgerMergeFixture(t);
+    const ledger = readFileSync(join(f.root, f.ledger));
+    const ledgerIndex = f.git('ls-files', '--stage', '--', f.ledger);
+    const gitBinary = execFileSync('which', ['git'], { env, encoding: 'utf8' }).trim();
+    mkdirSync(join(f.root, 'bin'));
+    // The classifier starts after the resolver has rendered and staged the projection.
+    writeFileSync(join(f.root, 'bin/node'), `#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+rendered = Path('SOURCES.md').read_bytes()
+Path('rendered-projection').write_bytes(rendered)
+Path('SOURCES.md').write_text('concurrent reviewed projection\\n')
+if ${staged ? 'True' : 'False'}:
+    subprocess.run([${JSON.stringify(gitBinary)}, 'add', 'SOURCES.md'], check=True)
+    Path('SOURCES.md').write_bytes(rendered)
+Path('reviewed-projection-index').write_bytes(subprocess.check_output([
+    ${JSON.stringify(gitBinary)}, 'ls-files', '--stage', '--', 'SOURCES.md',
+]))
+sys.exit(1)
+`, { mode: 0o755 });
+    const result = spawnSync('python3', [resolver, '--root', f.root, '--merge-ledger'], {
+      env: { ...env, PATH: `${join(f.root, 'bin')}:${env.PATH}` }, encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0);
+    assert.equal(readFileSync(join(f.root, f.output), 'utf8'), staged
+      ? readFileSync(join(f.root, 'rendered-projection'), 'utf8')
+      : 'concurrent reviewed projection\n');
+    assert.equal(f.git('ls-files', '--stage', '--', f.output),
+      readFileSync(join(f.root, 'reviewed-projection-index'), 'utf8'));
+    assert.deepEqual(readFileSync(join(f.root, f.ledger)), ledger);
+    assert.equal(f.git('ls-files', '--stage', '--', f.ledger), ledgerIndex);
+    assert.match(result.stderr, /projection changed during ledger validation/);
+    const retry = f.resolve();
+    assert.equal(retry.status, 1, retry.stderr);
+    assert.match(retry.stderr, /unstaged projection edits/);
+    f.git('add', f.output);
+    assert.equal(f.resolve().status, 0, 'staged reviewed inputs can be regenerated on retry');
+    assert.deepEqual(JSON.parse(f.git('show', `:${f.ledger}`)).map(({ fingerprint }) => fingerprint),
+      ['base', 'theirs', 'ours']);
+  });
+}
+
+for (const change of ['symlink', 'replacement', 'mode']) {
+  test(`ledger rollback preserves a concurrent projection ${change} with identical bytes`, (t) => {
+    const f = ledgerMergeFixture(t);
+    const ledger = readFileSync(join(f.root, f.ledger));
+    mkdirSync(join(f.root, 'bin'));
+    writeFileSync(join(f.root, 'bin/node'), `#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+projection = Path('SOURCES.md')
+reviewed = Path('reviewed-projection')
+reviewed.write_bytes(projection.read_bytes())
+if ${JSON.stringify(change)} == 'symlink':
+    projection.unlink()
+    projection.symlink_to(reviewed.name)
+elif ${JSON.stringify(change)} == 'replacement':
+    reviewed.replace(projection)
+else:
+    projection.chmod(projection.stat().st_mode ^ 0o100)
+Path('reviewed-identity').write_text(repr(projection.lstat()[:3]))
+Path('reviewed-index').write_bytes(subprocess.check_output(['git', 'ls-files', '--stage']))
+sys.exit(1)
+`, { mode: 0o755 });
+    const result = spawnSync('python3', [resolver, '--root', f.root, '--merge-ledger'], {
+      env: { ...env, PATH: `${join(f.root, 'bin')}:${env.PATH}` }, encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0);
+    assert.deepEqual(readFileSync(join(f.root, f.ledger)), ledger);
+    assert.equal(f.git('ls-files', '--stage'), readFileSync(join(f.root, 'reviewed-index'), 'utf8'));
+    const identity = execFileSync('python3', ['-c',
+      "from pathlib import Path; print(repr(Path('SOURCES.md').lstat()[:3]), end='')"],
+    { cwd: f.root, env, encoding: 'utf8' });
+    assert.equal(identity, readFileSync(join(f.root, 'reviewed-identity'), 'utf8'));
+    assert.match(f.git('show', `:${f.output}`), /Repository source map/);
+    assert.match(readFileSync(join(f.root, f.output), 'utf8'), /Repository source map/);
+    assert.match(result.stderr, /source projection changed during ledger validation/);
+  });
+}
 
 for (const problem of ['source conflict', 'missing guard', 'staged markers', 'no merge']) {
   test(`ledger repair refuses ${problem} without changing the projection, ledger or index`, (t) => {

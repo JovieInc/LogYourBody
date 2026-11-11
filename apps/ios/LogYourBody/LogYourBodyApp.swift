@@ -467,10 +467,7 @@ struct LogYourBodyApp: App {
             arguments.contains("-lybUITestBodyScoreFirstPhotoFixture")
         let usesDailyReminderPromptFixture = arguments.contains("-lybUITestDailyReminderPromptFixture")
 
-        guard usesPaidFixture || usesWeightLoggerFixture || usesPaywallFixture || usesPaywallPlansFixture ||
-            usesFullDashboardFixture || usesPhotoTimelineHUDFixture || usesBodyScoreOnboardingFixture else {
-            return false
-        }
+        guard !RealtimeSyncManager.online(true, arguments) else { return false }
 
         let isSubscribed = usesPaidFixture ||
             usesWeightLoggerFixture ||
@@ -843,7 +840,7 @@ struct LogYourBodyApp: App {
             isAuthenticated: authManager.isAuthenticated,
             user: user,
             hasCompletedOnboarding: OnboardingStateManager.shared.hasCompletedCurrentVersion(for: user?.id),
-            isSubscribed: subscriptionManager.isSubscribed
+            isSubscribed: subscriptionManager.isSubscribed, datedOutcomeEnabled: DatedOutcomeEntry.isEnabled()
         )
     }
 }

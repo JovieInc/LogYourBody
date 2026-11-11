@@ -82,6 +82,9 @@ It retains the refusal of unstaged dependency/output edits and pinned-source dri
 without re-resolving unrelated dependencies.
 Both dependency modes also require staged `repository-docs.json` changes before
 invoking pnpm, keeping parity checks and output selection on reviewed configuration.
+Both modes rebuild a conflicted source map from staged sources after frozen
+dependency verification. Failed verification preserves the conflict stages and
+artifact bytes for retry; resolve source conflicts before using either mode.
 Both dependency modes render the source map from the Git index, preserving
 unrelated unstaged source edits without fingerprinting them. Refresh mode stages
 the lockfile and projection together; verify mode stages only the projection.
@@ -105,6 +108,9 @@ repair and restore the original artifacts; retry uses the reviewed inputs.
 Tracked dependency edits during rendering also refuse repair before artifact
 writes or staging. The edits remain available for review; stage them and retry
 the same command.
+Both modes recheck for new untracked or ignored dependency inputs after verification
+and rendering, before writing artifacts. A newly created hook, npmrc file, patch or
+manifest refuses repair; the local file survives and generated artifacts are restored.
 Frozen verification also refuses lockfile changes before regenerating or staging
 the source map. Only a confirmed outdated lockfile permits refresh mode to write
 new resolutions; retrying after a refusal uses the original reviewed artifacts.

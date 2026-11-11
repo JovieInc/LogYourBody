@@ -109,6 +109,68 @@ test('manifest union leaves a conflicted correction ledger for its resolver', (t
   assert.equal(fixture.git('ls-files', '-u', '--', fixture.output).trim(), '');
 });
 
+test('manifest union accepts a glob that covers the other parent explicit inputs', (t) => {
+  const fixture = conflictingManifests(
+    t,
+    'node --test shared.test.mjs',
+    ['$TURBO_DEFAULT$', 'shared.mjs', 'shared_gesture.mjs', 'workflow.yml', 'workflow.yml'],
+    'node --test shared.test.mjs',
+    ['$TURBO_DEFAULT$', 'shared*.mjs', 'size.mjs', 'workflow.yml', 'workflow.yml'],
+  );
+  const result = fixture.run('--union-manifests');
+  assert.equal(result.status, 0, result.stderr);
+  const inputs = JSON.parse(readFileSync(join(fixture.root, fixture.turbo), 'utf8')).tasks.test.inputs;
+  assert.deepEqual(inputs, [
+    '$TURBO_DEFAULT$', 'shared*.mjs', 'size.mjs', 'workflow.yml', 'workflow.yml',
+  ]);
+});
+
+test('manifest union leaves a conflicted diagnostic pin for its resolver', (t) => {
+  const fixture = manifestRepo(t);
+  const workflow = '.github/workflows/ios-ui-diagnostics.yml';
+  const writePin = (digest) => {
+    mkdirSync(dirname(join(fixture.root, workflow)), { recursive: true });
+    writeFileSync(
+      join(fixture.root, workflow),
+      `jobs:\n  pins:\n            'apps/ios/LogYourBody.xcodeproj/project.pbxproj': '${digest}',\n`,
+    );
+  };
+  writePin('a'.repeat(64));
+  fixture.git('add', '--', workflow);
+  fixture.git('commit', '-qm', 'pin base');
+  fixture.git('switch', '-qc', 'incoming');
+  writePin('b'.repeat(64));
+  fixture.commit(
+    'node --test shared.test.mjs theirs.test.mjs',
+    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
+    'incoming',
+  );
+  fixture.git('switch', '-q', 'feature');
+  writePin('c'.repeat(64));
+  fixture.commit(
+    'node --test shared.test.mjs ours.test.mjs',
+    ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs'],
+    'ours',
+  );
+  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: fixture.root, env });
+  assert.equal(merge.status, 1, merge.stderr?.toString());
+  const beforeWorkflow = readFileSync(join(fixture.root, workflow), 'utf8');
+  assert.match(beforeWorkflow, /^<<<<<<< /m);
+  const result = spawnSync('python3', [resolver, '--root', fixture.root, '--union-manifests'], {
+    env, encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(join(fixture.root, workflow), 'utf8'), beforeWorkflow);
+  const unmerged = fixture.git('diff', '--name-only', '--diff-filter=U');
+  assert.match(unmerged, /ios-ui-diagnostics\.yml/);
+  assert.doesNotMatch(unmerged, /turbo\.json/);
+  const testScript = JSON.parse(readFileSync(join(fixture.root, fixture.pkg), 'utf8')).scripts.test;
+  assert.match(testScript, /ours\.test\.mjs/);
+  assert.match(testScript, /theirs\.test\.mjs/);
+  const inputs = JSON.parse(readFileSync(join(fixture.root, fixture.turbo), 'utf8')).tasks.test.inputs;
+  assert.ok(inputs.includes('ours.mjs') && inputs.includes('theirs.mjs'));
+});
+
 test('manifest union refuses an unrelated conflict without staging', (t) => {
   const fixture = manifestRepo(t);
   fixture.git('switch', '-qc', 'incoming');
@@ -190,6 +252,37 @@ function autoMergedManifests(t) {
   return { ...fixture, run };
 }
 
+for (const mode of ['--staged', null]) {
+  for (const input of ['repository-docs.json', 'README.md', 'packages/shared-lib/turbo.json']) {
+    test(`source-map repair ${mode ?? 'default'} refuses indexed symlink ${input}`, (t) => {
+      const f = autoMergedManifests(t);
+      const blob = f.git('rev-parse', `:${input}`).trim();
+      // Keep regular worktree bytes: the index mode must determine admission.
+      f.git('update-index', '--cacheinfo', `120000,${blob},${input}`);
+      const before = readFileSync(join(f.root, f.output));
+      const index = f.git('ls-files', '--stage');
+      const result = spawnSync('python3', [resolver, '--root', f.root, ...(mode ? [mode] : [])], {
+        env, encoding: 'utf8',
+      });
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /source input must be a regular indexed file/);
+      assert.deepEqual(readFileSync(join(f.root, f.output)), before);
+      assert.equal(f.git('ls-files', '--stage'), index);
+    });
+  }
+
+  test(`source-map repair ${mode ?? 'default'} accepts executable indexed sources`, (t) => {
+    const f = autoMergedManifests(t);
+    f.git('update-index', '--chmod=+x', 'README.md');
+    const result = spawnSync('python3', [resolver, '--root', f.root, ...(mode ? [mode] : [])], {
+      env, encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(f.git('ls-files', '--stage', '--', 'README.md'), /^100755 /);
+    assert.equal(f.git('ls-files', '--unmerged'), '');
+  });
+}
+
 test('auto-merged manifest refuses a dropped parent turbo input', (t) => {
   const fixture = autoMergedManifests(t);
   const turbo = JSON.parse(readFileSync(join(fixture.root, fixture.turbo), 'utf8'));
@@ -203,6 +296,56 @@ test('auto-merged manifest refuses a dropped parent turbo input', (t) => {
   assert.match(result.stderr, /additive manifest union keeps every parent test input/);
   assert.equal(readFileSync(join(fixture.root, fixture.output), 'utf8'), before);
   assert.equal(fixture.git('ls-files', '--stage'), index);
+});
+
+test('auto-merged manifest accepts a new glob that covers replaced inputs', (t) => {
+  const fixture = manifestRepo(t);
+  const named = ['scripts/ios/launch_ui_timeline_day.py', 'scripts/ios/launch_ui_opacity_audit.py'];
+  fixture.commit('node --test shared.test.mjs', ['$TURBO_DEFAULT$', ...named, 'workflow.yml'], 'narrow');
+  fixture.git('branch', 'incoming');
+  fixture.commit(
+    'node --test shared.test.mjs',
+    ['$TURBO_DEFAULT$', 'scripts/ios/launch_ui_*.py', 'workflow.yml', 'company.mjs'],
+    'glob',
+  );
+  fixture.git('switch', '-q', 'incoming');
+  fixture.commit(
+    'node --test shared.test.mjs',
+    ['$TURBO_DEFAULT$', ...named, 'workflow.yml', 'personal.ts'],
+    'personal',
+  );
+  fixture.git('switch', '-q', 'feature');
+  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], {
+    cwd: fixture.root, env, encoding: 'utf8',
+  });
+  assert.equal(merge.status, 1, merge.stderr);
+  const kept = {
+    extends: ['//'],
+    tasks: {
+      test: {
+        outputs: ['$TURBO_EXTENDS$'],
+        inputs: ['$TURBO_DEFAULT$', 'scripts/ios/launch_ui_*.py', 'workflow.yml', 'company.mjs', 'personal.ts'],
+      },
+      'test:mutation': { cache: false },
+    },
+  };
+  writeFileSync(join(fixture.root, fixture.turbo), `${JSON.stringify(kept, null, 2)}\n`);
+  fixture.git('add', fixture.turbo);
+  const accepted = spawnSync('python3', [resolver, '--root', fixture.root, '--staged'], {
+    env, encoding: 'utf8',
+  });
+  assert.equal(accepted.status, 0, accepted.stderr);
+  assert.match(fixture.git('show', `:${fixture.turbo}`), /launch_ui_\*\.py/);
+  assert.match(fixture.git('show', `:${fixture.turbo}`), /personal\.ts/);
+  const dropped = structuredClone(kept);
+  dropped.tasks.test.inputs = dropped.tasks.test.inputs.filter((item) => item !== 'personal.ts');
+  writeFileSync(join(fixture.root, fixture.turbo), `${JSON.stringify(dropped, null, 2)}\n`);
+  fixture.git('add', fixture.turbo);
+  const refused = spawnSync('python3', [resolver, '--root', fixture.root, '--staged'], {
+    env, encoding: 'utf8',
+  });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /additive manifest union keeps every parent test input/);
 });
 
 test('auto-merged manifest keeps both parent inputs and ignores dirty worktree bytes', (t) => {
@@ -263,124 +406,58 @@ assert Path('pnpm-lock.yaml').read_text() == 'reviewed bot resolutions\\n'
   });
 }
 
-function writeRegistrations(root, sibling) {
-  const audit = 'scripts/ios/launch-ui-regression-audit.py';
-  const expectation = 'scripts/ios/test_launch_ui_regression_audit.py';
-  const coverage = 'packages/shared-lib/src/launch-ui-regression-audit.test.ts';
-  mkdirSync(dirname(join(root, audit)), { recursive: true });
-  mkdirSync(dirname(join(root, coverage)), { recursive: true });
-  const extraTuple = sibling
-    ? `    ("${sibling}", "${sibling}.py", "check_${sibling}"),\n`
-    : '';
-  const extraName = sibling ? `check_${sibling}, ` : '';
-  const extraCall = sibling ? `    check_${sibling}()\n` : '';
-  const names = ['day', ...(sibling ? [sibling] : []), 'report'];
-  writeFileSync(join(root, audit), `_AUDIT_SIBLINGS = (
-    ("day", "day.py", "check_day"),
-${extraTuple}    ("report", "report.py", "write_outputs"),
-)
-${extraName}check_day, write_outputs = [
-    _load_sibling(*sibling) for sibling in _AUDIT_SIBLINGS
-]
-
-
-def main():
-    check_day()
-${extraCall}    write_outputs()
-`);
-  writeFileSync(join(root, expectation), `def test_siblings():
-    self.assertEqual(
-        [item[0] for item in AUDIT._AUDIT_SIBLINGS],
-        [
-${names.map((name) => `            "${name}",`).join('\n')}
-        ],
-    )
-`);
-  const inputs = ['day.py', ...(sibling ? [`${sibling}.py`] : []), 'report.py'];
-  writeFileSync(join(root, coverage), `for (const input of [
-${inputs.map((name) => `  '${name}',`).join('\n')}
-]) {
-  input
+for (const mutation of ['additive', 'deleted', 'reordered']) {
+  test(`launch binding union checks ${mutation} parent selectors`, (t) => {
+    const f = manifestRepo(t);
+    const binding = 'scripts/fixtures/lyb-launch-route-bindings.json';
+    const generated = 'scripts/fixtures/lyb-launch-route-manifest.json';
+    mkdirSync(dirname(join(f.root, binding)), { recursive: true });
+    const write = (ids, label) => {
+      writeFileSync(join(f.root, binding), JSON.stringify({ 'launch.deadline': ids }) + '\n');
+      writeFileSync(join(f.root, generated), JSON.stringify({ testIds: ids, label }) + '\n');
+      f.git('add', binding, generated);
+      f.git('commit', '-qm', label);
+    };
+    const base = ['Journey/testFirst()', 'Journey/testSecond()'];
+    write(base, 'base');
+    f.git('switch', '-qc', 'incoming');
+    const incoming = mutation === 'deleted' ? [base[0], 'Journey/testIncoming()']
+      : mutation === 'reordered' ? [...base].reverse().concat('Journey/testIncoming()')
+        : [...base, 'Journey/testIncoming()'];
+    write(incoming, 'incoming');
+    f.git('switch', '-q', 'feature');
+    const branch = [...base, 'Journey/testBranch()'];
+    write(branch, 'branch');
+    const merged = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: f.root, env });
+    assert.equal(merged.status, 1, 'real binding and generated-manifest conflicts are required');
+    const beforeBinding = readFileSync(join(f.root, binding));
+    const beforeGenerated = readFileSync(join(f.root, generated));
+    const index = f.git('ls-files', '--stage');
+    const run = (mode) => spawnSync('python3', [resolver, '--root', f.root, mode], { env, encoding: 'utf8' });
+    const result = run('--union-manifests');
+    if (mutation !== 'additive') {
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /additive manifest union keeps every parent test input/);
+      assert.deepEqual(readFileSync(join(f.root, binding)), beforeBinding);
+      assert.equal(f.git('ls-files', '--stage'), index);
+    } else {
+      assert.equal(result.status, 0, result.stderr);
+      const retained = JSON.parse(f.git('show', `:${binding}`))['launch.deadline'];
+      assert.deepEqual(new Set(retained), new Set([...branch, ...incoming]));
+      assert.deepEqual(retained.slice(0, 2), base);
+      assert.equal(f.git('diff', '--name-only', '--diff-filter=U').trim(), generated);
+      assert.equal(run('--union-manifests').status, 0, 'union remains retryable before generation');
+      writeFileSync(join(f.root, binding), JSON.stringify({ 'launch.deadline': branch }));
+      f.git('add', binding);
+      const dropped = run('--staged');
+      assert.notEqual(dropped.status, 0, 'staging only one parent cannot hide lost tests');
+      assert.match(dropped.stderr, /additive manifest union keeps every parent test input/);
+      writeFileSync(join(f.root, binding), '{}\n');
+      f.git('add', binding);
+      const missingPath = run('--staged');
+      assert.notEqual(missingPath.status, 0, 'dropping a whole launch path cannot hide lost tests');
+      assert.match(missingPath.stderr, /additive manifest union keeps every parent test input/);
+    }
+    assert.deepEqual(readFileSync(join(f.root, generated)), beforeGenerated, 'regenerate from reviewed bindings explicitly');
+  });
 }
-`);
-}
-
-function registrationMerge(t, theirsBody, oursBody) {
-  const fixture = manifestRepo(t);
-  writeRegistrations(fixture.root, null);
-  fixture.git('add', '.');
-  fixture.git('commit', '-qm', 'audit base');
-  fixture.git('switch', '-qc', 'incoming');
-  if (theirsBody) writeFileSync(join(fixture.root, 'scripts/ios/launch-ui-regression-audit.py'), theirsBody);
-  else writeRegistrations(fixture.root, 'gesture');
-  fixture.commit(
-    'node --test shared.test.mjs theirs.test.mjs',
-    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
-    'incoming',
-  );
-  fixture.git('switch', '-q', 'feature');
-  if (oursBody) writeFileSync(join(fixture.root, 'scripts/ios/launch-ui-regression-audit.py'), oursBody);
-  else writeRegistrations(fixture.root, 'home');
-  fixture.commit(
-    'node --test shared.test.mjs ours.test.mjs',
-    ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs'],
-    'ours',
-  );
-  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: fixture.root, env });
-  assert.equal(merge.status, 1, merge.stderr?.toString());
-  const run = (flag) => spawnSync('python3', [resolver, '--root', fixture.root, flag], { env, encoding: 'utf8' });
-  return { ...fixture, run };
-}
-
-test('manifest union keeps both launch-audit sibling registrations', (t) => {
-  const fixture = registrationMerge(t);
-  const result = fixture.run('--union-manifests');
-  assert.equal(result.status, 0, result.stderr);
-  const audit = readFileSync(join(fixture.root, 'scripts/ios/launch-ui-regression-audit.py'), 'utf8');
-  assert.match(audit, /check_home\(/);
-  assert.match(audit, /check_gesture\(/);
-  assert.doesNotMatch(audit, /^<<<<<<</m);
-  const names = readFileSync(join(fixture.root, 'scripts/ios/test_launch_ui_regression_audit.py'), 'utf8');
-  assert.match(names, /\[\n\s+"day",\n\s+"gesture",\n\s+"home",/);
-  assert.doesNotMatch(names, /^<<<<<<</m);
-  const coverage = readFileSync(
-    join(fixture.root, 'packages/shared-lib/src/launch-ui-regression-audit.test.ts'),
-    'utf8',
-  );
-  assert.match(coverage, /for \(const input of \[\n {2}'day\.py',\n {2}'gesture\.py',\n {2}'home\.py',\n {2}'report\.py',\n\]\)/);
-  assert.deepEqual(JSON.parse(readFileSync(join(fixture.root, fixture.turbo), 'utf8')).tasks.test.inputs, [
-    '$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs',
-  ]);
-  assert.equal(fixture.git('diff', '--name-only', '--diff-filter=U'), '');
-  const index = fixture.git('ls-files', '--stage');
-  assert.equal(fixture.run('--union-manifests').status, 0, 'resolved registrations stay idempotent');
-  assert.equal(fixture.git('ls-files', '--stage'), index);
-});
-
-test('manifest union refuses a non-additive launch-audit conflict without staging', (t) => {
-  const body = (token) => `_AUDIT_SIBLINGS = (
-    ("day", "day.py", "check_day"),
-    ("${token}", "${token}.py", "check_${token}"),
-    ("report", "report.py", "write_outputs"),
-)
-check_day, check_${token}, write_outputs = [
-    _load_sibling(*sibling) for sibling in _AUDIT_SIBLINGS
-]
-
-
-def main():
-    check_day()
-    check_${token}()
-    return "${token}"
-    write_outputs()
-`;
-  const fixture = registrationMerge(t, body('gesture'), body('home'));
-  const audit = 'scripts/ios/launch-ui-regression-audit.py';
-  const before = readFileSync(join(fixture.root, audit), 'utf8');
-  const index = fixture.git('ls-files', '--stage');
-  const result = fixture.run('--union-manifests');
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /not additive/);
-  assert.equal(readFileSync(join(fixture.root, audit), 'utf8'), before);
-  assert.equal(fixture.git('ls-files', '--stage'), index);
-});

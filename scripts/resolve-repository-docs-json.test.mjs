@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { env, resolver } from './resolve-repository-docs.test.mjs';
+import { manifestRepo, env, resolver } from './resolve-repository-docs.test.mjs';
 
 function jsonConflict(t, base, ours, theirs, path = 'config/inputs.json') {
   const root = mkdtempSync(join(tmpdir(), 'lyb-json-union-'));
@@ -157,3 +157,126 @@ test('projection merge fingerprints the merged source instead of either parent',
   assert.equal(projection.includes('<<<<<<<'), false);
   assert.equal(spawnSync('python3', [resolver, '--root', root], { env, encoding: 'utf8' }).status, 0);
 });
+
+function writeRegistrations(root, sibling) {
+  const audit = 'scripts/ios/launch-ui-regression-audit.py';
+  const expectation = 'scripts/ios/test_launch_ui_regression_audit.py';
+  const coverage = 'packages/shared-lib/src/launch-ui-regression-audit.test.ts';
+  mkdirSync(dirname(join(root, audit)), { recursive: true });
+  mkdirSync(dirname(join(root, coverage)), { recursive: true });
+  const extraTuple = sibling
+    ? `    ("${sibling}", "${sibling}.py", "check_${sibling}"),\n`
+    : '';
+  const extraName = sibling ? `check_${sibling}, ` : '';
+  const extraCall = sibling ? `    check_${sibling}()\n` : '';
+  const names = ['day', ...(sibling ? [sibling] : []), 'report'];
+  writeFileSync(join(root, audit), `_AUDIT_SIBLINGS = (
+    ("day", "day.py", "check_day"),
+${extraTuple}    ("report", "report.py", "write_outputs"),
+)
+${extraName}check_day, write_outputs = [
+    _load_sibling(*sibling) for sibling in _AUDIT_SIBLINGS
+]
+
+
+def main():
+    check_day()
+${extraCall}    write_outputs()
+`);
+  writeFileSync(join(root, expectation), `def test_siblings():
+    self.assertEqual(
+        [item[0] for item in AUDIT._AUDIT_SIBLINGS],
+        [
+${names.map((name) => `            "${name}",`).join('\n')}
+        ],
+    )
+`);
+  const inputs = ['day.py', ...(sibling ? [`${sibling}.py`] : []), 'report.py'];
+  writeFileSync(join(root, coverage), `for (const input of [
+${inputs.map((name) => `  '${name}',`).join('\n')}
+]) {
+  input
+}
+`);
+}
+
+function registrationMerge(t, theirsBody, oursBody) {
+  const fixture = manifestRepo(t);
+  writeRegistrations(fixture.root, null);
+  fixture.git('add', '.');
+  fixture.git('commit', '-qm', 'audit base');
+  fixture.git('switch', '-qc', 'incoming');
+  if (theirsBody) writeFileSync(join(fixture.root, 'scripts/ios/launch-ui-regression-audit.py'), theirsBody);
+  else writeRegistrations(fixture.root, 'gesture');
+  fixture.commit(
+    'node --test shared.test.mjs theirs.test.mjs',
+    ['$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml'],
+    'incoming',
+  );
+  fixture.git('switch', '-q', 'feature');
+  if (oursBody) writeFileSync(join(fixture.root, 'scripts/ios/launch-ui-regression-audit.py'), oursBody);
+  else writeRegistrations(fixture.root, 'home');
+  fixture.commit(
+    'node --test shared.test.mjs ours.test.mjs',
+    ['$TURBO_DEFAULT$', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs'],
+    'ours',
+  );
+  const merge = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: fixture.root, env });
+  assert.equal(merge.status, 1, merge.stderr?.toString());
+  const run = (flag) => spawnSync('python3', [resolver, '--root', fixture.root, flag], { env, encoding: 'utf8' });
+  return { ...fixture, run };
+}
+
+test('manifest union keeps both launch-audit sibling registrations', (t) => {
+  const fixture = registrationMerge(t);
+  const result = fixture.run('--union-manifests');
+  assert.equal(result.status, 0, result.stderr);
+  const audit = readFileSync(join(fixture.root, 'scripts/ios/launch-ui-regression-audit.py'), 'utf8');
+  assert.match(audit, /check_home\(/);
+  assert.match(audit, /check_gesture\(/);
+  assert.doesNotMatch(audit, /^<<<<<<</m);
+  const names = readFileSync(join(fixture.root, 'scripts/ios/test_launch_ui_regression_audit.py'), 'utf8');
+  assert.match(names, /\[\n\s+"day",\n\s+"gesture",\n\s+"home",/);
+  assert.doesNotMatch(names, /^<<<<<<</m);
+  const coverage = readFileSync(
+    join(fixture.root, 'packages/shared-lib/src/launch-ui-regression-audit.test.ts'),
+    'utf8',
+  );
+  assert.match(coverage, /for \(const input of \[\n {2}'day\.py',\n {2}'gesture\.py',\n {2}'home\.py',\n {2}'report\.py',\n\]\)/);
+  assert.deepEqual(JSON.parse(readFileSync(join(fixture.root, fixture.turbo), 'utf8')).tasks.test.inputs, [
+    '$TURBO_DEFAULT$', 'theirs.mjs', 'shared.mjs', 'workflow.yml', 'workflow.yml', 'ours.mjs',
+  ]);
+  assert.equal(fixture.git('diff', '--name-only', '--diff-filter=U'), '');
+  const index = fixture.git('ls-files', '--stage');
+  assert.equal(fixture.run('--union-manifests').status, 0, 'resolved registrations stay idempotent');
+  assert.equal(fixture.git('ls-files', '--stage'), index);
+});
+
+test('manifest union refuses a non-additive launch-audit conflict without staging', (t) => {
+  const body = (token) => `_AUDIT_SIBLINGS = (
+    ("day", "day.py", "check_day"),
+    ("${token}", "${token}.py", "check_${token}"),
+    ("report", "report.py", "write_outputs"),
+)
+check_day, check_${token}, write_outputs = [
+    _load_sibling(*sibling) for sibling in _AUDIT_SIBLINGS
+]
+
+
+def main():
+    check_day()
+    check_${token}()
+    return "${token}"
+    write_outputs()
+`;
+  const fixture = registrationMerge(t, body('gesture'), body('home'));
+  const audit = 'scripts/ios/launch-ui-regression-audit.py';
+  const before = readFileSync(join(fixture.root, audit), 'utf8');
+  const index = fixture.git('ls-files', '--stage');
+  const result = fixture.run('--union-manifests');
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /not additive/);
+  assert.equal(readFileSync(join(fixture.root, audit), 'utf8'), before);
+  assert.equal(fixture.git('ls-files', '--stage'), index);
+});
+

@@ -180,6 +180,88 @@ it('pins shared offline UI fixtures before late network callbacks can replace th
   expect(release).not.toMatch(/usesOfflineUITestFixture|applyOfflineUITestFixture/);
 });
 
+it('prefills the dated Stats editor from its DEBUG fixture without inventing a saved revision', () => {
+  const read = (path: string) =>
+    readFileSync(
+      new URL(`../../../apps/ios/LogYourBody/Services/${path}`, import.meta.url),
+      'utf8',
+    );
+  const host = read('LaunchJourneyUI.swift')
+    .split('struct DatedOutcomeEditorHost: View')[1]
+    .split('extension DashboardViewLiquid')[0];
+  expect(host).toContain('existing: existingOutcome, errorText: model.errorText');
+  expect(host).toMatch(
+    /#if DEBUG\s*return DatedStatsUITestFixture\.editorOutcome\(saved: model\.snapshot\?\.value\)\s*#else\s*return model\.snapshot\?\.value\s*#endif/,
+  );
+  const fixture = read('DatedStatsUITestFixture.swift');
+  expect(fixture.trim()).toMatch(/^#if DEBUG[\s\S]*#endif$/);
+  expect(fixture).toContain('outcome: outcome(for: state)');
+  expect(fixture).toContain('return selectedState(arguments).map { outcome(for: $0) }');
+  expect(fixture).toContain('if let saved { return saved }');
+  expect(fixture).not.toMatch(
+    /DatedOutcomeSnapshot|saveForPresentation|acceptRemoteForPresentation/,
+  );
+});
+
+it('qualifies native scenarios independently instead of sharing another XCTest case budget', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const nestedCalls = (source: string) =>
+    [...source.matchAll(/^\s*(?:(?:try[!?]?|await)\s+)*(?:self\.)?(test\w+)\s*\(/gm)].map(
+      (match) => match[1],
+    );
+  expect(
+    nestedCalls(
+      '        try testNested()\n        testDirect()\n        try await self.testAsync()',
+    ),
+  ).toEqual(['testNested', 'testDirect', 'testAsync']);
+  expect(
+    nestedCalls('// try testComment()\nfunc testIndependent() {}\ntry assertSurface()'),
+  ).toEqual([]);
+  const sources = execFileSync('git', ['ls-files', '--', 'apps/ios/LogYourBodyUITests'], {
+    cwd: root,
+    encoding: 'utf8',
+  })
+    .trim()
+    .split('\n')
+    .filter((path) => path.endsWith('.swift'));
+  expect(sources.length).toBeGreaterThan(0);
+  const nested = sources.flatMap((path) =>
+    nestedCalls(readFileSync(`${root}/${path}`, 'utf8')).map((method) => `${path}: ${method}`),
+  );
+  expect(
+    nested,
+    'Select each scenario directly so XCTest owns its timeout and execution receipt',
+  ).toEqual([]);
+  const audit = readFileSync(`${root}/scripts/ios/launch-quality-audit.sh`, 'utf8');
+  const selection = audit.slice(
+    audit.indexOf('LAUNCH_QUALITY_UI_TESTS=('),
+    audit.indexOf('UI_RESULT_BUNDLE='),
+  );
+  const output = execFileSync(
+    '/bin/bash',
+    [
+      '-c',
+      'set -euo pipefail\n' +
+        selection +
+        '\nprintf "%s\\n" "${UI_SELECTORS[@]}" "${UI_EVIDENCE_ARGS[@]}"',
+    ],
+    { encoding: 'utf8', env: { PATH: '/usr/bin:/bin' } },
+  ).split('\n');
+  for (const method of [
+    'testDatedOutcomeFirstLaunchCancelBackAndManualBaseline',
+    'testDatedOutcomeGateOffKeepsExistingFirstRun',
+    'testDatedTimelineManualBaselineAndInterruptedPhotoReturn',
+    'testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation',
+  ]) {
+    expect(
+      output.filter(
+        (line) => line === `-only-testing:LogYourBodyUITests/LogYourBodyUITests/${method}`,
+      ),
+    ).toHaveLength(1);
+    expect(output.filter((line) => line === `LogYourBodyUITests/${method}()`)).toHaveLength(1);
+  }
+});
+
 function barrierBody(source: string): string | undefined {
   const marker = 'final class Barrier';
   const start = source.indexOf(marker);
@@ -330,3 +412,13 @@ it('propagates evidence assertion failures and nonzero exits despite passing sui
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+it('runs the audit deadline regressions before native execution', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const output = execFileSync('python3', ['scripts/ios/test_xcodebuild_command_timeout.py'], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  expect(output).toContain('xcodebuild deadline behavior tests executed: 13');
+}, 30_000);

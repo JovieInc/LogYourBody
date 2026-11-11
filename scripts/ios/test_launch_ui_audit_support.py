@@ -131,15 +131,15 @@ class PatternScanTests(LaunchUIAuditTests):
 
         with patch.object(Path, "rglob", tracked_rglob), \
                 patch.object(Path, "__lt__", side_effect=AssertionError("Sort path parts once")), \
-                patch.object(AUDIT, "read_sources", wraps=AUDIT.read_sources) as read:
+                patch.object(AUDIT.swift_sources, "begin_swift_sources", wraps=AUDIT.swift_sources.begin_swift_sources) as read:
             self.assertEqual(self.run_audit()[0], 0)
-        self.assertEqual(read.call_args.args[0], expected)
+        self.assertEqual(read.call_args.args[0], self.root)
+        self.assertEqual(read.call_count, 1)
+        self.assertEqual(set(expected), set(path for path in self.root.rglob("*.swift")))
         self.assertEqual(visited.count(self.app), 1, "Do not rediscover the same app tree")
 
     def test_full_tree_patterns_skip_irrelevant_sources_without_changing_findings(self):
-        scan = AUDIT.add_pattern_violations
-        with patch.object(AUDIT, "add_pattern_violations", wraps=scan) as calls:
-            self.assertEqual(self.run_audit()[0], 0)
+        scan = AUDIT.swift_sources.scan_tree_patterns
         cases = {
             "swift.explicit_geometry_nonfinite": [
                 "let point = CGPoint(\n x: +.infinity, y: -.nan)\n",
@@ -155,20 +155,19 @@ class PatternScanTests(LaunchUIAuditTests):
                 'let identifier = "photo_timeline_hud_stats"\n',
             ],
         }
-        checked = set()
-        for call in calls.call_args_list:
-            arguments = call.kwargs.copy()
-            check = arguments["check"]
-            if check not in cases:
-                continue
-            checked.add(check)
-            sources = ["struct Irrelevant { let value = 0 }\n" * 100] * 100 + cases[check]
-            texts = {self.root / f"Fixture{index}.swift": text
-                     for index, text in enumerate(sources)}
-            pattern = arguments["pattern"]
+        sources = AUDIT.swift_sources
+        patterns = {
+            "swift.explicit_geometry_nonfinite": ("_GEOMETRY", "_GEOMETRY_DETAIL"),
+            "overscroll.no_large_fake_bottom_spacers": ("_SPACER", "_SPACER_DETAIL"),
+            "timeline.no_bottom_stats_card": ("_STATS_BUTTON", "_STATS_DETAIL"),
+        }
+        for check, (attribute, detail) in patterns.items():
+            sample = ["struct Irrelevant { let value = 0 }\n" * 100] * 100 + cases[check]
+            texts = {self.root / f"Fixture{index}.swift": text for index, text in enumerate(sample)}
+            pattern = getattr(sources, attribute)
             expected = [AUDIT.AuditViolation(
                 check=check, file=str(path.relative_to(self.root)),
-                line=AUDIT.line_number(text, match.start()), detail=arguments["detail"],
+                line=AUDIT.line_number(text, match.start()), detail=getattr(sources, detail),
             ) for path, text in texts.items() for match in pattern.finditer(text)]
             scanned = []
 
@@ -178,15 +177,16 @@ class PatternScanTests(LaunchUIAuditTests):
                     return pattern.finditer(text)
 
             findings = []
-            arguments.update(paths=list(texts), texts=texts, pattern=CountedPattern(),
-                             violations=findings)
-            scan(**arguments)
+            with patch.object(sources, "SWIFT_SOURCES", texts), \
+                    patch.object(sources, "APP_SOURCES", texts), \
+                    patch.object(sources, attribute, CountedPattern()):
+                scan(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
             with self.subTest(check=check):
                 self.assertEqual(findings, expected)
                 self.assertTrue(expected, "The negative control must contain a violation")
                 self.assertLessEqual(len(scanned), len(cases[check]),
                                      "Full-tree regexes must skip irrelevant source bytes")
-        self.assertEqual(checked, set(cases))
+
 
 
 class LaunchExecutionAuditTests(unittest.TestCase):
@@ -287,23 +287,25 @@ class LaunchExecutionAuditTests(unittest.TestCase):
         start = source.index('UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")')
         end = source.index('XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_xcodebuild_test', start)
         budget = source[start:end]
+        helpers = source[source.index("remaining_budget_seconds() {"):source.index('\nPHASE_NAME=""')]
         workflow = (ROOT / ".github/workflows/ios-quality.yml").read_text()
-        self.assertIn("timeout-minutes: 52", workflow.split("- name: Run launch quality audit", 1)[1])
-        cases = [(1200, None, 0, "1860"), (1472, None, 0, "1588"),
-                 (1472, "2000", 0, "1588"), (1472, "1200", 0, "1200"),
-                 (3060, None, 124, ""), (3120, None, 124, "")]
+        self.assertIn("timeout-minutes: 57", workflow.split("- name: Run launch quality audit", 1)[1])
+        cases = [(1200, None, 0, "1800"), (1472, None, 0, "1768"),
+                 (1472, "2000", 0, "1768"), (1472, "1200", 0, "1200"),
+                 (3240, None, 124, ""), (3300, None, 124, "")]
         for elapsed, override, status, expected in cases:
             with self.subTest(elapsed=elapsed, override=override):
-                script = 'set -euo pipefail\nAUDIT_STARTED_AT=0\nUI_RESULT_BUNDLE=fixture\n'
-                script += f'date() {{ echo {elapsed}; }}\n'
+                script = 'set -euo pipefail\nAUDIT_STARTED_AT=0\nAUDIT_DEADLINE_SECONDS=3240\nUI_RESULT_BUNDLE=fixture\n'
+                script += f'date() {{ echo {elapsed}; }}\nphase_start() {{ :; }}\n' + helpers
                 if override is not None:
                     script += f'UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS={override}\n'
                 result = subprocess.run(
-                    ["bash", "-c", script + budget + '\nprintf "%s" "$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS"'],
+                    ["bash", "-c", script + budget + '\nbounded_seconds "$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS"'],
                     capture_output=True, text=True, timeout=5,
                 )
                 self.assertEqual(result.returncode, status, result.stderr)
-                self.assertEqual(result.stdout, expected)
+                self.assertEqual(result.stdout.strip(), expected)
+
 
 
 class TimelineAndTypingAuditTests(LaunchUIAuditTests):

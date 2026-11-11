@@ -113,19 +113,97 @@ it('keeps paced chat typing focused and gives nested launch scenarios the audit 
   expect(audit).toContain('check_nested_launch_time_allowance(root, violations, violation)');
 });
 
+it('waits for exact metric text and Save readiness before testing Home check-in outcomes', () => {
+  const source = readFileSync(
+    new URL('../../../apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift', import.meta.url),
+    'utf8',
+  );
+  const method = (name: string) =>
+    source.split(`func ${name}(`)[1]?.split(/\n {4}(?:private )?func /)[0] ?? '';
+  // Run 42854027238: 17.0 was visible in the recording, but the immediate
+  // enabled snapshot still saw Save disabled after the delete/type transaction.
+  const readiness = method('assertSaveReady');
+  expect(readiness).toContain('NSPredicate(format: "enabled == true AND hittable == true")');
+  expect(readiness).toContain('evaluatedWith: save');
+  expect(readiness).toContain('XCTWaiter.wait(for: [ready], timeout: 5), .completed');
+  const replacement = method('replacePrefilledText');
+  expect(replacement).toContain('XCTAssertTrue(isFieldCleared(field),');
+  expect(replacement.indexOf('XCTAssertTrue(isFieldCleared(field),')).toBeLessThan(
+    replacement.indexOf('field.typeText(replacement)'),
+  );
+  expect(replacement).toContain('NSPredicate(format: "value == %@", replacement)');
+  expect(replacement).toContain('XCTWaiter.wait(for: [entered], timeout: 5), .completed');
+  for (const name of [
+    'testLogSheetEditsUnitsWithKeyboardAndCancelsWithoutChangingHome',
+    'testBodyFatCheckInRefreshesDataHeroWithoutSavingWeight',
+    'testBodyFatEditorAtLargestTextPreservesMethodUntilExplicitSelection',
+  ]) {
+    const body = method(name);
+    expect(body).toContain('replacePrefilledText(');
+    expect(body).toContain('assertSaveReady(save)');
+    expect(body).not.toContain('field.typeText(');
+    expect(body.indexOf('replacePrefilledText(')).toBeLessThan(
+      body.indexOf('assertSaveReady(save)'),
+    );
+    if (body.includes('save.tap()')) {
+      expect(body.indexOf('assertSaveReady(save)')).toBeLessThan(body.indexOf('save.tap()'));
+    }
+  }
+});
+
+it('waits for a stable hittable sidebar before each single dismissal tap', () => {
+  const source = readFileSync(
+    new URL(
+      '../../../apps/ios/LogYourBodyUITests/HomeV2TimelineIntegrationUITests.swift',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  const helper =
+    source.split('private func dismissSidebar(')[1]?.split('\n    private func ')[0] ?? '';
+  expect(helper).toContain('guard scrim.exists, scrim.isHittable else { return false }');
+  expect(helper).toContain('var previousFrame = CGRect.null');
+  expect(helper).toContain('let frame = scrim.frame');
+  expect(helper).toContain('defer { previousFrame = frame }');
+  expect(helper).toContain(
+    '!frame.isEmpty && window.frame.contains(frame) && frame == previousFrame',
+  );
+  expect(helper).toContain('XCTWaiter.wait(for: [ready], timeout: 5), .completed');
+  expect(helper).toContain(
+    'window.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()',
+  );
+  expect(helper.match(/\.tap\(\)/g)).toHaveLength(1);
+  expect(helper.indexOf('XCTWaiter.wait(')).toBeLessThan(helper.indexOf('.tap()'));
+  expect(helper).toContain('XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))');
+  expect(helper.indexOf('.tap()')).toBeLessThan(helper.indexOf('scrim.waitForNonExistence('));
+  const journey = source
+    .split('func testPhotoScrubResetsWhenNavigatingToTheMenuAndBack()')[1]
+    .split('\n    func ')[0];
+  expect(journey).toContain('for _ in 0..<3 {');
+  expect(journey.match(/dismissSidebar\(scrim, in: app\)/g)).toHaveLength(2);
+  expect(journey).not.toContain('scrim.coordinate(');
+  expect(journey).toContain('"Header swipes must still open the sidebar"');
+  expect(journey).toContain('app.buttons["home_v2_viewer_close"].waitForExistence(timeout: 5)');
+});
+
 it('checks Stats composition, card styling and provenance dismissal through the launch audit with executed coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
   for (const input of [
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_*.py',
+    '$TURBO_ROOT$/packages/shared-lib/scripts/company-size-ratchet.mjs',
+    '$TURBO_ROOT$/packages/shared-lib/scripts/company-size-ratchet.behavior.mjs',
+    '$TURBO_ROOT$/.company-guards/size-baseline.json',
     '$TURBO_ROOT$/scripts/ios/launch_ui_opacity_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_timeline_gesture_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_home_interaction_audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_offline_pin_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_dated_stats_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-report.py',
-    '$TURBO_ROOT$/scripts/ios/launch_ui_timeline_day.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
-    '$TURBO_ROOT$/scripts/ios/launch_ui_audit_test_support.py',
+    '$TURBO_ROOT$/scripts/ios/test_launch_ui_audit_support.py',
+    '$TURBO_ROOT$/scripts/ios/test_launch_ui_home_interaction.py',
     '$TURBO_ROOT$/apps/ios/LogYourBodyWidget/**/*.swift',
     '$TURBO_ROOT$/apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift',
   ]) {
@@ -135,18 +213,38 @@ it('checks Stats composition, card styling and provenance dismissal through the 
     new URL('../../../scripts/ios/launch-ui-regression-audit.py', import.meta.url),
     'utf8',
   );
-  // launch audit keeps every size-ratchet sibling
+  // launch audit loads every size-ratchet check sibling
   expect(audit).toContain('Cannot load launch UI audit sibling');
+  expect(audit).toContain('launch_ui_*.py');
+  expect(audit).toContain('def load_check_siblings');
   expect(audit).toContain('_AUDIT_SIBLINGS');
   expect(audit).toContain('launch_ui_timeline_day.py');
   expect(audit).toContain('launch_ui_opacity_audit.py');
   expect(audit).toContain('launch_ui_timeline_gesture_audit.py');
+  expect(audit).toContain('launch_ui_offline_pin_audit.py');
+  expect(audit).toContain('check_ui_test_offline_pin');
   expect(audit).toContain('launch_ui_dated_stats_audit.py');
   expect(audit).toContain('launch-ui-regression-report.py');
   expect(audit).not.toMatch(/^def write_outputs\(/m);
   expect(audit).not.toMatch(/^def check_timeline_calendar_day\(/m);
+  expect(audit).not.toMatch(/^def check_home_interaction\(/m);
   expect(audit).not.toMatch(/^def check_optional_cgfloat_opacity\(/m);
   expect(audit).not.toMatch(/^def check_timeline_gestures\(/m);
+  readFileSync(
+    new URL('../../../scripts/ios/launch_ui_home_interaction_audit.py', import.meta.url),
+  );
+  readFileSync(new URL('../../../scripts/ios/launch_ui_timeline_day.py', import.meta.url));
+  const opacity = readFileSync(
+    new URL('../../../scripts/ios/launch_ui_opacity_audit.py', import.meta.url),
+    'utf8',
+  );
+  expect(opacity).toContain('def contribute');
+  const gesture = readFileSync(
+    new URL('../../../scripts/ios/launch_ui_timeline_gesture_audit.py', import.meta.url),
+    'utf8',
+  );
+  expect(gesture).toContain('def contribute');
+  expect(audit).not.toMatch(/^def check_ui_test_offline_pin\(/m);
   expect(audit).not.toMatch(/^def check_dated_stats_fixture\(/m);
   // The parent audit stays within the company 500-line ratchet.
   const parentLines = audit.endsWith('\n') ? audit.slice(0, -1).split('\n') : audit.split('\n');
@@ -194,3 +292,20 @@ sys.exit(status)
     rmSync(coverage, { recursive: true, force: true });
   }
 }, 30_000);
+
+it('repairs additive audit and manifest conflicts while rejecting lost parent checks', () => {
+  const output = execFileSync(
+    process.execPath,
+    [
+      '--test',
+      'scripts/resolve-repository-docs-manifest.test.mjs',
+      'scripts/resolve-repository-docs-json.test.mjs',
+    ],
+    { cwd: fileURLToPath(new URL('../../..', import.meta.url)), encoding: 'utf8', timeout: 30_000 },
+  );
+  expect(output).toContain('# fail 0');
+  expect(output).toContain('manifest union keeps both launch-audit sibling registrations');
+  expect(output).toContain(
+    'manifest union refuses a non-additive launch-audit conflict without staging',
+  );
+});

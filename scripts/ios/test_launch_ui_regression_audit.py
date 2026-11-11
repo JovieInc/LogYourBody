@@ -8,13 +8,33 @@ from pathlib import Path
 import shutil
 import sys
 import unittest
+from unittest.mock import patch
+from launch_ui_timeline_day import check_timeline_calendar_day
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import launch_ui_audit_test_support as audit_support  # noqa: E402
-from launch_ui_audit_test_support import AUDIT, ROOT, LaunchUIAuditTests  # noqa: E402
+import test_launch_ui_audit_support as audit_support  # noqa: E402
+from test_launch_ui_audit_support import AUDIT, ROOT, LaunchUIAuditTests  # noqa: E402
 
 
-class StatsCardCompositionTests(LaunchUIAuditTests):
+from test_launch_ui_home_interaction import CheckSiblingDiscoveryTests, HomeInteractionAuditTests
+
+
+class StatsCardCompositionTests(HomeInteractionAuditTests, LaunchUIAuditTests):
+    def test_audit_reads_each_swift_file_once(self):
+        reads = []
+        original = Path.read_text
+
+        def counted(path, *args, **kwargs):
+            if path.suffix == ".swift":
+                reads.append(path)
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", counted):
+            self.assertEqual(self.run_audit()[0], 0)
+        self.assertGreater(len(reads), 0)
+        self.assertEqual(len(reads), len(set(reads)))
+
+
     def test_behavior_runner_requires_complete_unskipped_execution(self):
         class IncompleteSuite(unittest.TestSuite):
             def countTestCases(self):
@@ -42,16 +62,16 @@ class StatsCardCompositionTests(LaunchUIAuditTests):
 
     def test_empty_timeline_keeps_its_photo_button_accessible(self):
         findings = []
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual(findings, [])
         self.replace("Services/DatedTimelineUI.swift", ".accessibilityElement(children: .contain)", "")
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
 
     def test_empty_timeline_requires_the_photo_action_identifier(self):
         self.replace("Services/DatedTimelineUI.swift", '"launch_timeline_add_photo"', '"wrong_photo_action"')
         findings = []
-        AUDIT.check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+        check_timeline_calendar_day(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
         self.assertEqual([finding.check for finding in findings], ["timeline.empty_photo_accessibility"])
 
     def test_geometry_requires_typed_nonfinite_arguments_in_every_native_tree(self):
@@ -314,9 +334,9 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
             settings.write_text(source)
         helper = ui_path.read_text()
         for token, replacement in (
-            ('children(matching: .button).count == 0', 'descendants(matching: .button).firstMatch.exists'),
-            ('seen.insert(key).inserted', 'true'),
-            ('leaves.count == 1 ? leaves.first : nil', 'leaves.first'),
+            ('alert.buttons.matching(identifier: identifier)', 'alert.descendants(matching: .button)'),
+            ('$0.frame == action.frame', 'false'),
+            ('actions.count == 1 ? actions.first : nil', 'actions.first'),
             ('$0.label == label', 'true'),
         ):
             self.assertIn(token, helper)
@@ -330,7 +350,7 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         self.assertEqual(self.run_audit()[0], 0)
         for before, after in (
             ('segmentationQueue.async {', 'Task.detached {'),
-            ('qos: .userInitiated\n    )', 'qos: .userInitiated, attributes: .concurrent\n    )'),
+            ('qos: .userInitiated)', 'qos: .userInitiated, attributes: .concurrent)'),
             ('continuation.resume(with: Result {', 'continuation.resume(with: Result { continuation.resume()'),
         ):
             self.assertIn(before, source)
@@ -396,7 +416,7 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
         self.assertNotIn("def check_timeline_gestures", Path(AUDIT.__file__).read_text())
         for relative in (
             "scripts/ios/test_launch_ui_regression_audit.py",
-            "scripts/ios/launch_ui_audit_test_support.py",
+            "scripts/ios/test_launch_ui_audit_support.py",
         ):
             text = (ROOT / relative).read_text()
             measured = len(text.split("\n")) - (1 if text.endswith("\n") else 0)
@@ -413,7 +433,7 @@ let registration = BodyPhotoRegistration(translation: .zero, rotation: .nan, sca
                 "launch_ui_timeline_day",
                 "launch_ui_opacity_audit",
                 "launch_ui_timeline_gesture_audit",
-                "launch_ui_home_interaction_audit",
+                "launch_ui_offline_pin_audit",
                 "launch_ui_dated_stats_audit",
                 "launch_ui_regression_report",
             ],

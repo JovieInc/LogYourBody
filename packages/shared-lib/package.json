@@ -12,6 +12,7 @@
     "test": "vitest run --maxWorkers=1 --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs ../../.github/scripts/web-production-smoke.test.mjs ../../.github/scripts/verify-public-build-env.test.mjs ../../.github/scripts/signing-expiry.test.mjs ../../.github/scripts/signing-expiry-client.test.mjs ../../.github/scripts/release-signing-provisioned.test.mjs"
   },
   "devDependencies": {
+    "@types/node": "^22.20.4",
     "@typescript-eslint/eslint-plugin": "^8.71.0",
     "@typescript-eslint/parser": "^8.71.0",
     "eslint": "^9.39.5",

@@ -1,4 +1,5 @@
 """Move every current reviewed launch-audit pin from one explicit digest."""
+import difflib
 import re
 import subprocess
 
@@ -114,7 +115,7 @@ def _choose_audit(base_audit, ours_audit, theirs_audit, explicit_audit):
 
 
 def _dependency_union(base, ours, theirs):
-    """One-sided dependency lines stay; divergent audit pins need an explicit digest."""
+    """Keep one-sided dependency additions and hash updates; refuse deletions or divergence."""
     def skeleton(text):
         return [line for line in text.splitlines() if not _DEP_LINE.fullmatch(line)]
 
@@ -134,7 +135,7 @@ def _dependency_union(base, ours, theirs):
     base_entries, ours_entries, theirs_entries = entries(base), entries(ours), entries(theirs)
     if base_entries is None or ours_entries is None or theirs_entries is None:
         return None
-    extra = []
+    extra, replacements = [], {}
     for key in set(base_entries) | set(ours_entries) | set(theirs_entries):
         base_line = base_entries.get(key)
         ours_line = ours_entries.get(key)
@@ -143,12 +144,17 @@ def _dependency_union(base, ours, theirs):
             if base_line not in (None, ours_line):
                 return None
             continue
-        if base_line == ours_line and theirs_line is not None and ours_line is None:
-            extra.append(theirs_line)
-        elif base_line == theirs_line and ours_line is not None and theirs_line is None:
+        if base_line == ours_line and theirs_line is not None:
+            if ours_line is None:
+                extra.append(theirs_line)
+            else:
+                replacements[ours_line] = theirs_line
+        elif base_line == theirs_line and ours_line is not None:
             continue
         else:
             return None
+    for original, updated in replacements.items():
+        ours = ours.replace(original, updated)
     if not extra:
         return ours
     result = ours.splitlines()
@@ -276,10 +282,25 @@ def conflicted_pin_template(base, ours, theirs, project_pin, explicit_audit=None
         if count != 1:
             raise ValueError("diagnostic workflow conflict is not limited to the project pin")
         project_masked.append(masked_project)
-    if project_masked[0] == project_masked[2]:
-        if worktree is None or _project_hunk_text(worktree, project_pin) != ours:
+    unchanged = 2 if project_masked[0] == project_masked[2] else 1
+    if project_masked[0] == project_masked[unchanged]:
+        retained = 1 if unchanged == 2 else 2
+        if retained == 2 and any(
+            tag not in ("equal", "insert")
+            for tag, *_ in difflib.SequenceMatcher(
+                a=project_masked[0].splitlines(), b=project_masked[2].splitlines(), autojunk=False,
+            ).get_opcodes()
+        ):
             raise ValueError("diagnostic workflow conflict is not limited to the project pin")
-        return ours
+        if worktree is None:
+            raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+        actual = _project_hunk_text(worktree, project_pin)
+        masked_actual, _ = project_pin.subn(
+            lambda match: match.group(1) + ("0" * 64) + match.group(2), actual, count=1,
+        )
+        if masked_actual != project_masked[retained]:
+            raise ValueError("diagnostic workflow conflict is not limited to the project pin")
+        return (base, ours, theirs)[retained]
     raise ValueError("diagnostic workflow conflict is not limited to the project pin")
 
 
@@ -329,6 +350,10 @@ def stage_resolved_pins(root, pin_update, output, resolve_staged, git_bytes):
     workflow, updated, routing_text = pin_update
     path = repository_docs.local(root, workflow)
     original = path.read_bytes()
+    if not _MARKER.search(original) and original.decode() != updated:
+        raise ValueError(
+            "diagnostic pin repair refuses a manually edited workflow; review and stage it explicitly"
+        )
     index = git_bytes(root, "ls-files", "--stage", "--", workflow)
     routing_name = DIAGNOSTIC_ROUTING_TESTS
     routing_path = repository_docs.local(root, routing_name)

@@ -8,10 +8,16 @@ import CoreImage
 import UIKit
 class BackgroundRemovalService {
     static let shared = BackgroundRemovalService()
-    private let segmentationQueue = DispatchQueue(
-        label: "com.logyourbody.person-segmentation", qos: .userInitiated
-    )
-    private init() {}
+    private let segmentationQueue: DispatchQueue
+    private let makeMask: (CGImage, Float) throws -> CVPixelBuffer
+
+    init(
+        segmentationQueue: DispatchQueue = DispatchQueue(label: "com.logyourbody.segmentation", qos: .userInitiated),
+        segment: ((CGImage, Float) throws -> CVPixelBuffer)? = nil
+    ) {
+        self.segmentationQueue = segmentationQueue
+        self.makeMask = segment ?? Self.generatePersonMask
+    }
 
     enum BackgroundRemovalError: LocalizedError {
         case noPersonFound
@@ -40,26 +46,29 @@ class BackgroundRemovalService {
         return try applySegmentationMask(to: cgImage, mask: mask, quality: quality)
     }
 
-    /// Person mask from Vision. `perform` either throws or fills `results`, so
-    /// there is no completion handler and nothing that can be resumed twice
-    /// (the simulator trap that BackgroundRemovalServiceTests used to document).
-    /// Vision waits on its own workers. Serialize requests on a dispatch queue
-    /// so those waits never occupy Swift's cooperative task workers.
+    /// Vision waits for dependent work synchronously. Keep it off Swift's
+    /// cooperative pool so simultaneous photo previews cannot starve UI tasks.
     func personMask(for cgImage: CGImage, quality: Float) async throws -> CVPixelBuffer {
-        try await withCheckedThrowingContinuation { continuation in
+        try Task.checkCancellation()
+        let mask: CVPixelBuffer = try await withCheckedThrowingContinuation { continuation in
             segmentationQueue.async {
-                continuation.resume(with: Result {
-                    let request = VNGeneratePersonSegmentationRequest()
-                    request.qualityLevel = quality > 0.8 ? .accurate : .balanced
-                    let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-                    try handler.perform([request])
-                    guard let result = request.results?.first else {
-                        throw BackgroundRemovalError.noPersonFound
-                    }
-                    return result.pixelBuffer
-                })
+                // `perform` owns completion; Vision's callback must never resume this again.
+                continuation.resume(with: Result { try self.makeMask(cgImage, quality) })
             }
         }
+        try Task.checkCancellation()
+        return mask
+    }
+
+    private static func generatePersonMask(_ cgImage: CGImage, quality: Float) throws -> CVPixelBuffer {
+        let request = VNGeneratePersonSegmentationRequest()
+        request.qualityLevel = quality > 0.8 ? .accurate : .balanced
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        try handler.perform([request])
+        guard let result = request.results?.first else {
+            throw BackgroundRemovalError.noPersonFound
+        }
+        return result.pixelBuffer
     }
 
     /// Copies the Vision mask into a value grid so the buffer is not retained.

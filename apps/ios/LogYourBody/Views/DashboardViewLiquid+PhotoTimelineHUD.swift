@@ -71,9 +71,13 @@ extension DashboardViewLiquid {
                 .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.top, 8)
                 .padding(.bottom, 4)
+                // Keep header buttons above native scroll and pager hit regions.
+                .zIndex(1)
 
             photoTimelineHomeContent
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? 0 : .infinity)
+                .contentShape(Rectangle())
+                .zIndex(0)
                 // The edge swipe lives on the content, below the header. A
                 // high-priority drag that shares the menu button's edge drops
                 // the Open Menu tap before the sidebar can present.
@@ -165,6 +169,9 @@ extension DashboardViewLiquid {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Your entry is still saved. Try Undo again.")
+        }
+        .task(id: authManager.currentUser?.id) {
+            await refreshWeeklyPhotoProvenanceIfNeeded()
         }
     }
 

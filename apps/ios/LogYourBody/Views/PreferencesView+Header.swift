@@ -19,26 +19,9 @@ extension PreferencesView {
                 accessibilityIdentifier: "settings_profile_link",
                 titleAccessibilityIdentifier: "home_v2_settings_profile"
             ) {
-                SettingsDetailScreen(title: "Profile") {
-                    accountSection
+                ProfileLogoutScreen(authManager: authManager) { showingLogoutConfirmation in
+                    accountSection(showingLogoutConfirmation: showingLogoutConfirmation)
                     profileSection
-                }
-                // confirmationDialog on this settings screen presents as a popover
-                // and omits Cancel, so logout has no reachable escape hatch.
-                .alert(
-                    "Log out of LogYourBody?",
-                    isPresented: $showingLogoutConfirmation
-                ) {
-                    Button("Log Out", role: .destructive) {
-                        Task {
-                            await authManager.logout()
-                        }
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("settings_logout_confirm")
-                    Button("Cancel", role: .cancel) {}
-                        .accessibilityElement(children: .combine)
-                        .accessibilityIdentifier("settings_logout_cancel")
                 }
             }
             SettingsNavigationLink(
@@ -324,5 +307,41 @@ extension PreferencesView {
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(.primary)
             )
+    }
+}
+
+/// Logout confirmation lives on the pushed profile screen. Parent state on the
+/// settings list does not refresh a NavigationLink destination, so the alert
+/// never appears after the row action. confirmationDialog on this screen
+/// presents as a popover and omits Cancel.
+private struct ProfileLogoutScreen<Content: View>: View {
+    private let authManager: AuthManager
+    @State private var showingLogoutConfirmation = false
+    private let content: (Binding<Bool>) -> Content
+
+    init(authManager: AuthManager, @ViewBuilder content: @escaping (Binding<Bool>) -> Content) {
+        self.authManager = authManager
+        self.content = content
+    }
+
+    var body: some View {
+        SettingsDetailScreen(title: "Profile") {
+            content($showingLogoutConfirmation)
+        }
+        .alert(
+            "Log out of LogYourBody?",
+            isPresented: $showingLogoutConfirmation
+        ) {
+            Button("Log Out", role: .destructive) {
+                Task {
+                    await authManager.logout()
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("settings_logout_confirm")
+            Button("Cancel", role: .cancel) {}
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("settings_logout_cancel")
+        }
     }
 }

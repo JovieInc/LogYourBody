@@ -14,10 +14,14 @@ from pathlib import Path
 
 import repository_docs
 from json_union import _skip, _parse_json_node
+from audit_registration_union import _resolve_registration
 
+LAUNCH_BINDINGS = "scripts/fixtures/lyb-launch-route-bindings.json"
+LAUNCH_MANIFEST = "scripts/fixtures/lyb-launch-route-manifest.json"
 MANIFESTS = (
     "packages/shared-lib/package.json",
     "packages/shared-lib/turbo.json",
+    LAUNCH_BINDINGS,
 )
 # Additive launch-audit sibling registrations keep every parent export.
 AUDIT_REGISTRATIONS = (
@@ -27,14 +31,9 @@ AUDIT_REGISTRATIONS = (
 )
 # The correction ledger has its own resolver and must not deadlock manifest union.
 LEDGER = "packages/shared-lib/corrections.json"
+# A conflicted diagnostic project pin stays for the reviewed digest resolver.
+DIAGNOSTIC_PIN_WORKFLOW = ".github/workflows/ios-ui-diagnostics.yml"
 UNION_REFUSAL = "additive manifest union keeps every parent test input"
-_HUNK = re.compile(r"^<<<<<<<[^\n]*\n(.*?\n?)=======\n(.*?\n?)>>>>>>>[^\n]*\n", re.M | re.S)
-_TRIPLE = re.compile(r'\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)')
-_PY_LIST = re.compile(
-    r"\[item\[0\] for item in AUDIT\._AUDIT_SIBLINGS\],\s*\[(.*?)\]",
-    re.S,
-)
-_TS_LIST = re.compile(r"for \(const input of \[(.*?)\]", re.S)
 
 
 def parse_json_spans(text):
@@ -62,7 +61,7 @@ def _subsequence(needle, haystack):
     return position == len(needle)
 
 
-def union_strings(base, ours, theirs):
+def _union_strings_exact(base, ours, theirs):
     # Preserved repeated inputs, such as a workflow listed twice, stay in branch order.
     for sequence in (ours, theirs):
         if not _subsequence(base, sequence):
@@ -81,6 +80,26 @@ def union_strings(base, ours, theirs):
     if set(result) != set(ours) | set(theirs):
         raise ValueError(UNION_REFUSAL)
     return result
+
+
+def union_strings(base, ours, theirs):
+    try:
+        return _union_strings_exact(base, ours, theirs)
+    except ValueError:
+        # A parent may replace enumerated inputs with one new glob that matches them.
+        globs = [
+            token for token in (*ours, *theirs)
+            if token not in base and _replacement_glob(token)
+        ]
+        covered = [
+            item for item in (*base, *ours, *theirs)
+            if any(_covered_by_glob(glob, item) for glob in globs)
+        ]
+        if not globs or not covered:
+            raise ValueError(UNION_REFUSAL) from None
+        return _union_strings_exact(
+            *[_strip_replaced(list(sequence), globs) for sequence in (base, ours, theirs)]
+        )
 
 
 def union_json(base, ours, theirs, path=(), union_arrays=False):
@@ -167,136 +186,6 @@ def _stage_texts(root, name):
     return texts
 
 
-def _sibling_triples(text):
-    match = re.search(r"_AUDIT_SIBLINGS = \((.*?)\n\)", text, re.S)
-    triples = [tuple(item) for item in _TRIPLE.findall(match.group(1))] if match else []
-    if not triples:
-        raise ValueError(UNION_REFUSAL + ": missing audit siblings")
-    return triples
-
-
-def _union_triples(base_text, ours_text, theirs_text):
-    base, ours, theirs = (_sibling_triples(text) for text in (base_text, ours_text, theirs_text))
-    by_name = {}
-    for item in (*base, *ours, *theirs):
-        previous = by_name.setdefault(item[0], item)
-        if previous != item:
-            raise ValueError(UNION_REFUSAL + ": sibling identity diverged")
-    names = union_strings(
-        [item[0] for item in base], [item[0] for item in ours], [item[0] for item in theirs],
-    )
-    return [by_name[name] for name in names]
-
-
-def _render_siblings(triples):
-    rows = "\n".join(
-        f'    ("{name}", "{filename}", "{export}"),' for name, filename, export in triples
-    )
-    exports = ",\n".join(f"    {export}" for _name, _filename, export in triples)
-    return (
-        "_AUDIT_SIBLINGS = (\n"
-        f"{rows}\n"
-        ")\n(\n"
-        f"{exports},\n"
-        ") = [_load_sibling(*sibling) for sibling in _AUDIT_SIBLINGS]\n"
-    )
-
-
-def _quoted_names(text, pattern):
-    match = pattern.search(text)
-    if not match:
-        raise ValueError(UNION_REFUSAL + ": missing sibling name list")
-    inner = match.group(1)
-    names = re.findall(r"""(['"])([^'"]+)\1""", inner)
-    if not names and inner.strip():
-        raise ValueError(UNION_REFUSAL + ": sibling name list is not quoted strings")
-    quotes = {quote for quote, _name in names}
-    if len(quotes) > 1:
-        raise ValueError(UNION_REFUSAL + ": mixed sibling quote styles")
-    return [name for _quote, name in names]
-
-
-def _resolve_audit_python(working, triples):
-    """Replace the sibling block and union export calls. Other hunks refuse."""
-    exports = {export for _name, _filename, export in triples}
-    start = working.find("_AUDIT_SIBLINGS = (")
-    closer = working.find(">>>>>>>", start)
-    if start < 0 or closer < 0 or "<<<<<<<" in working[:start]:
-        raise ValueError(UNION_REFUSAL + ": audit registration conflict is not the sibling block")
-    end = working.find("\n", closer)
-    if end < 0:
-        raise ValueError(UNION_REFUSAL + ": audit registration conflict is not the sibling block")
-    merged = working[:start] + _render_siblings(triples) + working[end + 1:]
-
-    def call_union(match):
-        def calls(side):
-            rows = []
-            for line in side.splitlines():
-                if not line.strip():
-                    continue
-                found = re.fullmatch(r"\s*([A-Za-z_][A-Za-z0-9_]*)\(.*\)\s*", line)
-                if not found or found.group(1) not in exports:
-                    raise ValueError(UNION_REFUSAL + ": audit registration conflict is not additive")
-                rows.append(line)
-            return rows
-
-        lines = calls(match.group(1))
-        for line in calls(match.group(2)):
-            if line not in lines:
-                lines.append(line)
-        return "\n".join(lines) + ("\n" if lines else "")
-
-    result = _HUNK.sub(call_union, merged)
-    if re.search(r"^(?:<<<<<<<|=======|>>>>>>>)", result, re.M):
-        raise ValueError(UNION_REFUSAL + ": audit registration conflict is not additive")
-    missing = [export for export in exports if f"{export}(" not in result]
-    if missing:
-        raise ValueError(UNION_REFUSAL + ": missing sibling call " + ", ".join(missing))
-    return result
-
-
-def _resolve_quoted_list(working, pattern, names, quote):
-    match = pattern.search(working)
-    if not match:
-        raise ValueError(UNION_REFUSAL + ": missing sibling name list")
-    if not names:
-        raise ValueError(UNION_REFUSAL + ": sibling name list is empty")
-    hunks = list(_HUNK.finditer(working))
-    if not hunks or any(
-        hunk.start() < match.start(1) or hunk.end() > match.end(1) for hunk in hunks
-    ):
-        raise ValueError(UNION_REFUSAL + ": sibling registration conflict is not additive")
-    indent = "    "
-    for line in match.group(1).splitlines():
-        quoted = re.match(r"""^(\s*)(['"])""", line)
-        if quoted:
-            indent = quoted.group(1)
-            break
-    close = ""
-    trailing = re.search(r"\n([ \t]*)$", match.group(1))
-    if trailing:
-        close = trailing.group(1)
-    lead = "\n" if match.group(1).startswith("\n") else ""
-    rendered = lead + "\n".join(f"{indent}{quote}{name}{quote}," for name in names) + "\n" + close
-    return working[:match.start(1)] + rendered + working[match.end(1):]
-
-
-def _resolve_registration(root, name):
-    base_text, ours_text, theirs_text = _stage_texts(root, name)
-    working = repository_docs.local(root, name).read_text()
-    if name.endswith("launch-ui-regression-audit.py"):
-        return _resolve_audit_python(working, _union_triples(base_text, ours_text, theirs_text))
-    pattern = _PY_LIST if name.endswith("test_launch_ui_regression_audit.py") else _TS_LIST
-    ours_names = _quoted_names(ours_text, pattern)
-    names = union_strings(
-        _quoted_names(base_text, pattern),
-        ours_names,
-        _quoted_names(theirs_text, pattern),
-    )
-    quote = re.search(r"""(['"])[^'"]+\1""", pattern.search(ours_text).group(1)).group(1)
-    return _resolve_quoted_list(working, pattern, names, quote)
-
-
 def apply_manifest_union(root):
     root = Path(root).resolve()
     subprocess.run(
@@ -314,7 +203,7 @@ def apply_manifest_union(root):
     for name in AUDIT_REGISTRATIONS:
         if name in conflicts:
             planned.append((name, _resolve_registration(root, name)))
-    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER, *AUDIT_REGISTRATIONS})
+    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER, *AUDIT_REGISTRATIONS, DIAGNOSTIC_PIN_WORKFLOW, LAUNCH_MANIFEST})
     if unrelated:
         raise ValueError("manifest union refuses unrelated conflicts: " + ", ".join(unrelated))
     for name in MANIFESTS:
@@ -326,7 +215,8 @@ def apply_manifest_union(root):
             node_value(parse_json_spans(base_text)),
             node_value(ours_node),
             node_value(parse_json_spans(theirs_text)),
-            union_arrays=name.endswith("turbo.json"),
+            # Launch bindings retain every parent XCTest selector, just like test inputs.
+            union_arrays=name.endswith("turbo.json") or name == LAUNCH_BINDINGS,
         )
         rendered = render_updated(ours_text, ours_node, merged)
         if json.loads(rendered) != merged:
@@ -360,14 +250,60 @@ def _blob(root, spec):
         raise ValueError(UNION_REFUSAL + ": manifest is not text") from exc
 
 
+def _replacement_glob(token):
+    if token.count("*") != 1 or any(char in token for char in "?[]"):
+        return None
+    prefix, suffix = token.split("*", 1)
+    if not prefix or not suffix:
+        return None
+    return prefix, suffix
+
+
+def _covered_by_glob(token, item):
+    # A new glob does not cover itself or another pattern.
+    if item == token or "*" in item or "?" in item:
+        return False
+    parts = _replacement_glob(token)
+    if parts is None:
+        return False
+    prefix, suffix = parts
+    return item.startswith(prefix) and item.endswith(suffix) and len(item) >= len(prefix) + len(suffix)
+
+
+def _strip_replaced(sequence, globs):
+    return [item for item in sequence if not any(_covered_by_glob(glob, item) for glob in globs)]
+
+
+def _matches_union(expected, ours, theirs, merged):
+    return (
+        Counter(merged) == Counter(expected)
+        and _subsequence(ours, merged)
+        and _subsequence(theirs, merged)
+    )
+
+
 def _require_parent_inputs(base, ours, theirs, merged, path):
-    expected = union_strings(list(base), list(ours), list(theirs))
-    if (
-        Counter(merged) != Counter(expected)
-        or not _subsequence(list(ours), list(merged))
-        or not _subsequence(list(theirs), list(merged))
-    ):
-        location = ".".join(path) or "manifest"
+    location = ".".join(path) or "manifest"
+    base, ours, theirs, merged = list(base), list(ours), list(theirs), list(merged)
+    try:
+        expected = _union_strings_exact(base, ours, theirs)
+    except ValueError:
+        # A parent may replace enumerated inputs with one new glob that matches them.
+        globs = [
+            token for token in ours + theirs
+            if token not in base and token in merged and _replacement_glob(token)
+        ]
+        if not globs:
+            raise ValueError(UNION_REFUSAL + ": auto-merged " + location) from None
+        stripped = [_strip_replaced(seq, globs) for seq in (base, ours, theirs, merged)]
+        try:
+            expected = _union_strings_exact(*stripped[:3])
+        except ValueError:
+            raise ValueError(UNION_REFUSAL + ": auto-merged " + location) from None
+        if not _matches_union(expected, *stripped[1:]):
+            raise ValueError(UNION_REFUSAL + ": auto-merged " + location)
+        return
+    if not _matches_union(expected, ours, theirs, merged):
         raise ValueError(UNION_REFUSAL + ": auto-merged " + location)
 
 
@@ -414,6 +350,8 @@ def assert_auto_merged_parent_inputs(root):
         )
         if None in (ours, theirs, base, merged) or ours == base or theirs == base or ours == theirs:
             continue
+        if name == LAUNCH_BINDINGS and any(set(json.loads(parent)) - set(json.loads(merged)) for parent in (ours, theirs)):
+            raise ValueError(UNION_REFUSAL + ": auto-merged launch path missing")
         _preserved(
             node_value(parse_json_spans(base)),
             node_value(parse_json_spans(ours)),
@@ -461,14 +399,27 @@ def merge_ledger(root, resolve_staged, staged_bytes, git_bytes):
     path = repository_docs.local(root, output)
     original = path.read_bytes() if path.exists() else None
     index = git_bytes(root, "ls-files", "--stage", "--", output)
+    source_args = ("ls-files", "--stage", "-z", "--", ".", ":!" + LEDGER, ":!" + output)
+    source_index = git_bytes(root, *source_args)
     # Rendering refusals preserve concurrent projection edits; only roll back our completed render.
     resolve_staged(root)
+    rendered = path.read_bytes() if path.exists() else None
+    rendered_identity = path.lstat()[:3]  # File mode, inode and device, without following links.
+    rendered_index = git_bytes(root, "ls-files", "--stage", "--", output)
     try:
         subprocess.run(
             ["node", str(Path(__file__).with_name("correction-classifier.mjs")),
              "--resolve-merge", str(root), "--stage"], cwd=root, check=True,
         )
-    except (ValueError, OSError, subprocess.CalledProcessError):
+    except (ValueError, OSError, subprocess.CalledProcessError) as error:
+        # Rollback owns only our rendered projection, never another writer's edits.
+        # Identical bytes do not authorize rollback through a replaced file or symlink.
+        current_identity = path.lstat()[:3] if path.exists() or path.is_symlink() else None
+        if current_identity != rendered_identity:
+            raise ValueError("source projection changed during ledger validation; review and retry") from error
+        current = path.read_bytes() if path.exists() else None
+        if current != rendered or git_bytes(root, "ls-files", "--stage", "--", output) != rendered_index:
+            raise ValueError("source projection changed during ledger validation; review and retry") from error
         # A refused ledger repair restores the projection and its conflict stages.
         if original is None:
             path.unlink(missing_ok=True)
@@ -477,3 +428,7 @@ def merge_ledger(root, resolve_staged, staged_bytes, git_bytes):
         subprocess.run(["git", "update-index", "--force-remove", "--", output], cwd=root, check=True)
         subprocess.run(["git", "update-index", "--index-info"], cwd=root, input=index, check=True)
         raise
+    # The classifier may start after a source edit; retain the render's source snapshot.
+    if (git_bytes(root, *source_args) != source_index
+            or git_bytes(root, "ls-files", "--stage", "--", output) != rendered_index):
+        raise ValueError("source index changed during ledger validation; review staged inputs and retry")

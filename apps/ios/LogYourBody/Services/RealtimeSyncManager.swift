@@ -23,6 +23,7 @@ class RealtimeSyncManager: ObservableObject {
     @Published var unsyncedGlp1Count = 0
     @Published var unsyncedDexaCount = 0
     @Published var isOnline = true
+
     @Published var realtimeConnected = false
     @Published var error: String?
 
@@ -79,9 +80,10 @@ class RealtimeSyncManager: ObservableObject {
         }
     )
 
-    var pendingDatedOutcomeCount: Int {
+    func pendingDatedOutcomeCount() async throws -> Int {
         guard AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: DatedOutcomeStore.featureGate) else { return 0 }
-        return (try? datedOutcomeStore.pendingEdits().count) ?? 0
+        guard let owner = authManager.captureAccountSession() else { throw DatedOutcomeError.unauthenticated }
+        return try await datedOutcomeStore.pendingCountForPresentation { self.authManager.ownsAccountSession(owner) }
     }
 
     // Battery optimization settings

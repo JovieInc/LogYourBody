@@ -11,9 +11,14 @@ extension PreferencesView {
             footer: "Set targets that reflect your goals."
         ) {
             measurementSystemSection
-            goalRow(for: .weight)
-            goalRow(for: .bodyFat)
-            goalRow(for: .ffmi)
+            if DatedOutcomeEntry.isEnabled() {
+                Button("Outcome and date") { activeGoalEditor = .weight }
+                    .accessibilityIdentifier("settings_dated_outcome")
+            } else {
+                goalRow(for: .weight)
+                goalRow(for: .bodyFat)
+                goalRow(for: .ffmi)
+            }
         }
     }
 
@@ -45,7 +50,22 @@ extension PreferencesView {
         )
     }
 
+    @ViewBuilder
     func goalEditorSheet(for goal: PreferenceGoalKind) -> some View {
+        if DatedOutcomeEntry.isEnabled() {
+            if let owner = authManager.captureAccountSession() {
+                DatedOutcomeEditorHost(store: RealtimeSyncManager.shared.datedOutcomeStore, auth: authManager, owner: owner) {
+                    activeGoalEditor = nil
+                }
+            } else {
+                Button("Close") { activeGoalEditor = nil }
+            }
+        } else {
+            legacyGoalEditorSheet(for: goal)
+        }
+    }
+
+    private func legacyGoalEditorSheet(for goal: PreferenceGoalKind) -> some View {
         PreferenceGoalEditorSheet(
             goal: goal,
             initialText: initialGoalEditorText(for: goal),

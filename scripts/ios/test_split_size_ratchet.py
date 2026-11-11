@@ -245,6 +245,39 @@ class SplitSizeRatchetTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 extract_declarations(source, names, owner)
 
+    def test_private_type_extraction_requires_explicit_internal_access(self):
+        source = (
+            'import XCTest\n@testable import LogYourBody\n\n'
+            'final class SampleTests: XCTestCase {\n    func testOne() { _ = Fixture() }\n}\n\n'
+            '@MainActor\nprivate final class Fixture {\n    private var value = 1\n}\n\n'
+            'fileprivate struct Retained {\n    let value = 2\n}\n'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            original, sibling = Path(tmp) / 'SampleTests.swift', Path(tmp) / 'Fixture.swift'
+            original.write_text(source)
+            command = [sys.executable, str(ROOT / 'scripts/ios/split_size_ratchet.py'), str(original),
+                       '--extract', 'Fixture', '--sibling', str(sibling)]
+            refused = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn('review type access before extraction: Fixture', refused.stderr)
+            self.assertEqual(original.read_text(), source)
+            self.assertFalse(sibling.exists())
+            extracted = subprocess.run(command + ['--internalize', 'Fixture'], capture_output=True, text=True)
+            self.assertEqual(extracted.returncode, 0, extracted.stderr)
+            self.assertIn('fileprivate struct Retained', original.read_text())
+            self.assertIn('func testOne() { _ = Fixture() }', original.read_text())
+            self.assertEqual(sibling.read_text(),
+                             'import XCTest\n@testable import LogYourBody\n\n'
+                             '@MainActor\nfinal class Fixture {\n    private var value = 1\n}\n')
+
+    def test_internalization_refuses_unselected_or_already_internal_types(self):
+        for names, owner, internalize in [(['Alpha'], None, ['Holder']),
+                                          (['Alpha'], None, ['Alpha']),
+                                          (['value'], 'Holder', ['value'])]:
+            with self.subTest(names=names, owner=owner, internalize=internalize):
+                with self.assertRaises(ValueError):
+                    extract_declarations(NAMESAKE, names, owner, internalize)
+
     def test_extract_cli_refuses_collision_and_oversize_before_writing(self):
         with tempfile.TemporaryDirectory() as tmp:
             source, sibling = Path(tmp) / "Home.swift", Path(tmp) / "Photo.swift"

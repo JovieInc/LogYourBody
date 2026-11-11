@@ -28,6 +28,10 @@ extension DashboardViewLiquid {
         selectedPhotoTimelineRootPage == .analytics || isStatsDestinationActive
     }
 
+    var isDatedCoachSurface: Bool {
+        isHomeChatExpanded || selectedPhotoTimelineRootPage == .chat
+    }
+
     var datedTimelineDirective: some View {
         VStack(alignment: .leading, spacing: 8) {
             if datedTimelineIsOwned, let snapshot = datedTimelineSnapshot {
@@ -36,11 +40,24 @@ extension DashboardViewLiquid {
                         .font(.subheadline)
                         .accessibilityIdentifier("dated_timeline_outcome")
                 }
+                if snapshot.hasPendingOutcome {
+                    Text("Saved on this device. Waiting to sync.")
+                        .font(.footnote)
+                        .accessibilityIdentifier("dated_outcome_pending")
+                }
                 if datedTimelineLoadFailed {
                     Button("Retry sync") { scheduleDatedTimelineRefresh() }
                         .accessibilityIdentifier("dated_timeline_retry")
+                } else if realtimeSyncManager.datedOutcomeStore.syncIssue == .conflict {
+                    Button("Review account outcome") { openDatedTimelineEditor() }
+                } else if realtimeSyncManager.datedOutcomeStore.syncIssue == .retry {
+                    Button("Retry outcome sync") { realtimeSyncManager.syncAll() }
                 } else {
-                    LaunchDirectiveCard(presentation: isDatedStatsSurface ? snapshot.stats.presentation : snapshot.presentation) {
+                    LaunchDirectiveCard(
+                        presentation: isDatedCoachSurface ? snapshot.coach.presentation :
+                            (isDatedStatsSurface ? snapshot.stats.presentation : snapshot.presentation),
+                        note: isDatedCoachSurface ? snapshot.coach.note : nil
+                    ) {
                         performDatedTimelineAction()
                     }
                 }
@@ -54,23 +71,9 @@ extension DashboardViewLiquid {
         .padding(.horizontal, JovieTokens.screenInset)
         .sheet(isPresented: $showsDatedTimelineEditor) {
             if let owner = datedTimelineOwner, authManager.ownsAccountSession(owner) {
-                LaunchOutcomeEditor(
-                    existing: datedTimelineSnapshot?.outcome, errorText: launchOutcomeError, allowsMaintenance: true
-                ) { outcome in
-                    Task {
-                        do {
-                            try await realtimeSyncManager.datedOutcomeStore.saveForPresentation(outcome) {
-                                authManager.ownsAccountSession(owner)
-                            }
-                            guard authManager.ownsAccountSession(owner) else { return }
-                            launchOutcomeError = nil
-                            showsDatedTimelineEditor = false
-                            scheduleDatedTimelineRefresh()
-                        } catch {
-                            guard authManager.ownsAccountSession(owner) else { return }
-                            launchOutcomeError = "That outcome could not be saved. Revise the date or value."
-                        }
-                    }
+                DatedOutcomeEditorHost(store: realtimeSyncManager.datedOutcomeStore, auth: authManager, owner: owner) {
+                    showsDatedTimelineEditor = false
+                    scheduleDatedTimelineRefresh()
                 }
             }
         }
@@ -100,7 +103,7 @@ extension DashboardViewLiquid {
             openDatedTimelineEditor()
             return
         }
-        switch snapshot.destination {
+        switch isDatedCoachSurface ? snapshot.coach.destination : snapshot.destination {
         case .editor:
             openDatedTimelineEditor()
         case .measurement:
@@ -111,7 +114,7 @@ extension DashboardViewLiquid {
             realtimeSyncManager.syncAll()
             scheduleDatedTimelineRefresh()
         case .timeline:
-            selectedPhotoTimelineRootPage = .timeline
+            selectedPhotoTimelineRootPage = isDatedCoachSurface ? .analytics : .timeline
             isHomeChatExpanded = false
         }
     }
@@ -155,12 +158,17 @@ extension DashboardViewLiquid {
                 let outcome = try await realtimeSyncManager.datedOutcomeStore.loadForPresentation {
                     authManager.ownsAccountSession(owner)
                 }
-                let snapshot = await datedTimelineProjector.project(
+                let pending = try await realtimeSyncManager.datedOutcomeStore.hasPendingForPresentation {
+                    authManager.ownsAccountSession(owner)
+                }
+                var snapshot = await datedTimelineProjector.project(
                     owner: owner.subject, metrics: metrics,
                     input: LaunchJourney.Input(
-                        now: Date(), outcome: outcome?.value, offline: offline, planBaseline: outcome?.planBaseline
-                    ), heightCm: height
+                        now: Date(), outcome: outcome?.value, offline: offline,
+                        planBaseline: outcome?.planBaseline, enforcesDatedOutcomeDecision: true
+                    ), heightCm: height, savedOutcome: outcome
                 )
+                snapshot.hasPendingOutcome = pending
                 if outcome?.planBaseline == nil, let baseline = snapshot.planBaseline, let outcome {
                     try await realtimeSyncManager.datedOutcomeStore.retainPlanBaselineForPresentation(
                         baseline, revision: outcome.revision
@@ -168,13 +176,20 @@ extension DashboardViewLiquid {
                 }
                 guard !Task.isCancelled, datedTimelineRefreshID == request,
                       authManager.ownsAccountSession(owner) else { return }
+                if let action = snapshot.coach.actionToSave {
+                    try await realtimeSyncManager.datedOutcomeStore.retainCoachActionForPresentation(action) {
+                        authManager.ownsAccountSession(owner) && datedTimelineRefreshID == request
+                    }
+                }
+                guard !Task.isCancelled, datedTimelineRefreshID == request,
+                      authManager.ownsAccountSession(owner) else { return }
                 datedTimelineSnapshot = snapshot
                 datedTimelineOwner = owner
                 datedTimelineLoadFailed = false
-                // One wake at the saved UTC deadline, including while the app
-                // stays foregrounded in a timezone whose day changes later.
-                if let deadline = snapshot.stats.expiresAt, deadline > Date() {
-                    try await Task.sleep(for: .seconds(deadline.timeIntervalSinceNow))
+                // Wake once at the next review or UTC deadline. A due review
+                // without a new reading does not reschedule itself by polling.
+                if let wake = snapshot.coach.wakeAt ?? snapshot.stats.expiresAt, wake > Date() {
+                    try await Task.sleep(for: .seconds(wake.timeIntervalSinceNow))
                     guard !Task.isCancelled, datedTimelineRefreshID == request,
                           authManager.ownsAccountSession(owner) else { return }
                     scheduleDatedTimelineRefresh()
