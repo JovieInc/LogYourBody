@@ -4781,7 +4781,7 @@
     },
     "guard": {
       "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
-      "anchor": "guard XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }"
+      "anchor": "guard composer.value as? String == prefix\n                        || XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -8303,6 +8303,28 @@
     "guard": {
       "path": "scripts/resolve-repository-docs-project.test.mjs",
       "anchor": "unreviewed project repair must refuse stale pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "synthetic-chat-committed-prefix-eager-acknowledgment",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43104928475/job/130807049744",
+    "correction": "PR #1790 / LYB-371 repair, fix-red-5df69c1e5f occurrence 14 in 14 days: merge origin/main without rebasing, inspect failed checks and repair Launch Quality without weakening gates. The UI command reaches its unchanged 1800-second cap during onboarding after all preceding cases pass. Synthetic chat entry incurs an approximately one-second XCTest predicate polling delay for each already committed character. Vercel reports Deployment was blocked; its details API requires an unavailable authentication token. The harness owns pushing and PR edits.",
+    "mechanization": "Reuse the eager value acknowledgment already used by ChaosMonkeyUITests.typeVerifiedText in the synthetic chat character loop. Compare the exact committed prefix before invoking the existing eight-second predicate wait; preserve per-character keyboard focus recovery, delayed-input failure and full-question validation before Send. Extend the existing required launch UI audit and its discovered behavior suite to reject unconditional polling, reversed equality, conjunction, missing delayed waits and continuing after a failed acknowledgment. The new real-source case fails before the Swift repair and all 66 behavior cases pass afterwards. Keep every selector, timeout, coverage floor and workflow unchanged. Native timing and execution on this head remain unverified on Linux. The harness must add exactly one PR-body line: Machine: built scripts/ios/launch_ui_home_interaction_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Production chat cannot prevent a native test from waiting after text is already committed. The test must retain native typing and complete-value proof; the existing required source audit can prevent the recorded redundant wait from returning."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing launch UI audit can require exact-prefix readback with short-circuit evaluation before the retained bounded delayed-input wait. Real-source mutations verify both the fast path and failure path in the already required shared-lib suite."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_home_interaction_audit.py",
+      "anchor": "check=\"chat.synthetic_prefix_acknowledgment\""
     },
     "level": "static",
     "ruleId": "ci-invariant"

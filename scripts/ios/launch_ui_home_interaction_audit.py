@@ -88,6 +88,17 @@ def check(root: Path, app_dir: Path, violations: list, function_body, violation)
             line=1,
             detail="Refocus the composer when the keyboard drops before each synthetic character.",
         ))
+    # XCTest predicate waits poll at one-second intervals, even for committed text.
+    acknowledgment = re.compile(
+        r'guard composer\.value as\? String == prefix\s*'
+        r'\|\| XCTWaiter\.wait\(for: \[received\], timeout: 8\) == \.completed else \{ break \}'
+    )
+    if not acknowledgment.search(character):
+        violations.append(violation(
+            check="chat.synthetic_prefix_acknowledgment",
+            file=str(ui_tests.relative_to(root)), line=1,
+            detail="Accept an already committed prefix immediately; retain the bounded predicate wait for delayed input.",
+        ))
 
 
 def check_logout_alert(root: Path, violations: list, violation) -> None:
