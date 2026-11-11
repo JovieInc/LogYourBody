@@ -28,7 +28,7 @@ This adopts the saved strength. A second treatment is out of scope.
 For the generic illustration, draw the non-photoreal wire already saved for the explicit presentation.
 
 - Style is an unfilled, unlit line wire: material `kind` `wire`, `fill` false, lighting `unlit-wire`, on model `lyb.wireframe.torso`.
-- Male or female follows the saved presentation `lyb.wireframe.presentation`. An unset value stays the saved default, male. Profile fields and the photograph do not choose it.
+- Male or female follows an explicit saved presentation `lyb.wireframe.presentation`. Per [LYB-366](home-photo-visibility.md#unset-preferences-lyb-366), an unset choice shows no sexed wireframe and is never inferred from a name, photo, or measurement. This supersedes the earlier male default for an unset Home presentation.
 - The wireframe uses the same 4:5 stage height as the photo and leaves framing unchanged.
 
 Claims stay inside [body-composition visual claims](body-composition-visual-claims.md). Visibility stays inside [home photo visibility](home-photo-visibility.md). The mesh family stays inside [wireframe avatar family](wireframe-avatar-family.md).
