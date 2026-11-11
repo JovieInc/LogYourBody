@@ -10,6 +10,49 @@ import { pinFixture, mergePinFixture } from './resolve-repository-docs-pin.test.
 const PROJECT = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj';
 const WORKFLOW = '.github/workflows/ios-ui-diagnostics.yml';
 
+for (const mode of [[], ['--staged']]) {
+  test(`unreviewed project repair refuses stale pins before projection writes: ${mode[0] ?? 'ordinary'}`, (t) => {
+    const f = pinFixture(t);
+    f.writeProject('ours-project\n');
+    f.generate();
+    f.commit();
+    f.git('switch', '-q', 'theirs');
+    f.writeProject('theirs-project\n');
+    f.generate();
+    f.commit();
+    f.git('switch', '-q', 'ours');
+    mergePinFixture(f);
+    const merged = 'ours-project\ntheirs-project\n';
+    writeFileSync(join(f.root, PROJECT), merged);
+    f.git('checkout', '--ours', '--', WORKFLOW);
+    f.git('add', '--', PROJECT, WORKFLOW);
+    const snapshot = () => ({
+      index: f.git('ls-files', '--stage'),
+      files: [PROJECT, WORKFLOW, f.output].map((name) => readFileSync(join(f.root, name))),
+    });
+    const before = snapshot();
+    const resolve = (...args) => spawnSync('python3', [resolver, '--root', f.root, ...args], {
+      env, encoding: 'utf8',
+    });
+    const refused = resolve(...mode);
+    assert.notEqual(refused.status, 0, 'unreviewed project repair must refuse stale pins');
+    assert.match(refused.stderr, /staged diagnostic project pin.*stale or ambiguous/);
+    assert.match(refused.stderr, /--reviewed-project-sha256/);
+    assert.deepEqual(snapshot(), before, 'refusal preserves the index and every input and artifact');
+    const digest = createHash('sha256').update(merged).digest('hex');
+    const repaired = resolve('--reviewed-project-sha256', digest);
+    assert.equal(repaired.status, 0, repaired.stderr);
+    assert.equal(f.git('show', `:${PROJECT}`), merged);
+    assert.match(f.git('show', `:${WORKFLOW}`), new RegExp(digest));
+    assert.match(f.git('show', `:${f.output}`), new RegExp(digest));
+    assert.equal(f.git('ls-files', '--unmerged'), '');
+    const reviewedWorkflow = readFileSync(join(f.root, WORKFLOW));
+    const retry = resolve(...mode);
+    assert.equal(retry.status, 0, retry.stderr);
+    assert.deepEqual(readFileSync(join(f.root, WORKFLOW)), reviewedWorkflow);
+  });
+}
+
 for (const variant of ['stale', 'unstaged repair', 'duplicate', 'missing', 'reviewed', 'unstaged project']) {
   test(`staged source repair validates the indexed diagnostic project pin: ${variant}`, (t) => {
     const f = pinFixture(t);

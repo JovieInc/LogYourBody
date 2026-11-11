@@ -7900,5 +7900,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "project-pin-repair-refusal-and-reviewed-recovery",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43102996483/job/130799092388",
+    "correction": "PR #1790 / LYB-371, fix-red-d5dac7802d occurrence 5 in 14 days: merge origin/main and repair red Detect Changes and CI Summary without weakening gates. The existing success fixture still expects ordinary source-map repair to accept an unreviewed stale project pin after the staged pin guard was added.",
+    "mechanization": "Correct the obsolete success expectation and extend the existing project-pin regression machine across ordinary and --staged repair. Real-Git fixtures require stale-pin refusal before any index, source or projection change, an actionable reviewed-digest error, explicit reviewed repair, matching staged fingerprints, no unresolved paths and a successful retry. Both new cases fail when the existing pin guard is disabled in an isolated temporary copy and pass with the retained guard. The existing required Detect Changes and merge-aware lint suites run these cases without workflow changes. origin/main was already merged; the required merge command reports Already up to date. The body model and its XCTest coverage remain unchanged. The harness owns pushing and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs-project.test.mjs. Vercel reports Deployment was blocked; deployment details return HTTP 403 and this host has no Vercel credentials. Native execution requires the real macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The existing resolver already enforces the intended stale-pin refusal. The defect is a contradictory regression expectation; changing runtime behavior to satisfy it would weaken that trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required regression suite can execute both repair modes against real Git conflicts and enforce refusal without writes followed by explicit reviewed recovery, preventing either stale expectations or a bypassed guard from passing CI."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs-project.test.mjs",
+      "anchor": "unreviewed project repair must refuse stale pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
