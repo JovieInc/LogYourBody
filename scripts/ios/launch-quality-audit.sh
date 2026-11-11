@@ -464,6 +464,8 @@ LAUNCH_QUALITY_UI_TESTS=(
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces"
+  "LogYourBodyUITests/testDatedOutcomeFirstLaunchCancelBackAndManualBaseline"
+  "LogYourBodyUITests/testDatedOutcomeGateOffKeepsExistingFirstRun"
   "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn"
   "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation"
   "LogYourBodyUITests/testDatedTimelineExpiredOutcomeOpensEditorWithoutExtendingDate"

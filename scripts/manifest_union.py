@@ -14,9 +14,12 @@ from pathlib import Path
 
 import repository_docs
 
+LAUNCH_BINDINGS = "scripts/fixtures/lyb-launch-route-bindings.json"
+LAUNCH_MANIFEST = "scripts/fixtures/lyb-launch-route-manifest.json"
 MANIFESTS = (
     "packages/shared-lib/package.json",
     "packages/shared-lib/turbo.json",
+    LAUNCH_BINDINGS,
 )
 # The correction ledger has its own resolver and must not deadlock manifest union.
 LEDGER = "packages/shared-lib/corrections.json"
@@ -247,7 +250,7 @@ def apply_manifest_union(root):
             cwd=root, check=True, capture_output=True,
         ).stdout.decode().split("\0") if name
     }
-    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER, DIAGNOSTIC_PIN_WORKFLOW})
+    unrelated = sorted(conflicts - {output, *MANIFESTS, LEDGER, DIAGNOSTIC_PIN_WORKFLOW, LAUNCH_MANIFEST})
     if unrelated:
         raise ValueError("manifest union refuses unrelated conflicts: " + ", ".join(unrelated))
     planned = []
@@ -260,7 +263,8 @@ def apply_manifest_union(root):
             node_value(parse_json_spans(base_text)),
             node_value(ours_node),
             node_value(parse_json_spans(theirs_text)),
-            union_arrays=name.endswith("turbo.json"),
+            # Launch bindings retain every parent XCTest selector, just like test inputs.
+            union_arrays=name.endswith("turbo.json") or name == LAUNCH_BINDINGS,
         )
         rendered = render_updated(ours_text, ours_node, merged)
         if json.loads(rendered) != merged:
@@ -394,6 +398,8 @@ def assert_auto_merged_parent_inputs(root):
         )
         if None in (ours, theirs, base, merged) or ours == base or theirs == base or ours == theirs:
             continue
+        if name == LAUNCH_BINDINGS and any(set(json.loads(parent)) - set(json.loads(merged)) for parent in (ours, theirs)):
+            raise ValueError(UNION_REFUSAL + ": auto-merged launch path missing")
         _preserved(
             node_value(parse_json_spans(base)),
             node_value(parse_json_spans(ours)),

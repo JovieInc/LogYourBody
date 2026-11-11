@@ -7615,5 +7615,175 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e228851098",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1748",
+    "correction": "PR #1748 repair occurrence 3: merge origin/main without rebasing, repair stale diagnostic audit pins reported by Mac Runner Routing Tests and retain the native dated-outcome launch intent. Build the recurring repair machine in this PR.",
+    "mechanization": "Extend the existing repository-docs repair CLI with --reviewed-audit-sha256. Validate the explicit reviewed digest against a regular resolved staged audit and require the workflow plus all three independent regression pins to agree before updating them together. Real-Git refusal, preservation, success and retry cases run through the existing required pre-commit suite. Use the mode on this audit after reviewing the selector and evidence diff. The harness owns push and PR edits and must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair entrypoint can prevent partial pin refreshes by validating all four pins and staged audit identity before writing any of them."
+      }
+    },
+    "guard": {
+      "path": "scripts/diagnostic_audit_pin.py",
+      "anchor": "reviewed audit regression pins must agree with the workflow"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "vision-segmentation-blocks-cooperative-executor",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42382240897/job/128432385799",
+    "correction": "The native launch gate stalled after the Context edit sheet appeared. The captured 15:29:02 hang sample shows all three active Swift worker tasks waiting in VNGeneratePersonSegmentationRequest and VNControlledCapacityTasksQueue.dispatchGroupWait while the main thread is idle.",
+    "mechanization": "Run blocking Vision segmentation on DispatchQueue through a checked throwing continuation so concurrent previews do not consume the Swift cooperative executor. Inject the mask operation into the existing service for deterministic executor, success and failure tests. Require both named native cases in the existing launch-quality evidence validator; retain the photo-import safety UI test and all timeouts. Linux can validate tooling and source audits, but the new native cases require exact-head execution on the real macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing Vision service owns the blocking call. Suspending the task and dispatching that call prevents it from occupying a cooperative worker without changing segmentation policy or results."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/BackgroundRemovalService.swift",
+      "anchor": "continuation.resume(with: Result { try self.makeMask(cgImage, quality) })"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-341-consumes-adopted-native-promise",
+    "source": "https://linear.app/jovie/issue/LYB-341",
+    "correction": "LYB-341 requires the exact native sentence adopted by LYB-273 on 2026-10-30 through the LYB-286 table. The merged table still selected the older Jovie contract promise for every native launch.",
+    "mechanization": "Extend the existing canonical copy table and required launch-promise-copy test with the adopted sentence and native selector. Keep the legacy table entries for gate-off users, require both sign-in paths and the first data screen to consume the selector, and retain the prohibition on result guarantees. Removing the adopted sentence makes the real Vitest source guard fail; restored source passes. Jovie-owned policy, immutable fixtures and certification gates stay unchanged. The harness owns push and PR operations. Machine: built packages/shared-lib/src/launch-promise-copy.test.ts",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A shared table and selector remove runtime duplication, but code cannot establish exact parity with a separately recorded natural-language decision without the same literal comparison. The authoritative decision and Jovie policy remain separately owned."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib source guard can compare every canonical string and verify native launch consumers without adding a CI gate or treating a test-only policy as production approval."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-promise-copy.test.ts",
+      "anchor": "keeps the app copy table exactly equal to the approved strings"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "lyb-341-launch-projector-value-models",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/41501564870/job/125470586165",
+    "correction": "PR #1748 launch-quality build fails because the first-launch view passes [CachedBodyMetrics] to a projector requiring [BodyMetrics]. Company guards and iOS static audits also reject growth in ContentView, LogYourBodyApp and DatedOutcomeStoreTests.",
+    "mechanization": "Reuse the existing fetchVisibleBodyMetrics API to return converted, visibility-filtered value models to the actor projector. Move profile completeness policy beside its gate and store fixtures to a test-target source, retaining every XCTest case and target selector. Keep the app deep-link arguments on one line to avoid file growth. The existing compiler check already rejected the cached-object call, and the existing size behavior suite reproduced all three failures before the repair and passed afterward. Reuse the established source-size and native-build gates; no new repair machine or CI exemption. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing typed, visibility-aware fetch API returns the projector input model by construction. Relocating cohesive declarations and test fixtures removes source growth without changing behavior, tests or baseline allowances."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreHookView.swift",
+      "anchor": "let metrics = await CoreDataManager.shared.fetchVisibleBodyMetrics(for: owner.subject)"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "lyb-341-offline-timeline-fixture-state",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42356980231/job/128357381749",
+    "correction": "PR #1748 / LYB-341, fix-red-5df69c1e5f occurrence 26: merge origin/main without rebasing and repair the native launch gate. testLaunchQualityGateCapturesTimelineSurfaces fails in the dated-timeline offline retry scenario because a late satisfied network path replaces the fixture offline state, showing Record a fresh measurement instead of Retry sync.",
+    "mechanization": "Extend the shared offline fixture setup to cancel its network monitor and pin offline state in DEBUG. Route every monitor callback through the existing sync manager transition so queued callbacks cannot overwrite fixture state. Extend the required shared-lib launch-quality evidence guard; its new regression fails against the original setup and passes after the repair. Add native cases for queued and repeated path callbacks, explicit retry, and normal offline-to-online transitions. Native XCTest execution requires the macOS runner and is not claimed by Linux source checks. Preserve the existing UI assertion, account-isolation coverage, production connection transitions and all gates. Resolve the ledger union with the existing classifier. The harness owns push and PR edits and must add exactly one PR-body line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared fixture owns sync network state. A DEBUG-only pin checked at the callback transition prevents every late network update from changing fixture connectivity by construction, while release builds retain ordinary transitions."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/RealtimeSyncManager.swift",
+      "anchor": "guard !usesOfflineUITestFixture else { return }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-341-independent-launch-quality-scenarios",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42366774177/job/128386585308",
+    "correction": "PR #1748 / LYB-341, fix-red-5df69c1e5f occurrence 28: merge origin/main without rebasing and repair the native launch gate. testLaunchQualityGateCapturesTimelineSurfaces invokes two additional XCTest scenarios and exceeds its 120-second execution allowance during the final account-isolation relaunch. The first-launch screenshot case also invokes two dated-outcome tests inside its own timeout.",
+    "mechanization": "Extend the existing required shared-lib launch-quality evidence guard to reject nested XCTest scenario calls across native UI test sources and require independent dated-outcome selectors. Prove the guard rejects all four existing nested calls before repairing them. Select those same four cases independently in the existing single UI runner invocation; the shared selector loop requires their exact passing XCTest evidence. Retain every scenario, assertion, timeout, coverage floor and existing selector. Resolve the main merge with the existing reviewed-project fingerprint and correction-ledger resolvers. Linux source and shell checks do not establish exact-head native execution; that remains with the macOS required gate. The harness owns push and PR edits and must retain exactly one PR-body line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Product runtime cannot prevent future XCTest source edits from nesting independently discovered scenarios under one timeout. The repair changes test selection without altering product behavior."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib suite can reject nested native XCTest calls and omitted direct scenario selectors before spending simulator time."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "qualifies native scenarios independently instead of sharing another XCTest case budget"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "merge-launch-bindings-retain-both-parent-selectors",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1748",
+    "correction": "PR #1748 / LYB-341 repair, fix-red-e3b0c44298 occurrence 90 in 14 days: merge origin/main without rebasing, keep the native first-launch promise and dated-outcome editor, and build or extend the recurring merge-repair machine. Both parents independently added launch route XCTest bindings and the generated manifest; manual conflict resolution can silently drop parent scenarios.",
+    "mechanization": "Extend the existing --union-manifests repair and staged parent-input verifier to include canonical launch route binding arrays. Leave the derived launch manifest for its existing generator, so the machine preserves every parent selector without treating generated JSON as a second source. Three real-Git cases fail before the extension and pass after it: additive union, deletion refusal and reorder refusal; the successful union also proves a manually staged lost selector is rejected and retries preserve the generated conflict. The existing required Detect Changes suite imports these cases through scripts/pre-commit-lint.test.mjs. Use the extended resolver for this PR, regenerate the manifest with scripts/lyb-launch-manifest.mjs, retain both parent ledgers, merge the maintenance/baseline/coach behavior with the contextual editor, and keep unique Xcode membership for editor tests. The harness owns pushes and PR edits and must add exactly one PR-body line: Machine: built scripts/manifest_union.py. Native execution and coverage on the repaired head remain for macOS CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing manifest resolver owns additive test-input merges and pre-commit verifies the immutable parent inputs. Including launch bindings in those same operations prevents lost parent XCTest selectors by construction, while the existing generator remains the only writer of the derived manifest."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "Launch bindings retain every parent XCTest selector, just like test inputs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-341-stats-fixture-editor-draft-parity",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42903358986/job/130136084599",
+    "correction": "PR #1748 / LYB-341 repair, fix-red-c44c8cd09b occurrence 2: the expired, impossible, maintenance and unsafe Stats recovery cases display a synthetic outcome but open the journal-backed editor with an empty date. Static Audits also reports vertical_whitespace_closing_braces in DatedOutcomeStoreFixtureCase.swift. Merge origin/main first without rebasing and retain every native assertion and gate.",
+    "mechanization": "Share the existing DEBUG fixture outcome factory between the arithmetic projection and the unsaved editor draft. Persisted values take precedence; both fixture flags and a valid state are required. Do not fabricate a saved revision or write the journal. Add native parity and invalid-argument cases to the existing Unit-selected DatedOutcomeStatsTests and extend the required shared-lib launch-quality source guard. The new source guard fails against the original editor before the repair. Keep all four failing UI cases and their date assertions unchanged. Remove the single blank line reported by the existing strict SwiftLint gate. Exact-head XCTest execution remains for macOS CI; Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR edits and must retain exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One DEBUG outcome factory supplies the same unsaved value to the projector and editor, preventing fixture drift without changing production journal ownership, revisions or persistence."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/DatedStatsUITestFixture.swift",
+      "anchor": "return selectedState(arguments).map { outcome(for: $0) }"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "release-health-fixture-cold-runtime-preflight",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/42914679983/job/130175189984",
+    "correction": "PR #1748 / LYB-341, fix-red-1a39536f40 occurrence 7: merge origin/main first and repair the JavaScript/TypeScript release-health fixture failure without weakening gates. The first Ruby scenario took 5149ms and exceeded the default 5000ms test deadline; the remaining 30 cases passed. The required main merge reports already up to date. Vercel independently reports Deployment was blocked.",
+    "mechanization": "Extend the existing release-health fixture runner with explicit runtime preparation and invoke it through the bounded Vitest beforeAll setup hook. Load the same Ruby dependencies and initialize fixture signing before timed release scenarios. Preserve all 31 cases, assertions, five-second scenario deadlines and ten-second child timeouts. A real child-runner regression injects six seconds into the first Ruby invocation and fails with the old harness, then passes with preparation. Negative controls retain failure for a six-second behavior scenario and refuse scenario execution after preparation fails. The existing required shared-lib test task discovers these regressions. Cold runtime initialization is inferred from the first-only hosted delay; fresh hosted CI must confirm the repair. The harness owns push and PR edits and must add exactly one PR-body line: Machine: built .github/scripts/fixtures/app-store-release-health/run.rb. No Vercel credentials are available on this host to inspect or release its external hold.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture runner can prepare its Ruby runtime once during bounded suite setup, preventing cold initialization from consuming a release-behavior scenario deadline without relaxing release-health decisions or assertions."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/fixtures/app-store-release-health/run.rb",
+      "anchor": "if JSON.parse(ARGV.fetch(0)) == \"preflight\""
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

@@ -3,14 +3,21 @@
     "LaunchJourneyTests/testBaselineDenialAndNoDataRecoverToOneAction()",
     "DatedTimelineTests/testDeniedAndInterruptedOptionalInputsAllowManualBaselineWithoutPolicy()",
     "DatedTimelineTests/testManualBodyFatAndFFMIBaselinesUseExistingInputs()",
-    "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()"
+    "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()",
+    "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()"
   ],
-  "launch.deadline": ["LaunchJourneyTests/testDatedOutcomeSurvivesAndEditRecomputes()"],
+  "launch.deadline": [
+    "LaunchJourneyTests/testDatedOutcomeSurvivesAndEditRecomputes()",
+    "DatedOutcomeStoreTests/testEditorSaveIsAtomicAndUnchangedSaveCreatesNoRequest()",
+    "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()",
+    "DatedOutcomeStoreTests/testRawEditorDraftPreservesConstraintsAndRejectsInvalidTextWithoutFallback()"
+  ],
   "launch.deadline-replan": [
     "LaunchJourneyTests/testDateEditRecomputesWithoutExtendingExpired()",
     "DatedOutcomeStatsTests/testDateEditsAndNewMeasurementsRetainOriginalBaseline()",
     "DatedOutcomeStoreTests/testPlanBaselineSurvivesEditsAcknowledgementAndRelaunchWithoutWireChanges()",
-    "DatedOutcomeStatsTests/testCoachDateEditRecomputesAndRetryDoesNotReplaceBaseline()"
+    "DatedOutcomeStatsTests/testCoachDateEditRecomputesAndRetryDoesNotReplaceBaseline()",
+    "DatedOutcomeStoreTests/testEditorSaveIsAtomicAndUnchangedSaveCreatesNoRequest()"
   ],
   "launch.directive": [
     "LaunchJourneyTests/testOneNextActionForReadyPlan()",
@@ -36,9 +43,16 @@
     "DatedTimelineTests/testDelayedSheetActionsRejectReplacementAccountAndSessionGeneration()",
     "DatedOutcomeStoreTests/testBaselineCannotReplaceExistingRevisionOrCrossAccountSession()",
     "LogYourBodyUITests/testDatedStatsManualMeasurementDateEditExpiryAndAccountReturn()",
-    "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()"
+    "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()",
+    "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()",
+    "DatedOutcomeStoreTests/testEditorAndReconciliationCannotCrossAccountSessions()",
+    "LaunchJourneyTests/testDatedManualTrackingCanProceedWithoutAFullProfile()"
   ],
-  "launch.promise": ["LaunchJourneyTests/testPromiseCopyStatesTheDate()"],
+  "launch.promise": [
+    "LaunchJourneyTests/testPromiseCopyStatesTheDate()",
+    "LaunchJourneyTests/testDatedOutcomeEntryUsesExistingDefaultOffPlatformGate()",
+    "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()"
+  ],
   "launch.recovery": [
     "LaunchJourneyTests/testOfflineStaleAndConflictRecover()",
     "DatedTimelineTests/testEveryTimelineStatePreservesOutcomeAndHasOneRecoveryDestination()",
@@ -58,7 +72,11 @@
     "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()",
     "DatedOutcomeStatsTests/testNewAcceptedReadingRecoversLatestConflictWithoutReplacingExistingBaseline()",
     "DatedOutcomeStatsTests/testCoachWeeklyFreshnessGapDoesNotChangeActionOrPretendToAdjust()",
-    "DatedOutcomeStatsTests/testEveryStatsManifestStateHasOneRecoveryAndPreservesConstraints()"
+    "DatedOutcomeStatsTests/testEveryStatsManifestStateHasOneRecoveryAndPreservesConstraints()",
+    "DatedOutcomeStoreTests/testEditorInvalidAndFailedSaveKeepOpeningRevisionForRetry()",
+    "DatedOutcomeStoreTests/testStaleEditorCannotReplaceNewerValueOrDuplicateItsPendingRequest()",
+    "DatedOutcomeStoreTests/testConflictRetryKeepsIdentityAndExplicitReconciliationEmitsNoRequest()",
+    "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()"
   ],
   "launch.return": [
     "LaunchJourneyTests/testExpiredAndMaintenanceDoNotExtendTheDate()",
@@ -79,7 +97,9 @@
     "DatedOutcomeStatsTests/testRateBoundaryDoesNotBypassTargetEligibilityOrIncompletePolicy()",
     "DatedOutcomeStatsTests/testUnavailablePolicyMaintenanceAndAccountReplacementNeverAdmitAPlan()",
     "DatedOutcomeStatsTests/testAdoptedCeilingUsesCurrentAcceptedWeightAndElapsedTimeWithoutCompounding()",
-    "DatedOutcomeStatsTests/testCoachUnavailablePlannerPolicyAndForeignMemoryFailClosed()"
+    "DatedOutcomeStatsTests/testCoachUnavailablePlannerPolicyAndForeignMemoryFailClosed()",
+    "LaunchJourneyTests/testAdoptedWeightCeilingRejectsBothDirectionsWithoutAdmittingPartialPolicy()",
+    "LaunchJourneyTests/testDatedAdmissionKeepsEligibilityUnavailableExpiryAndNoDataDistinct()"
   ],
   "launch.stats": [
     "LaunchJourneyTests/testStatsSurfaceProjectsEveryState()",

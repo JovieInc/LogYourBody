@@ -115,6 +115,8 @@ export const logYourBody = {
       apple: { appStore: 'https://apps.apple.com/us/app/logyourbody/id6755209876' },
     },
     allowlist: [
+      { value: 'https://linear.app/jovie/issue/LYB-273', reason: 'Adopted native promise and outer rejection ceiling; not complete feasibility policy or a runtime endpoint.' },
+      { value: 'https://linear.app/jovie/issue/LYB-341', reason: 'Native dated-outcome entry source and correction receipt; not a runtime endpoint.' },
       { value: 'https://app.bodyspec.com', reason: 'LYB-246 public OpenAPI and Scalar docs for the BodySpec capability finding. Host only; not a new runtime endpoint.' },
       { value: 'https://www.atg.wa.gov/file-complaint', reason: 'Washington Attorney General complaint link in the supplied consumer health data privacy policy.' },
       { value: 'https://linear.app/jovie/issue/LYB-328', reason: 'LYB-328 source review and counsel handoff for health-data consent and wellness claims; not a runtime endpoint.' },

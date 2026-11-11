@@ -479,9 +479,9 @@ def main():
             union_project(args.root)
         elif args.union_manifests:
             union_manifests(args.root)
-            # A conflicted diagnostic project pin stays for the reviewed digest resolver.
+            # Pins and the generated launch manifest stay for their existing resolvers.
             pending_pin = subprocess.run(
-                ["git", "ls-files", "--unmerged", "--", DIAGNOSTIC_WORKFLOW],
+                ["git", "ls-files", "--unmerged", "--", DIAGNOSTIC_WORKFLOW, "scripts/fixtures/lyb-launch-route-manifest.json"],
                 cwd=args.root, check=True, capture_output=True,
             ).stdout
             if not pending_pin.strip():
