@@ -78,6 +78,14 @@ existing lockfile with pinned Corepack pnpm (frozen, offline, lockfile-only,
 lifecycle scripts disabled) before regenerating and staging only the source map.
 It retains the refusal of unstaged dependency/output edits and pinned-source drift
 without re-resolving unrelated dependencies.
+
+If dependency release notes contain HTML code spans that the mention guard
+misreads, run `python3 scripts/resolve-repository-docs.py --dependency-pr-body body.md`
+to print a proposed Markdown body. This preserves prose mentions and existing
+Markdown code, refuses ambiguous HTML code, and never edits or publishes the PR.
+Review the output and run the pinned company mention guard before the harness
+applies it; the normal guard remains required.
+
 Both dependency modes also require staged `repository-docs.json` changes before
 invoking pnpm, keeping parity checks and output selection on reviewed configuration.
 Both modes rebuild a conflicted source map from staged sources after frozen

@@ -10,7 +10,9 @@ from contextlib import ExitStack
 from pathlib import Path
 
 import repository_docs
-from manifest_union import projection_is_unmerged, restore_dependency_artifacts_on_failure
+from dependency_pr_body import dependency_pr_body
+# Additive manifest union keeps every parent test input; retain the shared implementation.
+from manifest_union import apply_manifest_union as union_manifests, projection_is_unmerged, restore_dependency_artifacts_on_failure
 
 
 def staged_bytes(root, name):
@@ -116,13 +118,6 @@ def merge_sections(root, name):
     if not additions:
         raise ValueError("no incoming sections to merge")
     return ours.rstrip("\n") + "\n\n" + "\n\n".join(additions) + "\n"
-
-
-def union_manifests(root):
-    """Additive manifest union keeps every parent test input."""
-    # A conflicted correction ledger stays for its own resolver.
-    from manifest_union import apply_manifest_union
-    apply_manifest_union(root)
 
 
 def union_project(root):
@@ -456,6 +451,7 @@ def main():
     mode.add_argument("--staged", action="store_true", help="refresh from the Git index before commit")
     mode.add_argument("--refresh-lockfile", action="store_true", help="repair and verify the pnpm lockfile before refreshing docs")
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
+    mode.add_argument("--dependency-pr-body", metavar="PATH", help="print dependency release notes with HTML code converted to Markdown; never edit the PR")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining additive paragraphs or new incoming sections; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
     mode.add_argument("--union-project", action="store_true", help="union additive Xcode file membership from both parents and stage the project")
@@ -464,11 +460,13 @@ def main():
     parser.add_argument("--reviewed-audit-sha256", help="refresh every current reviewed audit pin using an explicitly reviewed audit digest")
     args = parser.parse_args()
     if any((args.staged, args.refresh_lockfile, args.verify_lockfile, args.merge_sections,
-            args.union_manifests, args.union_project)) and (
+            args.union_manifests, args.union_project, args.dependency_pr_body)) and (
             args.reviewed_project_sha256 or args.reviewed_audit_sha256):
         parser.error("reviewed digests cannot be combined with another repair mode")
     try:
-        if args.merge_sections:
+        if args.dependency_pr_body:
+            print(dependency_pr_body(Path(args.dependency_pr_body).read_text()), end="")
+        elif args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
         elif args.merge_ledger:
             from manifest_union import merge_ledger

@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependabot-html-code-mentions",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1765",
+    "correction": "PR #1765 repair, fix-red-f8dba15025 occurrence 5: merge origin/main without rebasing, preserve @tailwindcss/postcss 4.3.5, and repair Company Guards and CI Summary. The pinned mention guard reads Tailwind directives inside Dependabot HTML code spans as unapproved mentions. The harness owns pushes and PR updates; Vercel reports Deployment was blocked without a build error.",
+    "mechanization": "Extend the existing dependency repair entrypoint with --dependency-pr-body to generate a reviewable local body with HTML code spans converted to Markdown. Preserve existing Markdown and all prose mentions; reject multiline, nested, unclosed and backtick-containing HTML code instead of concealing mentions. The CLI regression fails before this extension and passes afterward in the existing required pre-commit-lint.test.mjs suite. Run the generator on this PR body and verify the result with the exact pinned company mention guard: the original fails on four directives and the generated body passes. The harness must apply the prepared body and include exactly one line: Machine: built scripts/resolve-repository-docs.py. No PR edit or push is performed here. The Vercel provider block still needs fresh deployment evidence after push.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency repair command can normalize generated release-note code before the harness publishes it, preserving the rendered code meaning and leaving real mentions subject to the unchanged guard. A separate shipper or weaker allowlist is unnecessary."
+      }
+    },
+    "guard": {
+      "path": "scripts/dependency_pr_body.py",
+      "anchor": "parts[index] = re.sub(r\"<code>(.*?)</code>\", code_span, parts[index], flags=re.S | re.I)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-1423773703",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1764",
     "correction": "PR #1764 repair, fix-red-1423773703 occurrence 44: merge origin/main without rebasing, preserve the jose 6.2.14 to 6.2.15 update, and repair CI Summary, Detect Changes and parity reporting a stale repository source map. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR updates.",
