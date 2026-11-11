@@ -172,6 +172,11 @@ an existing line. Review the staged project, then pass its digest to
 The same command verifies an automatically merged, stage-zero project against
 the immutable additive parent union without changing files or the index. It
 refuses a different staged result or unstaged project edits.
+Before regenerating the staged source map, the resolver also requires one
+diagnostic project pin matching the indexed Xcode project. Stale, missing or
+duplicate pins refuse without writing. Review the project diff, then use
+`--reviewed-project-sha256` with the reviewed digest; unstaged pin edits do not
+repair the commit.
 The pin resolver retains independent workflow edits from either parent when
 the other changed only the project pin, verifying that the working conflict
 contains only that pin and matches the retained parent outside it.

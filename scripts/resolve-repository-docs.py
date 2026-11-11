@@ -146,13 +146,14 @@ def assert_no_local_dependency_inputs(root, inputs):
         if found:
             raise ValueError(label + " dependency inputs: " + found.decode().strip("\0").replace("\0", ", "))
 
-
 def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfile=None, dependency_inputs=()):
     root = Path(root).resolve()
     source_index = expected_index if expected_index is not None else git_bytes(root, "ls-files", "--stage", "-z")
     # An auto-merged manifest must keep every parent test input.
     from manifest_union import assert_auto_merged_parent_inputs
+    from reviewed_audit_pin import assert_staged_project_pin
     assert_auto_merged_parent_inputs(root)
+    assert_staged_project_pin(root, staged_bytes, DIAGNOSTIC_PROJECT)
     registry = staged_bytes(root, "repository-docs.json")
     config = json.loads(registry)
     output = repository_docs.local(root, config["output"])
@@ -209,7 +210,6 @@ def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfil
             output.write_bytes(original)
         raise
     print("repository-docs: regenerated and staged " + config["output"] + " from index")
-
 
 DIAGNOSTIC_PROJECT = "apps/ios/LogYourBody.xcodeproj/project.pbxproj"
 DIAGNOSTIC_WORKFLOW = ".github/workflows/ios-ui-diagnostics.yml"

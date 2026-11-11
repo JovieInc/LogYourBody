@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "fix-red-d96bbbfa0f",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1790",
+    "correction": "PR #1790 / LYB-371 repair, fix-red-d96bbbfa0f occurrence 3: merge origin/main without rebasing, preserve the uncalibrated continuous male and female body parameter model, and repair CI Summary and Mac Runner Routing Tests. The reviewed diagnostic project pin was stale after the two new Swift files were added to their Xcode targets. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing staged source-map resolver with a diagnostic project-pin check in its reviewed-pin module. Before writing or staging a projection, require exactly one pin matching the regular indexed project bytes. Refuse stale, missing and duplicate pins without deriving trust or accepting an unstaged workflow repair. Four negative controls fail against the old resolver; all six new cases pass with the guard, including reviewed pins and unrelated unstaged project edits. The existing required Detect Changes pre-commit-lint.test.mjs suite imports these real-Git cases. Use the existing --reviewed-project-sha256 repair with the explicitly reviewed project digest for this PR. The harness must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py. The Vercel provider block and new-head native execution remain externally unverified; no gate is weakened.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing staged projection boundary can prevent a local commit from accepting source evidence with a stale diagnostic project pin. Reading both values from the index and refusing before writes preserves the explicit trust review and prevents working-tree edits from hiding the defect."
+      }
+    },
+    "guard": {
+      "path": "scripts/reviewed_audit_pin.py",
+      "anchor": "if pins != [repository_docs.digest(read_staged(root, project))]:"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-1423773703",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1764",
     "correction": "PR #1764 repair, fix-red-1423773703 occurrence 44: merge origin/main without rebasing, preserve the jose 6.2.14 to 6.2.15 update, and repair CI Summary, Detect Changes and parity reporting a stale repository source map. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR updates.",

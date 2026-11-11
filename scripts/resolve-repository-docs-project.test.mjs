@@ -10,6 +10,43 @@ import { pinFixture, mergePinFixture } from './resolve-repository-docs-pin.test.
 const PROJECT = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj';
 const WORKFLOW = '.github/workflows/ios-ui-diagnostics.yml';
 
+for (const variant of ['stale', 'unstaged repair', 'duplicate', 'missing', 'reviewed', 'unstaged project']) {
+  test(`staged source repair validates the indexed diagnostic project pin: ${variant}`, (t) => {
+    const f = pinFixture(t);
+    const projectPath = join(f.root, PROJECT);
+    const workflowPath = join(f.root, WORKFLOW);
+    writeFileSync(projectPath, 'new-membership\n');
+    f.git('add', '--', PROJECT);
+    const digest = createHash('sha256').update('new-membership\n').digest('hex');
+    const reviewed = readFileSync(workflowPath, 'utf8').replace(/[a-f0-9]{64}/, digest);
+    if (variant !== 'stale') {
+      writeFileSync(workflowPath, variant === 'duplicate' ? reviewed + reviewed
+        : variant === 'missing' ? 'jobs: {}\n' : reviewed);
+      if (variant !== 'unstaged repair') f.git('add', '--', WORKFLOW);
+    }
+    if (variant === 'unstaged project') writeFileSync(projectPath, 'local-only\n');
+    const index = f.git('ls-files', '--stage');
+    const projection = readFileSync(join(f.root, f.output));
+    const workflow = readFileSync(workflowPath);
+    const project = readFileSync(projectPath);
+    const result = spawnSync('python3', [resolver, '--root', f.root, '--staged'], {
+      env, encoding: 'utf8',
+    });
+    if (['reviewed', 'unstaged project'].includes(variant)) {
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(f.git('show', `:${f.output}`), new RegExp(digest));
+    } else {
+      assert.notEqual(result.status, 0, 'stale or ambiguous pins must refuse projection writes');
+      assert.match(result.stderr, /staged diagnostic project pin/);
+      assert.match(result.stderr, /--reviewed-project-sha256/);
+      assert.equal(f.git('ls-files', '--stage'), index);
+      assert.deepEqual(readFileSync(join(f.root, f.output)), projection);
+    }
+    assert.deepEqual(readFileSync(workflowPath), workflow);
+    assert.deepEqual(readFileSync(projectPath), project);
+  });
+}
+
 for (const manualEdit of [false, true]) {
   test(`reviewed digest preserves incoming workflow additions; manual edit: ${manualEdit}`, (t) => {
     const f = pinFixture(t);
