@@ -10,6 +10,7 @@ from contextlib import ExitStack
 from pathlib import Path
 
 import repository_docs
+from json_union import _unmerged_texts, union_json
 from manifest_union import projection_is_unmerged, restore_dependency_artifacts_on_failure
 
 
@@ -39,22 +40,7 @@ def merge_sections(root, name):
     if not name.startswith("docs/") or not name.endswith(".md"):
         raise ValueError("section merging requires a docs/*.md path")
 
-    def git(*args):
-        return subprocess.run(
-            ["git", *args], cwd=root, check=True, capture_output=True, text=True,
-        ).stdout
-
-    git("rev-parse", "--verify", "MERGE_HEAD")
-    entries = git("ls-files", "--unmerged", "-z", "--", name).strip("\0").split("\0")
-    stages = [entry.split("\t", 1)[0].split() for entry in entries]
-    if len(stages) != 3 or {row[2] for row in stages if len(row) == 3} != {"1", "2", "3"}:
-        raise ValueError("section merging requires all three unmerged stages")
-    if any(row[0] not in {"100644", "100755"} for row in stages):
-        raise ValueError("section merging requires regular indexed files")
-    base, ours, theirs = [git("show", f":{stage}:{name}") for stage in (1, 2, 3)]
-    for source in (base, ours, theirs):
-        if re.search(r"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", source):
-            raise ValueError("section merging refuses conflict markers in a parent")
+    base, ours, theirs = _unmerged_texts(root, name, "section merging")
     # Independent paragraph insertions retain their common-base positions.
     original = base.splitlines(keepends=True)
     insertions = []
@@ -457,19 +443,24 @@ def main():
     mode.add_argument("--refresh-lockfile", action="store_true", help="repair and verify the pnpm lockfile before refreshing docs")
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining additive paragraphs or new incoming sections; review and stage explicitly")
+    mode.add_argument("--union-json", metavar="PATH", help="print an additive JSON merge from index stages; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
     mode.add_argument("--union-project", action="store_true", help="union additive Xcode file membership from both parents and stage the project")
     mode.add_argument("--merge-ledger", action="store_true", help="refresh staged docs, then preserve and classify both merge parents' correction receipts")
     parser.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     parser.add_argument("--reviewed-audit-sha256", help="refresh every current reviewed audit pin using an explicitly reviewed audit digest")
     args = parser.parse_args()
-    if any((args.staged, args.refresh_lockfile, args.verify_lockfile, args.merge_sections,
-            args.union_manifests, args.union_project)) and (
-            args.reviewed_project_sha256 or args.reviewed_audit_sha256):
+    exclusive = any((
+        args.staged, args.refresh_lockfile, args.verify_lockfile, args.merge_sections, args.union_json,
+        args.union_manifests, args.union_project,
+    ))
+    if exclusive and (args.reviewed_project_sha256 or args.reviewed_audit_sha256):
         parser.error("reviewed digests cannot be combined with another repair mode")
     try:
         if args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
+        elif args.union_json:
+            print(union_json(args.root, args.union_json), end="")
         elif args.merge_ledger:
             from manifest_union import merge_ledger
             git_bytes(args.root, "rev-parse", "--verify", "MERGE_HEAD")
