@@ -861,7 +861,7 @@ test('reviewed project repair refreshes only its exact pin and the merged source
     const normal = spawnSync('python3', [
       path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', fx.root,
     ], { env: gitEnv, encoding: 'utf8' });
-    assert.equal(normal.status, 0, normal.stderr);
+    assert.notEqual(normal.status, 0, 'normal repair must refuse an unreviewed project pin');
     assert.equal(fs.readFileSync(path.join(fx.root, fx.workflow), 'utf8'), fx.policy, 'normal repair never grants review');
     const result = fx.resolve();
     assert.equal(result.status, 0, result.stderr);

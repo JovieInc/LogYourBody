@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B37120261111000000000002 /* BodyParameterModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B37120261111000000000001 /* BodyParameterModel.swift */; };
+		B37120261111000000000004 /* BodyParameterModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B37120261111000000000003 /* BodyParameterModelTests.swift */; };
 		B34320261102000000000008 /* DatedOutcomeStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000007 /* DatedOutcomeStatsTests.swift */; };
 		B34420261109000000000002 /* DatedOutcomeStoreFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34420261109000000000001 /* DatedOutcomeStoreFixtures.swift */; };
 		B34320261102000000000006 /* DatedOutcomeStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000005 /* DatedOutcomeStatsView.swift */; };
@@ -662,6 +664,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B37120261111000000000001 /* BodyParameterModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyParameterModel.swift; sourceTree = "<group>"; };
+		B37120261111000000000003 /* BodyParameterModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyParameterModelTests.swift; sourceTree = "<group>"; };
 		B34320261102000000000007 /* DatedOutcomeStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStatsTests.swift; sourceTree = "<group>"; };
 		B34420261109000000000001 /* DatedOutcomeStoreFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStoreFixtures.swift; sourceTree = "<group>"; };
 		B34320261102000000000005 /* DatedOutcomeStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DatedOutcomeStatsView.swift; path = Components/DatedOutcomeStatsView.swift; sourceTree = "<group>"; };
@@ -1611,6 +1615,7 @@
 		AD723ACF2E15FA5C002376C6 /* LogYourBodyTests */ = {
 			isa = PBXGroup;
 			children = (
+				B37120261111000000000003 /* BodyParameterModelTests.swift */,
 				AD2600042F00000100ABCDEF /* HomeFocusSelectorTests.swift */,
 				E24920261025000400000001 /* WorkoutReconciliationPromptTests.swift */,
 				B26920261025000000000003 /* BackwardPlannerTests.swift */,
@@ -1783,6 +1788,7 @@
 		AD723ADC2E15FA5C002376C6 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				B37120261111000000000001 /* BodyParameterModel.swift */,
 				F1B241000000000000000001 /* HealthSyncState.swift */,
 				ADA600452ED375EE00088042 /* GlobalTimelineModels.swift */,
 				ADA600462ED375EE00088042 /* Glp1Medication.swift */,
@@ -2663,6 +2669,7 @@
 				B314A11A0000000000000008 /* WireframeAvatarFamilyTests.swift in Sources */,
 				B316A11A0000000000000008 /* PersonalBodyEngineTests.swift in Sources */,
 				B318A11A0000000000000004 /* BodyShapeCalibrationTests.swift in Sources */,
+				B37120261111000000000004 /* BodyParameterModelTests.swift in Sources */,
 				B31820261107000000000004 /* VoiceServiceLifecycleTests.swift in Sources */,
 				B317A11A000000000000000A /* PersonalBodyEstimateTests.swift in Sources */,
 				B319A11A0000000000000006 /* PhotographicAppearanceTests.swift in Sources */,
@@ -2889,6 +2896,7 @@
 				B314A11A0000000000000002 /* WireframeAvatarFamily.swift in Sources */,
 				B316A11A0000000000000002 /* PersonalBodyEngine.swift in Sources */,
 				B318A11A0000000000000002 /* BodyShapeCalibration.swift in Sources */,
+				B37120261111000000000002 /* BodyParameterModel.swift in Sources */,
 				B314A11A0000000000000004 /* WireframeAvatarStage.swift in Sources */,
 				B317A11A0000000000000002 /* PersonalBodyEstimate.swift in Sources */,
 				B317A11A0000000000000004 /* PersonalBodyEstimateStore.swift in Sources */,

@@ -3551,7 +3551,8 @@ final class LogYourBodyUITests: XCTestCase {
                     let received = XCTNSPredicateExpectation(
                         predicate: NSPredicate(format: "value == %@", prefix), object: composer
                     )
-                    guard XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }
+                    guard composer.value as? String == prefix
+                        || XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }
                 }
             }
             let entered = XCTNSPredicateExpectation(
