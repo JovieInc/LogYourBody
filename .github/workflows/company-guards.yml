@@ -10,6 +10,6 @@ permissions:
   contents: read
 jobs:
   company-guards:
-    uses: JovieInc/ci/.github/workflows/company-guards.yml@ba6ecacf5833a50cc1f13998ba4f08153b322916
+    uses: JovieInc/ci/.github/workflows/company-guards.yml@c79cbb4e3bd36fb69f3655bdefe12879f7c0790a
     with:
-      ci-ref: ba6ecacf5833a50cc1f13998ba4f08153b322916
+      ci-ref: c79cbb4e3bd36fb69f3655bdefe12879f7c0790a
