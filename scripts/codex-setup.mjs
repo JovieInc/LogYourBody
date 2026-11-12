@@ -34,6 +34,29 @@ export function bootstrap(root, env = process.env) {
     throw new Error(`pnpm install failed (${install.status ?? install.signal}).`);
 }
 
+export const CORRECTION_LEDGER_MERGE_DRIVER =
+  'node scripts/correction-classifier.mjs --merge-driver %O %A %B';
+
+export function installCorrectionLedgerMergeDriver(root, env = process.env) {
+  const options = { cwd: root, env, encoding: 'utf8' };
+  const probe = spawnSync('git', ['rev-parse', '--git-dir'], options);
+  if (probe.status !== 0) return false;
+  const config = spawnSync(
+    'git',
+    ['config', '--local', 'merge.correction-ledger.driver', CORRECTION_LEDGER_MERGE_DRIVER],
+    options,
+  );
+  if (config.error) throw config.error;
+  if (config.status !== 0) {
+    throw new Error(
+      `correction ledger merge driver was not installed (${config.status ?? config.signal}).`,
+    );
+  }
+  return true;
+}
+
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  bootstrap(resolve(dirname(fileURLToPath(import.meta.url)), '..'));
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  bootstrap(root);
+  installCorrectionLedgerMergeDriver(root);
 }

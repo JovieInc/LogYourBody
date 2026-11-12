@@ -7,16 +7,7 @@ import UIKit
 
 final class LogYourBodyUITests: XCTestCase {
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
     func testSignedOutAppleIsTheOnlyAuthAction() throws {
@@ -1880,6 +1871,10 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     func testLaunchQualityGateCapturesTimelineSurfaces() throws {
+        // XCTest rounds the 90s default up to 2 minutes. This case also runs
+        // the dated-timeline scenarios. That kill landed inside typeText and
+        // then terminate hung. 180s is the audit maximum.
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         launch(
             app,
@@ -2889,7 +2884,10 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
         var sharedMetrics = Set<String>()
         for (identifier, title) in [("steps", "Steps"), ("weight", "Weight"), ("body_fat", "Body fat"), ("ffmi", "FFMI")] {
-            app.buttons["home_v2_progress_tab_\(identifier)"].tap()
+            let tab = app.buttons["home_v2_progress_tab_\(identifier)"]
+            tab.tap()
+            let selected = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: tab)
+            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
             let expectedValue = value.label
             let share = app.buttons["home_v2_progress_share"]
             if ["—", "–"].contains(expectedValue) {
@@ -2915,6 +2913,7 @@ final class LogYourBodyUITests: XCTestCase {
             share.tap()
             let sheet = app.descendants(matching: .any)["body_score_share_sheet"]
             XCTAssertTrue(sheet.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.staticTexts["Share \(title)"].waitForExistence(timeout: 5))
             XCTAssertFalse(app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists)
             let summary = sheet.descendants(matching: .any)["body_score_share_summary"]
             XCTAssertTrue(summary.exists)
@@ -2927,7 +2926,6 @@ final class LogYourBodyUITests: XCTestCase {
                 XCTAssertTrue(summary.staticTexts[unitIdentifier].exists)
                 XCTAssertEqual(summary.staticTexts[unitIdentifier].label, try XCTUnwrap(expectedUnit))
             }
-            XCTAssertTrue(app.staticTexts["Share \(title)"].exists)
             XCTAssertEqual(app.staticTexts["body_score_share_score"].label, expectedValue)
             XCTAssertFalse(app.staticTexts["Share Body Score"].exists)
             XCTAssertFalse(app.descendants(matching: .any)["body_score_share_photo_visual"].exists)
@@ -3445,8 +3443,6 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     func testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity() throws {
-        // Include failure, retry and persisted relaunch in the audit's existing cap.
-        executionTimeAllowance = 180
         let app = XCUIApplication()
         launchSyntheticChatReplay(app, extra: ["-lybUITestChatErrorFixture"])
         submitSyntheticChatQuestion(in: app)
@@ -3505,6 +3501,7 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     private func launchSyntheticChatReplay(_ app: XCUIApplication, extra: [String] = []) {
+        executionTimeAllowance = 180
         // A unique nonce starts empty; the same launch environment deliberately survives relaunch.
         app.launchEnvironment["LYB_UI_TEST_CHAT_REPLAY_ID"] = UUID().uuidString
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestChatFirstFixture",
@@ -3525,16 +3522,24 @@ final class LogYourBodyUITests: XCTestCase {
                 // committed prefix. The trailing edge puts it after that text.
                 let addition = syntheticQuestionInsertion(current: current, question: question)
                 var prefix = current
-                // typeText fails the test when focus drops. Refocus, then continue.
+                // Acknowledge each prefix while the simulator keyboard connects.
+                // Run 42354066867 kept "S" and then lost keyboard focus before "y".
                 let keyboard = app.keyboards.firstMatch
                 for character in addition {
                     if !keyboard.exists {
+                        let insertion = CGVector(dx: prefix.isEmpty ? 0.5 : 0.9, dy: 0.5)
+                        composer.coordinate(withNormalizedOffset: insertion).tap()
+                    }
+                    let focused = app.descendants(matching: composer.elementType)
+                        .matching(identifier: composer.identifier)
+                        .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
+                    if !focused.exists {
                         if prefix.isEmpty {
                             composer.tap()
                         } else {
                             composer.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
                         }
-                        guard keyboard.waitForExistence(timeout: 2) else { break }
+                        guard focused.waitForExistence(timeout: 2) else { break }
                     }
                     composer.typeText(String(character))
                     if String(character) == XCUIKeyboardKey.delete.rawValue {
@@ -3546,7 +3551,8 @@ final class LogYourBodyUITests: XCTestCase {
                     let received = XCTNSPredicateExpectation(
                         predicate: NSPredicate(format: "value == %@", prefix), object: composer
                     )
-                    guard XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }
+                    guard composer.value as? String == prefix
+                        || XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }
                 }
             }
             let entered = XCTNSPredicateExpectation(
@@ -4370,7 +4376,7 @@ final class LogYourBodyUITests: XCTestCase {
         ]
         app.forwardActualXCTestContext()
         app.launch()
-        app.tap()
+        app.activateSystemAlertMonitor()
 
         let start = app.buttons["body_score_onboarding_start_button"]
         XCTAssertTrue(start.waitForExistence(timeout: 15))
@@ -4486,7 +4492,7 @@ final class LogYourBodyUITests: XCTestCase {
         ]
         app.forwardActualXCTestContext()
         app.launch()
-        app.tap()
+        app.activateSystemAlertMonitor()
 
         let start = app.buttons["body_score_onboarding_start_button"]
         XCTAssertTrue(start.waitForExistence(timeout: 15))

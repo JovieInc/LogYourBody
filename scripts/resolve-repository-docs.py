@@ -11,6 +11,7 @@ from pathlib import Path
 
 import repository_docs
 from dependency_pr_body import dependency_pr_body
+from json_union import _unmerged_texts, union_json
 # Additive manifest union keeps every parent test input; retain the shared implementation.
 from manifest_union import apply_manifest_union as union_manifests, projection_is_unmerged, restore_dependency_artifacts_on_failure
 
@@ -41,22 +42,7 @@ def merge_sections(root, name):
     if not name.startswith("docs/") or not name.endswith(".md"):
         raise ValueError("section merging requires a docs/*.md path")
 
-    def git(*args):
-        return subprocess.run(
-            ["git", *args], cwd=root, check=True, capture_output=True, text=True,
-        ).stdout
-
-    git("rev-parse", "--verify", "MERGE_HEAD")
-    entries = git("ls-files", "--unmerged", "-z", "--", name).strip("\0").split("\0")
-    stages = [entry.split("\t", 1)[0].split() for entry in entries]
-    if len(stages) != 3 or {row[2] for row in stages if len(row) == 3} != {"1", "2", "3"}:
-        raise ValueError("section merging requires all three unmerged stages")
-    if any(row[0] not in {"100644", "100755"} for row in stages):
-        raise ValueError("section merging requires regular indexed files")
-    base, ours, theirs = [git("show", f":{stage}:{name}") for stage in (1, 2, 3)]
-    for source in (base, ours, theirs):
-        if re.search(r"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", source):
-            raise ValueError("section merging refuses conflict markers in a parent")
+    base, ours, theirs = _unmerged_texts(root, name, "section merging")
     # Independent paragraph insertions retain their common-base positions.
     original = base.splitlines(keepends=True)
     insertions = []
@@ -141,13 +127,14 @@ def assert_no_local_dependency_inputs(root, inputs):
         if found:
             raise ValueError(label + " dependency inputs: " + found.decode().strip("\0").replace("\0", ", "))
 
-
 def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfile=None, dependency_inputs=()):
     root = Path(root).resolve()
     source_index = expected_index if expected_index is not None else git_bytes(root, "ls-files", "--stage", "-z")
     # An auto-merged manifest must keep every parent test input.
     from manifest_union import assert_auto_merged_parent_inputs
+    from reviewed_audit_pin import assert_staged_project_pin
     assert_auto_merged_parent_inputs(root)
+    assert_staged_project_pin(root, staged_bytes, DIAGNOSTIC_PROJECT)
     registry = staged_bytes(root, "repository-docs.json")
     config = json.loads(registry)
     output = repository_docs.local(root, config["output"])
@@ -204,7 +191,6 @@ def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfil
             output.write_bytes(original)
         raise
     print("repository-docs: regenerated and staged " + config["output"] + " from index")
-
 
 DIAGNOSTIC_PROJECT = "apps/ios/LogYourBody.xcodeproj/project.pbxproj"
 DIAGNOSTIC_WORKFLOW = ".github/workflows/ios-ui-diagnostics.yml"
@@ -453,21 +439,26 @@ def main():
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
     mode.add_argument("--dependency-pr-body", metavar="PATH", help="print dependency release notes with HTML code converted to Markdown; never edit the PR")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining additive paragraphs or new incoming sections; review and stage explicitly")
+    mode.add_argument("--union-json", metavar="PATH", help="print an additive JSON merge from index stages; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
     mode.add_argument("--union-project", action="store_true", help="union additive Xcode file membership from both parents and stage the project")
     mode.add_argument("--merge-ledger", action="store_true", help="refresh staged docs, then preserve and classify both merge parents' correction receipts")
     parser.add_argument("--reviewed-project-sha256", help="refresh the diagnostic project pin using an explicitly reviewed merged-project digest")
     parser.add_argument("--reviewed-audit-sha256", help="refresh every current reviewed audit pin using an explicitly reviewed audit digest")
     args = parser.parse_args()
-    if any((args.staged, args.refresh_lockfile, args.verify_lockfile, args.merge_sections,
-            args.union_manifests, args.union_project, args.dependency_pr_body)) and (
-            args.reviewed_project_sha256 or args.reviewed_audit_sha256):
+    exclusive = any((
+        args.staged, args.refresh_lockfile, args.verify_lockfile, args.merge_sections, args.union_json,
+        args.union_manifests, args.union_project, args.dependency_pr_body,
+    ))
+    if exclusive and (args.reviewed_project_sha256 or args.reviewed_audit_sha256):
         parser.error("reviewed digests cannot be combined with another repair mode")
     try:
         if args.dependency_pr_body:
             print(dependency_pr_body(Path(args.dependency_pr_body).read_text()), end="")
         elif args.merge_sections:
             print(merge_sections(args.root, args.merge_sections), end="")
+        elif args.union_json:
+            print(union_json(args.root, args.union_json), end="")
         elif args.merge_ledger:
             from manifest_union import merge_ledger
             git_bytes(args.root, "rev-parse", "--verify", "MERGE_HEAD")

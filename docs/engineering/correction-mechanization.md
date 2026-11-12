@@ -115,6 +115,13 @@ apply. When the lanes harness owns pushing and PR creation, hand it the commits
 and validation evidence. Do not enable the retired Codex Auto-Fix workflow or
 start a second PR owner.
 
+For merge repairs, `packages/shared-lib/corrections.json` uses the
+`correction-ledger` merge driver. `scripts/codex-setup.mjs` installs
+`merge.correction-ledger.driver` as
+`node scripts/correction-classifier.mjs --merge-driver %O %A %B`.
+That command classifies the same parent union as `--resolve-merge`: incoming
+receipt order, then branch-only receipts. Divergent edits of one receipt stay
+conflicted. A checkout without the driver keeps Git's text merge.
 For launch-route conflicts, `python3 scripts/resolve-repository-docs.py --union-manifests`
 also unions the canonical launch binding arrays and rejects lost or reordered
 parent selectors. It leaves a conflicted generated manifest untouched. Regenerate
@@ -172,6 +179,11 @@ an existing line. Review the staged project, then pass its digest to
 The same command verifies an automatically merged, stage-zero project against
 the immutable additive parent union without changing files or the index. It
 refuses a different staged result or unstaged project edits.
+Before regenerating the staged source map, the resolver also requires one
+diagnostic project pin matching the indexed Xcode project. Stale, missing or
+duplicate pins refuse without writing. Review the project diff, then use
+`--reviewed-project-sha256` with the reviewed digest; unstaged pin edits do not
+repair the commit.
 The pin resolver retains independent workflow edits from either parent when
 the other changed only the project pin, verifying that the working conflict
 contains only that pin and matches the retained parent outside it.

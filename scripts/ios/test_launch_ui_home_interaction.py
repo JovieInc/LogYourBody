@@ -40,6 +40,28 @@ class HomeInteractionAuditTests:
         destination.write_text(source.replace("if !keyboard.exists {\n", "if false {\n", 1))
         self.assert_rejected("chat.synthetic_typing_refocuses")
 
+    def test_synthetic_prefix_acknowledgment_avoids_polling_committed_text(self):
+        destination = self.root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        source = (ROOT / destination.relative_to(self.root)).read_text()
+        destination.write_text(source)
+        self.assertEqual(self.run_audit()[0], 0)
+        eager = "composer.value as? String == prefix\n                        || "
+        self.assertIn(eager, source)
+        for before, after in [
+            (eager, ""),
+            ("String == prefix", "String != prefix"),
+            (eager, eager.replace("||", "&&")),
+            ("XCTWaiter.wait(for: [received], timeout: 8) == .completed", "true"),
+            ("timeout: 8) == .completed else { break }", "timeout: 8) == .completed else { continue }"),
+        ]:
+            with self.subTest(before=before):
+                self.assertIn(before, source)
+                destination.write_text(source.replace(before, after, 1))
+                self.assert_rejected("chat.synthetic_prefix_acknowledgment")
+        destination.write_text(source)
+        self.assertEqual(self.run_audit()[0], 0)
+
     def test_person_segmentation_cannot_block_the_swift_cooperative_pool(self):
         path = self.app / "Services/BackgroundRemovalService.swift"
         original = path.read_text()

@@ -20,6 +20,26 @@ def _staged_bytes(root, name):
     ).stdout
 
 
+def assert_staged_project_pin(root, read_staged, project):
+    """Refuse stale diagnostic trust before a commit can refresh its source map."""
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z", "--", project],
+        cwd=root, check=True, capture_output=True,
+    ).stdout
+    if not tracked:
+        return
+    source = read_staged(root, DIAGNOSTIC_WORKFLOW).decode()
+    pins = re.findall(
+        r"(?m)^ +'" + re.escape(project) + r"': '([0-9a-f]{64})',$", source,
+    )
+    if pins != [repository_docs.digest(read_staged(root, project))]:
+        raise ValueError(
+            "staged diagnostic project pin is stale or ambiguous; review the project diff, "
+            "then run python3 scripts/resolve-repository-docs.py "
+            "--reviewed-project-sha256 <reviewed-digest>"
+        )
+
+
 def _snapshot(root, name):
     path = root / name
     if any(parent.is_symlink() for parent in (path, *path.parents) if parent != root.parent):

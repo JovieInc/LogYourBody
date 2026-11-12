@@ -180,7 +180,12 @@ final class HomeV2PhotoViewerLayoutUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [today], timeout: 8), .completed, "Today shows today's photo only")
         // History still has to finish loading before the viewer can scrub it.
         app.buttons["photo_timeline_root_menu"].tap()
-        app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
+        let entries = app.buttons["home_v2_sidebar_entries"]
+        guard entries.waitForExistence(timeout: 8) else {
+            XCTFail("The sidebar must expose Entries before opening imported history")
+            return app
+        }
+        entries.tap()
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_entries"].waitForExistence(timeout: 8))
         let rows = app.buttons.matching(identifier: "home_v2_entries_row")
         let loaded = expectation(for: NSPredicate(format: "count == 5"), evaluatedWith: rows)

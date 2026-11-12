@@ -78,6 +78,31 @@ final class BackgroundRemovalServiceTests: XCTestCase {
         }
     }
 
+    func testConcurrentPersonMasksCompleteWithoutStarvingAsyncExecutor() async throws {
+        let image = try XCTUnwrap(SyntheticImage.solidCGImage(width: 32, height: 40))
+        await withTaskGroup(of: Bool.self) { group in
+            for index in 0..<8 {
+                group.addTask {
+                    do {
+                        let mask = try await BackgroundRemovalService.shared.personMask(
+                            for: image, quality: index.isMultiple(of: 2) ? 0.85 : 0.5
+                        )
+                        return CVPixelBufferGetWidth(mask) > 0 && CVPixelBufferGetHeight(mask) > 0
+                    } catch {
+                        // Unsupported Vision must complete every waiter with an error.
+                        return !error.localizedDescription.isEmpty
+                    }
+                }
+            }
+            var completed = 0
+            for await validResult in group {
+                XCTAssertTrue(validResult)
+                completed += 1
+            }
+            XCTAssertEqual(completed, 8)
+        }
+    }
+
     // MARK: - Input validation
 
     func testPersonMaskRunsOutsideCooperativeTasksAndReturnsTheMask() async throws {
