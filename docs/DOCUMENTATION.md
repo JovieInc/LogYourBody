@@ -85,6 +85,8 @@ If dependency release notes contain HTML code spans that the mention guard
 misreads, run `python3 scripts/resolve-repository-docs.py --dependency-pr-body body.md`
 to print a proposed Markdown body. This preserves prose mentions and existing
 Markdown code, refuses ambiguous HTML code, and never edits or publishes the PR.
+The proposal includes exactly one `Machine:` line naming this repair command;
+duplicate or conflicting machine and waiver metadata is refused before output.
 Review the output and run the pinned company mention guard before the harness
 applies it; the normal guard remains required.
 

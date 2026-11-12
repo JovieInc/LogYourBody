@@ -20,4 +20,11 @@ def dependency_pr_body(text):
         parts[index] = re.sub(r"<code>(.*?)</code>", code_span, parts[index], flags=re.S | re.I)
         if re.search(r"</?code\b", parts[index], re.I):
             raise ValueError("dependency PR body contains an unsupported HTML code span")
-    return "".join(parts)
+    body = "".join(parts)
+    machine = "Machine: built scripts/resolve-repository-docs.py"
+    metadata = [line for line in body.splitlines() if re.match(r"^(?:Machine|Machine-gap)(?: waiver)?:", line)]
+    if metadata:
+        if metadata != [machine] or not any(machine in part.splitlines() for part in parts[::2]):
+            raise ValueError("dependency PR body requires one matching Machine line")
+        return body
+    return body + ("\n" if body.endswith("\n") else "\n\n") + machine + "\n"
