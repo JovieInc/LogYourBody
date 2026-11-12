@@ -8328,5 +8328,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-f8dba15025-company-pin-history",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1797",
+    "correction": "PR #1797 repair, fix-red-f8dba15025 occurrence 7: merge origin/main without rebasing, preserve the company guard and certification update, repair failed Company Guards and CI Summary from the actual logs, and extend the existing machine. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing required merge-queue policy verifier with --refresh-company-pins. Resolve immutable upstream main, select the latest commit from the same canon/guard/workflow histories used by the shared drift check, and verify complete guard-tree equivalence with main before writing both callers. Keep certification on the latest kit, validate unique matching full-SHA pins, and refuse incomplete history or trees without writing. The existing required policy suite rejects certification-only tip selection, lost guards, incomplete trees, malformed history and partial caller updates. The tip-selection negative control fails before the repair; all 87 policy and enrollment cases pass after it. Use the refresh command for this instance: guards da878c8965355cd5a08db7bd0cee0d5527cf7dcb, certification daf34326a2c35331546da9fe2e888692dfe4714a. The required origin/main merge is already up to date. The harness must add exactly one PR-body line: Machine: built .github/scripts/verify-merge-queue-policy.mjs. Vercel reports Deployment was blocked without a build error; provider inspection is unavailable without Vercel credentials. No gate or guard is weakened.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing policy entrypoint can generate the two workflow pins from immutable upstream history. Selecting a guard-affecting commit while proving identical guard and canon trees prevents the shared drift evaluator from misclassifying an unrelated certification tip as stale, without changing or bypassing the shared gate."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/verify-merge-queue-policy.mjs",
+      "anchor": "const guard = candidates[0].sha;"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

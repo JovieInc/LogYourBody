@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -42,6 +43,64 @@ const requiredFragments = {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+const guardPaths = ['canon', 'guards', '.github/workflows/company-guards.yml'];
+const fullSHA = /^[a-f0-9]{40}$/;
+
+function guardTree(tree) {
+  assert(tree.truncated === false && Array.isArray(tree.tree), 'Company guard tree is incomplete');
+  for (const name of guardPaths) {
+    assert(tree.tree.some(({ path }) => path === name), `Company guard tree is missing ${name}`);
+  }
+  const entries = tree.tree
+    .filter(({ path }) => guardPaths.some((name) => path === name || path.startsWith(`${name}/`)))
+    .map(({ path, mode, type, sha }) => [path, mode, type, sha])
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  assert(entries.every(([, mode, type, sha]) =>
+    typeof mode === 'string' && /^(?:100644|100755|120000|040000)$/.test(mode) &&
+    ['blob', 'tree'].includes(type) && fullSHA.test(sha)), 'Company guard tree metadata is incomplete');
+  return entries;
+}
+
+// The shared drift check only recognizes commits touching guardPaths. A newer
+// certification-only commit can be falsely stale even when it is main's tip.
+export function refreshCompanyPins(rootDirectory, api) {
+  const head = api('commits/main').sha;
+  assert(fullSHA.test(head), 'Company main must resolve to a full commit SHA');
+  const candidates = guardPaths.flatMap((name) => {
+    const commits = api(`commits?sha=${head}&path=${encodeURIComponent(name)}&per_page=1`);
+    assert(Array.isArray(commits) && commits.length === 1, `No company guard history for ${name}`);
+    const [commit] = commits;
+    assert(fullSHA.test(commit.sha) && Number.isFinite(Date.parse(commit.commit?.committer?.date)),
+      `Invalid company guard history for ${name}`);
+    return commits;
+  }).sort((a, b) => Date.parse(b.commit.committer.date) - Date.parse(a.commit.committer.date));
+  const guard = candidates[0].sha;
+  assert(
+    JSON.stringify(guardTree(api(`git/trees/${guard}?recursive=1`))) ===
+      JSON.stringify(guardTree(api(`git/trees/${head}?recursive=1`))),
+    'Company guard pin would omit changes from main',
+  );
+  const updates = [
+    ['company-guards', guard],
+    ['public-app-certification', head],
+  ].map(([name, sha]) => {
+    const file = path.join(rootDirectory, `.github/workflows/${name}.yml`);
+    assert(fs.lstatSync(file).isFile(), `Company pin input must be a regular file: ${name}`);
+    const source = fs.readFileSync(file, 'utf8');
+    const uses = new RegExp(`^    uses: JovieInc/ci/\\.github/workflows/${name}\\.yml@([a-f0-9]{40})$`, 'gm');
+    const input = /^      ci-ref: ([a-f0-9]{40})$/gm;
+    const pins = [...source.matchAll(uses)];
+    const refs = [...source.matchAll(input)];
+    assert(pins.length === 1 && refs.length === 1 && pins[0][1] === refs[0][1],
+      `Company workflow pins must be unique full SHAs and agree: ${name}`);
+    return [file, source.replace(uses, `    uses: JovieInc/ci/.github/workflows/${name}.yml@${sha}`)
+      .replace(input, `      ci-ref: ${sha}`)];
+  });
+  // Validate both workflows and upstream trees before changing either caller.
+  for (const [file, source] of updates) fs.writeFileSync(file, source);
+  return { guards: guard, certification: head };
 }
 
 export function verifyCompanyGuards(ciWorkflow, companyGuardsWorkflow) {
@@ -158,6 +217,14 @@ export function verifyRepository(rootDirectory) {
 
 const isMainModule = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMainModule) {
+  if (process.argv[2] === '--refresh-company-pins') {
+    const pins = refreshCompanyPins(process.cwd(), (endpoint) => JSON.parse(execFileSync(
+      'gh', ['api', '--hostname', 'github.com', `repos/JovieInc/ci/${endpoint}`], { encoding: 'utf8' },
+    )));
+    console.log(`Company pins refreshed: guards=${pins.guards} certification=${pins.certification}`);
+  } else {
+    assert(process.argv.length === 2, 'Unknown policy verifier argument');
+  }
   verifyRepository(process.cwd());
   console.log('Repository-native merge queue policy verified.');
 }
