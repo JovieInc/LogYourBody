@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `41d70abc519bb0c3993b590439a5da72d15edf8b4afe15f4450d2f1d574d9ace`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `5a86db70a76868c2f76cb3dd120dc88b11ce8a5af13d8299251cb433908ec255`)
 
 ### `apps/web/package.json`: engines
 
@@ -110,7 +110,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@sentry/nextjs": "^11.9.0",
   "@statsig/js-client": "^3.33.7",
   "@statsig/statsig-node-core": "0.24.0",
-  "@tailwindcss/postcss": "^4.3.3",
+  "@tailwindcss/postcss": "^4.3.5",
   "@tailwindcss/typography": "^0.5.20",
   "@tanstack/react-query": "^5.104.5",
   "@types/react-syntax-highlighter": "^15.5.13",

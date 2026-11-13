@@ -8422,5 +8422,63 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependabot-pr-body-machine-metadata",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1765",
+    "correction": "PR #1765 repair, fix-red-f8dba15025 occurrence 7: merge origin/main first without rebasing, preserve the PostCSS 4.3.5 bump and extend the recurring repair machine. Both Company Guards jobs still reject four Tailwind directives in the remote Dependabot HTML release notes, causing CI Summary to fail. Vercel reports Deployment was blocked. The harness owns pushing and PR edits.",
+    "mechanization": "Extend the existing --dependency-pr-body generator to emit exactly one Machine line naming the repair command, retain that line on retries, and refuse duplicate, divergent, waiver or code-fenced metadata before producing output. The CLI regression fails against the previous generator and passes with the extension in the existing required pre-commit-lint.test.mjs suite. Use this command on the real PR body: the original fails the exact pinned mention guard on source, scope, utility and property; the generated body passes with the unchanged allowlist. The harness must apply the locally prepared body, which contains exactly one line: Machine: built scripts/resolve-repository-docs.py. Frozen lockfile verification and the parent-preserving merge resolver retain both parent ledgers and refresh source parity. Fresh GitHub and Vercel results remain for the harness after publication; no provider or CI control is relaxed.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing local metadata generator can make the abstraction receipt part of every prepared body and fail before emitting ambiguous metadata, without adding a second PR owner or weakening the company mention guard."
+      }
+    },
+    "guard": {
+      "path": "scripts/dependency_pr_body.py",
+      "anchor": "dependency PR body requires one matching Machine line"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependabot-html-code-mentions",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1765",
+    "correction": "PR #1765 repair, fix-red-f8dba15025 occurrence 5: merge origin/main without rebasing, preserve @tailwindcss/postcss 4.3.5, and repair Company Guards and CI Summary. The pinned mention guard reads Tailwind directives inside Dependabot HTML code spans as unapproved mentions. The harness owns pushes and PR updates; Vercel reports Deployment was blocked without a build error.",
+    "mechanization": "Extend the existing dependency repair entrypoint with --dependency-pr-body to generate a reviewable local body with HTML code spans converted to Markdown. Preserve existing Markdown and all prose mentions; reject multiline, nested, unclosed and backtick-containing HTML code instead of concealing mentions. The CLI regression fails before this extension and passes afterward in the existing required pre-commit-lint.test.mjs suite. Run the generator on this PR body and verify the result with the exact pinned company mention guard: the original fails on four directives and the generated body passes. The harness must apply the prepared body and include exactly one line: Machine: built scripts/resolve-repository-docs.py. No PR edit or push is performed here. The Vercel provider block still needs fresh deployment evidence after push.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency repair command can normalize generated release-note code before the harness publishes it, preserving the rendered code meaning and leaving real mentions subject to the unchanged guard. A separate shipper or weaker allowlist is unnecessary."
+      }
+    },
+    "guard": {
+      "path": "scripts/dependency_pr_body.py",
+      "anchor": "parts[index] = re.sub(r\"<code>(.*?)</code>\", code_span, parts[index], flags=re.S | re.I)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-2ca499ed2b",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1765",
+    "correction": "PR #1765 occurrence 2: merge origin/main without rebasing and preserve the @tailwindcss/postcss 4.3.5 update. Parity rejects the stale source map. Both Company Guards jobs reject Tailwind directives in Dependabot's HTML release notes as unapproved mentions, causing CI Summary to fail. Vercel reports Deployment was blocked.",
+    "mechanization": "Reuse scripts/resolve-repository-docs.py --verify-lockfile to verify the merged bot lockfile with pinned pnpm and regenerate the staged source map without changing resolutions. The existing parity check fails before regeneration and passes afterward; its retained negative-control tests reject stale output. This recurring dependency repair already has a deterministic machine and required parity gate, so no parallel guard is needed. The harness owns pushes and PR edits: replace HTML code tags in the PR body with Markdown backticks so the existing mention guard recognizes the directives as code. Vercel's provider block requires fresh deployment evidence after push; no code-level cause is exposed.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Dependabot produces its dependency commit and release-note body outside this repository's commit hooks. Regenerating the source map repairs this instance but cannot prevent future external bot commits from omitting it. The existing repair helper and required parity gate already cover this class."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required source-parity check deterministically rejects stale generated documentation for any dependency manifest change, including this exact PostCSS update. Reuse its retained regression and repair helper without weakening CI."
+      }
+    },
+    "guard": {
+      "path": "scripts/repository_docs.py",
+      "anchor": "source projection stale: "
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

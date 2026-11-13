@@ -15,6 +15,42 @@ const env = {
   GIT_COMMITTER_NAME: 'fixture', GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
 };
 
+test('dependency PR body repair preserves prose, code meaning and existing Markdown without writing', (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'lyb-dependency-body-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const input = join(directory, 'body.md');
+  const machine = 'Machine: built scripts/resolve-repository-docs.py';
+  const original = 'Keep @unapproved and `@already`.\n```html\n<code>@example</code>\n```\n' +
+    '<code>@source</code> <code>@scope</code> <code>@utility</code> <code>@property</code>\n' +
+    '<code>a &lt; b &amp;&amp; c &gt; d</code>\n<code>  @scope  </code>\n';
+  const expected = original.replace(/<code>(@(?:source|scope|utility|property))<\/code>/g, '`$1`')
+    .replace('<code>a &lt; b &amp;&amp; c &gt; d</code>', '`a < b && c > d`')
+    .replace('<code>  @scope  </code>', '`   @scope   `') + `\n${machine}\n`;
+  writeFileSync(input, original);
+  const index = execFileSync('git', ['ls-files', '--stage'], { encoding: 'utf8' });
+  const run = (...args) => spawnSync('python3', [resolver, '--dependency-pr-body', input, ...args],
+    { env, encoding: 'utf8' });
+  const result = run();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, expected);
+  assert.equal(readFileSync(input, 'utf8'), original);
+  assert.equal(execFileSync('git', ['ls-files', '--stage'], { encoding: 'utf8' }), index);
+  writeFileSync(input, expected);
+  assert.equal(run().stdout, expected, 'repair is idempotent');
+  assert.notEqual(run('--verify-lockfile').status, 0, 'metadata repair cannot mutate dependencies');
+  assert.notEqual(run('--reviewed-project-sha256', 'a'.repeat(64)).status, 0);
+  for (const bad of ['<code>@source\n@scope</code>', '<code>` @scope</code>',
+    '<code>&#96; @scope</code>', '<code>&#10;@scope</code>', '<code><em>@scope</em></code>', '<code>@scope',
+    `${machine}\n${machine}`, 'Machine: built other.py', 'Machine-gap: LYB-1', 'Machine-gap waiver: incident',
+    `\`\`\`\n${machine}\n\`\`\``]) {
+    writeFileSync(input, bad);
+    const refused = run();
+    assert.notEqual(refused.status, 0, bad);
+    assert.equal(refused.stdout, '', 'refusal must not produce a partial body');
+    assert.equal(readFileSync(input, 'utf8'), bad);
+  }
+});
+
 function fixture(t, input, state) {
   const root = mkdtempSync(join(tmpdir(), 'lyb-dependency-inputs-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
