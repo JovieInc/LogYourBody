@@ -64,6 +64,10 @@ source edits, and refuses unstaged projection edits or pinned-source drift.
 Bot commits created outside local hooks still need this refresh during repair;
 CI continues to reject stale output.
 
+Staged repair also refuses a projection edited, deleted or created while sources
+are rendering, preserving that change and the index. Review and stage the edits,
+then retry `--staged`; this also refreshes fingerprints for Bundler lockfile bumps.
+
 When the generated source map and correction ledger both conflict, resolve and
 stage the source inputs, then run the same `--staged` command before the ledger
 resolver. Pre-commit uses that order so a conflicted projection cannot make the

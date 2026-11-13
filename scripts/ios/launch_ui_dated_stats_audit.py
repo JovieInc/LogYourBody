@@ -99,3 +99,32 @@ def contribute(root, _app_dir, violations, violation, _line_number) -> None:
     if texts is None:
         texts = sources.begin_swift_sources(root)
     check_dated_stats_fixture(root, texts, violations, violation)
+    check_recovery_readiness(root, violations, violation)
+
+
+def check_recovery_readiness(root, violations, violation_cls):
+    """Repeated fixture helpers read ready controls before XCTest's polling wait."""
+    from launch_ui_timeline_audit import text_for
+
+    helpers = (
+        ("LogYourBodyUITests+DatedTimeline.swift", "assertDatedStatsRecovery", (15, 8, 8, 8, 8, 8)),
+        ("LogYourBodyUITests+DatedTimeline.swift", "assertDatedCoachRecovery", (5, 5, 8, 5, 5, 5)),
+        ("MesocycleCanvasUITests.swift", "send", (8, 8)),
+        ("MesocycleCanvasUITests.swift", "tap", (8,)),
+        ("MesocycleCanvasUITests.swift", "revealReadback", (4,)),
+    )
+    assertion = re.compile(
+        r'XCTAssertTrue\((.+?)\.exists\s*\|\|\s*\1\.waitForExistence\(timeout: (\d+)\)'
+    )
+    for filename, name, allowances in helpers:
+        path = root / "apps/ios/LogYourBodyUITests" / filename
+        if not path.is_file():
+            continue
+        body = _function_body(text_for(path), name)
+        matched = tuple(int(timeout) for _, timeout in assertion.findall(body))
+        if matched != allowances or body.count(".waitForExistence(") != len(allowances):
+            violations.append(_violation(
+                root, path, "uitest.recovery_readiness",
+                f"{name} must accept each present control immediately and retain its bounded wait for delayed controls.",
+                violation_cls,
+            ))
