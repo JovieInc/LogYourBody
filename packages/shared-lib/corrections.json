@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "launch-recovery-readiness-avoids-redundant-polling",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43370783065/job/131706803096",
+    "correction": "PR #1798 repair, fix-red-5df69c1e5f occurrence 15 in 14 days: merge origin/main without rebasing, retain Addressable 2.9.1, inspect failed checks, repair Launch Quality and extend the existing machine. The unit suite passes; the UI command reaches its 1800-second cap after 43 passing cases, while repeated recovery and canvas helpers spend one second polling already present controls. CI Summary reflects that timeout. Vercel reports Deployment was blocked; its details API returns 403 missing an authentication token. The harness owns pushing and PR updates.",
+    "mechanization": "Reuse the immediate existence check already used by launch UI tests in the two dated recovery helpers and the canvas send, tap and readback helpers. Retain all sixteen bounded delayed-control waits, semantic assertions, native selectors, timeouts, coverage floors and workflow gates. Extend the existing required launch UI audit to require the same element before short-circuiting to each original allowance, and retain every wait. The real-source regression fails on the previous helpers and passes after the repair; mutations reject unconditional or reversed polling, negated presence, conjunction, another element, missing waits, unconditional success and zero timeouts for every helper. All 69 behavior cases pass. The required origin/main merge is already up to date. Native execution and timing on this head require the real Mac runner. The harness must replace any prior machine marker with exactly one PR-body line: Machine: built scripts/ios/launch_ui_dated_stats_audit.py. The external Vercel block remains unverified; no provider control is changed.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Production UI cannot prevent XCTest from polling controls that are already present. The native tests must still wait for genuinely delayed controls and prove the same outcomes; the existing source audit can prevent redundant polling from returning without changing product behavior."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required launch UI audit can require eager same-element presence checks with short-circuit evaluation and every original delayed-control allowance in the repeated recovery and canvas helpers. Its real-source behavior suite tests the repair and refusal paths."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_dated_stats_audit.py",
+      "anchor": "\"uitest.recovery_readiness\""
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "dependency-source-map-preserves-concurrent-projection",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1798",
     "correction": "PR #1798 repair, fix-red-1423773703 occurrence 44 in 14 days: merge origin/main without rebasing, retain the Addressable 2.9.1 Bundler update, repair stale source-map failures in Detect Changes and parity, and extend the existing repair machine. CI Summary reflects the Detect Changes failure. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR updates.",

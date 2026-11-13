@@ -120,7 +120,7 @@ extension LogYourBodyUITests {
             "-lybUITestDatedStatsState", state, "-lybUITestChatFirstFixture"
         ])
         let surface = app.descendants(matching: .any)["dated_stats_\(state)"]
-        XCTAssertTrue(surface.waitForExistence(timeout: 15), state)
+        XCTAssertTrue(surface.exists || surface.waitForExistence(timeout: 15), state)
         XCTAssertEqual(app.buttons.matching(identifier: "launch_next_action").count, 1, state)
         XCTAssertFalse(app.descendants(matching: .any)["dashboard_body_score_hero"].exists)
         if state != "ready" {
@@ -133,18 +133,19 @@ extension LogYourBodyUITests {
         switch state {
         case "unsafe-date", "impossible-date", "expired-date", "maintenance":
             let date = app.textFields["launch_outcome_date"]
-            XCTAssertTrue(date.waitForExistence(timeout: 8), state)
+            XCTAssertTrue(date.exists || date.waitForExistence(timeout: 8), state)
             XCTAssertEqual(date.value as? String,
                            state == "expired-date" ? "2026-10-01" : state == "impossible-date" ? "2026-11-08" : "2026-12-27")
             XCTAssertTrue(app.switches["launch_outcome_maintenance"].exists)
             app.buttons["launch_outcome_cancel"].tap()
-            XCTAssertTrue(surface.waitForExistence(timeout: 8), state)
+            XCTAssertTrue(surface.exists || surface.waitForExistence(timeout: 8), state)
         case "denial", "no-data", "stale", "conflicting":
-            XCTAssertTrue(app.textFields["Weight value"].waitForExistence(timeout: 8), state)
+            let weight = app.textFields["Weight value"]
+            XCTAssertTrue(weight.exists || weight.waitForExistence(timeout: 8), state)
             app.buttons["Cancel"].tap()
-            XCTAssertTrue(surface.waitForExistence(timeout: 8), state)
+            XCTAssertTrue(surface.exists || surface.waitForExistence(timeout: 8), state)
         case "offline":
-            XCTAssertTrue(surface.waitForExistence(timeout: 8))
+            XCTAssertTrue(surface.exists || surface.waitForExistence(timeout: 8))
         default:
             let returned = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: surface)
             XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 8), .completed)
@@ -155,15 +156,15 @@ extension LogYourBodyUITests {
     private func assertDatedCoachRecovery(in app: XCUIApplication, state: String) {
         app.buttons["photo_timeline_root_menu"].tap()
         let timeline = app.buttons["photo_timeline_root_nav_timeline"]
-        XCTAssertTrue(timeline.waitForExistence(timeout: 5))
+        XCTAssertTrue(timeline.exists || timeline.waitForExistence(timeout: 5))
         timeline.tap()
         let composer = app.textFields["chat_composer"]
-        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        XCTAssertTrue(composer.exists || composer.waitForExistence(timeout: 5))
         composer.tap()
         composer.typeText("Review my dated outcome")
         app.buttons["chat_send_button"].tap()
         let coach = app.descendants(matching: .any)["launch_directive_coach"]
-        XCTAssertTrue(coach.waitForExistence(timeout: 8), state)
+        XCTAssertTrue(coach.exists || coach.waitForExistence(timeout: 8), state)
         XCTAssertEqual(app.buttons.matching(identifier: "launch_next_action").count, 1, state)
         let action = app.buttons["launch_next_action"]
         if !action.isHittable {
@@ -174,14 +175,16 @@ extension LogYourBodyUITests {
         action.tap()
         switch state {
         case "denial", "no-data", "stale", "conflicting":
-            XCTAssertTrue(app.textFields["Weight value"].waitForExistence(timeout: 5), state)
+            let weight = app.textFields["Weight value"]
+            XCTAssertTrue(weight.exists || weight.waitForExistence(timeout: 5), state)
             app.buttons["Cancel"].tap()
         case "offline":
-            XCTAssertTrue(coach.waitForExistence(timeout: 5))
+            XCTAssertTrue(coach.exists || coach.waitForExistence(timeout: 5))
         default:
             // The arithmetic-only UI fixture owns no persisted outcome revision.
             // Even ready arithmetic must not produce an unbound saved action.
-            XCTAssertTrue(app.textFields["launch_outcome_date"].waitForExistence(timeout: 5), state)
+            let date = app.textFields["launch_outcome_date"]
+            XCTAssertTrue(date.exists || date.waitForExistence(timeout: 5), state)
             app.buttons["launch_outcome_cancel"].tap()
         }
     }
