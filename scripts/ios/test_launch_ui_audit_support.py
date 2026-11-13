@@ -114,6 +114,35 @@ class LaunchUIAuditTests(unittest.TestCase):
 
 
 class PatternScanTests(LaunchUIAuditTests):
+    def test_tree_pattern_parses_reuse_content_and_preserve_fresh_findings(self):
+        sources = AUDIT.swift_sources
+        pattern = sources._GEOMETRY
+        parsed = []
+
+        class CountedPattern:
+            def finditer(self, text):
+                parsed.append(text)
+                return pattern.finditer(text)
+
+        source = "let point = CGPoint(x: .nan, y: 0)\n"
+        paths = [self.root / "First.swift", self.root / "Second.swift"]
+        texts = dict.fromkeys(paths, source)
+        with patch.object(sources, "SWIFT_SOURCES", texts), \
+                patch.object(sources, "APP_SOURCES", {}), \
+                patch.object(sources, "_GEOMETRY", CountedPattern()):
+            for _ in range(2):
+                findings = []
+                sources.scan_tree_patterns(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+                self.assertEqual([(item.file, item.line) for item in findings],
+                                 [("First.swift", 1), ("Second.swift", 1)])
+            self.assertEqual(parsed, [source], "Parse identical content once, even across paths")
+            texts[paths[0]] = "\n" + source
+            texts[paths[1]] = "let point = CGPoint(x: CGFloat.nan, y: 0)\n"
+            findings = []
+            sources.scan_tree_patterns(self.root, findings, AUDIT.AuditViolation, AUDIT.line_number)
+            self.assertEqual([(item.file, item.line) for item in findings], [("First.swift", 2)])
+            self.assertEqual(len(parsed), 3, "Changed bytes must be parsed again")
+
     def test_native_discovery_reuses_app_paths_and_keeps_exact_file_order(self):
         directories = ("LogYourBody", "LogYourBodyTests", "LogYourBodyUITests", "LogYourBodyWidget")
         for directory in directories[1:]:

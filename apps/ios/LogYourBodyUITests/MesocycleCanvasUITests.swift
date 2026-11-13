@@ -102,7 +102,7 @@ final class MesocycleCanvasUITests: XCTestCase {
 
     private func send(_ app: XCUIApplication, _ text: String) {
         let composer = app.textFields["canvas_composer"]
-        XCTAssertTrue(composer.waitForExistence(timeout: 8))
+        XCTAssertTrue(composer.exists || composer.waitForExistence(timeout: 8))
         XCTAssertEqual(app.textFields.matching(identifier: "canvas_composer").count, 1)
         XCTAssertEqual(app.textFields.matching(identifier: "canvas_root").count, 0)
         XCTAssertEqual(app.buttons.matching(identifier: "canvas_root").count, 0)
@@ -112,7 +112,7 @@ final class MesocycleCanvasUITests: XCTestCase {
         tap(app, "canvas_send")
         XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
         let accept = app.buttons["canvas_accept"]
-        XCTAssertTrue(accept.waitForExistence(timeout: 8))
+        XCTAssertTrue(accept.exists || accept.waitForExistence(timeout: 8))
         // Proposal decisions stay reachable even when its change list fills the scroll view.
         XCTAssertTrue(accept.isHittable)
         XCTAssertTrue(app.buttons["canvas_reject"].isHittable)
@@ -120,7 +120,7 @@ final class MesocycleCanvasUITests: XCTestCase {
 
     private func tap(_ app: XCUIApplication, _ identifier: String) {
         let control = app.descendants(matching: .any)[identifier]
-        XCTAssertTrue(control.waitForExistence(timeout: 8), identifier)
+        XCTAssertTrue(control.exists || control.waitForExistence(timeout: 8), identifier)
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: identifier).count, 1, identifier)
         let scroll = app.scrollViews.firstMatch
         // Previews sit above the plan. Voice decisions and fixture checks are pinned.
@@ -143,7 +143,7 @@ final class MesocycleCanvasUITests: XCTestCase {
 
     private func revealReadback(_ app: XCUIApplication) {
         let readback = app.descendants(matching: .any)["canvas_execution"]
-        XCTAssertTrue(readback.waitForExistence(timeout: 4))
+        XCTAssertTrue(readback.exists || readback.waitForExistence(timeout: 4))
         let reveal = app.buttons["canvas_reveal_readback"]
         if !readback.isHittable, reveal.exists, reveal.isHittable {
             reveal.tap()

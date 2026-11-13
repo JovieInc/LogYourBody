@@ -154,6 +154,7 @@ def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfil
     # An unrelated ledger conflict must not deadlock the two existing merge resolvers.
     if (dirty and not conflicted) or (output.exists() and not tracked):
         raise ValueError("unstaged projection edits: " + config["output"])
+    original = output.read_bytes() if output.exists() else None
     # Render the index, so partially staged manifests cannot leak into the commit.
     with tempfile.TemporaryDirectory(prefix="repository-docs-index-") as directory:
         snapshot = Path(directory)
@@ -178,8 +179,10 @@ def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfil
         raise ValueError("dependency inputs changed during projection generation; stage reviewed inputs and retry")
     if dependency_inputs:
         assert_no_local_dependency_inputs(root, dependency_inputs)
+    # Rendering must preserve another writer's projection edit, deletion or creation.
+    if (output.read_bytes() if output.exists() else None) != original:
+        raise ValueError("projection changed during generation; review edits and retry")
     output.parent.mkdir(parents=True, exist_ok=True)
-    original = output.read_bytes() if output.exists() else None
     try:
         output.write_bytes(projection)
         subprocess.run(["git", "add", "--", config["output"], *extra_outputs], cwd=root, check=True)

@@ -1,18 +1,40 @@
 [
   {
-    "fingerprint": "dependabot-pr-body-machine-metadata",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1765",
-    "correction": "PR #1765 repair, fix-red-f8dba15025 occurrence 7: merge origin/main first without rebasing, preserve the PostCSS 4.3.5 bump and extend the recurring repair machine. Both Company Guards jobs still reject four Tailwind directives in the remote Dependabot HTML release notes, causing CI Summary to fail. Vercel reports Deployment was blocked. The harness owns pushing and PR edits.",
-    "mechanization": "Extend the existing --dependency-pr-body generator to emit exactly one Machine line naming the repair command, retain that line on retries, and refuse duplicate, divergent, waiver or code-fenced metadata before producing output. The CLI regression fails against the previous generator and passes with the extension in the existing required pre-commit-lint.test.mjs suite. Use this command on the real PR body: the original fails the exact pinned mention guard on source, scope, utility and property; the generated body passes with the unchanged allowlist. The harness must apply the locally prepared body, which contains exactly one line: Machine: built scripts/resolve-repository-docs.py. Frozen lockfile verification and the parent-preserving merge resolver retain both parent ledgers and refresh source parity. Fresh GitHub and Vercel results remain for the harness after publication; no provider or CI control is relaxed.",
+    "fingerprint": "launch-recovery-readiness-avoids-redundant-polling",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43370783065/job/131706803096",
+    "correction": "PR #1798 repair, fix-red-5df69c1e5f occurrence 15 in 14 days: merge origin/main without rebasing, retain Addressable 2.9.1, inspect failed checks, repair Launch Quality and extend the existing machine. The unit suite passes; the UI command reaches its 1800-second cap after 43 passing cases, while repeated recovery and canvas helpers spend one second polling already present controls. CI Summary reflects that timeout. Vercel reports Deployment was blocked; its details API returns 403 missing an authentication token. The harness owns pushing and PR updates.",
+    "mechanization": "Reuse the immediate existence check already used by launch UI tests in the two dated recovery helpers and the canvas send, tap and readback helpers. Retain all sixteen bounded delayed-control waits, semantic assertions, native selectors, timeouts, coverage floors and workflow gates. Extend the existing required launch UI audit to require the same element before short-circuiting to each original allowance, and retain every wait. The real-source regression fails on the previous helpers and passes after the repair; mutations reject unconditional or reversed polling, negated presence, conjunction, another element, missing waits, unconditional success and zero timeouts for every helper. All 69 behavior cases pass. The required origin/main merge is already up to date. Native execution and timing on this head require the real Mac runner. The harness must replace any prior machine marker with exactly one PR-body line: Machine: built scripts/ios/launch_ui_dated_stats_audit.py. The external Vercel block remains unverified; no provider control is changed.",
     "classification": {
       "codebase": {
+        "feasible": false,
+        "rationale": "Production UI cannot prevent XCTest from polling controls that are already present. The native tests must still wait for genuinely delayed controls and prove the same outcomes; the existing source audit can prevent redundant polling from returning without changing product behavior."
+      },
+      "static": {
         "feasible": true,
-        "rationale": "The existing local metadata generator can make the abstraction receipt part of every prepared body and fail before emitting ambiguous metadata, without adding a second PR owner or weakening the company mention guard."
+        "rationale": "The existing required launch UI audit can require eager same-element presence checks with short-circuit evaluation and every original delayed-control allowance in the repeated recovery and canvas helpers. Its real-source behavior suite tests the repair and refusal paths."
       }
     },
     "guard": {
-      "path": "scripts/dependency_pr_body.py",
-      "anchor": "dependency PR body requires one matching Machine line"
+      "path": "scripts/ios/launch_ui_dated_stats_audit.py",
+      "anchor": "\"uitest.recovery_readiness\""
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "dependency-source-map-preserves-concurrent-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1798",
+    "correction": "PR #1798 repair, fix-red-1423773703 occurrence 44 in 14 days: merge origin/main without rebasing, retain the Addressable 2.9.1 Bundler update, repair stale source-map failures in Detect Changes and parity, and extend the existing repair machine. CI Summary reflects the Detect Changes failure. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the staged source-map resolver to snapshot the projection before rendering and refuse a concurrent edit, deletion or creation before writing or staging. Three real-Git Bundler regressions fail on the previous resolver and pass with the guard, preserving concurrent bytes and the index, then proving reviewed retry, the bumped lockfile fingerprint, unchanged lockfile bytes and idempotence. The existing required Detect Changes pre-commit suite executes these cases. Use --staged for this Bundler update; no pnpm resolution or native runtime behavior changes. The fetched origin/main is already an ancestor. The harness must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py. Vercel remains externally blocked; no checks or provider controls are relaxed.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing staged repair boundary owns projection writes and can prevent overwriting another writer by comparing the pre-render snapshot immediately before its own write, without creating another generator or weakening source parity."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "projection changed during generation; review edits and retry"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -8346,6 +8368,78 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-f8dba15025-company-pin-history",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1797",
+    "correction": "PR #1797 repair, fix-red-f8dba15025 occurrence 7: merge origin/main without rebasing, preserve the company guard and certification update, repair failed Company Guards and CI Summary from the actual logs, and extend the existing machine. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing required merge-queue policy verifier with --refresh-company-pins. Resolve immutable upstream main, select the latest commit from the same canon/guard/workflow histories used by the shared drift check, and verify complete guard-tree equivalence with main before writing both callers. Keep certification on the latest kit, validate unique matching full-SHA pins, and refuse incomplete history or trees without writing. The existing required policy suite rejects certification-only tip selection, lost guards, incomplete trees, malformed history and partial caller updates. The tip-selection negative control fails before the repair; all 87 policy and enrollment cases pass after it. Use the refresh command for this instance: guards da878c8965355cd5a08db7bd0cee0d5527cf7dcb, certification daf34326a2c35331546da9fe2e888692dfe4714a. The required origin/main merge is already up to date. The harness must add exactly one PR-body line: Machine: built .github/scripts/verify-merge-queue-policy.mjs. Vercel reports Deployment was blocked without a build error; provider inspection is unavailable without Vercel credentials. No gate or guard is weakened.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing policy entrypoint can generate the two workflow pins from immutable upstream history. Selecting a guard-affecting commit while proving identical guard and canon trees prevents the shared drift evaluator from misclassifying an unrelated certification tip as stale, without changing or bypassing the shared gate."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/verify-merge-queue-policy.mjs",
+      "anchor": "const guard = candidates[0].sha;"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40-launch-audit-content-parsing",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43325172393/job/131557369909",
+    "correction": "PR #1797 repair, fix-red-1a39536f40 occurrence 6: preserve the shared company guard pin update and repair the JavaScript/TypeScript launch UI behavior suite timeout without removing cases, relaxing coverage, or extending the 30-second limit. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing launch UI audit with bounded content-keyed memoization of full-tree pattern offsets and CGFloat binding names. Cache immutable parse results by pattern and exact source bytes; keep file discovery, reads, member-name aggregation and path/line findings fresh for every invocation. The required launch-audit behavior suite rejects repeated parsing of unchanged bytes across paths and invocations, and proves changed bytes refresh offsets, clear resolved violations and replace prior binding names. Both new regressions fail without memoization and pass with it. The harness must retain exactly one PR-body machine line for this repair: Machine: built scripts/ios/launch_ui_timeline_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing audit can prevent redundant regex parsing by construction using bounded caches of immutable content-derived results. Reading files on every invocation and caching neither paths nor combined findings preserves mutation detection while keeping repeated behavior checks inside the unchanged deadline."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_timeline_audit.py",
+      "anchor": "def _pattern_offsets(pattern, text: str) -> tuple[int, ...]:"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "ci-lyb-382975123-launch-quality-launch-quality",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43355101470/job/131655571915",
+    "correction": "LYB-160: post-merge Launch Quality reaches its 1800-second UI command deadline while all completed cases pass. The same commit's retry passes. The profile and weight-entry photo-import safety probes repeatedly resolve live attributes (571 and 736 element resolutions, taking 75.605s and 102.828s). Preserve native selectors, safety assertions, coverage, retries and deadlines; the lanes harness owns pushing and PR operations.",
+    "mechanization": "Extend the existing chaos candidate discovery machine to capture each element's XCTest attributes once per scan and reuse them for denylist, finite-frame, viewport and protected-parent filtering. Keep live hittability checks and action targets; propagate capture errors instead of dropping unknown candidates. The required shared-lib regression fails on the original discovery and passes with the capture, and retains all four throwing callers plus photo-import and geometry safety conditions. Native build, timing and exact-head launch qualification remain unverified on this Linux host and must run through the existing Mac CI gate. The harness must include exactly one PR-body line: Machine: built apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared native discovery helper can eliminate repeated remote attribute resolutions by construction for every chaos scan. Immutable per-scan captures preserve the same safety filters and fail closed on capture errors without increasing timeouts or bypassing evidence gates."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift",
+      "anchor": "(element: element, attributes: try element.snapshot())"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependabot-pr-body-machine-metadata",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1765",
+    "correction": "PR #1765 repair, fix-red-f8dba15025 occurrence 7: merge origin/main first without rebasing, preserve the PostCSS 4.3.5 bump and extend the recurring repair machine. Both Company Guards jobs still reject four Tailwind directives in the remote Dependabot HTML release notes, causing CI Summary to fail. Vercel reports Deployment was blocked. The harness owns pushing and PR edits.",
+    "mechanization": "Extend the existing --dependency-pr-body generator to emit exactly one Machine line naming the repair command, retain that line on retries, and refuse duplicate, divergent, waiver or code-fenced metadata before producing output. The CLI regression fails against the previous generator and passes with the extension in the existing required pre-commit-lint.test.mjs suite. Use this command on the real PR body: the original fails the exact pinned mention guard on source, scope, utility and property; the generated body passes with the unchanged allowlist. The harness must apply the locally prepared body, which contains exactly one line: Machine: built scripts/resolve-repository-docs.py. Frozen lockfile verification and the parent-preserving merge resolver retain both parent ledgers and refresh source parity. Fresh GitHub and Vercel results remain for the harness after publication; no provider or CI control is relaxed.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing local metadata generator can make the abstraction receipt part of every prepared body and fail before emitting ambiguous metadata, without adding a second PR owner or weakening the company mention guard."
+      }
+    },
+    "guard": {
+      "path": "scripts/dependency_pr_body.py",
+      "anchor": "dependency PR body requires one matching Machine line"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "dependabot-html-code-mentions",

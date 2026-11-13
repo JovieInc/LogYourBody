@@ -1,5 +1,7 @@
 # Shared company guard suite from JovieInc/ci (canon/COMPANY.md). Pin is bumped by a bot PR;
 # a pin more than 72h behind the newest canon/guard commit fails this check.
+# Refresh both callers: node .github/scripts/verify-merge-queue-policy.mjs --refresh-company-pins
+# Guard pin follows the shared drift history; refresh verifies parity with main.
 name: Company Guards
 on:
   workflow_call:
@@ -10,6 +12,6 @@ permissions:
   contents: read
 jobs:
   company-guards:
-    uses: JovieInc/ci/.github/workflows/company-guards.yml@9891c0ec01d1a19bc441977f2fa58c24d2611e4e
+    uses: JovieInc/ci/.github/workflows/company-guards.yml@da878c8965355cd5a08db7bd0cee0d5527cf7dcb
     with:
-      ci-ref: 9891c0ec01d1a19bc441977f2fa58c24d2611e4e
+      ci-ref: da878c8965355cd5a08db7bd0cee0d5527cf7dcb

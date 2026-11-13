@@ -108,6 +108,22 @@ merge-group, or preceding-main base already fetched for coverage. The normal
 shared-lib suite runs the runner's behavioral tests with coverage. This adds
 no scheduler, cloud account, API credential, or model-driven CI decision.
 
+Refresh shared company workflow pins with the existing policy verifier:
+
+```sh
+node .github/scripts/verify-merge-queue-policy.mjs --refresh-company-pins
+```
+
+It reads GitHub through `gh api`, resolves upstream main once, and selects the
+latest commit touching the shared drift check's canon, guard or workflow paths.
+Before writing, it verifies that this commit contains exactly the same guard
+and canon trees as upstream main. Certification retains main's latest kit.
+The callers may therefore have different immutable SHAs: a certification-only
+commit is absent from the drift check's filtered history and would falsely fail.
+Missing history, incomplete trees, lost guard changes and ambiguous caller pins
+refuse without changing either workflow. The required policy suite tests this
+selection and its refusal paths. Review and stage both outputs explicitly.
+
 The existing Native Merge Queue Enrollment workflow automatically enqueues every
 eligible same-repo, non-draft PR to main after CI passes on its exact head. Keep
 that automatic path on; all required checks, deployments and queue rules still

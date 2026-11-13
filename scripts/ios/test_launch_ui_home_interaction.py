@@ -12,6 +12,80 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class HomeInteractionAuditTests:
+    def test_recovery_helpers_accept_ready_controls_and_retain_delayed_failure(self):
+        from launch_ui_dated_stats_audit import check_recovery_readiness
+        from test_launch_ui_audit_support import AUDIT
+
+        ui = self.root / "apps/ios/LogYourBodyUITests"
+        ui.mkdir(parents=True, exist_ok=True)
+        paths = [ui / name for name in (
+            "LogYourBodyUITests+DatedTimeline.swift", "MesocycleCanvasUITests.swift",
+        )]
+        originals = {}
+        for path in paths:
+            originals[path] = (ROOT / path.relative_to(self.root)).read_text()
+            path.write_text(originals[path])
+
+        def findings():
+            found = []
+            check_recovery_readiness(self.root, found, AUDIT.AuditViolation)
+            return found
+
+        self.assertEqual(findings(), [])
+        self.assertEqual(self.run_audit()[0], 0)
+        for path, element, timeout in (
+            (paths[0], "surface", 15), (paths[0], "timeline", 5),
+            (paths[1], "composer", 8), (paths[1], "control", 8), (paths[1], "readback", 4),
+        ):
+            eager = f"{element}.exists || "
+            wait = f"{element}.waitForExistence(timeout: {timeout})"
+            for before, after in (
+                (eager + wait, wait),
+                (eager + wait, wait + f" || {element}.exists"),
+                (eager, f"!{element}.exists || "),
+                (eager, f"{element}.exists && "),
+                (eager, "other.exists || "),
+                (eager + wait, f"{element}.exists"),
+                (eager + wait, "true"),
+                (wait, f"{element}.waitForExistence(timeout: 0)"),
+            ):
+                with self.subTest(helper=element, before=before, after=after):
+                    self.assertIn(before, originals[path])
+                    path.write_text(originals[path].replace(before, after, 1))
+                    found = findings()
+                    self.assertEqual([item.check for item in found], ["uitest.recovery_readiness"])
+                    self.assertEqual(found[0].file, str(path.relative_to(self.root)))
+                    path.write_text(originals[path])
+        self.assertEqual(findings(), [])
+
+    def test_opacity_binding_parses_reuse_content_without_hiding_type_changes(self):
+        from unittest.mock import patch
+        import launch_ui_opacity_audit as opacity
+
+        pattern = opacity._CGFLOAT_BINDING
+        parsed = []
+
+        class CountedPattern:
+            def finditer(self, text):
+                parsed.append(text)
+                return pattern.finditer(text)
+
+        declaration = "// opacity parse regression\nvar cachedOpacity: CGFloat\n"
+        binding = self.root / "Binding.swift"
+        usage = self.root / "Usage.swift"
+        texts = {binding: declaration, usage: "view.opacity(model?.cachedOpacity ?? 1)\n"}
+        with patch.object(opacity, "_CGFLOAT_BINDING", CountedPattern()):
+            for _ in range(2):
+                findings = []
+                opacity.check_optional_cgfloat_opacity(self.root, [], findings, texts)
+                self.assertEqual([(item.file, item.line) for item in findings], [("Usage.swift", 1)])
+            self.assertEqual(parsed, [declaration], "Unchanged declarations must reuse their parse")
+            texts[binding] = declaration.replace("cachedOpacity", "otherOpacity")
+            findings = []
+            opacity.check_optional_cgfloat_opacity(self.root, [], findings, texts)
+            self.assertEqual(findings, [], "A changed declaration must replace its prior member names")
+            self.assertEqual(parsed, [declaration, texts[binding]])
+
     def test_weekly_prompt_cannot_precede_the_provenance_chip(self):
         path = self.app / "Views/HomeV2/HomeV2Surface.swift"
         source = path.read_text()
