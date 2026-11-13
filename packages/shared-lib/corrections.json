@@ -8364,5 +8364,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "ci-lyb-382975123-launch-quality-launch-quality",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43355101470/job/131655571915",
+    "correction": "LYB-160: post-merge Launch Quality reaches its 1800-second UI command deadline while all completed cases pass. The same commit's retry passes. The profile and weight-entry photo-import safety probes repeatedly resolve live attributes (571 and 736 element resolutions, taking 75.605s and 102.828s). Preserve native selectors, safety assertions, coverage, retries and deadlines; the lanes harness owns pushing and PR operations.",
+    "mechanization": "Extend the existing chaos candidate discovery machine to capture each element's XCTest attributes once per scan and reuse them for denylist, finite-frame, viewport and protected-parent filtering. Keep live hittability checks and action targets; propagate capture errors instead of dropping unknown candidates. The required shared-lib regression fails on the original discovery and passes with the capture, and retains all four throwing callers plus photo-import and geometry safety conditions. Native build, timing and exact-head launch qualification remain unverified on this Linux host and must run through the existing Mac CI gate. The harness must include exactly one PR-body line: Machine: built apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared native discovery helper can eliminate repeated remote attribute resolutions by construction for every chaos scan. Immutable per-scan captures preserve the same safety filters and fail closed on capture errors without increasing timeouts or bypassing evidence gates."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift",
+      "anchor": "(element: element, attributes: try element.snapshot())"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
