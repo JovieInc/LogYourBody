@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -61,12 +62,18 @@ def end_swift_sources() -> None:
     APP_SOURCES = None
 
 
+@lru_cache(maxsize=512)
+def _pattern_offsets(pattern, text: str) -> tuple[int, ...]:
+    """Reuse parsing of identical bytes; paths and findings stay invocation-local."""
+    return tuple(match.start() for match in pattern.finditer(text))
+
+
 def _append_matches(root, path, text, pattern, check, detail, violations, violation, line_number):
-    for match in pattern.finditer(text):
+    for offset in _pattern_offsets(pattern, text):
         violations.append(violation(
             check=check,
             file=str(path.relative_to(root)),
-            line=line_number(text, match.start()),
+            line=line_number(text, offset),
             detail=detail,
         ))
 

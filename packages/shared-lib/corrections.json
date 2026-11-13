@@ -8328,5 +8328,41 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-f8dba15025-company-pin-history",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1797",
+    "correction": "PR #1797 repair, fix-red-f8dba15025 occurrence 7: merge origin/main without rebasing, preserve the company guard and certification update, repair failed Company Guards and CI Summary from the actual logs, and extend the existing machine. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing required merge-queue policy verifier with --refresh-company-pins. Resolve immutable upstream main, select the latest commit from the same canon/guard/workflow histories used by the shared drift check, and verify complete guard-tree equivalence with main before writing both callers. Keep certification on the latest kit, validate unique matching full-SHA pins, and refuse incomplete history or trees without writing. The existing required policy suite rejects certification-only tip selection, lost guards, incomplete trees, malformed history and partial caller updates. The tip-selection negative control fails before the repair; all 87 policy and enrollment cases pass after it. Use the refresh command for this instance: guards da878c8965355cd5a08db7bd0cee0d5527cf7dcb, certification daf34326a2c35331546da9fe2e888692dfe4714a. The required origin/main merge is already up to date. The harness must add exactly one PR-body line: Machine: built .github/scripts/verify-merge-queue-policy.mjs. Vercel reports Deployment was blocked without a build error; provider inspection is unavailable without Vercel credentials. No gate or guard is weakened.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing policy entrypoint can generate the two workflow pins from immutable upstream history. Selecting a guard-affecting commit while proving identical guard and canon trees prevents the shared drift evaluator from misclassifying an unrelated certification tip as stale, without changing or bypassing the shared gate."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/verify-merge-queue-policy.mjs",
+      "anchor": "const guard = candidates[0].sha;"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40-launch-audit-content-parsing",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43325172393/job/131557369909",
+    "correction": "PR #1797 repair, fix-red-1a39536f40 occurrence 6: preserve the shared company guard pin update and repair the JavaScript/TypeScript launch UI behavior suite timeout without removing cases, relaxing coverage, or extending the 30-second limit. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing launch UI audit with bounded content-keyed memoization of full-tree pattern offsets and CGFloat binding names. Cache immutable parse results by pattern and exact source bytes; keep file discovery, reads, member-name aggregation and path/line findings fresh for every invocation. The required launch-audit behavior suite rejects repeated parsing of unchanged bytes across paths and invocations, and proves changed bytes refresh offsets, clear resolved violations and replace prior binding names. Both new regressions fail without memoization and pass with it. The harness must retain exactly one PR-body machine line for this repair: Machine: built scripts/ios/launch_ui_timeline_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing audit can prevent redundant regex parsing by construction using bounded caches of immutable content-derived results. Reading files on every invocation and caching neither paths nor combined findings preserves mutation detection while keeping repeated behavior checks inside the unchanged deadline."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_timeline_audit.py",
+      "anchor": "def _pattern_offsets(pattern, text: str) -> tuple[int, ...]:"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
