@@ -4,6 +4,38 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 
+it('captures chaos candidate attributes once per discovery without weakening photo-import safety', () => {
+  const source = readFileSync(
+    new URL('../../../apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift', import.meta.url),
+    'utf8',
+  );
+  const discovery =
+    source.split('private func snapshotElements(')[1]?.split('/// `.isHittable`')[0] ?? '';
+  // Native run 43355101470 resolved elements 736 and 571 times in the two
+  // photo-import probes. Attribute reads during filtering must use one capture.
+  expect(discovery).toContain('throws -> StepSnapshot');
+  expect(discovery).toContain('let captured = try elements.map');
+  expect(discovery).toContain('(element: element, attributes: try element.snapshot())');
+  expect(discovery.match(/\.snapshot\(\)/g)).toHaveLength(1);
+  const filters = discovery.split('let protectedFrames =')[1] ?? '';
+  expect(filters).not.toMatch(/\belement\.(?:frame|identifier|label|elementType)\b/);
+  expect(filters).not.toMatch(
+    /(?:hasFiniteNonZeroFrame|isDenylisted)\((?:element|candidate\.element)\)/,
+  );
+  expect(filters).toContain('captured.compactMap');
+  expect(filters).toContain('attributes.elementType == .button');
+  expect(filters).toContain('isDenylisted(attributes), hasFiniteNonZeroFrame(attributes)');
+  expect(filters).toContain('attributes.frame.intersects(windowFrame)');
+  expect(filters).toContain('!isDenylisted(attributes), attributes.elementType != .key');
+  expect(filters).toContain('attributes.elementType == .other || attributes.elementType == .cell');
+  expect(filters).toContain('protectedFrames.contains(where: { $0.intersects(attributes.frame) })');
+  expect(filters).toContain('return candidate.element.isHittable ? candidate.element : nil');
+  expect(discovery).not.toMatch(/try[!?]|catch/);
+  expect(source.match(/try snapshotElements\(in: app\)/g)).toHaveLength(4);
+  expect(source).toContain('hasFiniteNonZeroFrame(_ element: XCUIElementAttributes)');
+  expect(source).toContain('isDenylisted(_ element: XCUIElementAttributes)');
+});
+
 it('keeps voice hardware dormant during ordinary chat construction and dismissal', () => {
   const source = readFileSync(
     new URL('../../../apps/ios/LogYourBody/Services/VoiceCaptureService.swift', import.meta.url),

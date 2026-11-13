@@ -406,7 +406,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         tree.name = "Profile photo picker candidate safety"
         tree.lifetime = .keepAlways
         add(tree)
-        let candidates = snapshotElements(in: app).interactive
+        let candidates = try snapshotElements(in: app).interactive
         XCTAssertFalse(candidates.contains { $0.label.contains("Change profile photo") })
         for candidate in candidates where candidate.elementType == .other || candidate.elementType == .cell {
             XCTAssertFalse(candidate.frame.intersects(photo.frame), "Generic parent must not activate profile photo import.")
@@ -475,7 +475,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_context"].waitForExistence(timeout: 8))
         let addPhoto = app.buttons["home_v2_context_add_photo"]
         XCTAssertTrue(addPhoto.exists)
-        let contextCandidates = snapshotElements(in: app).interactive
+        let contextCandidates = try snapshotElements(in: app).interactive
         XCTAssertFalse(contextCandidates.map(\.identifier).contains(addPhoto.identifier),
                        "Monkey must not open the personal photo picker from Context.")
         let edit = app.buttons["home_v2_edit_entry"]
@@ -502,7 +502,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         for identifier in photoControls {
             XCTAssertTrue(app.buttons[identifier].waitForExistence(timeout: 5))
         }
-        let candidates = snapshotElements(in: app).interactive
+        let candidates = try snapshotElements(in: app).interactive
         let identifiers = candidates.map(\.identifier)
         for identifier in photoControls {
             let protectedFrame = app.buttons[identifier].frame
@@ -947,7 +947,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         }
 
         let queryStart = Date()
-        let snapshot = snapshotElements(in: app)
+        let snapshot = try snapshotElements(in: app)
         let queryDuration = Date().timeIntervalSince(queryStart)
         // A merely-slow query (device under load, a larger tree) is a
         // metric, not a step-ending anomaly on its own -- only a genuine
@@ -1243,7 +1243,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         let layoutCandidates: [XCUIElement]
     }
 
-    private func snapshotElements(in app: XCUIApplication) -> StepSnapshot {
+    private func snapshotElements(in app: XCUIApplication) throws -> StepSnapshot {
         let buttons = app.buttons.allElementsBoundByIndex
         let staticTexts = app.staticTexts.allElementsBoundByIndex
 
@@ -1254,7 +1254,10 @@ final class ChaosMonkeyUITests: XCTestCase {
         elements.append(contentsOf: app.sliders.allElementsBoundByIndex)
         elements.append(contentsOf: app.segmentedControls.allElementsBoundByIndex)
         elements.append(contentsOf: app.otherElements.allElementsBoundByIndex.prefix(40))
-
+        // Reuse one attribute capture per scan; capture errors must fail qualification.
+        let captured = try elements.map { element in
+            (element: element, attributes: try element.snapshot())
+        }
         // Defense in depth: `runStep` already skips the general query
         // entirely whenever a keyboard is showing, but exclude individual
         // key elements from the candidate set too in case one is ever
@@ -1263,19 +1266,24 @@ final class ChaosMonkeyUITests: XCTestCase {
         // frame under an extreme text size or locale instead of returning
         // false -- see layoutAnomalies below for the evidence.
         let windowFrame = app.windows.firstMatch.frame
-        let protectedFrames = buttons.filter { isDenylisted($0) && hasFiniteNonZeroFrame($0) }
-            .map(\.frame).filter { $0.intersects(windowFrame) }
-        let interactive = elements.filter { element in
-            guard hasFiniteNonZeroFrame(element), element.frame.intersects(windowFrame),
-                  !isDenylisted(element), element.elementType != .key else { return false }
+        let protectedFrames = captured.compactMap { candidate -> CGRect? in
+            let attributes = candidate.attributes
+            guard attributes.elementType == .button,
+                  isDenylisted(attributes), hasFiniteNonZeroFrame(attributes),
+                  attributes.frame.intersects(windowFrame) else { return nil }
+            return attributes.frame
+        }
+        let interactive = captured.compactMap { candidate -> XCUIElement? in
+            let attributes = candidate.attributes
+            guard hasFiniteNonZeroFrame(attributes), attributes.frame.intersects(windowFrame),
+                  !isDenylisted(attributes), attributes.elementType != .key else { return nil }
             // A generic parent can delegate its activation point to a protected
             // child. Keep such parents out of random taps; direct safe controls
             // and the existing app-level swipe actions remain available.
-            if element.elementType == .other || element.elementType == .cell {
-                let frame = element.frame
-                if protectedFrames.contains(where: { $0.intersects(frame) }) { return false }
+            if attributes.elementType == .other || attributes.elementType == .cell {
+                if protectedFrames.contains(where: { $0.intersects(attributes.frame) }) { return nil }
             }
-            return element.isHittable
+            return candidate.element.isHittable ? candidate.element : nil
         }
         // Not pre-filtered by .isHittable: layoutAnomalies needs to see a
         // degenerate frame (including one .isHittable can't safely judge)
@@ -1290,14 +1298,14 @@ final class ChaosMonkeyUITests: XCTestCase {
     /// so geometry is checked before ever calling it -- own simulator
     /// evidence: a "What changed recently?" button crashed a layout scan
     /// this way under AccessibilityXXXL.
-    private func hasFiniteNonZeroFrame(_ element: XCUIElement) -> Bool {
+    private func hasFiniteNonZeroFrame(_ element: XCUIElementAttributes) -> Bool {
         let frame = element.frame
         return frame.width.isFinite && frame.height.isFinite
             && frame.origin.x.isFinite && frame.origin.y.isFinite
             && frame.width > 0 && frame.height > 0
     }
 
-    private func isDenylisted(_ element: XCUIElement) -> Bool {
+    private func isDenylisted(_ element: XCUIElementAttributes) -> Bool {
         if Self.denylistedIdentifiers.contains(element.identifier) {
             return true
         }
