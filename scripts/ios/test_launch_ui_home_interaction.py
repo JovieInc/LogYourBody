@@ -12,6 +12,34 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class HomeInteractionAuditTests:
+    def test_opacity_binding_parses_reuse_content_without_hiding_type_changes(self):
+        from unittest.mock import patch
+        import launch_ui_opacity_audit as opacity
+
+        pattern = opacity._CGFLOAT_BINDING
+        parsed = []
+
+        class CountedPattern:
+            def finditer(self, text):
+                parsed.append(text)
+                return pattern.finditer(text)
+
+        declaration = "// opacity parse regression\nvar cachedOpacity: CGFloat\n"
+        binding = self.root / "Binding.swift"
+        usage = self.root / "Usage.swift"
+        texts = {binding: declaration, usage: "view.opacity(model?.cachedOpacity ?? 1)\n"}
+        with patch.object(opacity, "_CGFLOAT_BINDING", CountedPattern()):
+            for _ in range(2):
+                findings = []
+                opacity.check_optional_cgfloat_opacity(self.root, [], findings, texts)
+                self.assertEqual([(item.file, item.line) for item in findings], [("Usage.swift", 1)])
+            self.assertEqual(parsed, [declaration], "Unchanged declarations must reuse their parse")
+            texts[binding] = declaration.replace("cachedOpacity", "otherOpacity")
+            findings = []
+            opacity.check_optional_cgfloat_opacity(self.root, [], findings, texts)
+            self.assertEqual(findings, [], "A changed declaration must replace its prior member names")
+            self.assertEqual(parsed, [declaration, texts[binding]])
+
     def test_weekly_prompt_cannot_precede_the_provenance_chip(self):
         path = self.app / "Views/HomeV2/HomeV2Surface.swift"
         source = path.read_text()

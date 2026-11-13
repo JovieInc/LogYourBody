@@ -8346,5 +8346,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40-launch-audit-content-parsing",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43325172393/job/131557369909",
+    "correction": "PR #1797 repair, fix-red-1a39536f40 occurrence 6: preserve the shared company guard pin update and repair the JavaScript/TypeScript launch UI behavior suite timeout without removing cases, relaxing coverage, or extending the 30-second limit. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing launch UI audit with bounded content-keyed memoization of full-tree pattern offsets and CGFloat binding names. Cache immutable parse results by pattern and exact source bytes; keep file discovery, reads, member-name aggregation and path/line findings fresh for every invocation. The required launch-audit behavior suite rejects repeated parsing of unchanged bytes across paths and invocations, and proves changed bytes refresh offsets, clear resolved violations and replace prior binding names. Both new regressions fail without memoization and pass with it. The harness must retain exactly one PR-body machine line for this repair: Machine: built scripts/ios/launch_ui_timeline_audit.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing audit can prevent redundant regex parsing by construction using bounded caches of immutable content-derived results. Reading files on every invocation and caching neither paths nor combined findings preserves mutation detection while keeping repeated behavior checks inside the unchanged deadline."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_timeline_audit.py",
+      "anchor": "def _pattern_offsets(pattern, text: str) -> tuple[int, ...]:"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

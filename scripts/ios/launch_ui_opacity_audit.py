@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from launch_ui_timeline_audit import AuditViolation, line_number
@@ -68,6 +69,13 @@ def _opacity_arguments(text: str):
     yield from _walk_opacity_arguments(text)
 
 
+@lru_cache(maxsize=512)
+def _binding_names(pattern, text: str) -> frozenset[str]:
+    """Cache only immutable parse results, never file reads or combined findings."""
+    return frozenset(next(group for group in match.groups() if group)
+                     for match in pattern.finditer(text))
+
+
 def check_optional_cgfloat_opacity(
     root: Path,
     paths: list[Path],
@@ -84,8 +92,7 @@ def check_optional_cgfloat_opacity(
     )
     for path, text in pairs:
         if "CGFloat" in text:
-            for match in _CGFLOAT_BINDING.finditer(text):
-                names.add(next(group for group in match.groups() if group))
+            names.update(_binding_names(_CGFLOAT_BINDING, text))
         # A file without optional chaining cannot pass a CGFloat? into opacity.
         if ".opacity(" in text and "?." in text:
             candidates.append((path, text))
