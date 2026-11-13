@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-source-map-preserves-concurrent-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1798",
+    "correction": "PR #1798 repair, fix-red-1423773703 occurrence 44 in 14 days: merge origin/main without rebasing, retain the Addressable 2.9.1 Bundler update, repair stale source-map failures in Detect Changes and parity, and extend the existing repair machine. CI Summary reflects the Detect Changes failure. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the staged source-map resolver to snapshot the projection before rendering and refuse a concurrent edit, deletion or creation before writing or staging. Three real-Git Bundler regressions fail on the previous resolver and pass with the guard, preserving concurrent bytes and the index, then proving reviewed retry, the bumped lockfile fingerprint, unchanged lockfile bytes and idempotence. The existing required Detect Changes pre-commit suite executes these cases. Use --staged for this Bundler update; no pnpm resolution or native runtime behavior changes. The fetched origin/main is already an ancestor. The harness must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py. Vercel remains externally blocked; no checks or provider controls are relaxed.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing staged repair boundary owns projection writes and can prevent overwriting another writer by comparing the pre-render snapshot immediately before its own write, without creating another generator or weakening source parity."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "projection changed during generation; review edits and retry"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-1423773703",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1764",
     "correction": "PR #1764 repair, fix-red-1423773703 occurrence 44: merge origin/main without rebasing, preserve the jose 6.2.14 to 6.2.15 update, and repair CI Summary, Detect Changes and parity reporting a stale repository source map. Vercel reports Deployment was blocked without a build error. The harness owns pushing and PR updates.",
