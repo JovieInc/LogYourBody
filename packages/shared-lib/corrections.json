@@ -8480,5 +8480,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "body-fat-field-recovers-keyboard-focus",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43636675575",
+    "correction": "LYB-214: Scheduled diagnostic run 43636675575 on main fails testBodyFatCheckInRefreshesDataHeroWithoutSavingWeight and testBodyFatEditorAtLargestTextPreservesMethodUntilExplicitSelection at HomeV2LayoutUITests.swift:493. The trailing inset tap never gives the padded, center-aligned body-fat field keyboard focus, so delete keys fail before Save. The other five selected cases pass.",
+    "mechanization": "Keep the trailing tap for trailing-aligned readings, then require keyboard focus and tap the field center when that inset misses. Delete at least eight characters, matching the previously passing center-tap clear, before the existing select-and-delete fallback. Extend the required launch UI regression source guard to reject a helper that deletes before focus is proven. The guard fails on the previous helper and passes after the repair. Preserve every selected identity, save outcome, provenance and unchanged-weight assertion, per-test allowance, command cap, one-attempt policy and nonqualifying receipt contract. Machine: built apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift. Native execution of the seven-case diagnostic remains for macOS CI; the harness owns pushing and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing native replacement helper owns where the check-in test taps before deleting. Requiring keyboard focus, and tapping the field itself when the trailing inset misses, prevents delete keys from being sent to an unfocused padded body-fat reading without changing the field's alignment or validation."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift",
+      "anchor": "hasKeyboardFocus == true"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
