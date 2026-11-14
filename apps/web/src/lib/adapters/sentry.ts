@@ -14,6 +14,41 @@ const SENSITIVE_HEADERS = /^(authorization|cookie|set-cookie|x-.*(token|key|secr
 
 type SentryEvent = Sentry.ErrorEvent;
 
+/**
+ * Browser extension runtimes (Obscura's `<obscura:bootstrap>`, Deno-style
+ * `ext:` URLs, and `chrome-extension:` / `moz-extension:` pages) reject
+ * through the page's unhandled-rejection handler. Sentry marks those frames
+ * in-app when they have no bundle URL. LOG-YOUR-BODY-WEB-2 was that class
+ * on `/`: `toLowerCase` of undefined, with no application frame.
+ */
+const EXTENSION_LOCATION =
+  /^(?:ext:|chrome-extension:|moz-extension:|safari-web-extension:|safari-extension:|<?obscura:)/i;
+
+const APPLICATION_LOCATION =
+  /(?:\/_next\/|webpack-internal:|\.next\/server\/|(?:^|\/)src\/|(?:^|\/)apps\/web\/|(?:^|\/)packages\/|\.tsx?(?:$|\?))/i;
+
+function frameLocation(frame: { filename?: string; abs_path?: string }): string {
+  return frame.filename || frame.abs_path || '';
+}
+
+function eventFrames(event: SentryEvent): { filename?: string; abs_path?: string }[] {
+  return [...(event.exception?.values ?? []), ...(event.threads?.values ?? [])].flatMap(
+    (entry) => entry.stacktrace?.frames ?? [],
+  );
+}
+
+export function isThirdPartyExtensionError(event: SentryEvent): boolean {
+  const locations = eventFrames(event)
+    .map(frameLocation)
+    .filter((location) => location !== '');
+  if (locations.length === 0) return false;
+  const extensionFrames = locations.filter((location) => EXTENSION_LOCATION.test(location));
+  if (extensionFrames.length === 0) return false;
+  return locations.every(
+    (location) => EXTENSION_LOCATION.test(location) || !APPLICATION_LOCATION.test(location),
+  );
+}
+
 export function redactSentryEvent<T extends SentryEvent>(event: T): T {
   delete event.user;
   if (event.request) {
@@ -27,6 +62,11 @@ export function redactSentryEvent<T extends SentryEvent>(event: T): T {
     }
   }
   return event;
+}
+
+export function prepareSentryEvent<T extends SentryEvent>(event: T): T | null {
+  if (isThirdPartyExtensionError(event)) return null;
+  return redactSentryEvent(event);
 }
 
 export interface SentryRuntimeConfig {
@@ -80,7 +120,7 @@ export function initSentry(
       stackFrameVariables: false,
     },
     tracesSampleRate: 0,
-    beforeSend: redactSentryEvent,
+    beforeSend: prepareSentryEvent,
     ...overrides,
   });
   return true;
