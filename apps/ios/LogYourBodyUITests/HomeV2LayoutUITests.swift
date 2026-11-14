@@ -467,10 +467,12 @@ final class HomeV2LayoutUITests: XCTestCase {
 
     private func replacePrefilledText(_ replacement: String, in field: XCUIElement) {
         let existing = field.value as? String ?? ""
-        // The reading is trailing-aligned. A center tap leaves the caret before
-        // it, so delete keys do nothing and the next entry is prepended.
         let trailing = field.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: 0.5))
         trailing.tap()
+        let focused = XCUIApplication().descendants(matching: field.elementType)
+            .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
+        if !focused.waitForExistence(timeout: 1) { field.tap() }
+        XCTAssertTrue(focused.waitForExistence(timeout: 5))
         deletePrefilledText(existing, in: field)
         if !isFieldCleared(field), !existing.isEmpty {
             let leading = field.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5))
@@ -490,7 +492,7 @@ final class HomeV2LayoutUITests: XCTestCase {
 
     private func deletePrefilledText(_ existing: String, in field: XCUIElement) {
         guard !existing.isEmpty, existing != field.placeholderValue else { return }
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: max(existing.count, 8)))
     }
 
     private func isFieldCleared(_ field: XCUIElement) -> Bool {

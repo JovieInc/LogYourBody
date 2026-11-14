@@ -166,6 +166,17 @@ it('waits for exact metric text and Save readiness before testing Home check-in 
   );
   expect(replacement).toContain('NSPredicate(format: "value == %@", replacement)');
   expect(replacement).toContain('XCTWaiter.wait(for: [entered], timeout: 5), .completed');
+  // Run 43636675575: the trailing inset never focused the padded body-fat field,
+  // so delete keys failed before either body-fat case could save.
+  const trailingTap = replacement.indexOf('trailing.tap()');
+  const focusProbe = replacement.indexOf('hasKeyboardFocus == true');
+  const centerTap = replacement.indexOf('field.tap()');
+  const deleteCall = replacement.indexOf('deletePrefilledText(existing, in: field)');
+  expect(trailingTap).toBeGreaterThan(-1);
+  expect(focusProbe).toBeGreaterThan(trailingTap);
+  expect(centerTap).toBeGreaterThan(focusProbe);
+  expect(deleteCall).toBeGreaterThan(centerTap);
+  expect(method('deletePrefilledText')).toContain('count: max(existing.count, 8)');
   for (const name of [
     'testLogSheetEditsUnitsWithKeyboardAndCancelsWithoutChangingHome',
     'testBodyFatCheckInRefreshesDataHeroWithoutSavingWeight',
