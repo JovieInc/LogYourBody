@@ -13,13 +13,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class HomeInteractionAuditTests:
     def test_recovery_helpers_accept_ready_controls_and_retain_delayed_failure(self):
-        from launch_ui_dated_stats_audit import check_recovery_readiness
+        from launch_ui_dated_stats_audit import check_recovery_readiness, _function_body
         from test_launch_ui_audit_support import AUDIT
 
         ui = self.root / "apps/ios/LogYourBodyUITests"
         ui.mkdir(parents=True, exist_ok=True)
         paths = [ui / name for name in (
             "LogYourBodyUITests+DatedTimeline.swift", "MesocycleCanvasUITests.swift",
+            "HomeV2LayoutUITests.swift",
         )]
         originals = {}
         for path in paths:
@@ -36,6 +37,8 @@ class HomeInteractionAuditTests:
         for path, element, timeout in (
             (paths[0], "surface", 15), (paths[0], "timeline", 5),
             (paths[1], "composer", 8), (paths[1], "control", 8), (paths[1], "readback", 4),
+            (paths[2], "scroll", 8), (paths[2], "target", 5),
+            (paths[2], "option", 5), (paths[2], "scroll", 5),
         ):
             eager = f"{element}.exists || "
             wait = f"{element}.waitForExistence(timeout: {timeout})"
@@ -51,7 +54,13 @@ class HomeInteractionAuditTests:
             ):
                 with self.subTest(helper=element, before=before, after=after):
                     self.assertIn(before, originals[path])
-                    path.write_text(originals[path].replace(before, after, 1))
+                    # Other helpers have the same waits; mutate the sheet helper only.
+                    if path == paths[2]:
+                        name = "assertSheetControlReachable" if timeout == 8 or element == "target" else "selectSheetChoice"
+                        body = _function_body(originals[path], name)
+                        path.write_text(originals[path].replace(body, body.replace(before, after, 1), 1))
+                    else:
+                        path.write_text(originals[path].replace(before, after, 1))
                     found = findings()
                     self.assertEqual([item.check for item in found], ["uitest.recovery_readiness"])
                     self.assertEqual(found[0].file, str(path.relative_to(self.root)))

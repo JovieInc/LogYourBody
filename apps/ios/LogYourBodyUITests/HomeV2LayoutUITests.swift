@@ -382,11 +382,11 @@ final class HomeV2LayoutUITests: XCTestCase {
 
     private func assertSheetControlReachable(_ target: XCUIElement, in app: XCUIApplication, screenshot: String) {
         let scroll = app.scrollViews["add_entry_content"]
-        XCTAssertTrue(scroll.waitForExistence(timeout: 8))
-        XCTAssertTrue(target.waitForExistence(timeout: 5))
-        let save = app.buttons["home_v2_log_sheet_save"]
-        let viewport = CGRect(x: scroll.frame.minX, y: scroll.frame.minY, width: scroll.frame.width,
-                              height: max(0, min(scroll.frame.maxY, save.frame.minY) - scroll.frame.minY))
+        XCTAssertTrue(scroll.exists || scroll.waitForExistence(timeout: 8))
+        XCTAssertTrue(target.exists || target.waitForExistence(timeout: 5))
+        let frame = scroll.frame
+        let viewport = CGRect(x: frame.minX, y: frame.minY, width: frame.width,
+                              height: max(0, min(frame.maxY, app.buttons["home_v2_log_sheet_save"].frame.minY) - frame.minY))
         XCTAssertGreaterThan(viewport.height, 88)
         let attempts = scrollToContain(target, in: viewport, app: app)
         let geometry = XCTAttachment(string: attempts.joined(separator: "\n"))
@@ -446,15 +446,15 @@ final class HomeV2LayoutUITests: XCTestCase {
     }
 
     private func selectSheetChoice(_ option: XCUIElement, in app: XCUIApplication) {
-        XCTAssertTrue(option.waitForExistence(timeout: 5))
+        XCTAssertTrue(option.exists || option.waitForExistence(timeout: 5))
         let scroll = app.scrollViews["add_entry_content"]
         let save = app.buttons["home_v2_log_sheet_save"]
-        XCTAssertTrue(scroll.waitForExistence(timeout: 5))
-        let lowerBound = save.exists ? save.frame.minY : scroll.frame.maxY
+        XCTAssertTrue(scroll.exists || scroll.waitForExistence(timeout: 5))
+        let frame = scroll.frame
+        let lowerBound = save.exists ? save.frame.minY : frame.maxY
         let viewport = CGRect(
-            x: scroll.frame.minX, y: scroll.frame.minY, width: scroll.frame.width,
-            height: max(0, min(scroll.frame.maxY, lowerBound) - scroll.frame.minY)
-        )
+            x: frame.minX, y: frame.minY, width: frame.width,
+            height: max(0, min(frame.maxY, lowerBound) - frame.minY))
         XCTAssertGreaterThan(viewport.height, 88)
         let attempts = scrollToContain(option, in: viewport, app: app)
         XCTAssertTrue(option.isEnabled)

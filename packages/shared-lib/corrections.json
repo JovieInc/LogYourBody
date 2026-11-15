@@ -8498,5 +8498,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "body-fat-sheet-ready-controls-avoid-polling-delay",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43651466534",
+    "correction": "LYB-214: The latest diagnostic on main passes the body-fat check-in but the largest-text editor crosses its 120-second execution allowance while reopening the saved DEXA method. Run 43651466534 repeatedly waits one second for already-present sheet controls and resolves the same scroll frame five times per viewport. A runner restart follows the timeout.",
+    "mechanization": "Extend the existing recovery-readiness audit to the two repeated Home sheet helpers. Accept an already-present control immediately while retaining the original bounded wait for delayed or missing controls, and capture each scroll frame once per viewport calculation. Extend the existing required launch UI audit mutation suite to reject eager polling, removed or zero waits, reversed or mismatched readiness checks and unconditional success for all four sheet waits. The regression fails on the previous native helper and passes after the repair. Preserve all seven diagnostic selectors, product assertions, screenshots, 120-second per-test allowance, command limits, one-attempt policy and nonqualifying evidence contract. Machine: built scripts/ios/launch_ui_dated_stats_audit.py. The harness owns push and PR operations; final-head macOS diagnostic execution remains required.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing native sheet helpers own repeated readiness waits and viewport construction. Short-circuiting present controls prevents avoidable polling by construction without accepting absent controls or changing the geometry assertions. The existing required audit prevents regression across these helpers."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift",
+      "anchor": "XCTAssertTrue(scroll.exists || scroll.waitForExistence(timeout: 8))"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
