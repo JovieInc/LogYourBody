@@ -8516,5 +8516,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "ci-lyb-382975123-launch-quality-launch-quality-native-chat-batch",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43665640050/job/132665283020",
+    "correction": "LYB-160: the post-merge launch-quality UI command times out at 1800 seconds after 42 passing cases; the same-commit retry passes all 45. Synthetic chat scenarios spend 84 to 97 seconds repeatedly dispatching native character input and resolving keyboard, focus and value. Preserve exact-question verification, partial-input recovery, all selectors, deadlines, coverage and retry rules. The harness owns push and PR operations.",
+    "mechanization": "Try focused native batch input once for an empty synthetic composer, then reuse the existing bounded character-by-character prefix recovery when native input is partial or incorrect. Verify the exact complete question before Send, accepting committed text immediately and retaining the delayed predicate wait. Extend the existing required launch UI audit and discovered behavior suite with mutations for missing batch input, wrong input, unfocused typing, lost recovery and incorrect readback. The new regression fails against the previous Swift helper and all 70 audit behavior cases pass after the fix. Native timing and execution on the final head remain unverified on Linux. The harness must include exactly one PR-body line: Machine: built apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing shared synthetic chat helper can avoid per-character native dispatches on the normal path by construction. Exact readback and the retained bounded prefix repair prevent partial native input from being submitted, while the existing required audit prevents regression."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "let addition = attempt == 0 && current.isEmpty"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
