@@ -112,6 +112,8 @@ def check_recovery_readiness(root, violations, violation_cls):
         ("MesocycleCanvasUITests.swift", "send", (8, 8)),
         ("MesocycleCanvasUITests.swift", "tap", (8,)),
         ("MesocycleCanvasUITests.swift", "revealReadback", (4,)),
+        ("HomeV2LayoutUITests.swift", "assertSheetControlReachable", (8, 5)),
+        ("HomeV2LayoutUITests.swift", "selectSheetChoice", (5, 5)),
     )
     assertion = re.compile(
         r'XCTAssertTrue\((.+?)\.exists\s*\|\|\s*\1\.waitForExistence\(timeout: (\d+)\)'
