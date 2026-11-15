@@ -78,6 +78,21 @@ def check(root: Path, app_dir: Path, violations: list, function_body, violation)
         "submitSyntheticChatQuestion",
         "enteredSyntheticQuestion",
     )
+    batch = re.compile(
+        r'let addition = attempt == 0 && current\.isEmpty\s*'
+        r'\? \[question\] : syntheticQuestionInsertion\(current: current, question: question\)\.map\(String\.init\)'
+    )
+    readback = re.compile(
+        r'complete = composer\.value as\? String == question\s*'
+        r'\|\| XCTWaiter\.wait\(for: \[entered\], timeout: timeout\) == \.completed'
+    )
+    if (not batch.search(loop) or not readback.search(loop) or "for attempt in 0..<3" not in loop
+            or "prefix.append(contentsOf: character)" not in loop):
+        violations.append(violation(
+            check="chat.synthetic_batch_before_recovery",
+            file=str(ui_tests.relative_to(root)), line=1,
+            detail="Try focused native batch input once, verify exact text, and retain bounded prefix recovery for partial input.",
+        ))
     character = loop.split("for character in addition", 1)[-1] if "for character in addition" in loop else ""
     type_at = character.find("typeText(")
     focus_at = character.find("keyboard.exists")

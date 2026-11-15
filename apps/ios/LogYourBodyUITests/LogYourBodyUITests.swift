@@ -3512,18 +3512,17 @@ final class LogYourBodyUITests: XCTestCase {
     private func submitSyntheticChatQuestion(in app: XCUIApplication) {
         let composer = app.textFields["chat_composer"]
         let question = "Synthetic full-turn question"
-        // Launch Quality run 40189917522 kept only "S" after one typeText while
-        // the app was still settling. Top up a prefix; never send anything else.
+        // Try native batch input once, then repair partial input; never send a partial question.
         var complete = false
         for attempt in 0..<3 {
             let current = enteredSyntheticQuestion(in: composer)
             if current != question {
                 // A center tap in a short draft can leave the caret before the
                 // committed prefix. The trailing edge puts it after that text.
-                let addition = syntheticQuestionInsertion(current: current, question: question)
+                let addition = attempt == 0 && current.isEmpty
+                    ? [question] : syntheticQuestionInsertion(current: current, question: question).map(String.init)
                 var prefix = current
-                // Acknowledge each prefix while the simulator keyboard connects.
-                // Run 42354066867 kept "S" and then lost keyboard focus before "y".
+                // Acknowledge each prefix and recover lost keyboard focus (run 42354066867).
                 let keyboard = app.keyboards.firstMatch
                 for character in addition {
                     if !keyboard.exists {
@@ -3545,7 +3544,7 @@ final class LogYourBodyUITests: XCTestCase {
                     if String(character) == XCUIKeyboardKey.delete.rawValue {
                         prefix = String(prefix.dropLast())
                     } else {
-                        prefix.append(character)
+                        prefix.append(contentsOf: character)
                     }
                     if prefix.isEmpty { continue }
                     let received = XCTNSPredicateExpectation(
@@ -3559,7 +3558,8 @@ final class LogYourBodyUITests: XCTestCase {
                 predicate: NSPredicate(format: "value == %@", question), object: composer
             )
             let timeout: TimeInterval = attempt == 0 ? 8 : 4
-            complete = XCTWaiter.wait(for: [entered], timeout: timeout) == .completed
+            complete = composer.value as? String == question
+                || XCTWaiter.wait(for: [entered], timeout: timeout) == .completed
             if complete { break }
         }
         if !complete {

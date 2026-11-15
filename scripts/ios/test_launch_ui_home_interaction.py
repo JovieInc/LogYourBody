@@ -12,6 +12,29 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class HomeInteractionAuditTests:
+    def test_synthetic_batch_retains_focus_exact_readback_and_partial_input_recovery(self):
+        destination = self.root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        source = (ROOT / destination.relative_to(self.root)).read_text()
+        destination.write_text(source)
+        self.assertEqual(self.run_audit()[0], 0)
+        for before, after in (
+            ("attempt == 0 && current.isEmpty", "false"),
+            ("attempt == 0 && current.isEmpty", "attempt == 0"),
+            ("? [question] : syntheticQuestionInsertion", '? ["S"] : syntheticQuestionInsertion'),
+            (".map(String.init)", ""),
+            ("prefix.append(contentsOf: character)", "prefix = question"),
+            ("for attempt in 0..<3", "for attempt in 0..<1"),
+            ("complete = composer.value as? String == question", "complete = true"),
+            ("|| XCTWaiter.wait(for: [entered], timeout: timeout) == .completed", "|| true"),
+        ):
+            with self.subTest(before=before):
+                self.assertIn(before, source)
+                destination.write_text(source.replace(before, after, 1))
+                self.assert_rejected("chat.synthetic_batch_before_recovery")
+        destination.write_text(source)
+        self.assertEqual(self.run_audit()[0], 0)
+
     def test_recovery_helpers_accept_ready_controls_and_retain_delayed_failure(self):
         from launch_ui_dated_stats_audit import check_recovery_readiness, _function_body
         from test_launch_ui_audit_support import AUDIT
