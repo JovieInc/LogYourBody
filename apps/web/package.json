@@ -133,7 +133,7 @@
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
-    "playwright": "^1.63.0",
+    "playwright": "^1.65.0",
     "postcss": "^8.5.30",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",

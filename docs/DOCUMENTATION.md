@@ -135,7 +135,7 @@ lock and unrelated edits remain untouched.
 It then stages the lockfile and source map, refusing unresolved source conflicts,
 unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift. It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.
-Both dependency modes also refuse ignored npmrc files, pnpm hooks and patches;
+Both dependency modes also refuse ignored workspace configuration, npmrc files, pnpm hooks and patches;
 configuration inside installed `node_modules` and generated `.next` build output
 is excluded from this preflight. Next.js-generated manifests are preserved.
 Both dependency modes check pnpm hooks (`.pnpmfile.cjs`), workspace `.npmrc`
