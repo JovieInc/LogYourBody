@@ -115,10 +115,11 @@ def union_project(root):
 def assert_no_local_dependency_inputs(root, inputs):
     # Ignored hooks, npmrc files and patches are still local-only resolver inputs.
     # Ignored workspace manifests are still local-only resolver inputs.
+    # Ignored workspace configuration must not alter package discovery.
     for options, label, paths in [
         ([], "untracked", inputs),
         (["--ignored"], "ignored", [
-            ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
+            "pnpm-workspace.yaml", ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
             "package.json", "**/package.json",
             ":(glob,exclude)**/node_modules/**", ":(glob,exclude)**/.next/**",
         ]),

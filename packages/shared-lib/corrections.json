@@ -8534,5 +8534,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-ignored-workspace-configuration",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1809",
+    "correction": "PR #1809, fix-red-1423773703 occurrence 45: merge origin/main without rebasing, preserve the Playwright 1.65.0 update, and repair the stale source map reported by Detect Changes and parity. CI Summary reflects that failure; Vercel separately reports Deployment was blocked. Extend and use the existing dependency-repair machine, leaving pushes and PR edits to the harness.",
+    "mechanization": "Extend the existing ignored-input preflight to refuse an ignored pnpm-workspace.yaml before invoking pnpm in both dependency repair modes. Two real-Git regressions fail before the extension and pass afterward, proving artifacts and index remain unchanged, local workspace configuration survives refusal, and retry remains idempotent after that local input is removed. The existing required Detect Changes pre-commit-lint suite imports these cases. Use the extended --verify-lockfile helper to verify the unchanged bot lockfile and regenerate the staged source map. The harness must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py. No CI or provider gate is relaxed; Vercel's provider block still needs external verification.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency-repair preflight owns pnpm's local resolution inputs. Rejecting ignored workspace configuration prevents package discovery from using configuration absent from the reviewed index and CI checkout."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Ignored workspace configuration must not alter package discovery."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
