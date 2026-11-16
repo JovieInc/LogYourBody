@@ -80,6 +80,10 @@
       "purpose": "Local manifest or workflow; review related instructions when changed"
     },
     {
+      "path": "pnpm-lock.yaml",
+      "purpose": "Resolved workspace dependencies; regenerate after dependency updates"
+    },
+    {
       "path": ".github/workflows/repository-docs-shadow.yml",
       "purpose": "Nonblocking parity qualification"
     },

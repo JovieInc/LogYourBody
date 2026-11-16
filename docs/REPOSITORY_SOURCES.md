@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `5a86db70a76868c2f76cb3dd120dc88b11ce8a5af13d8299251cb433908ec255`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `3f705e2202f65f990714e9baa10856603691d295b802627f4dbd3df1e40b686d`)
 
 ### `apps/web/package.json`: engines
 
@@ -104,7 +104,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-tabs": "^1.1.22",
   "@radix-ui/react-toast": "^1.3.1",
   "@radix-ui/react-toggle": "^1.2.1",
-  "@radix-ui/react-toggle-group": "^1.1.19",
+  "@radix-ui/react-toggle-group": "^1.2.1",
   "@radix-ui/react-tooltip": "^1.3.0",
   "@radix-ui/react-visually-hidden": "^1.2.13",
   "@sentry/nextjs": "^11.9.0",
@@ -387,6 +387,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 ```
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fc5a43b2fed86c3144518403ef49c0b5e2f5709099b2233d7c3db4a4d2f0ae5b`)
+- `pnpm-lock.yaml` — Resolved workspace dependencies; regenerate after dependency updates (SHA-256 `cef220b893137f6fc1b469f2c4eec3ad3e9833a1a20606b405948819b1a9c28a`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
 - `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `fa138ca30add587cd114b29291e06695c0a21f5ac52e899d527b34ea697a51ea`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)

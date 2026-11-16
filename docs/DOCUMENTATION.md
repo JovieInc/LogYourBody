@@ -84,6 +84,8 @@ existing lockfile with pinned Corepack pnpm (frozen, offline, lockfile-only,
 lifecycle scripts disabled) before regenerating and staging only the source map.
 It retains the refusal of unstaged dependency/output edits and pinned-source drift
 without re-resolving unrelated dependencies.
+The source registry also fingerprints `pnpm-lock.yaml`, so lockfile-only updates
+must refresh the projection even when no package manifest changes.
 
 If dependency release notes contain HTML code spans that the mention guard
 misreads, run `python3 scripts/resolve-repository-docs.py --dependency-pr-body body.md`
