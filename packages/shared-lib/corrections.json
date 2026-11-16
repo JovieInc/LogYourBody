@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-ignored-workspace-configuration",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1811",
+    "correction": "PR #1811 repair, fix-red-1423773703 occurrence 47 in 14 days: merge origin/main without rebasing, preserve the Next.js 15.5.29 update, repair stale source-map failures in Detect Changes and parity, and extend the existing repair machine. CI Summary reflects the Detect Changes failure. Vercel reports Deployment was blocked; its details API returns 403 missing an authentication token. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing dependency repair preflight to reject ignored pnpm-workspace.yaml files before frozen verification and before artifact writes. Six real-Git regressions fail against the previous helper for both dependency modes at preflight, verification and rendering. The extended cases preserve local inputs, original artifacts and the index, then retry successfully and remain idempotent. The existing required Detect Changes pre-commit suite executes these tests. Use the extended --verify-lockfile helper to retain the bot lockfile resolutions and regenerate source parity. The required origin/main merge is already up to date. The harness must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py. The external Vercel block remains unverified; no provider or CI control is relaxed.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency repair boundary owns resolver-input preflight and repeats it after verification and rendering. Including ignored workspace configuration prevents local-only dependency resolution inputs from being certified and staged by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "\"package.json\", \"**/package.json\", \"pnpm-workspace.yaml\","
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "launch-recovery-readiness-avoids-redundant-polling",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43370783065/job/131706803096",
     "correction": "PR #1798 repair, fix-red-5df69c1e5f occurrence 15 in 14 days: merge origin/main without rebasing, retain Addressable 2.9.1, inspect failed checks, repair Launch Quality and extend the existing machine. The unit suite passes; the UI command reaches its 1800-second cap after 43 passing cases, while repeated recovery and canvas helpers spend one second polling already present controls. CI Summary reflects that timeout. Vercel reports Deployment was blocked; its details API returns 403 missing an authentication token. The harness owns pushing and PR updates.",

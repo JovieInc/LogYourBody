@@ -113,8 +113,8 @@ function conflictedProjection(t, sourceConflict = false) {
 
 for (const mode of ['--refresh-lockfile', '--verify-lockfile']) {
   for (const phase of ['verification', 'rendering']) {
-    for (const [state, input] of [['untracked', '.pnpmfile.cjs'], ['ignored', 'apps/web/.npmrc']]) {
-      test(`dependency repair ${mode} refuses new ${state} inputs during ${phase}`, (t) => {
+    for (const [state, input] of [['untracked', '.pnpmfile.cjs'], ['ignored', 'apps/web/.npmrc'], ['ignored', 'pnpm-workspace.yaml']]) {
+      test(`dependency repair ${mode} refuses new ${state} ${input} inputs during ${phase}`, (t) => {
         const f = fixture(t, '.npmrc', 'staged');
         if (state === 'ignored') {
           writeFileSync(join(f.root, '.gitignore'), `${input}\n`);
@@ -365,7 +365,7 @@ if not marker.exists():
       assert.equal(f.git('ls-files', '--stage'), repairedIndex);
     });
   }
-  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch', 'apps/local-only/package.json']) {
+  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch', 'apps/local-only/package.json', 'pnpm-workspace.yaml']) {
     test(`dependency repair ${mode} refuses ignored ${input} before invoking pnpm`, (t) => {
       const f = fixture(t, input, 'untracked');
       writeFileSync(join(f.root, '.gitignore'), `${input}\nnode_modules/\n.next/\n`);
