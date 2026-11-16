@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `5a86db70a76868c2f76cb3dd120dc88b11ce8a5af13d8299251cb433908ec255`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `4f0f2b0bbc2fb27b8d1a0e8b0679abfffcdc0e2ac7c62b11595fdaa90f9dfe08`)
 
 ### `apps/web/package.json`: engines
 
@@ -131,7 +131,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "js-yaml": "5.4.3",
   "lodash": "^4.18.1",
   "lucide-react": "^1.55.0",
-  "next": "15.5.28",
+  "next": "15.5.29",
   "next-themes": "^0.4.6",
   "openai": "^7.38.0",
   "pdf-lib": "^1.17.1",

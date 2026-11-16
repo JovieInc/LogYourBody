@@ -119,7 +119,7 @@ def assert_no_local_dependency_inputs(root, inputs):
         ([], "untracked", inputs),
         (["--ignored"], "ignored", [
             ".npmrc", "**/.npmrc", ".pnpmfile.cjs", "**/.pnpmfile.cjs", "patches/**",
-            "package.json", "**/package.json",
+            "package.json", "**/package.json", "pnpm-workspace.yaml",
             ":(glob,exclude)**/node_modules/**", ":(glob,exclude)**/.next/**",
         ]),
     ]:
