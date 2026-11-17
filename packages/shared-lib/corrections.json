@@ -8552,5 +8552,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-ignored-lockfile",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1808",
+    "correction": "PR #1808, fix-red-1423773703 occurrence 21: merge origin/main without rebasing, preserve the navigation-menu 1.4.1 bump, and repair stale source parity reported by Detect Changes and parity. CI Summary reflects that failure; Vercel separately reports Deployment was blocked. Extend and use the dependency-repair machine; the harness owns pushes and PR edits.",
+    "mechanization": "Extend the existing dependency-input preflight to refuse an ignored pnpm-lock.yaml before invoking pnpm in both repair modes. The two real-Git regressions fail before this extension and pass afterward, preserving the index, lockfile, source map and local input on refusal, then proving retry and idempotence after staging the reviewed lockfile. The existing required Detect Changes pre-commit-lint suite imports these cases. Use the extended --verify-lockfile helper to verify the merged lockfile without changing resolutions and refresh the source map. The harness must include exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py. No CI or deployment gate is relaxed; Vercel requires fresh external evidence after push.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency repair preflight owns local resolver inputs. Rejecting an ignored lockfile prevents frozen verification from trusting resolutions absent from the reviewed index and CI checkout, and refuses refresh before pnpm can mutate artifacts."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Ignored lockfiles must not supply unreviewed resolutions."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
