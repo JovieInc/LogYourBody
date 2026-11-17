@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `5a86db70a76868c2f76cb3dd120dc88b11ce8a5af13d8299251cb433908ec255`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `6b5264c2ab1e207a342ccef78496aa70e861e3f1805a13c20a39a2b418706b12`)
 
 ### `apps/web/package.json`: engines
 
@@ -91,7 +91,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-hover-card": "^1.1.24",
   "@radix-ui/react-label": "^2.1.15",
   "@radix-ui/react-menubar": "^1.2.1",
-  "@radix-ui/react-navigation-menu": "^1.2.22",
+  "@radix-ui/react-navigation-menu": "^1.4.1",
   "@radix-ui/react-popover": "^1.1.23",
   "@radix-ui/react-progress": "^1.2.1",
   "@radix-ui/react-radio-group": "^1.5.1",
@@ -182,7 +182,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "eslint-plugin-jsx-a11y": "^6.10.2",
   "jest": "^30.5.2",
   "jest-environment-jsdom": "^30.5.2",
-  "playwright": "^1.63.0",
+  "playwright": "^1.65.0",
   "postcss": "^8.5.30",
   "tailwindcss": "^4.3.3",
   "tsx": "^4.23.15",
