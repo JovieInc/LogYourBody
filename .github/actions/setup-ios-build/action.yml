@@ -2,9 +2,9 @@ name: 'Setup iOS Build Environment'
 description: 'Install and cache iOS build tools (SwiftLint, xcbeautify)'
 inputs:
   xcode-version:
-    description: 'Xcode version to use'
+    description: 'Must be 27.1; the shared pin rejects other versions'
     required: false
-    default: '16.1'
+    default: '27.1'
   working-directory:
     description: 'Working directory for iOS project'
     required: false
@@ -21,12 +21,16 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    # Self-hosted Macs keep their selected Xcode: setup-xcode needs sudo.
-    - name: Setup Xcode
-      if: runner.environment == 'github-hosted'
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: ${{ inputs.xcode-version }}
+    - name: Pin Xcode 27.1 (all runners)
+      shell: bash
+      env:
+        REQUESTED_XCODE_VERSION: ${{ inputs.xcode-version }}
+      run: |
+        if [[ "$REQUESTED_XCODE_VERSION" != '27.1' ]]; then
+          echo '::error::setup-ios-build requires Xcode 27.1; alternate toolchains are not supported.'
+          exit 1
+        fi
+        bash "$GITHUB_WORKSPACE/.github/scripts/pin-xcode-27.sh"
 
     - name: Cache Homebrew packages
       if: runner.environment == 'github-hosted'

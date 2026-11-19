@@ -116,6 +116,12 @@ end
 
   desc "Build and upload to TestFlight (preview branch - beta)"
   lane :beta do
+    beta_archive
+    beta_upload
+  end
+
+  desc "Archive beta without uploading (CI SDK guard runs next)"
+  lane :beta_archive do
     # Ensure we have a clean state
     clean_build_artifacts
     
@@ -138,10 +144,27 @@ end
       clean_artifacts: true
     )
     
-    # Upload to TestFlight
+    # Lane context is process-local; retain artifact paths for beta_upload's
+    # separate CI invocation, including Sentry and clean_build_artifacts.
+    artifact_context = lane_context.select do |key, _|
+      %w[IPA_OUTPUT_PATH DSYM_OUTPUT_PATH XCODEBUILD_ARCHIVE GENERATED_PLIST_PATH].include?(key.to_s)
+    end
+    File.write(File.expand_path('../build/beta-archive.json', __dir__), JSON.generate(
+      output_path: build_result[:output_path], artifact_context: artifact_context
+    ))
+  end
+
+  desc "Upload the guarded beta archive to TestFlight"
+  lane :beta_upload do
+    setup_app_store_connect_api
+    receipt_path = File.expand_path('../build/beta-archive.json', __dir__)
+    receipt = JSON.parse(File.read(receipt_path))
+    receipt.fetch('artifact_context').each { |key, value| lane_context[key.to_sym] = value }
+
+    # Upload options are unchanged from the combined beta lane.
     upload_to_testflight(
       **testflight_upload_options.call(
-        ipa: build_result[:output_path],
+        ipa: receipt.fetch('output_path'),
         groups: ["Beta Testers"],
         distribute_external: true # Beta includes external testers
       )
@@ -153,6 +176,7 @@ end
 
     # Clean up
     clean_build_artifacts
+    File.delete(receipt_path) if File.exist?(receipt_path)
     notify_success(context: 'beta')
   end
 

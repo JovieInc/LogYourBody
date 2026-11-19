@@ -39,6 +39,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v6
 
+    - name: Pin Xcode 27.1 (Swift only)
+      if: matrix.language == 'swift'
+      shell: bash
+      run: bash .github/scripts/pin-xcode-27.sh
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v4
       with:
@@ -50,7 +55,7 @@ jobs:
       if: matrix.language == 'swift'
       uses: ./.github/actions/setup-ios-build
       with:
-        xcode-version: '16.1'
+        xcode-version: '27.1'
         working-directory: 'apps/ios'
         create-config-files: 'true'
 
