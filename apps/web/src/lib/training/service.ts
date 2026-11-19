@@ -2,6 +2,7 @@ import type { TrainingMutationAdmission } from '@/lib/ports/training-mutations';
 import { learnedExerciseSwaps, type ExerciseSwapRecord } from './selection-learning';
 export { learnedExerciseSwaps, type ExerciseSwapRecord } from './selection-learning';
 import { exerciseSelectionEnabled } from './selection';
+import { latestSwapState, readNextPrescriptionExercise } from './swap-persistence';
 import {
   captureTrainingAdmission,
   requireAdmittedSetup,
@@ -355,6 +356,36 @@ type SessionRecord = NativeProductRecord & {
   recoveryExerciseIds?: string[];
 };
 
+/** Applies one stored swap, or the exercise restored by rollback, to a built session. */
+function withPersistedSwap(
+  session: Session,
+  sessions: readonly NativeProductRecord[],
+  setup: TrainingProgramSetup,
+  logs: SetLog[],
+): Session {
+  const state = latestSwapState(sessions, setup.id);
+  if (!state || session.safetyStop) return session;
+  let changed = false;
+  const exercises = session.exercises.map((exercise) => {
+    const nextId = readNextPrescriptionExercise(exercise.id, state);
+    if (nextId === exercise.id) return exercise;
+    const variant = catalogVariantById(nextId);
+    if (!variant || variant.primaryMuscle !== exercise.primaryMuscle) return exercise;
+    if (setup.excludedVariantIds?.includes(nextId)) return exercise;
+    if (setup.delegated && !eligibleForProgram(nextId, setup.delegated.inputs)) return exercise;
+    if (
+      !state.rolledBack &&
+      !isEligibleVariant(variant, { available: new Set(state.confirmedEquipment) })
+    )
+      return exercise;
+    const swapped = swappedPrescription(exercise, nextId, logs, exercise.targetRir);
+    if (!swapped) return exercise;
+    changed = true;
+    return swapped;
+  });
+  return changed ? { ...session, exercises } : session;
+}
+
 export async function getOrCreateNextWorkout(input: {
   records: NativeProductRecordsPort;
   subject: string;
@@ -689,17 +720,22 @@ export async function getOrCreateNextWorkout(input: {
     // The retained snapshot stays on engine exercise ids so set counts still match.
     // Block swaps are applied after that and own the variant's progression.
     const initialPrescription = initial ?? (!adjusted.safetyStop ? adjusted : undefined);
-    const prescribed = applyConfiguredVariants(
-      applyExerciseSwaps(
-        adjusted,
-        snapshot.swaps.filter(
-          (swap) =>
-            swap.programSetupId === setup.id &&
-            swap.blockId === activeRecord!.blockId &&
-            (!setup.delegated || eligibleForProgram(swap.toVariantId, setup.delegated.inputs)),
+    const prescribed = withPersistedSwap(
+      applyConfiguredVariants(
+        applyExerciseSwaps(
+          adjusted,
+          snapshot.swaps.filter(
+            (swap) =>
+              swap.programSetupId === setup.id &&
+              swap.blockId === activeRecord!.blockId &&
+              (!setup.delegated || eligibleForProgram(swap.toVariantId, setup.delegated.inputs)),
+          ),
+          completedLogs,
         ),
+        setup,
         completedLogs,
       ),
+      periodSessions,
       setup,
       completedLogs,
     );
@@ -748,8 +784,13 @@ export async function getOrCreateNextWorkout(input: {
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
       decision,
     };
-  const session = applyConfiguredVariants(
-    applyExerciseSwaps(planned, blockSwaps, completedLogs),
+  const session = withPersistedSwap(
+    applyConfiguredVariants(
+      applyExerciseSwaps(planned, blockSwaps, completedLogs),
+      setup,
+      completedLogs,
+    ),
+    periodSessions,
     setup,
     completedLogs,
   );
