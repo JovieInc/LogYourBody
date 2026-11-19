@@ -8657,5 +8657,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "lyb-64-installed-evidence-nonpassing-traces",
+    "source": "https://linear.app/jovie/issue/LYB-64",
+    "correction": "LYB-64 requires failed, skipped, timed-out, unavailable and stale native coverage never to be reported as passing. The installed-build xcresult adapter accepted a passing trace while discarding a non-passing repetition and manufactured negative retry and infrastructure-skip accounting when those fields were absent.",
+    "mechanization": "Extend the existing installed-build xcresult adapter to reject every non-passing trace and require explicit negative retry and infrastructure-skip accounting. Its existing required shared-lib suite runs a deliberate-red regression that fails on the previous adapter and passes after repair. This is evidence-accounting protection only; native, installed-device and TestFlight certification remain unverified. Machine: built packages/shared-lib/src/installed-build-xcresult.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing receipt adapter owns conversion of native traces and run accounting into certification evidence and can refuse incomplete or non-passing inputs before emitting a receipt."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/installed-build-xcresult.ts",
+      "anchor": "non-passing-trace:"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
