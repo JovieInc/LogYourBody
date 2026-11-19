@@ -1,11 +1,21 @@
 # iOS Performance Baseline & Instrumentation
 
-This document describes the DEBUG-only performance instrumentation added in the
+This document describes the performance instrumentation added in the
 "rock solid & blazing fast" campaign (Phase 0) and how to capture the baseline
 numbers that later phases must not regress.
 
-All instrumentation is compiled out of release builds — it lives behind `#if DEBUG`
-and, for the frame monitor, an explicit launch flag. There is **zero shipping overhead**.
+`PerfSignpost` compiles only into an opt-in trace build (`LYB_PERF_TRACE`).
+Checked-in Debug and Release configurations do not set that flag, so the
+App Store binary does not contain the signposts. `LaunchMetrics` logging and
+`FrameHitchMonitor` stay behind `#if DEBUG`; the hitch monitor also requires
+`-lybPerfHitchMonitor` or `LYB_PERF_HITCH_MONITOR=1`.
+
+Per-surface signpost names, local-acknowledgement points, and proposed budgets
+live in [`scripts/ios/swift-performance-contract.json`](../../../../scripts/ios/swift-performance-contract.json).
+Those budgets are targets (synchronous UI work under 5ms where feasible,
+event-to-feedback p95 under 100ms, hitch ceiling 10ms/s). Current numbers stay
+blank until a physical-device receipt exists. A missing device receipt is
+unverified. The static guard is `scripts/ios/swift-performance-guard.py`.
 
 ## What's instrumented
 
@@ -46,11 +56,11 @@ Call `FrameHitchMonitor.shared.flush(label:)` after a measured gesture to log
 
 ### Launch → first frame
 
-1. Run the app (Debug) on a physical device (preferred) or simulator.
+1. Run a Debug build that also defines `LYB_PERF_TRACE`, on a physical device (preferred) or simulator.
 2. Filter the Console / unified log for subsystem `co.logyourbody.*`, category `ui`.
 3. Read the `launch→firstDashboardFrame <ms>` line. Take the median of 3 cold launches.
 
-Or in Instruments: profile with the **os_signpost** instrument and read the
+Or in Instruments: profile that trace build with the **os_signpost** instrument and read the
 `launch_first_dashboard_frame` point event.
 
 ### Scrub / scroll hitches

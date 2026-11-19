@@ -1,0 +1,293 @@
+{
+  "schemaVersion": 1,
+  "kind": "lyb.swift-performance-contract",
+  "measurementPolicy": "Budgets below are proposed targets, not measured gates. Synchronous UI work stays under 5ms where feasible, event-to-feedback p95 stays under 100ms, and the hitch ceiling is 10ms/s. Current numbers stay blank until a physical-device receipt exists. CI treats a missing device receipt as unverified.",
+  "signpostBuild": {
+    "compilationCondition": "LYB_PERF_TRACE",
+    "optIn": true,
+    "appStoreRelease": "excluded"
+  },
+  "deviceReceipt": {
+    "path": "scripts/ios/swift-performance-device-receipt.json",
+    "missingStatus": "unverified",
+    "physicalPassRequires": [
+      "device",
+      "os",
+      "buildSha",
+      "thermalState",
+      "refreshRateHz",
+      "fixtureId"
+    ],
+    "refreshRateHz": [60, 120]
+  },
+  "surfaces": [
+    {
+      "id": "launch-auth-onboarding",
+      "name": "launch/auth/onboarding",
+      "signposts": ["launch_first_dashboard_frame"],
+      "localAcknowledgement": "First dashboard frame after auth and onboarding have resolved to a route.",
+      "targets": {
+        "kind": "proposed-target",
+        "synchronousUiWorkMs": 5,
+        "eventToFeedbackP95Ms": 100,
+        "hitchCeilingMsPerSecond": 10,
+        "current": {
+          "synchronousUiWorkMs": null,
+          "eventToFeedbackP95Ms": null,
+          "hitchMsPerSecond": null
+        }
+      },
+      "files": [
+        "apps/ios/LogYourBody/LogYourBodyApp.swift",
+        "apps/ios/LogYourBody/ContentView.swift",
+        "apps/ios/LogYourBody/Views/LoginView.swift",
+        "apps/ios/LogYourBody/Views/MainTabView.swift",
+        "apps/ios/LogYourBody/Views/MainTabViewPolicies.swift",
+        "apps/ios/LogYourBody/Views/LegalConsentView.swift",
+        "apps/ios/LogYourBody/Views/LegalDocumentView.swift",
+        "apps/ios/LogYourBody/Views/BiometricLockView.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/**/*.swift",
+        "apps/ios/LogYourBody/Services/AuthManager.swift",
+        "apps/ios/LogYourBody/Services/LaunchJourney.swift",
+        "apps/ios/LogYourBody/Services/LaunchJourneyUI.swift",
+        "apps/ios/LogYourBody/Services/OnboardingStateManager.swift",
+        "apps/ios/LogYourBody/Services/PreAuthOnboardingStore.swift",
+        "apps/ios/LogYourBody/DesignSystem/Organisms/LoadingScreen.swift",
+        "apps/ios/LogYourBody/DesignSystem/Organisms/BiometricAuthView.swift",
+        "apps/ios/LogYourBody/DesignSystem/Organisms/VerificationForm.swift",
+        "apps/ios/LogYourBody/DesignSystem/Molecules/AuthConsentCheckbox.swift",
+        "apps/ios/LogYourBody/DesignSystem/Molecules/OTPField.swift",
+        "apps/ios/LogYourBody/DesignSystem/Atoms/DSAuthLink.swift"
+      ]
+    },
+    {
+      "id": "home-timeline-photos",
+      "name": "home/timeline/photos",
+      "signposts": [
+        "scrub_select_closest",
+        "scrub_update_animated_values",
+        "dashboard_scrub_refresh",
+        "dashboard_derived_refresh",
+        "timeline_photo_decode"
+      ],
+      "localAcknowledgement": "Timeline cursor selection updates the on-screen hero before any network round trip.",
+      "targets": {
+        "kind": "proposed-target",
+        "synchronousUiWorkMs": 5,
+        "eventToFeedbackP95Ms": 100,
+        "hitchCeilingMsPerSecond": 10,
+        "current": {
+          "synchronousUiWorkMs": null,
+          "eventToFeedbackP95Ms": null,
+          "hitchMsPerSecond": null
+        }
+      },
+      "files": [
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+*.swift",
+        "apps/ios/LogYourBody/Views/DashboardMetricsSection.swift",
+        "apps/ios/LogYourBody/Views/HomeV2/**/*.swift",
+        "apps/ios/LogYourBody/Views/OptimizedProgressPhotoView.swift",
+        "apps/ios/LogYourBody/Views/ProgressPhoto*.swift",
+        "apps/ios/LogYourBody/Views/CameraView.swift",
+        "apps/ios/LogYourBody/Views/BulkPhotoImportView.swift",
+        "apps/ios/LogYourBody/Views/AddEntry*.swift",
+        "apps/ios/LogYourBody/Components/AvatarBodyRenderer.swift",
+        "apps/ios/LogYourBody/Components/GlobalTimelineHeader.swift",
+        "apps/ios/LogYourBody/Components/LiquidGlassTimelineSlider.swift",
+        "apps/ios/LogYourBody/Components/PhotoAnchoredTimelineSlider.swift",
+        "apps/ios/LogYourBody/Components/ProgressTimelineView.swift",
+        "apps/ios/LogYourBody/Components/Dashboard*.swift",
+        "apps/ios/LogYourBody/Components/PersonalBody*.swift",
+        "apps/ios/LogYourBody/Components/PhotographicAppearance*.swift",
+        "apps/ios/LogYourBody/Components/WireframeAvatar*.swift",
+        "apps/ios/LogYourBody/Helpers/Timeline*.swift",
+        "apps/ios/LogYourBody/Helpers/HeroMetricInterpolationCache.swift",
+        "apps/ios/LogYourBody/Helpers/DashboardMetricFormatting.swift",
+        "apps/ios/LogYourBody/Services/TimelineDataProvider.swift",
+        "apps/ios/LogYourBody/Services/GlobalTimelineService.swift",
+        "apps/ios/LogYourBody/Services/ImageCacheService.swift",
+        "apps/ios/LogYourBody/Services/ImageProcessingService.swift",
+        "apps/ios/LogYourBody/Services/Photo*.swift",
+        "apps/ios/LogYourBody/Services/BackgroundPhotoUploadService.swift",
+        "apps/ios/LogYourBody/ViewModels/DashboardViewModel.swift",
+        "apps/ios/LogYourBody/ViewModels/GlobalTimelineStore.swift",
+        "apps/ios/LogYourBody/ViewModels/HomeFocusSelector.swift",
+        "apps/ios/LogYourBody/Utils/FrameHitchMonitor.swift"
+      ]
+    },
+    {
+      "id": "stats-chart-detail",
+      "name": "stats/chart detail",
+      "signposts": ["chart_generate", "chart_generate_async"],
+      "localAcknowledgement": "Chart detail shows the prepared series for the selected metric.",
+      "targets": {
+        "kind": "proposed-target",
+        "synchronousUiWorkMs": 5,
+        "eventToFeedbackP95Ms": 100,
+        "hitchCeilingMsPerSecond": 10,
+        "current": {
+          "synchronousUiWorkMs": null,
+          "eventToFeedbackP95Ms": null,
+          "hitchMsPerSecond": null
+        }
+      },
+      "files": [
+        "apps/ios/LogYourBody/Components/FullMetricChartView.swift",
+        "apps/ios/LogYourBody/Components/FullMetricChartView+*.swift",
+        "apps/ios/LogYourBody/Components/MetricChartView.swift",
+        "apps/ios/LogYourBody/Components/DatedOutcomeStatsView.swift",
+        "apps/ios/LogYourBody/Components/PeriodSelector.swift",
+        "apps/ios/LogYourBody/Helpers/MetricChartDataHelper.swift",
+        "apps/ios/LogYourBody/Services/DatedOutcomeStats.swift",
+        "apps/ios/LogYourBody/Services/DatedOutcomeStore.swift",
+        "apps/ios/LogYourBody/Services/MetricsInterpolationService.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+FullScreenMetricData.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+MetricViews.swift",
+        "apps/ios/LogYourBody/Views/HomeV2/HomeV2TrendChart.swift",
+        "apps/ios/LogYourBody/Views/HomeV2/HomeV2ProgressView.swift"
+      ]
+    },
+    {
+      "id": "share",
+      "name": "share",
+      "signposts": ["share_present"],
+      "localAcknowledgement": "Share card is on screen before the system share sheet is presented.",
+      "targets": {
+        "kind": "proposed-target",
+        "synchronousUiWorkMs": 5,
+        "eventToFeedbackP95Ms": 100,
+        "hitchCeilingMsPerSecond": 10,
+        "current": {
+          "synchronousUiWorkMs": null,
+          "eventToFeedbackP95Ms": null,
+          "hitchMsPerSecond": null
+        }
+      },
+      "files": [
+        "apps/ios/LogYourBody/Components/BodyScoreShareCard.swift",
+        "apps/ios/LogYourBody/Components/ContextualMetricShare.swift",
+        "apps/ios/LogYourBody/Services/BodyScoreShareExport.swift",
+        "apps/ios/LogYourBody/Views/HomeV2/HomeV2ShareView.swift"
+      ]
+    },
+    {
+      "id": "settings",
+      "name": "settings",
+      "signposts": ["settings_present"],
+      "localAcknowledgement": "Preferences root accepts input before any account network call.",
+      "targets": {
+        "kind": "proposed-target",
+        "synchronousUiWorkMs": 5,
+        "eventToFeedbackP95Ms": 100,
+        "hitchCeilingMsPerSecond": 10,
+        "current": {
+          "synchronousUiWorkMs": null,
+          "eventToFeedbackP95Ms": null,
+          "hitchMsPerSecond": null
+        }
+      },
+      "files": [
+        "apps/ios/LogYourBody/SettingsComponents.swift",
+        "apps/ios/LogYourBody/Views/PreferencesView.swift",
+        "apps/ios/LogYourBody/Views/PreferencesView+*.swift",
+        "apps/ios/LogYourBody/Views/ProfileSettings*.swift",
+        "apps/ios/LogYourBody/Views/PreferenceGoal*.swift",
+        "apps/ios/LogYourBody/Views/IntegrationsView.swift",
+        "apps/ios/LogYourBody/Views/SecuritySessionsView.swift",
+        "apps/ios/LogYourBody/Views/HomeV2/HomeV2SettingsCopy.swift",
+        "apps/ios/LogYourBody/Views/DashboardViewLiquid+HomeV2Settings.swift",
+        "apps/ios/LogYourBody/DesignSystem/Organisms/SettingsSectionGroup.swift",
+        "apps/ios/LogYourBody/DesignSystem/Components/SettingsRow.swift",
+        "apps/ios/LogYourBody/DesignSystem/Components/StandardHeader.swift"
+      ]
+    },
+    {
+      "id": "healthkit-import-sync",
+      "name": "HealthKit/import/sync",
+      "signposts": ["health_sync_apply"],
+      "localAcknowledgement": "Imported or synced sample is visible from the local store before cloud acknowledgement.",
+      "targets": {
+        "kind": "proposed-target",
+        "synchronousUiWorkMs": 5,
+        "eventToFeedbackP95Ms": 100,
+        "hitchCeilingMsPerSecond": 10,
+        "current": {
+          "synchronousUiWorkMs": null,
+          "eventToFeedbackP95Ms": null,
+          "hitchMsPerSecond": null
+        }
+      },
+      "files": [
+        "apps/ios/LogYourBody/Services/HealthKitManager.swift",
+        "apps/ios/LogYourBody/Services/HealthKitManager+*.swift",
+        "apps/ios/LogYourBody/Services/HealthSyncCoordinator.swift",
+        "apps/ios/LogYourBody/Services/HealthSyncPresentationStore.swift",
+        "apps/ios/LogYourBody/Services/HealthAnchorStore.swift",
+        "apps/ios/LogYourBody/Services/BulkImportManager.swift",
+        "apps/ios/LogYourBody/Services/RealtimeSyncManager.swift",
+        "apps/ios/LogYourBody/Services/RealtimeSyncManager+*.swift",
+        "apps/ios/LogYourBody/Services/BodySpec*.swift",
+        "apps/ios/LogYourBody/Services/CoreDataManager.swift",
+        "apps/ios/LogYourBody/Services/CoreDataManager+*.swift",
+        "apps/ios/LogYourBody/Services/MetricSourceAdapter.swift",
+        "apps/ios/LogYourBody/Views/DexaPDFImportSheet.swift",
+        "apps/ios/LogYourBody/Views/BodySpecIntegrationView.swift",
+        "apps/ios/LogYourBody/Views/BodySpecIntegrationState.swift",
+        "apps/ios/LogYourBody/Components/HealthSyncStatusView.swift",
+        "apps/ios/LogYourBody/Components/DashboardSyncComponents.swift"
+      ]
+    },
+    {
+      "id": "chat",
+      "name": "chat",
+      "signposts": ["chat_local_turn"],
+      "localAcknowledgement": "Composer shows the local pending turn before the model response.",
+      "targets": {
+        "kind": "proposed-target",
+        "synchronousUiWorkMs": 5,
+        "eventToFeedbackP95Ms": 100,
+        "hitchCeilingMsPerSecond": 10,
+        "current": {
+          "synchronousUiWorkMs": null,
+          "eventToFeedbackP95Ms": null,
+          "hitchMsPerSecond": null
+        }
+      },
+      "files": [
+        "apps/ios/LogYourBody/Services/ChatService.swift",
+        "apps/ios/LogYourBody/Services/VoiceCaptureService.swift",
+        "apps/ios/LogYourBody/Services/VoicePlaybackService.swift",
+        "apps/ios/LogYourBody/Views/ChatSessionState.swift",
+        "apps/ios/LogYourBody/Views/MainTabView.swift"
+      ]
+    },
+    {
+      "id": "paywall-account-export",
+      "name": "paywall/account/export",
+      "signposts": ["paywall_present"],
+      "localAcknowledgement": "Paywall, account, or export surface is interactive before StoreKit or export I/O finishes.",
+      "targets": {
+        "kind": "proposed-target",
+        "synchronousUiWorkMs": 5,
+        "eventToFeedbackP95Ms": 100,
+        "hitchCeilingMsPerSecond": 10,
+        "current": {
+          "synchronousUiWorkMs": null,
+          "eventToFeedbackP95Ms": null,
+          "hitchMsPerSecond": null
+        }
+      },
+      "files": [
+        "apps/ios/LogYourBody/Views/PaywallView.swift",
+        "apps/ios/LogYourBody/Views/DeleteAccountView.swift",
+        "apps/ios/LogYourBody/Views/ExportDataView.swift",
+        "apps/ios/LogYourBody/Views/PreferencesView+AccountSection.swift",
+        "apps/ios/LogYourBody/Services/RevenueCatManager.swift",
+        "apps/ios/LogYourBody/Services/RevenueCatManager+*.swift",
+        "apps/ios/LogYourBody/Utils/ExportCSVBuilder.swift",
+        "apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreAccountCreationView.swift"
+      ]
+    }
+  ]
+}

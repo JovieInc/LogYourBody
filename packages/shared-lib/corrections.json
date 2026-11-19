@@ -8617,5 +8617,27 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "performance-signpost-registry-contract-merge",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1830",
+    "correction": "PR #1830 / LYB-380, fix-red-e3b0c44298 occurrence 114: merge main's opt-in performance tracing with timeline photo instrumentation and retain the decode signpost in the surface contract.",
+    "mechanization": "Extend the required Swift performance audit to reject a missing or nonliteral Swift signpost registry and names absent from the performance contract. Its behavior tests cover missing and valid registrations. The merged checkout failed both the existing call check and the new registry check before the contract entry was added; both pass afterward. The harness owns the PR body and must add exactly one line: Machine: built scripts/ios/swift_performance_scan.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The Swift registry and JSON surface contract are maintained in different languages and cannot share a runtime definition without changing the instrumentation architecture."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing performance audit can compare the literal Swift registry against the contract during the required static audit."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/swift_performance_scan.py",
+      "anchor": "Keep the Swift test registry aligned with the merged performance contract."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
