@@ -105,3 +105,19 @@ enum LaunchMetrics {
         #endif
     }
 }
+
+/// Instruments names for launch and dashboard hot paths. Add a name here before emitting it.
+enum PerfSignpostContract {
+    static let launchRepair: StaticString = "launch_repair"
+
+    static let names: Set<String> = [
+        "launch_first_dashboard_frame",
+        "launch_repair",
+        "scrub_select_closest",
+        "scrub_update_animated_values",
+        "dashboard_scrub_refresh",
+        "dashboard_derived_refresh",
+        "chart_generate",
+        "chart_generate_async"
+    ]
+}

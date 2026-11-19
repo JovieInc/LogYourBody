@@ -422,6 +422,8 @@
 		ADDC47C32E2D89F3003C97E7 /* BackgroundPhotoUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF5C1B52E1CF89E00E3FB4D /* BackgroundPhotoUploadService.swift */; };
 		ADDC47C42E2D89F3003C97E7 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AE72E15FA5C002376C6 /* HealthKitManager.swift */; };
 		ADDC47C52E2D89F3003C97E7 /* LoadingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AE82E15FA5C002376C6 /* LoadingManager.swift */; };
+		B379A0122F20000100AB0002 /* BodyMetricLaunchRepair.swift in Sources */ = {isa = PBXBuildFile; fileRef = B379A0112F20000100AB0001 /* BodyMetricLaunchRepair.swift */; };
+		B379A0142F20000100AB0004 /* BodyMetricLaunchRepairTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B379A0132F20000100AB0003 /* BodyMetricLaunchRepairTests.swift */; };
 		ADDC47C82E2D89F3003C97E7 /* LiquidGlassComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D39B2E24AD30001F82A8 /* LiquidGlassComponents.swift */; };
 		ADDC47C92E2D89F3003C97E7 /* ShakeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE6D3962E24A96A001F82A8 /* ShakeDetector.swift */; };
 		ADDC47CA2E2D89F3003C97E7 /* AppVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD3304BF2E241FE80043C4AC /* AppVersion.swift */; };
@@ -960,6 +962,8 @@
 		A23800012F23800100ABCDE1 /* HealthAnchorStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthAnchorStore.swift; sourceTree = "<group>"; };
 		A23800032F23800100ABCDE2 /* HealthKitManager+Anchors.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "HealthKitManager+Anchors.swift"; path = "HealthKitManager+Anchors.swift"; sourceTree = "<group>"; };
 		AD723AE82E15FA5C002376C6 /* LoadingManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoadingManager.swift; sourceTree = "<group>"; };
+		B379A0112F20000100AB0001 /* BodyMetricLaunchRepair.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyMetricLaunchRepair.swift; sourceTree = "<group>"; };
+		B379A0132F20000100AB0003 /* BodyMetricLaunchRepairTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyMetricLaunchRepairTests.swift; sourceTree = "<group>"; };
 		AD723AEE2E15FA5C002376C6 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		AD723AEF2E15FA5C002376C6 /* Constants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		AD723AFE2E15FA5C002376C6 /* DeleteAccountView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DeleteAccountView.swift; sourceTree = "<group>"; };
@@ -1640,6 +1644,7 @@
 				B12671022F16000100ABCDEF /* BodyScoreHealthKitTriggerTests.swift */,
 				EB121088934BE398599BE39A /* BodyMetricContractTests.swift */,
 				776620205152E0A15A875703 /* BodyMetricLocalDateContractTests.swift */,
+				B379A0132F20000100AB0003 /* BodyMetricLaunchRepairTests.swift */,
 				192238EEFD8161597A0B99AA /* BodyMetricLoggingAndInsightTests.swift */,
 				C639B8116483011892C95543 /* BodyMetricLoggingServiceTests.swift */,
 				533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */,
@@ -1919,6 +1924,7 @@
 				ADF5C1B52E1CF89E00E3FB4D /* BackgroundPhotoUploadService.swift */,
 				AD723AE72E15FA5C002376C6 /* HealthKitManager.swift */,
 				AD723AE82E15FA5C002376C6 /* LoadingManager.swift */,
+				B379A0112F20000100AB0001 /* BodyMetricLaunchRepair.swift */,
 				ADF0A8B02FFD0A0E007C0A5C /* OnboardingStateManager.swift */,
 				ADA6004A2FFDAAAA00ABCDEF /* AnalyticsService.swift */,
 				BF02BFDD936CBA59B3704AA3 /* CoreDataManager+Part01.swift */,
@@ -2693,6 +2699,7 @@
 				B12671032F16000100ABCDEF /* BodyScoreHealthKitTriggerTests.swift in Sources */,
 				022D79AC5B1840BC58FB7D70 /* BodyMetricContractTests.swift in Sources */,
 				1564F129E1D9BAAC5F85C703 /* BodyMetricLocalDateContractTests.swift in Sources */,
+				B379A0142F20000100AB0004 /* BodyMetricLaunchRepairTests.swift in Sources */,
 				8F1D82C327BC8A6B5FB2A6DB /* BodyMetricLoggingAndInsightTests.swift in Sources */,
 				B1F00834695D3233B62404FD /* BodyMetricLoggingServiceTests.swift in Sources */,
 				5AAEA63151156B8F114A0B83 /* BodyRecordReviewConsumerTests.swift in Sources */,
@@ -3004,6 +3011,7 @@
 				ADDC47C32E2D89F3003C97E7 /* BackgroundPhotoUploadService.swift in Sources */,
 				ADDC47C42E2D89F3003C97E7 /* HealthKitManager.swift in Sources */,
 				ADDC47C52E2D89F3003C97E7 /* LoadingManager.swift in Sources */,
+				B379A0122F20000100AB0002 /* BodyMetricLaunchRepair.swift in Sources */,
 				ADF0A8B12FFD0A0E007C0A5C /* OnboardingStateManager.swift in Sources */,
 				ADDC47C82E2D89F3003C97E7 /* LiquidGlassComponents.swift in Sources */,
 				ADDC47C92E2D89F3003C97E7 /* ShakeDetector.swift in Sources */,
