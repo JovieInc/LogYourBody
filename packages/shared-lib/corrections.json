@@ -8595,5 +8595,27 @@
     },
     "level": "static",
     "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "export-snapshot-equatable-and-async-xctest-repair",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44607915041/job/135857884635",
+    "correction": "PR #1827 LYB-383: Launch Quality cannot synthesize Equatable for export snapshots containing non-Equatable DailyLog values. The same test target also places await directly in synchronous XCTest assertion autoclosures.",
+    "mechanization": "Remove unused snapshot equality conformances and await task results before asserting. Extend the existing required native-source evidence suite to reject a direct await as the first argument to an XCTest assertion across both test targets. Its repository regression fails on the original tests and passes after repair. The native compiler remains the authoritative conformance and test build gate. The harness owns PR edits and must add exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Removing unused equality prevents the current invalid conformance, but product code cannot prevent later async expressions in XCTest autoclosures."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required shared-lib suite can detect a direct await as the first XCTest assertion argument before native compilation."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "keeps direct awaits out of XCTest autoclosures in %s"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

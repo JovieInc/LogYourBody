@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
@@ -28,6 +28,33 @@ function checkedTrace(test: string, coverage: string, root: string) {
     timeout: 90_000,
   });
 }
+
+// XCTest's assertion arguments are synchronous autoclosures. Await the value first.
+const directAwaitInXCTestAssertion = (source: string) =>
+  /\bXCT(?:Assert\w*|Unwrap)\s*\(\s*(?:try[?!]?\s+)?await\b/.test(
+    source.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|"""[\s\S]*?"""|"(?:\\[\s\S]|[^"\\])*"/g, ''),
+  );
+
+it('detects direct awaits in XCTest autoclosures and permits awaited locals', () => {
+  expect(directAwaitInXCTestAssertion('XCTAssertTrue(\n try await task.value)')).toBe(true);
+  expect(directAwaitInXCTestAssertion('XCTUnwrap(await value())')).toBe(true);
+  expect(directAwaitInXCTestAssertion('let value = await task.value\nXCTAssertTrue(value)')).toBe(
+    false,
+  );
+  expect(directAwaitInXCTestAssertion('// XCTAssertTrue(await task.value)')).toBe(false);
+});
+
+it.each(['LogYourBodyTests', 'LogYourBodyUITests'])(
+  'keeps direct awaits out of XCTest autoclosures in %s',
+  (target) => {
+    const root = fileURLToPath(new URL(`../../../apps/ios/${target}/`, import.meta.url));
+    const violations = readdirSync(root, { recursive: true })
+      .map(String)
+      .filter((path) => path.endsWith('.swift'))
+      .filter((path) => directAwaitInXCTestAssertion(readFileSync(`${root}/${path}`, 'utf8')));
+    expect(violations, 'Await each result before passing it to an XCTest assertion').toEqual([]);
+  },
+);
 
 it('invalidates native source guards for every app and native test source and build policy', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));

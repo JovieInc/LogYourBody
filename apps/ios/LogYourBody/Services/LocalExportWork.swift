@@ -22,7 +22,7 @@ enum LocalExportFormat: Equatable {
     }
 }
 
-struct ExportValueSnapshots: Equatable {
+struct ExportValueSnapshots {
     var bodyMetrics: [BodyMetrics]
     var dailyLogs: [DailyLog]
 }
@@ -33,7 +33,7 @@ struct ExportValueSnapshotProbe: Equatable {
     var isMainThread: Bool
 }
 
-struct ExportValueSnapshotRead: Equatable {
+struct ExportValueSnapshotRead {
     var snapshots: ExportValueSnapshots
     var probe: ExportValueSnapshotProbe
 }

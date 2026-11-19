@@ -150,12 +150,14 @@ final class LocalExportAndPurchaseAdmissionTests: XCTestCase {
 
         await fulfillment(of: [started], timeout: 2)
         hold.release()
-        XCTAssertTrue(await task.value)
+        let taskResult = await task.value
+        XCTAssertTrue(taskResult)
         XCTAssertFalse(admission.isInFlight)
 
         let next = admission.admit(.restore) { () async -> Bool in true }
         guard case .started(let fresh) = next else { return XCTFail("expected a new flight after abandon") }
-        XCTAssertTrue(await fresh.value)
+        let freshResult = await fresh.value
+        XCTAssertTrue(freshResult)
         XCTAssertFalse(admission.isInFlight)
     }
 
@@ -234,7 +236,8 @@ final class LocalExportAndPurchaseAdmissionTests: XCTestCase {
         XCTAssertEqual(client.purchaseCalls, 1)
         XCTAssertEqual(client.restoreCalls, 0)
         client.releasePurchase(activeCustomer())
-        XCTAssertTrue(await purchase.value)
+        let purchaseResult = await purchase.value
+        XCTAssertTrue(purchaseResult)
     }
 
     private func installSignposts() -> SignpostRecorder {
