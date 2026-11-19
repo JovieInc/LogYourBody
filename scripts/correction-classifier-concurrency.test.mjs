@@ -372,6 +372,20 @@ test('configured git merge unions consecutive correction ledgers and keeps diver
     [rows[2].fingerprint, rows[0].fingerprint, shared.fingerprint],
   );
   assert.equal(git('diff', '--name-only', '--diff-filter=U'), '');
+  const quiet = { log() {}, error: (message) => assert.fail(message) };
+  assert.equal(runClassifier(['--check-merge', root], quiet), 0);
+  const mergedLedger = readFileSync(ledger, 'utf8');
+  writeLedger([rows[2], rows[0]]);
+  git('add', '--', 'packages/shared-lib/corrections.json');
+  const errors = [];
+  assert.equal(runClassifier(['--check-merge', root], {
+    log() {},
+    error: (message) => errors.push(message),
+  }), 1);
+  assert.match(errors.at(-1), /regression: removed (?:rule|receipt)/);
+  writeFileSync(ledger, mergedLedger);
+  git('add', '--', 'packages/shared-lib/corrections.json');
+  assert.equal(runClassifier(['--check-merge', root], quiet), 0);
   git('commit', '-m', 'test: first automatic ledger merge');
   git('switch', 'right');
   writeFileSync(join(root, rows[3].guard.path), rows[3].guard.anchor);
