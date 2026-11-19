@@ -47,7 +47,8 @@ final class BodyMetricLaunchRepairTests: XCTestCase {
         XCTAssertNotEqual(first.repairContextID, Optional(ObjectIdentifier(viewContext)))
         XCTAssertEqual(first.repairConcurrency, Optional(.privateQueueConcurrencyType))
 
-        let repaired = try XCTUnwrap(await storedMetric())
+        let storedAfterFirst = try await storedMetric()
+        let repaired = try XCTUnwrap(storedAfterFirst)
         XCTAssertEqual(repaired.date, Optional(repairedAt))
         XCTAssertEqual(repaired.createdAt, Optional(repairedAt))
         XCTAssertEqual(repaired.updatedAt, Optional(repairedAt))
@@ -62,7 +63,8 @@ final class BodyMetricLaunchRepairTests: XCTestCase {
         XCTAssertFalse(second.didFetchBodyMetrics)
         XCTAssertNil(second.repairContextID)
         XCTAssertFalse(second.repairContextIsViewContext)
-        let afterSkip = try XCTUnwrap(await storedMetric())
+        let storedAfterSkip = try await storedMetric()
+        let afterSkip = try XCTUnwrap(storedAfterSkip)
         XCTAssertEqual(afterSkip.updatedAt, Optional(repairedAt))
         XCTAssertEqual(afterSkip.localDate, repaired.localDate)
         let receiptAfterSkip = try storedReceipt()
@@ -77,7 +79,8 @@ final class BodyMetricLaunchRepairTests: XCTestCase {
         XCTAssertFalse(third.repairContextIsViewContext)
         XCTAssertNotEqual(third.repairContextID, Optional(ObjectIdentifier(viewContext)))
         XCTAssertEqual(third.repairConcurrency, Optional(.privateQueueConcurrencyType))
-        let rerun = try XCTUnwrap(await storedMetric())
+        let storedAfterRerun = try await storedMetric()
+        let rerun = try XCTUnwrap(storedAfterRerun)
         XCTAssertEqual(rerun.localDate, Optional(BodyMetricLocalDate.key(for: repairedAt)))
         XCTAssertEqual(try storedReceipt().generation, nextGeneration)
     }
@@ -101,6 +104,7 @@ final class BodyMetricLaunchRepairTests: XCTestCase {
     private func insertCorruptMetric() async throws {
         let context = manager.persistentContainer.newBackgroundContext()
         let metricID = metricID
+        let repairedAt = repairedAt
         try await context.perform {
             let row = CachedBodyMetrics(context: context)
             row.id = metricID
@@ -110,6 +114,7 @@ final class BodyMetricLaunchRepairTests: XCTestCase {
             row.createdAt = nil
             row.updatedAt = nil
             row.localDate = nil
+            row.lastModified = repairedAt
             try context.save()
         }
     }
