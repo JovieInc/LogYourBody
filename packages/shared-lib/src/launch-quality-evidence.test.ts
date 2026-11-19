@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
+import { savedCacheRowsMissingLastModified } from './saved-cache-row-last-modified';
 
 // The trace CLI swallows SystemExit. Keep coverage while propagating suite failures.
 const driver = `
@@ -28,6 +29,69 @@ function checkedTrace(test: string, coverage: string, root: string) {
     timeout: 90_000,
   });
 }
+
+// XCTest's assertion arguments are synchronous autoclosures. Await the value first.
+const directAwaitInXCTestAssertion = (source: string) =>
+  /\bXCT(?:Assert\w*|Unwrap)\s*\(\s*(?:try[?!]?\s+)?await\b/.test(
+    source.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|"""[\s\S]*?"""|"(?:\\[\s\S]|[^"\\])*"/g, ''),
+  );
+
+it('detects direct awaits in XCTest autoclosures and permits awaited locals', () => {
+  expect(directAwaitInXCTestAssertion('XCTAssertTrue(\n try await task.value)')).toBe(true);
+  expect(directAwaitInXCTestAssertion('XCTUnwrap(await value())')).toBe(true);
+  expect(directAwaitInXCTestAssertion('let value = await task.value\nXCTAssertTrue(value)')).toBe(
+    false,
+  );
+  expect(directAwaitInXCTestAssertion('// XCTAssertTrue(await task.value)')).toBe(false);
+});
+
+it.each(['LogYourBodyTests', 'LogYourBodyUITests'])(
+  'keeps direct awaits out of XCTest autoclosures in %s',
+  (target) => {
+    const root = fileURLToPath(new URL(`../../../apps/ios/${target}/`, import.meta.url));
+    const violations = readdirSync(root, { recursive: true })
+      .map(String)
+      .filter((path) => path.endsWith('.swift'))
+      .filter((path) => directAwaitInXCTestAssertion(readFileSync(`${root}/${path}`, 'utf8')));
+    expect(violations, 'Await each result before passing it to an XCTest assertion').toEqual([]);
+  },
+);
+
+it('saves cached body and daily metrics with required lastModified', () => {
+  const missing = [
+    'func seed() {',
+    ' let metric = CachedBodyMetrics(context: context)',
+    ' let log = CachedDailyMetrics(context: context)',
+    ' try context.save()',
+    '}',
+  ].join('\n');
+  expect(savedCacheRowsMissingLastModified(missing)).toEqual([
+    'seed: metric is saved without lastModified',
+    'seed: log is saved without lastModified',
+  ]);
+  const repaired = missing
+    .replace('let metric = CachedBodyMetrics(context: context)', '$&\n metric.lastModified = date')
+    .replace('let log = CachedDailyMetrics(context: context)', '$&\n log.lastModified = date');
+  expect(savedCacheRowsMissingLastModified(repaired)).toEqual([]);
+  const commented = missing.replace(
+    'try context.save()',
+    '// metric.lastModified = date\n try context.save()',
+  );
+  expect(savedCacheRowsMissingLastModified(commented)).toEqual([
+    'seed: metric is saved without lastModified',
+    'seed: log is saved without lastModified',
+  ]);
+  const root = fileURLToPath(new URL('../../../apps/ios/LogYourBodyTests/', import.meta.url));
+  const violations = readdirSync(root, { recursive: true })
+    .map(String)
+    .filter((path) => path.endsWith('.swift'))
+    .flatMap((path) =>
+      savedCacheRowsMissingLastModified(readFileSync(`${root}/${path}`, 'utf8')).map(
+        (finding) => `${path}: ${finding}`,
+      ),
+    );
+  expect(violations).toEqual([]);
+});
 
 it('invalidates native source guards for every app and native test source and build policy', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));

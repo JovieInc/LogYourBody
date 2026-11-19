@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "uptime-probe-clean-merge-source-map-repair",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44613098410/job/135874773505",
+    "correction": "PR #1828 LYB-386, fix-red-1423773703 occurrence 22: merge main and repair Detect Changes, CI Summary and parity after a bot commit leaves the repository source map stale. The harness owns push and PR updates.",
+    "mechanization": "Extend the existing staged source-map repair to clean automatic merges via the pre-merge-commit hook. When regeneration changes the index, stop the automatic merge because Git has already prepared its tree; review and finish with a normal commit. A real-Git regression checks stale detection, staged repair, refusal to commit the stale tree, and the finished commit. The required Detect Changes test suite executes it. Use the staged resolver for this PR. The harness must add exactly one PR-body line: Machine: built .husky/pre-merge-commit.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The local merge hook can invoke the existing index-safe repair and prevent a stale automatic merge commit, while CI continues to detect bot commits that bypass hooks."
+      }
+    },
+    "guard": {
+      "path": ".husky/pre-merge-commit",
+      "anchor": "Source map refreshed; review the staged merge and run git commit."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "launch-recovery-readiness-avoids-redundant-polling",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43370783065/job/131706803096",
     "correction": "PR #1798 repair, fix-red-5df69c1e5f occurrence 15 in 14 days: merge origin/main without rebasing, retain Addressable 2.9.1, inspect failed checks, repair Launch Quality and extend the existing machine. The unit suite passes; the UI command reaches its 1800-second cap after 43 passing cases, while repeated recovery and canvas helpers spend one second polling already present controls. CI Summary reflects that timeout. Vercel reports Deployment was blocked; its details API returns 403 missing an authentication token. The harness owns pushing and PR updates.",
@@ -8595,5 +8613,49 @@
     },
     "level": "static",
     "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "export-snapshot-equatable-and-async-xctest-repair",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44607915041/job/135857884635",
+    "correction": "PR #1827 LYB-383: Launch Quality cannot synthesize Equatable for export snapshots containing non-Equatable DailyLog values. The same test target also places await directly in synchronous XCTest assertion autoclosures.",
+    "mechanization": "Remove unused snapshot equality conformances and await task results before asserting. Extend the existing required native-source evidence suite to reject a direct await as the first argument to an XCTest assertion across both test targets. Its repository regression fails on the original tests and passes after repair. The native compiler remains the authoritative conformance and test build gate. The harness owns PR edits and must add exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Removing unused equality prevents the current invalid conformance, but product code cannot prevent later async expressions in XCTest autoclosures."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required shared-lib suite can detect a direct await as the first XCTest assertion argument before native compilation."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "keeps direct awaits out of XCTest autoclosures in %s"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "export-snapshot-save-requires-last-modified",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44612154128/job/135872876903",
+    "correction": "PR 1827 LYB-383 Launch Quality run 44612154128 failed testExportSnapshotsComeFromABackgroundContext because the in-memory seed saved CachedBodyMetrics and CachedDailyMetrics without required lastModified. CI Summary failed only because Launch Quality failed.",
+    "mechanization": "Assign lastModified on both seeded rows before save. Extend the existing required launch-quality evidence suite with a source scan that rejects a later saved cache row missing that assignment, including a comment-only assignment. The scan fails on the original seed and passes after the repair, and it accepts a full attribute copy, a delete-before-save, and a forKey assignment. The fetched origin/main is already an ancestor, so the required merge adds no commit. Native execution remains on the Mac runner. The harness owns push and PR edits and must add exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The model already rejects a nil lastModified when the native test saves, but that check does not run until Launch Quality and cannot stop the fixture from being committed."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required shared-lib suite can reject a cached metric save that never assigns lastModified before the native runner starts."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "saves cached body and daily metrics with required lastModified"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

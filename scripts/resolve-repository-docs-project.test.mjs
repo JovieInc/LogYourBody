@@ -90,8 +90,8 @@ for (const variant of ['stale', 'unstaged repair', 'duplicate', 'missing', 'revi
   });
 }
 
-for (const manualEdit of [false, true]) {
-  test(`reviewed digest preserves incoming workflow additions; manual edit: ${manualEdit}`, (t) => {
+for (const variant of ['clean', 'workflow edit', 'project edit']) {
+  test(`reviewed digest preserves incoming workflow additions; ${variant}`, (t) => {
     const f = pinFixture(t);
     f.writeProject('ours-project\n');
     f.generate();
@@ -108,21 +108,25 @@ for (const manualEdit of [false, true]) {
     const merged = 'ours-project\ntheirs-project\n';
     writeFileSync(join(f.root, PROJECT), merged);
     f.git('add', '--', PROJECT);
-    if (manualEdit) {
+    if (variant === 'workflow edit') {
       writeFileSync(workflowPath, `# unreviewed edit\n${readFileSync(workflowPath, 'utf8')}`);
     }
+    if (variant === 'project edit') writeFileSync(join(f.root, PROJECT), 'unreviewed project\n');
     const index = f.git('ls-files', '--stage');
     const workflow = readFileSync(workflowPath);
+    const project = readFileSync(join(f.root, PROJECT));
     const projection = readFileSync(join(f.root, f.output));
     const digest = createHash('sha256').update(merged).digest('hex');
     const result = spawnSync('python3', [
       resolver, '--root', f.root, '--reviewed-project-sha256', digest,
     ], { env, encoding: 'utf8' });
-    if (manualEdit) {
+    if (variant !== 'clean') {
       assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /conflict is not limited to the project pin/);
+      assert.match(result.stderr, variant === 'workflow edit'
+        ? /conflict is not limited to the project pin/ : /unstaged project edits/);
       assert.equal(f.git('ls-files', '--stage'), index);
       assert.deepEqual(readFileSync(workflowPath), workflow);
+      assert.deepEqual(readFileSync(join(f.root, PROJECT)), project);
       assert.deepEqual(readFileSync(join(f.root, f.output)), projection);
     } else {
       assert.equal(result.status, 0, result.stderr);

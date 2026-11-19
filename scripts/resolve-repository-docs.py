@@ -260,6 +260,8 @@ def reviewed_conflicted_pin(root, expected, explicit_audit=None):
         project = staged_bytes(root, DIAGNOSTIC_PROJECT)
     except subprocess.CalledProcessError as error:
         raise ValueError("resolve source conflicts first: " + DIAGNOSTIC_PROJECT) from error
+    if repository_docs.local(root, DIAGNOSTIC_PROJECT).read_bytes() != project:
+        raise ValueError("reviewed project repair refuses unstaged project edits")
     if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", project):
         raise ValueError("resolve staged conflict markers first: " + DIAGNOSTIC_PROJECT)
     assert_merged_project_keeps_parent_files(root, project)
