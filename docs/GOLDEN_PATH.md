@@ -67,3 +67,7 @@ GP7 walks the full journey end-to-end in a single test.
   paywall render on simulator) belongs in the launch-quality gate, not here.
 - **New golden-path stages** (e.g. progress photos becoming core) require updating this doc,
   the suite, and the table above together.
+- **No feature flags on this path** until Linear records a completed golden task by a real
+  external person (company contract v2 §1.16). Changes to these six stages, or to anything they
+  depend on, ship live or stay a draft. The full rule, term map, and Tim-ordered kill-switch
+  exemption live in `AGENTS.md` (Feature Flags & Safety). Do not invent a second copy here.
