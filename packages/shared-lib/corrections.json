@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "uptime-probe-clean-merge-source-map-repair",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44613098410/job/135874773505",
+    "correction": "PR #1828 LYB-386, fix-red-1423773703 occurrence 22: merge main and repair Detect Changes, CI Summary and parity after a bot commit leaves the repository source map stale. The harness owns push and PR updates.",
+    "mechanization": "Extend the existing staged source-map repair to clean automatic merges via the pre-merge-commit hook. When regeneration changes the index, stop the automatic merge because Git has already prepared its tree; review and finish with a normal commit. A real-Git regression checks stale detection, staged repair, refusal to commit the stale tree, and the finished commit. The required Detect Changes test suite executes it. Use the staged resolver for this PR. The harness must add exactly one PR-body line: Machine: built .husky/pre-merge-commit.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The local merge hook can invoke the existing index-safe repair and prevent a stale automatic merge commit, while CI continues to detect bot commits that bypass hooks."
+      }
+    },
+    "guard": {
+      "path": ".husky/pre-merge-commit",
+      "anchor": "Source map refreshed; review the staged merge and run git commit."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "launch-recovery-readiness-avoids-redundant-polling",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43370783065/job/131706803096",
     "correction": "PR #1798 repair, fix-red-5df69c1e5f occurrence 15 in 14 days: merge origin/main without rebasing, retain Addressable 2.9.1, inspect failed checks, repair Launch Quality and extend the existing machine. The unit suite passes; the UI command reaches its 1800-second cap after 43 passing cases, while repeated recovery and canvas helpers spend one second polling already present controls. CI Summary reflects that timeout. Vercel reports Deployment was blocked; its details API returns 403 missing an authentication token. The harness owns pushing and PR updates.",
