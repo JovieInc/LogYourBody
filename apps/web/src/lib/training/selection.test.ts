@@ -3,6 +3,7 @@ import { suggestAlternatives } from './alternatives';
 import { applyWorkoutAction, logTrainingSet, recordTrainingFeedback } from './commands';
 import { MemoryTrainingRecords } from './memory-records.testing';
 import { reviewExerciseSelection, exerciseSelectionEnabled } from './selection';
+import { readNextPrescriptionExercise, reloadApprovedSwap } from './swap-persistence';
 import { CONCERNING_PAIN_MESSAGE } from './pain-policy';
 import {
   applyExerciseSwaps,
@@ -226,6 +227,20 @@ describe('curated exercise selection', () => {
     expect(result.session.exercises[1]).toMatchObject({ targetLoadKg: null, progression: 'hold' });
     expect(result.session.loggedSets).toHaveLength(1);
     expect(result.session.executionEvents[0].selectionContext).toEqual(context);
+    const persisted = reloadApprovedSwap(
+      (await records.pull(subject, 'training_sessions')).records.find(
+        (record) => record.id === session.id,
+      )?.swapPersistence,
+    );
+    expect(persisted).toMatchObject({
+      approvedExerciseId: 'supported_cable_curl',
+      setupId: 'supported_cable_curl',
+      previousExerciseId: 'cable_curl',
+      confirmedEquipment: context.availableEquipment,
+      dimensions: {},
+      responses: {},
+    });
+    expect(readNextPrescriptionExercise('cable_curl', persisted)).toBe('supported_cable_curl');
     expect(await action(records)).toEqual(result); // Lost-response replay is not another swap.
     expect((await action(records, { eventId: 'stale' })).kind).toBe('stale_revision');
     const undone = await action(records, {
@@ -235,6 +250,13 @@ describe('curated exercise selection', () => {
     });
     expect(undone.kind).toBe('updated');
     if (undone.kind === 'updated') expect(undone.session.exercises).toEqual(session.exercises);
+    const restored = reloadApprovedSwap(
+      (await records.pull(subject, 'training_sessions')).records.find(
+        (record) => record.id === session.id,
+      )?.swapPersistence,
+    );
+    expect(restored?.rolledBack).toBe(true);
+    expect(readNextPrescriptionExercise('cable_curl', restored)).toBe('cable_curl');
     expect(learnedExerciseSwaps(await loadTrainingRecords(records, subject))).toEqual([]);
   });
 

@@ -196,3 +196,22 @@ snapshot in CI; the existing root typecheck includes the component. Scoped run:
 pnpm --filter logyourbody test:watch --watch=false --runInBand --runTestsByPath src/components/training/ExerciseSwapApproval.test.tsx
 pnpm typecheck
 ```
+
+## Approved-swap persistence (LYB-299)
+
+`apps/web/src/lib/training/swap-persistence.ts` stores one approved swap on the
+existing workout session for the active gym profile. The stored fields are the
+approved exercise id, setup id, user-confirmed equipment, and the dimension and
+response values the user actually submitted. Omitted dimensions and responses
+stay absent. They are not written as zero. Free-text health notes, device
+location, inferred spinal load, and a cleared axial-load flag are not fields
+on the record. A belt plus persistent symptoms does not create one. One
+tolerated session does not mark other exercises ineligible and is not stored
+as high confidence.
+
+`rollbackSavedSwap` is one write. The next `getOrCreateNextWorkout` read uses
+the restored exercise. There is no off-device export and no learning job.
+Check-ins stay on LYB-114. Cross-session preference learning stays out of this
+slice. No new collection or migration is added.
+
+Machine: built `apps/web/src/lib/training/swap-persistence.ts`.

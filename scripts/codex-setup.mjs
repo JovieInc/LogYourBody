@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Dependency-only bootstrap shared by local worktrees and Codex Cloud.
 import { spawnSync } from 'node:child_process';
-import { readFileSync, realpathSync } from 'node:fs';
+import { chmodSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,6 +32,41 @@ export function bootstrap(root, env = process.env) {
   if (install.error) throw install.error;
   if (install.status !== 0)
     throw new Error(`pnpm install failed (${install.status ?? install.signal}).`);
+  installGitHooks(root, env);
+}
+
+export function installGitHooks(root, env = process.env) {
+  const options = { cwd: root, env, encoding: 'utf8' };
+  const probe = spawnSync('git', ['rev-parse', '--show-toplevel'], options);
+  if (probe.status !== 0) return false;
+  const husky = spawnSync('pnpm', ['exec', 'husky'], { ...options, stdio: 'inherit' });
+  if (husky.error) throw husky.error;
+  if (husky.status !== 0) {
+    throw new Error(`husky hook install failed (${husky.status ?? husky.signal}).`);
+  }
+  // Husky is the repo installer; also pin hooksPath to the tracked hooks so a
+  // generated `.husky/_` wrapper path cannot silently disable pre-push.
+  const config = spawnSync('git', ['config', 'core.hooksPath', '.husky'], options);
+  if (config.error) throw config.error;
+  if (config.status !== 0) {
+    throw new Error(`core.hooksPath was not set (${config.status ?? config.signal}).`);
+  }
+  for (const name of ['pre-commit', 'pre-push']) {
+    try {
+      chmodSync(resolve(root, '.husky', name), 0o755);
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+  const verify = spawnSync('bash', [resolve(root, 'scripts/hooks/verify-git-hooks.sh')], {
+    ...options,
+    stdio: 'inherit',
+  });
+  if (verify.error) throw verify.error;
+  if (verify.status !== 0) {
+    throw new Error(`git hook verify failed (${verify.status ?? verify.signal}).`);
+  }
+  return true;
 }
 
 export const CORRECTION_LEDGER_MERGE_DRIVER =
@@ -55,8 +90,22 @@ export function installCorrectionLedgerMergeDriver(root, env = process.env) {
   return true;
 }
 
-if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  bootstrap(root);
-  installCorrectionLedgerMergeDriver(root);
+export function runCli(root, env) {
+  bootstrap(root, env);
+  installCorrectionLedgerMergeDriver(root, env);
 }
+
+export function maybeRunCli({
+  argv = process.argv,
+  modulePath = fileURLToPath(import.meta.url),
+  root = resolve(dirname(modulePath), '..'),
+  env = process.env,
+} = {}) {
+  if (argv[1] && realpathSync(argv[1]) === modulePath) {
+    runCli(root, env);
+    return true;
+  }
+  return false;
+}
+
+maybeRunCli();
