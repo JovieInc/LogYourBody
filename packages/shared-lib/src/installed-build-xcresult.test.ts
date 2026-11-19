@@ -14,7 +14,7 @@ it('fails the CI check when launch xcresult coverage, fixture traces, or the ins
     ],
     { cwd: root, encoding: 'utf8', timeout: 30_000 },
   );
-  expect(output).toContain('# tests 7');
+  expect(output).toContain('# tests 8');
   expect(output).toContain('# fail 0');
   expect(output).toContain('missing-xcresult-entry:');
   expect(output).toContain('fixture-substitute:');
