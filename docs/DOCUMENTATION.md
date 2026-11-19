@@ -64,6 +64,12 @@ source edits, and refuses unstaged projection edits or pinned-source drift.
 Bot commits created outside local hooks still need this refresh during repair;
 CI continues to reject stale output.
 
+The pre-merge-commit hook runs the same staged repair for clean automatic
+merges, which do not invoke pre-commit. If it changes the map, it stops the
+merge so the staged result can be reviewed and committed: Git has already
+prepared the automatic merge tree before this hook runs. Conflicted merges use
+pre-commit after resolution. Both paths retain the resolver's protections.
+
 Staged repair also refuses a projection edited, deleted or created while sources
 are rendering, preserving that change and the index. Review and stage the edits,
 then retry `--staged`; this also refreshes fingerprints for Bundler lockfile bumps.
