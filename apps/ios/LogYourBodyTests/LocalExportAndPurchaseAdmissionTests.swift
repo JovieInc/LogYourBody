@@ -274,6 +274,7 @@ final class LocalExportAndPurchaseAdmissionTests: XCTestCase {
             metric.notes = Self.noteSentinel
             metric.createdAt = date
             metric.updatedAt = date
+            metric.lastModified = date
             let log = CachedDailyMetrics(context: context)
             log.id = "log-lyb-383"
             log.userId = Self.userId
@@ -282,6 +283,7 @@ final class LocalExportAndPurchaseAdmissionTests: XCTestCase {
             log.notes = Self.noteSentinel
             log.createdAt = date
             log.updatedAt = date
+            log.lastModified = date
             try context.save()
         }
     }
