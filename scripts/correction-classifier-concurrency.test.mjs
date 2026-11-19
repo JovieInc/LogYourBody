@@ -86,7 +86,15 @@ test('repeated main merges retain every earlier receipt and reject one-sided res
     }
     writeFileSync(ledger, resolved);
     git('add', ledgerPath);
-    assert.equal(runClassifier(['--check-merge', root], quiet), 0);
+    const messages = [];
+    assert.equal(runClassifier(['--check-merge', root], {
+      log: (message) => messages.push(message),
+      error: (message) => assert.fail(message),
+    }), 0);
+    assert.equal(
+      messages.at(-1),
+      `correction-classifier: verified ${expected.length} staged receipts against merge parents ${git('rev-parse', 'HEAD').trim()} ${git('rev-parse', 'MERGE_HEAD').trim()}`,
+    );
     assert.equal(runClassifier(['--resolve-merge', root, '--stage'], quiet), 0);
     assert.deepEqual(JSON.parse(git('show', `:0:${ledgerPath}`)), expected);
     git('commit', '-m', `test: integrate main ${round}`);

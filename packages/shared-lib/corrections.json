@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "uptime-probe-clean-merge-source-map-repair",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44613098410/job/135874773505",
+    "correction": "PR #1828 LYB-386, fix-red-1423773703 occurrence 22: merge main and repair Detect Changes, CI Summary and parity after a bot commit leaves the repository source map stale. The harness owns push and PR updates.",
+    "mechanization": "Extend the existing staged source-map repair to clean automatic merges via the pre-merge-commit hook. When regeneration changes the index, stop the automatic merge because Git has already prepared its tree; review and finish with a normal commit. A real-Git regression checks stale detection, staged repair, refusal to commit the stale tree, and the finished commit. The required Detect Changes test suite executes it. Use the staged resolver for this PR. The harness must add exactly one PR-body line: Machine: built .husky/pre-merge-commit.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The local merge hook can invoke the existing index-safe repair and prevent a stale automatic merge commit, while CI continues to detect bot commits that bypass hooks."
+      }
+    },
+    "guard": {
+      "path": ".husky/pre-merge-commit",
+      "anchor": "Source map refreshed; review the staged merge and run git commit."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "launch-recovery-readiness-avoids-redundant-polling",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43370783065/job/131706803096",
     "correction": "PR #1798 repair, fix-red-5df69c1e5f occurrence 15 in 14 days: merge origin/main without rebasing, retain Addressable 2.9.1, inspect failed checks, repair Launch Quality and extend the existing machine. The unit suite passes; the UI command reaches its 1800-second cap after 43 passing cases, while repeated recovery and canvas helpers spend one second polling already present controls. CI Summary reflects that timeout. Vercel reports Deployment was blocked; its details API returns 403 missing an authentication token. The harness owns pushing and PR updates.",
@@ -7982,28 +8000,6 @@
     "ruleId": "code-prevention"
   },
   {
-    "fingerprint": "lyb-380-automatic-ledger-merge-verification",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1830",
-    "correction": "PR #1830 LYB-380, fix-red-e3b0c44298 occurrence 116: merge origin/main without rebasing to resolve a correction ledger conflict; no checks have failed.",
-    "mechanization": "Use the existing correction ledger merge driver and extend its required real-Git regression to run the staged verifier after an automatic union, reject a staged ledger missing a parent receipt, and accept the restored union. Verify this merge against both parents with the same classifier. The harness owns PR edits and must add exactly one line: Machine: built scripts/correction-classifier-concurrency.test.mjs.",
-    "classification": {
-      "codebase": {
-        "feasible": false,
-        "rationale": "The existing driver already automatically unions additive receipts and the verifier rejects regressions; the missing protection is a combined regression exercising both in the same Git merge."
-      },
-      "static": {
-        "feasible": true,
-        "rationale": "The required classifier fixture can exercise an automatic merge and assert that staged verification rejects a dropped parent receipt."
-      }
-    },
-    "guard": {
-      "path": "scripts/correction-classifier-concurrency.test.mjs",
-      "anchor": "configured git merge unions consecutive correction ledgers and keeps divergent edits conflicted"
-    },
-    "level": "static",
-    "ruleId": "ci-invariant"
-  },
-  {
     "fingerprint": "correction-ledger-merge-driver",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1698#repair-ledger-merge-driver",
     "correction": "PR #1698 / LYB-338, fix-red-e3b0c44298 occurrence 79: merge origin/main without rebasing. The only conflict is the correction ledger, because both parents appended different receipts. Failing checks: none. Repeated conflict-only repairs must union that ledger during git merge instead of editing it by hand. Occurrence 85 repeats the conflict-only repair with no failed checks; merge the next origin/main through the retained driver and prove it handles consecutive incoming receipts.",
@@ -8658,6 +8654,46 @@
     "guard": {
       "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
       "anchor": "saves cached body and daily metrics with required lastModified"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "lyb-64-installed-evidence-nonpassing-traces",
+    "source": "https://linear.app/jovie/issue/LYB-64",
+    "correction": "LYB-64 requires failed, skipped, timed-out, unavailable and stale native coverage never to be reported as passing. The installed-build xcresult adapter accepted a passing trace while discarding a non-passing repetition and manufactured negative retry and infrastructure-skip accounting when those fields were absent.",
+    "mechanization": "Extend the existing installed-build xcresult adapter to reject every non-passing trace and require explicit negative retry and infrastructure-skip accounting. Its existing required shared-lib suite runs a deliberate-red regression that fails on the previous adapter and passes after repair. This is evidence-accounting protection only; native, installed-device and TestFlight certification remain unverified. Machine: built packages/shared-lib/src/installed-build-xcresult.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing receipt adapter owns conversion of native traces and run accounting into certification evidence and can refuse incomplete or non-passing inputs before emitting a receipt."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/installed-build-xcresult.ts",
+      "anchor": "non-passing-trace:"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-380-automatic-ledger-merge-verification",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1830",
+    "correction": "PR #1830 LYB-380, fix-red-e3b0c44298 occurrence 116: merge origin/main without rebasing to resolve a correction ledger conflict; no checks have failed.",
+    "mechanization": "Use the existing correction ledger merge driver and extend its required real-Git regression to run the staged verifier after an automatic union, reject a staged ledger missing a parent receipt, and accept the restored union. Verify this merge against both parents with the same classifier. The harness owns PR edits and must add exactly one line: Machine: built scripts/correction-classifier-concurrency.test.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The existing driver already automatically unions additive receipts and the verifier rejects regressions; the missing protection is a combined regression exercising both in the same Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required classifier fixture can exercise an automatic merge and assert that staged verification rejects a dropped parent receipt."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier-concurrency.test.mjs",
+      "anchor": "configured git merge unions consecutive correction ledgers and keeps divergent edits conflicted"
     },
     "level": "static",
     "ruleId": "ci-invariant"
