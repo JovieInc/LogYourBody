@@ -26,6 +26,19 @@ const forbidden = new RegExp(
 );
 
 export const EXCEPTIONS = {
+  'scripts/hooks/company-size-local.sh': {
+    reason:
+      'Shared company size-500 hook; must use the same JOVIE_* kill switches and pin-fetch env as JovieInc/Jovie so pre-commit/pre-push stay aligned with CI Company Guards (JOV-13052).',
+    identifiers: {
+      jovie_ci_remote: 1,
+      jovie_push_base_ref: 1,
+      jovie_size_base: 1,
+      jovie_size_guard_local: 4,
+      jovie_size_precommit: 2,
+      jovie_size_precommit_timeout_ms: 1,
+      jovie_size_precommit_warm: 2,
+    },
+  },
   '.github/scripts/lib/linear-issue-intake.mjs': {
     reason:
       'Retained upstream adapter defaults; LYB intake callers explicitly resolve their own team.',
