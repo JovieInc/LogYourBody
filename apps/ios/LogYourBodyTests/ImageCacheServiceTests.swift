@@ -141,10 +141,12 @@ final class ImageCacheServiceTests: XCTestCase {
         let large = await service.loadImage(from: url, maxPixelSize: 120)
         let smallAgain = await service.loadImage(from: url, maxPixelSize: 40)
         let loadCount = await loader.loadCount()
+        let smallImage = try XCTUnwrap(small)
+        let largeImage = try XCTUnwrap(large)
 
-        XCTAssertEqual(small?.size.width, 40, accuracy: 0.5)
-        XCTAssertEqual(large?.size.width, 120, accuracy: 0.5)
-        XCTAssertFalse(small === large)
+        XCTAssertEqual(smallImage.size.width, 40, accuracy: 0.5)
+        XCTAssertEqual(largeImage.size.width, 120, accuracy: 0.5)
+        XCTAssertFalse(smallImage === largeImage)
         XCTAssertTrue(small === smallAgain)
         XCTAssertEqual(loadCount, 2)
         XCTAssertNil(service.cachedImage(for: url))
@@ -165,11 +167,13 @@ final class ImageCacheServiceTests: XCTestCase {
         let loadCount = await loader.loadCount()
         let small = service.cachedImage(for: url, maxPixelSize: 64)
         let large = service.cachedImage(for: url, maxPixelSize: 96)
+        let smallImage = try XCTUnwrap(small)
+        let largeImage = try XCTUnwrap(large)
 
         XCTAssertEqual(loadCount, 2)
-        XCTAssertEqual(small?.size.width, 64, accuracy: 0.5)
-        XCTAssertEqual(large?.size.width, 96, accuracy: 0.5)
-        XCTAssertFalse(small === large)
+        XCTAssertEqual(smallImage.size.width, 64, accuracy: 0.5)
+        XCTAssertEqual(largeImage.size.width, 96, accuracy: 0.5)
+        XCTAssertFalse(smallImage === largeImage)
     }
 
     private func waitUntil(

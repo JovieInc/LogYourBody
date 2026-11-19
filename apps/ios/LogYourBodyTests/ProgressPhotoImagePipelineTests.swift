@@ -29,9 +29,11 @@ final class ProgressPhotoImagePipelineTests: XCTestCase {
             context.fill(CGRect(x: 0, y: 0, width: 2_400, height: 1_800))
         }
         let data = try XCTUnwrap(image.jpegData(compressionQuality: 0.8))
-        let decoded = try XCTUnwrap(
-            await ProgressPhotoImagePipeline.decodeAndOptimizeImage(from: data, maxPixelSize: requested)
+        let decodedImage = await ProgressPhotoImagePipeline.decodeAndOptimizeImage(
+            from: data,
+            maxPixelSize: requested
         )
+        let decoded = try XCTUnwrap(decodedImage)
 
         XCTAssertEqual(decoded.size.width, 320, accuracy: 1)
         XCTAssertEqual(decoded.size.height, 240, accuracy: 1)
