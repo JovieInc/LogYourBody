@@ -1,0 +1,27 @@
+name: iOS Launch Quality Weekly Canary
+# Forced full Launch Quality on main, once a week. Catches a stale exact-hash
+# receipt if a declared input was missed. Does not change runners.
+
+on:
+  schedule:
+    - cron: '27 14 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ios-launch-quality-weekly-canary
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  canary:
+    name: Weekly full Launch Quality
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/ios-quality.yml
+    with:
+      force-full: true
+      mac-first: false
+      static-audits: false

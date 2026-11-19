@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "description": "Declared inputs of the LogYourBody iOS Launch Quality audit. A success receipt may be reused only when this exact content hash is unchanged. Any declared-input change, a missing or invalid receipt, or the weekly canary runs the audit fully.",
+  "globs": [
+    "apps/ios/**",
+    "scripts/ios/**",
+    ".github/actions/setup-ios-build/action.yml",
+    ".github/scripts/launch-quality-inputs.json",
+    ".github/scripts/launch-quality-hash.py",
+    ".github/scripts/launch-quality-hash.test.mjs",
+    ".github/workflows/ios-quality.yml",
+    ".github/workflows/ios-launch-quality-canary.yml"
+  ],
+  "xcodeVersionFrom": {
+    "file": ".github/workflows/ios-quality.yml",
+    "pattern": "xcode-version:\\s*'([^']+)'"
+  }
+}

@@ -10,6 +10,11 @@ on:
         description: Full SHA of a current branch head in this repository to qualify on hosted macOS.
         required: true
         type: string
+      force-full:
+        description: Ignore a matching receipt and run the audit fully (weekly canary).
+        required: false
+        default: false
+        type: boolean
   workflow_call:
     inputs:
       checkout-ref:
@@ -37,6 +42,11 @@ on:
         required: false
         default: true
         type: boolean
+      force-full:
+        description: Ignore a matching receipt and run the audit fully (weekly canary).
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -61,6 +71,9 @@ jobs:
     runs-on: ${{ !(github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository))) && inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
     # Setup allowance (4m) plus one 57-minute audit plus the 8-minute performance cap.
     timeout-minutes: 69
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Validate manual qualification source
         if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository)) }}
@@ -88,7 +101,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: ${{ !(github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository))) }}
 
+      - name: Resolve Launch Quality input hash
+        id: receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE_LAUNCH_QUALITY: ${{ inputs.force-full && '1' || '0' }}
+        run: python3 .github/scripts/launch-quality-hash.py lookup
+
       - name: Setup iOS build environment
+        if: ${{ steps.receipt.outputs.reuse != 'true' || format('{0}', inputs.static-audits) != 'false' }}
         uses: ./.github/actions/setup-ios-build
         with:
           xcode-version: 'latest-stable'
@@ -99,7 +120,7 @@ jobs:
       # Hosted VMs start cold. A persistent Mac keeps these locally, and
       # saving multi-GB caches over its home uplink would outlast the job.
       - name: Cache Swift packages
-        if: ${{ runner.environment == 'github-hosted' }}
+        if: ${{ steps.receipt.outputs.reuse != 'true' && runner.environment == 'github-hosted' }}
         uses: actions/cache@v6
         with:
           path: |
@@ -119,6 +140,8 @@ jobs:
         # reached UI at 1375s and the 2940s audit cap killed still-passing cases;
         # the retry finished UI in 1697s. 57m covers the 3240s deadline plus 180s
         # finalization grace. Per-test limits and the 1800s UI hang cap stay.
+        id: audit
+        if: ${{ steps.receipt.outputs.reuse != 'true' }}
         timeout-minutes: 57
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
@@ -129,6 +152,22 @@ jobs:
           RUN_STATIC_UI_REGRESSION_AUDIT: ${{ format('{0}', inputs.static-audits) }}
           RUN_OPTICAL_GRID_AUDIT: ${{ format('{0}', inputs.static-audits) }}
         run: bash scripts/ios/launch-quality-audit.sh
+
+      - name: Publish Launch Quality receipt
+        if: ${{ success() && steps.receipt.outputs.reuse != 'true' && steps.audit.conclusion == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/launch-quality-hash.py publish --dir "$RUNNER_TEMP/lq-receipt"
+
+      - name: Upload Launch Quality receipt
+        if: ${{ success() && steps.receipt.outputs.reuse != 'true' && steps.audit.conclusion == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-quality-receipt-${{ steps.receipt.outputs.hash }}
+          path: ${{ runner.temp }}/lq-receipt
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: true
 
       - name: Run performance budget audit
         # Static-only in CI (unit and launch performance are off), so ci.yml ios_static runs it on ubuntu.
