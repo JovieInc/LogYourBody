@@ -90,8 +90,22 @@ export function installCorrectionLedgerMergeDriver(root, env = process.env) {
   return true;
 }
 
-if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  bootstrap(root);
-  installCorrectionLedgerMergeDriver(root);
+export function runCli(root, env) {
+  bootstrap(root, env);
+  installCorrectionLedgerMergeDriver(root, env);
 }
+
+export function maybeRunCli({
+  argv = process.argv,
+  modulePath = fileURLToPath(import.meta.url),
+  root = resolve(dirname(modulePath), '..'),
+  env = process.env,
+} = {}) {
+  if (argv[1] && realpathSync(argv[1]) === modulePath) {
+    runCli(root, env);
+    return true;
+  }
+  return false;
+}
+
+maybeRunCli();
