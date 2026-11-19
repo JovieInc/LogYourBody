@@ -148,7 +148,7 @@ jobs:
         run: node --test .github/scripts/verify-public-build-env-types.test.mjs
 
       - name: Test change detection and the CI Summary gate
-        run: node --test .github/scripts/detect-changes.test.mjs .github/scripts/detect-changes-signing.test.mjs
+        run: node --test .github/scripts/detect-changes.test.mjs .github/scripts/detect-changes-signing.test.mjs .github/scripts/launch-quality-hash.test.mjs
 
       - name: Test agent environment lifecycle with coverage
         run: >-
