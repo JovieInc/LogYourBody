@@ -1594,6 +1594,11 @@ def _diagnostic_repository(tmp_path: Path) -> tuple[Path, str]:
     root = (tmp_path / 'repo').resolve()
     (root / 'scripts/ios').mkdir(parents=True)
     (root / 'apps/ios').mkdir(parents=True)
+    (root / '.github/scripts').mkdir(parents=True)
+    # The trusted diagnostic fence hashes this pin before the synthetic helpers.
+    # It must be committed so a missing file does not escape as an uncaught lstat error.
+    (root / '.github/scripts/pin-xcode-27.sh').write_bytes(
+        (_REPO_ROOT / '.github/scripts/pin-xcode-27.sh').read_bytes())
     (root / 'scripts/ios/launch-quality-audit.sh').write_bytes((_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes())
     (root / 'scripts/ios/launch-quality-diagnostic-seven.sh').write_bytes(
         (_REPO_ROOT / 'scripts/ios/launch-quality-diagnostic-seven.sh').read_bytes())
@@ -2021,7 +2026,11 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert build_seconds + ui_seconds + 180 + 60 <= step_minutes * 60
     assert step_minutes + 7 == job_minutes
     uses = re.findall(r'uses: ([^\s]+)', source)
-    assert len(uses) == 3 and all(re.fullmatch(r'[\w-]+/[\w-]+@[0-9a-f]{40}', value) for value in uses)
+    # Checkout and artifact upload stay SHA-pinned. Xcode selection is the reviewed
+    # pin script, so setup-xcode / latest-stable is not a third action.
+    assert len(uses) == 2 and all(re.fullmatch(r'[\w-]+/[\w-]+@[0-9a-f]{40}', value) for value in uses)
+    assert 'maxim-lobanov/setup-xcode' not in source and 'latest-stable' not in source
+    assert 'run: bash .github/scripts/pin-xcode-27.sh\n' in source
 
 
 def _reviewed_diagnostic_candidate_bytes() -> bytes:
