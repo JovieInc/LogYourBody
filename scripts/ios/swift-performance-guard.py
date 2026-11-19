@@ -3,41 +3,43 @@
 
 Budgets in the contract are proposed targets. Current numbers stay blank until
 a physical-device receipt exists. A missing device receipt is unverified.
-
-The guard fails when the toolchain receipt drifts from the Xcode project, when
-app source uses @concurrent while that receipt says the toolchain does not
-enable it, when a PerfSignpost name is not in the contract, when signposts are
-compiled into the App Store Release configuration, when a physical-pass receipt
-omits hardware fields, or when an interaction-path violation is new or the
-baseline is stale-high. Baseline counts may only fall.
+Baseline counts may only fall.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import re
 import subprocess
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from swift_performance_scan import (  # noqa: E402
+    REQUIRED_RECEIPT_FIELDS,
+    counts_of,
+    fall_only_errors,
+    mask_non_code,
+    ratchet_errors,
+    scan_source,
+    signpost_errors,
+    uses_concurrent,
+    validate_device_receipt,
+)
+from swift_performance_toolchain import (  # noqa: E402
+    PROJECT_REL,
+    SCHEMA,
+    build_toolchain_receipt,
+    parse_project,
+    row_enables_concurrent,
+    toolchain_drift_errors,
+)
 
 CONTRACT_REL = "scripts/ios/swift-performance-contract.json"
 RECEIPT_REL = "scripts/ios/swift-performance-toolchain.json"
 BASELINE_REL = "scripts/ios/swift-performance-baseline.json"
 DEVICE_RECEIPT_REL = "scripts/ios/swift-performance-device-receipt.json"
-PROJECT_REL = "apps/ios/LogYourBody.xcodeproj/project.pbxproj"
-SCHEMA = 1
-PASS_CLAIMS = {"pass", "passed", "physical-pass", "physical_pass"}
-REQUIRED_RECEIPT_FIELDS = (
-    "device",
-    "os",
-    "buildSha",
-    "thermalState",
-    "refreshRateHz",
-    "fixtureId",
-)
 SURFACES = (
     ("launch-auth-onboarding", "launch/auth/onboarding"),
     ("home-timeline-photos", "home/timeline/photos"),
@@ -66,59 +68,8 @@ LEGACY_SMELL_FILES = (
     "apps/ios/LogYourBody/Components/PhotoAnchoredTimelineSlider.swift",
     "apps/ios/LogYourBody/Components/ProgressTimelineView.swift",
 )
-VIEW_MARKERS = ("/Views/", "/Components/", "/Features/", "/DesignSystem/", "SettingsComponents.swift")
-BLOCKING = (
-    ("interaction.perform_and_wait", re.compile(r"\bperformAndWait\b"), "performAndWait blocks the interaction path."),
-    ("interaction.dispatch_semaphore", re.compile(r"\bDispatchSemaphore\b"), "DispatchSemaphore blocks the interaction path."),
-    ("interaction.main_sync", re.compile(r"\.main\.sync\b"), "main.sync stalls the interaction path."),
-    ("interaction.thread_sleep", re.compile(r"\bThread\.sleep\b"), "Thread.sleep stalls the interaction path."),
-)
-UIIMAGE_DATA = re.compile(r"\bUIImage\s*\(\s*data\s*:")
-SWIFTUI_SMELLS = (
-    (
-        "swiftui.no_render_path_image_decode",
-        re.compile(r"Image\s*\(\s*uiImage:\s*UIImage\s*\(\s*data\s*:"),
-        "Decode image data before SwiftUI render work starts.",
-    ),
-    (
-        "swiftui.no_inline_collection_transform_in_foreach",
-        re.compile(r"ForEach\s*\([^)\n]*\.(?:filter|sorted|map)\s*(?:\{|\\\()"),
-        "Precompute collection transforms before ForEach.",
-    ),
-    (
-        "swiftui.no_per_render_uuid_identity",
-        re.compile(r"\b(?:var|let)\s+id\s*=\s*UUID\s*\(\s*\)"),
-        "Use a stable domain identity for visual rows.",
-    ),
-)
-VIEW_BODY = re.compile(
-    r"(?:@ViewBuilder\s+)?"
-    r"(?:(?:public|private|fileprivate|internal|open|package|static|final)\s+)*"
-    r"var\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*some\s+View\b"
-)
-SIGNPOST_CALL = re.compile(r"PerfSignpost\s*\.\s*(?:measure|begin|event)\s*\(")
-SIGNPOST_LITERAL = re.compile(r'PerfSignpost\s*\.\s*(?:measure|begin|event)\s*\(\s*"([^"]+)"')
-CONCURRENT = re.compile(r"(?<![\w])@concurrent\b")
-CONFIG_LIST = re.compile(
-    r"(?P<id>[A-Fa-f0-9]+) /\* Build configuration list for (?P<kind>PBXNativeTarget|PBXProject) \"(?P<name>[^\"]+)\" \*/ = \{\s*"
-    r"isa = XCConfigurationList;\s*buildConfigurations = \((?P<body>.*?)\);",
-    re.S,
-)
-CONFIG_BLOCK = re.compile(
-    r"(?P<id>[A-Fa-f0-9]+) /\* (?P<label>Debug|Release) \*/ = \{\s*"
-    r"isa = XCBuildConfiguration;\s*(?P<pre>.*?)buildSettings = \{(?P<body>.*?)\};\s*"
-    r"name = (?P<name>Debug|Release);",
-    re.S,
-)
+
 BASELINE_POLICY = "Counts may only fall. A stale-high baseline fails until it is lowered to the live tree."
-
-
-@dataclass(frozen=True)
-class Finding:
-    rule: str
-    path: str
-    line: int
-    detail: str
 
 
 def canonical(payload: dict) -> str:
@@ -127,391 +78,6 @@ def canonical(payload: dict) -> str:
 
 def load_json(path: Path) -> dict:
     return json.loads(path.read_text())
-
-
-def mask_comments(text: str) -> str:
-    """Blank comments while preserving indexes, newlines, and string literals."""
-    chars = list(text)
-    i = 0
-    n = len(chars)
-    while i < n:
-        if chars[i] == "/" and i + 1 < n and chars[i + 1] == "/":
-            while i < n and chars[i] != "\n":
-                chars[i] = " "
-                i += 1
-            continue
-        if chars[i] == "/" and i + 1 < n and chars[i + 1] == "*":
-            chars[i] = chars[i + 1] = " "
-            i += 2
-            while i + 1 < n and not (chars[i] == "*" and chars[i + 1] == "/"):
-                if chars[i] != "\n":
-                    chars[i] = " "
-                i += 1
-            if i < n:
-                chars[i] = " "
-            if i + 1 < n:
-                chars[i + 1] = " "
-            i += 2
-            continue
-        if chars[i] == '"':
-            if text.startswith('"""', i):
-                i += 3
-                while i + 2 < n and not text.startswith('"""', i):
-                    i += 1
-                i += 3
-                continue
-            i += 1
-            while i < n and chars[i] != '"':
-                if chars[i] == "\\":
-                    i += 2
-                    continue
-                if chars[i] == "\n":
-                    break
-                i += 1
-            i += 1
-            continue
-        i += 1
-    return "".join(chars)
-
-
-def mask_non_code(text: str) -> str:
-    """Blank comments and strings while preserving indexes and newlines."""
-    chars = list(text)
-    i = 0
-    n = len(chars)
-    while i < n:
-        if chars[i] == "/" and i + 1 < n and chars[i + 1] == "/":
-            while i < n and chars[i] != "\n":
-                chars[i] = " "
-                i += 1
-            continue
-        if chars[i] == "/" and i + 1 < n and chars[i + 1] == "*":
-            chars[i] = chars[i + 1] = " "
-            i += 2
-            while i + 1 < n and not (chars[i] == "*" and chars[i + 1] == "/"):
-                if chars[i] != "\n":
-                    chars[i] = " "
-                i += 1
-            if i < n:
-                chars[i] = " "
-            if i + 1 < n:
-                chars[i + 1] = " "
-            i += 2
-            continue
-        if chars[i] == '"':
-            if text.startswith('"""', i):
-                chars[i] = chars[i + 1] = chars[i + 2] = " "
-                i += 3
-                while i + 2 < n and not text.startswith('"""', i):
-                    if chars[i] != "\n":
-                        chars[i] = " "
-                    i += 1
-                for _ in range(3):
-                    if i < n:
-                        chars[i] = " "
-                        i += 1
-                continue
-            chars[i] = " "
-            i += 1
-            while i < n and chars[i] != '"':
-                if chars[i] == "\\":
-                    chars[i] = " "
-                    i += 1
-                    if i < n and chars[i] != "\n":
-                        chars[i] = " "
-                        i += 1
-                    continue
-                if chars[i] != "\n":
-                    chars[i] = " "
-                i += 1
-            if i < n:
-                chars[i] = " "
-                i += 1
-            continue
-        i += 1
-    return "".join(chars)
-
-
-def line_of(text: str, index: int) -> int:
-    return text.count("\n", 0, index) + 1
-
-
-def is_view_path(path: str) -> bool:
-    return any(marker in f"/{path}" or path.endswith(marker) for marker in VIEW_MARKERS)
-
-
-def brace_end(text: str, open_index: int) -> int:
-    depth = 0
-    for index in range(open_index, len(text)):
-        char = text[index]
-        if char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                return index + 1
-    return len(text)
-
-
-def view_body_spans(masked: str) -> list[tuple[int, int]]:
-    spans = []
-    for match in VIEW_BODY.finditer(masked):
-        brace = masked.find("{", match.end())
-        if brace < 0:
-            continue
-        spans.append((brace, brace_end(masked, brace)))
-    return spans
-
-
-def in_spans(index: int, spans: list[tuple[int, int]]) -> bool:
-    return any(start <= index < end for start, end in spans)
-
-
-def scan_source(path: str, text: str) -> list[Finding]:
-    masked = mask_non_code(text)
-    findings: list[Finding] = []
-    for rule, pattern, detail in BLOCKING:
-        for match in pattern.finditer(masked):
-            findings.append(Finding(rule, path, line_of(text, match.start()), detail))
-    spans = view_body_spans(masked)
-    for match in UIIMAGE_DATA.finditer(masked):
-        if in_spans(match.start(), spans):
-            findings.append(
-                Finding(
-                    "interaction.uiimage_data_in_view_body",
-                    path,
-                    line_of(text, match.start()),
-                    "UIImage(data:) inside a view body decodes on the render path.",
-                )
-            )
-    if is_view_path(path):
-        for rule, pattern, detail in SWIFTUI_SMELLS:
-            for match in pattern.finditer(masked):
-                findings.append(Finding(rule, path, line_of(text, match.start()), detail))
-    return findings
-
-
-def counts_of(findings: list[Finding]) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for finding in findings:
-        key = f"{finding.rule}|{finding.path}"
-        counts[key] = counts.get(key, 0) + 1
-    return dict(sorted(counts.items()))
-
-
-def ratchet_errors(live: dict[str, int], baseline: dict[str, int]) -> list[str]:
-    errors = []
-    for key in sorted(set(live) | set(baseline)):
-        have = live.get(key, 0)
-        allowed = baseline.get(key, 0)
-        if have > allowed:
-            errors.append(f"new violation {key}: {have} > baseline {allowed}")
-        elif have < allowed:
-            errors.append(f"stale-high baseline {key}: baseline {allowed} > live {have}")
-    return errors
-
-
-def fall_only_errors(current: dict[str, int], ancestor: dict[str, int] | None) -> list[str]:
-    if ancestor is None:
-        return []
-    errors = []
-    for key, count in sorted(current.items()):
-        previous = ancestor.get(key, 0)
-        if count > previous:
-            errors.append(f"baseline may only fall for {key}: {previous} -> {count}")
-    return errors
-
-
-def signpost_errors(text: str, allowed: set[str], path: str) -> list[str]:
-    masked = mask_comments(text)
-    errors = []
-    for match in SIGNPOST_CALL.finditer(masked):
-        literal = SIGNPOST_LITERAL.match(masked, match.start())
-        if literal is None:
-            errors.append(f"unknown signpost at {path}:{line_of(text, match.start())}: name must be a contract string literal")
-            continue
-        name = literal.group(1)
-        if name not in allowed:
-            errors.append(f"unknown signpost {name} at {path}:{line_of(text, match.start())}")
-    return errors
-
-
-def validate_device_receipt(payload: object) -> tuple[str, list[str]]:
-    """Return (status, errors). Missing data is unverified and is not a failure."""
-    if payload is None:
-        return "unverified", []
-    if not isinstance(payload, dict):
-        return "rejected", ["device receipt must be a JSON object"]
-    claim = str(payload.get("verdict") or payload.get("status") or "").strip().lower()
-    if claim not in PASS_CLAIMS:
-        return ("unverified" if claim in {"", "missing", "unverified"} else "recorded"), []
-    missing = []
-    for field in REQUIRED_RECEIPT_FIELDS:
-        value = payload.get(field)
-        if field == "refreshRateHz":
-            if value not in (60, 120):
-                missing.append(field)
-            continue
-        if not isinstance(value, str) or not value.strip():
-            missing.append(field)
-    if missing:
-        return "rejected", ["physical-pass receipt omits " + ", ".join(missing)]
-    return "verified", []
-
-
-def parse_settings(body: str) -> dict[str, str]:
-    settings: dict[str, str] = {}
-    lines = body.splitlines()
-    index = 0
-    while index < len(lines):
-        line = lines[index].strip()
-        index += 1
-        if not line or line.startswith("//") or "=" not in line:
-            continue
-        key, rest = line.split("=", 1)
-        key = key.strip()
-        rest = rest.strip()
-        if rest == "(":
-            values = []
-            while index < len(lines) and lines[index].strip() != ");":
-                chunk = lines[index].strip().strip(",").strip().strip('"')
-                if chunk:
-                    values.append(chunk)
-                index += 1
-            settings[key] = " ".join(values)
-            continue
-        settings[key] = rest.rstrip(";").strip().strip('"')
-    return settings
-
-
-def parse_project(text: str) -> list[dict]:
-    blocks = {match.group("id"): parse_settings(match.group("body")) for match in CONFIG_BLOCK.finditer(text)}
-    lists = []
-    for match in CONFIG_LIST.finditer(text):
-        configs = re.findall(r"([A-Fa-f0-9]+) /\* (Debug|Release) \*/", match.group("body"))
-        lists.append((match.group("kind"), match.group("name"), configs))
-    project = {"Debug": {}, "Release": {}}
-    targets = []
-    for kind, name, configs in lists:
-        resolved = {}
-        for config_id, label in configs:
-            resolved[label] = blocks.get(config_id, {})
-        if kind == "PBXProject":
-            project = resolved
-        else:
-            targets.append((name, resolved))
-    rows = []
-    for name, configs in targets:
-        for label in ("Debug", "Release"):
-            merged = dict(project.get(label, {}))
-            merged.update(configs.get(label, {}))
-            rows.append(toolchain_row(name, label, merged))
-    return rows
-
-
-def upcoming_features(settings: dict[str, str]) -> list[str]:
-    names = []
-    for key, value in settings.items():
-        prefix = "SWIFT_UPCOMING_FEATURE_"
-        if key.startswith(prefix) and key != prefix and value == "YES":
-            names.append(key[len(prefix):])
-    flags = settings.get("OTHER_SWIFT_FLAGS", "")
-    names.extend(re.findall(r"-enable-upcoming-feature\s+([A-Za-z0-9_]+)", flags))
-    return sorted(set(names))
-
-
-def isolation_setting(settings: dict[str, str]) -> str | None:
-    value = settings.get("SWIFT_DEFAULT_ACTOR_ISOLATION")
-    if value:
-        return value
-    flags = settings.get("OTHER_SWIFT_FLAGS", "")
-    match = re.search(r"-default-isolation\s+([A-Za-z0-9_]+)", flags)
-    return match.group(1) if match else None
-
-
-def trace_enabled(settings: dict[str, str]) -> bool:
-    blob = f"{settings.get('SWIFT_ACTIVE_COMPILATION_CONDITIONS', '')} {settings.get('OTHER_SWIFT_FLAGS', '')}"
-    return "LYB_PERF_TRACE" in set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", blob))
-
-
-def toolchain_row(target: str, config: str, settings: dict[str, str]) -> dict:
-    version = settings.get("SWIFT_VERSION")
-    return {
-        "target": target,
-        "config": config,
-        "swift": version,
-        "strict": settings.get("SWIFT_STRICT_CONCURRENCY"),
-        "isolation": isolation_setting(settings),
-        "upcoming": upcoming_features(settings),
-        "trace": trace_enabled(settings),
-    }
-
-
-def version_tuple(value: str | None) -> tuple[int, int]:
-    if not value:
-        return (0, 0)
-    parts = []
-    for part in value.split("."):
-        if part.isdigit():
-            parts.append(int(part))
-        else:
-            break
-    if not parts:
-        return (0, 0)
-    return (parts[0], parts[1] if len(parts) > 1 else 0)
-
-
-def row_enables_concurrent(row: dict) -> bool:
-    if row["isolation"]:
-        return True
-    if any("CONCURRENT" in name.upper() for name in row["upcoming"]):
-        return True
-    return version_tuple(row["swift"]) >= (6, 2)
-
-
-def build_toolchain_receipt(text: str) -> dict:
-    rows = sorted(parse_project(text), key=lambda row: (row["target"], row["config"]))
-    tuples = {(row["swift"], row["strict"], row["isolation"], tuple(row["upcoming"])) for row in rows}
-    agree = len(tuples) == 1 and bool(rows)
-    prototype = rows[0] if agree else None
-    app_rows = [row for row in rows if row["target"] == "LogYourBody"]
-    enabled = bool(app_rows) and all(row_enables_concurrent(row) for row in app_rows)
-    formatted = [
-        "{target}|{config}|swift={swift}|strict={strict}|isolation={isolation}|upcoming={upcoming}|trace={trace}".format(
-            target=row["target"],
-            config=row["config"],
-            swift=row["swift"] or "",
-            strict=row["strict"] or "",
-            isolation=row["isolation"] or "",
-            upcoming=",".join(row["upcoming"]),
-            trace="true" if row["trace"] else "false",
-        )
-        for row in rows
-    ]
-    note = "SWIFT_VERSION is the Swift language mode."
-    if agree and prototype and prototype["isolation"] is None and not enabled:
-        note += " No default-actor-isolation setting is present, so @concurrent is not enabled."
-    return {
-        "schemaVersion": SCHEMA,
-        "kind": "lyb.swift-toolchain-receipt",
-        "source": PROJECT_REL,
-        "swiftLanguageMode": prototype["swift"] if prototype else None,
-        "SWIFT_VERSION": prototype["swift"] if prototype else None,
-        "strictConcurrency": prototype["strict"] if prototype else None,
-        "defaultActorIsolation": prototype["isolation"] if prototype else None,
-        "upcomingFeatures": list(prototype["upcoming"]) if prototype else [],
-        "configurationsAgree": agree,
-        "concurrentAttributeEnabled": enabled,
-        "traceSignpostsEnabled": any(row["trace"] for row in rows),
-        "rows": formatted,
-        "note": note,
-    }
-
-
-def toolchain_drift_errors(live: dict, committed: dict) -> list[str]:
-    if live == committed:
-        return []
-    return ["toolchain receipt drifted from the Xcode project: " + json.dumps(live, sort_keys=True)]
 
 
 def contract_errors(contract: dict, device_status: str) -> list[str]:
@@ -615,10 +181,6 @@ def production_swift(root: Path) -> list[Path]:
                 continue
             files.append(path)
     return sorted(files)
-
-
-def uses_concurrent(text: str) -> bool:
-    return CONCURRENT.search(mask_non_code(text)) is not None
 
 
 def trace_gate_errors(text: str) -> list[str]:
