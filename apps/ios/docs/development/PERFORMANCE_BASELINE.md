@@ -1,34 +1,47 @@
 # iOS Performance Baseline & Instrumentation
 
-This document describes the DEBUG-only performance instrumentation added in the
+This document describes the performance instrumentation added in the
 "rock solid & blazing fast" campaign (Phase 0) and how to capture the baseline
 numbers that later phases must not regress.
 
-All instrumentation is compiled out of release builds — it lives behind `#if DEBUG`
-and, for the frame monitor, an explicit launch flag. There is **zero shipping overhead**.
+`PerfSignpost` compiles only into an opt-in trace build (`LYB_PERF_TRACE`).
+Checked-in Debug and Release configurations do not set that flag, so the
+App Store binary does not contain the signposts. `LaunchMetrics` logging and
+`FrameHitchMonitor` stay behind `#if DEBUG`; the hitch monitor also requires
+`-lybPerfHitchMonitor` or `LYB_PERF_HITCH_MONITOR=1`.
+
+Per-surface signpost names, local-acknowledgement points, and proposed budgets
+live in [`scripts/ios/swift-performance-contract.json`](../../../../scripts/ios/swift-performance-contract.json).
+Those budgets are targets (synchronous UI work under 5ms where feasible,
+event-to-feedback p95 under 100ms, hitch ceiling 10ms/s). Current numbers stay
+blank until a physical-device receipt exists. A missing device receipt is
+unverified. The static guard is `scripts/ios/swift-performance-guard.py`.
 
 ## What's instrumented
 
 ### `PerfSignpost` (`LogYourBody/Utils/PerfSignpost.swift`)
+
 Thin wrapper over `OSSignposter` (category `perf`). Use it to time hot paths so they
 show up as intervals in Instruments' **os_signpost** / **Points of Interest** track.
 
-| Signpost name                  | Where                                                            | Measures |
-|--------------------------------|-----------------------------------------------------------------|----------|
-| `launch_first_dashboard_frame` | `LaunchMetrics.markFirstDashboardFrame()`                       | Launch → first dashboard frame (point event) |
-| `scrub_select_closest`         | `selectClosestMetric(to:)`                                      | Timeline header cursor → metric selection |
-| `scrub_update_animated_values` | `updateAnimatedValues(for:)`                                    | Per-index hero value recompute (3× interpolation) |
-| `dashboard_derived_refresh`    | `scheduleDashboardDerivedStateRefresh(...)`                    | Derived-state rebuild on data/index change |
-| `chart_generate` / `_async`    | `MetricChartDataHelper.generateChartData[Async]`               | Sparkline/chart compute (cache miss cost) |
+| Signpost name                  | Where                                            | Measures                                          |
+| ------------------------------ | ------------------------------------------------ | ------------------------------------------------- |
+| `launch_first_dashboard_frame` | `LaunchMetrics.markFirstDashboardFrame()`        | Launch → first dashboard frame (point event)      |
+| `scrub_select_closest`         | `selectClosestMetric(to:)`                       | Timeline header cursor → metric selection         |
+| `scrub_update_animated_values` | `updateAnimatedValues(for:)`                     | Per-index hero value recompute (3× interpolation) |
+| `dashboard_derived_refresh`    | `scheduleDashboardDerivedStateRefresh(...)`      | Derived-state rebuild on data/index change        |
+| `chart_generate` / `_async`    | `MetricChartDataHelper.generateChartData[Async]` | Sparkline/chart compute (cache miss cost)         |
 
 API: `PerfSignpost.measure("name") { ... }`, `begin/end`, `event("name", "msg")`.
 
 ### `LaunchMetrics` (`LogYourBody/Utils/PerfSignpost.swift`)
+
 - `LaunchMetrics.begin()` — called in `LogYourBodyApp.init()` (earliest hook).
 - `LaunchMetrics.markFirstDashboardFrame()` — called in `DashboardViewLiquid.onAppear`;
   logs `launch→firstDashboardFrame <ms>` once via `AppLogger.ui`.
 
 ### `FrameHitchMonitor` (`LogYourBody/Utils/FrameHitchMonitor.swift`)
+
 CADisplayLink-based hitch counter. A frame is a **hitch** if its render interval
 exceeds 1.5× the display's nominal frame budget. Only runs when explicitly enabled:
 
@@ -41,14 +54,16 @@ Call `FrameHitchMonitor.shared.flush(label:)` after a measured gesture to log
 ## How to capture the baseline
 
 ### Launch → first frame
-1. Run the app (Debug) on a physical device (preferred) or simulator.
+
+1. Run a Debug build that also defines `LYB_PERF_TRACE`, on a physical device (preferred) or simulator.
 2. Filter the Console / unified log for subsystem `co.logyourbody.*`, category `ui`.
 3. Read the `launch→firstDashboardFrame <ms>` line. Take the median of 3 cold launches.
 
-Or in Instruments: profile with the **os_signpost** instrument and read the
+Or in Instruments: profile that trace build with the **os_signpost** instrument and read the
 `launch_first_dashboard_frame` point event.
 
 ### Scrub / scroll hitches
+
 1. Launch with the hitch monitor enabled, e.g. in the scheme's Run arguments add
    `-lybPerfHitchMonitor`, or run a UI test with that argument
    (the `-lybUITestPhotoTimelineHUDFixture` fixture seeds timeline data).
@@ -57,6 +72,7 @@ Or in Instruments: profile with the **os_signpost** instrument and read the
    **Time Profiler** alongside the `scrub_*` signpost intervals.
 
 ### Recommended: Instruments
+
 Profile the **os_signpost**, **Time Profiler**, and **Animation Hitches** instruments
 on a physical device. The `scrub_*` and `chart_generate` intervals pinpoint the
 main-thread work to attack in Phase 2.
@@ -66,11 +82,11 @@ main-thread work to attack in Phase 2.
 > Capture on a fixed device (e.g. iPhone 15, iOS 26) with the
 > `-lybUITestPhotoTimelineHUDFixture` data set, and record here + in the PR.
 
-| Metric                              | Baseline | Target |
-|-------------------------------------|----------|--------|
-| Launch → first dashboard frame (ms) | _TBD_    | hold / ↓ |
-| Scrub hitches (end-to-end drag)     | _TBD_    | ~0 |
-| Cold scroll hitches (home)          | _TBD_    | ~0 |
+| Metric                              | Baseline | Target         |
+| ----------------------------------- | -------- | -------------- |
+| Launch → first dashboard frame (ms) | _TBD_    | hold / ↓       |
+| Scrub hitches (end-to-end drag)     | _TBD_    | ~0             |
+| Cold scroll hitches (home)          | _TBD_    | ~0             |
 | Worst frame during scrub (ms)       | _TBD_    | < frame budget |
 
 These become the regression gate for Phases 2–4.
