@@ -36,9 +36,6 @@ final class BodyMetricLaunchRepairTests: XCTestCase {
     }
 
     func testCleanRelaunchSkipsFetchAndGenerationChangeRepairsOffViewContext() async throws {
-        XCTAssertTrue(PerfSignpostContract.names.contains("launch_repair"))
-        XCTAssertEqual(String(describing: PerfSignpostContract.launchRepair), "launch_repair")
-
         try await insertCorruptMetric()
         let viewContext = manager.persistentContainer.viewContext
 

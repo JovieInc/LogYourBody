@@ -33,7 +33,7 @@ enum BodyMetricLaunchRepair {
         now: Date = Date()
     ) async -> RunResult {
         if receipt(in: defaults)?.generation == generation {
-            PerfSignpost.event(PerfSignpostContract.launchRepair, "skipped")
+            PerfSignpost.event("launch_repair", "skipped")
             return RunResult(
                 repairedCount: 0,
                 didFetchBodyMetrics: false,
@@ -44,7 +44,7 @@ enum BodyMetricLaunchRepair {
         }
 
         let context = makeBackgroundContext(container)
-        let token = PerfSignpost.begin(PerfSignpostContract.launchRepair)
+        let token = PerfSignpost.begin("launch_repair")
         let scan = await context.perform { () -> Scan in
             do {
                 let metrics = try fetchAllBodyMetrics(in: context)
