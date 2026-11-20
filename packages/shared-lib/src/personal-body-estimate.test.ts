@@ -301,7 +301,8 @@ it('keeps the estimate inside the photo stage and off the scrubber hot path', ()
   expect(
     homePhotoStageFindings(
       surface,
-      read('apps/ios/LogYourBody/Views/HomeV2/HomeV2SystemStates.swift'),
+      read('apps/ios/LogYourBody/Views/HomeV2/HomeV2Tokens.swift'),
+      read('apps/ios/LogYourBody/Views/HomeV2/HomeV2Policy.swift'),
     ),
   ).toEqual([]);
   expect(estimateOnPhotoStageFindings(hero)).toEqual([]);
