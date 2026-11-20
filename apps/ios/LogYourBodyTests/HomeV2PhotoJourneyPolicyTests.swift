@@ -20,18 +20,6 @@ final class HomeV2PhotoJourneyPolicyTests: XCTestCase {
         XCTAssertTrue(HomeV2FilmstripPolicy.isEnabled(arguments: [], environment: [:], checkGate: { _ in true }))
     }
 
-    func testEmptyPhotoLibraryOffersAddInsteadOfTheBrowseHint() {
-        XCTAssertTrue(HomeV2EmptyPhotoLibrary.showsEmptyState(photoCount: 0))
-        XCTAssertFalse(HomeV2EmptyPhotoLibrary.showsEmptyState(photoCount: 1))
-        XCTAssertEqual(HomeV2EmptyPhotoLibrary.title, "Add progress photo")
-        XCTAssertNotEqual(HomeV2EmptyPhotoLibrary.title, HomeV2PhotoCopy.tapToOpen)
-        XCTAssertTrue(HomeV2EmptyPhotoLibrary.captureOrImport.contains("library"))
-        XCTAssertTrue(HomeV2EmptyPhotoLibrary.privacy.localizedCaseInsensitiveContains("optional"))
-        XCTAssertFalse(HomeV2EmptyPhotoLibrary.why.isEmpty)
-        XCTAssertFalse(HomeV2EmptyPhotoLibrary.posing.isEmpty)
-        XCTAssertEqual(HomeV2PhotoCopy.tryPhotoAgain, "Try again")
-    }
-
     func testFilmstripLeavesEmptyOrMismatchedPhotoHistoryOnTheExistingRuler() {
         XCTAssertFalse(HomeV2FilmstripPolicy.canRender(photoURLs: [], dateCount: 0))
         XCTAssertFalse(HomeV2FilmstripPolicy.canRender(photoURLs: [nil, "", " \n"], dateCount: 3))

@@ -321,4 +321,49 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
     }
+
+    func testNoPhotoAndLoadingKeepThePhotoStageBounds() {
+        let photo = launchStage(fixture: "-lybUITestHomeV2PhotoFixture")
+        let photoCard = photo.descendants(matching: .any)["home_v2_editorial_card"]
+        let photoFrame = photoCard.frame
+        XCTAssertGreaterThan(photoFrame.width, 1)
+        XCTAssertGreaterThan(photoFrame.height, 1)
+        XCTAssertFalse(photo.buttons["launch_timeline_add_photo"].exists)
+        photo.terminate()
+
+        let metrics = launchStage(fixture: "-lybUITestHomeV2Fixture")
+        let metricsCard = metrics.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertEqual(metricsCard.frame.width, photoFrame.width, accuracy: 1)
+        XCTAssertEqual(metricsCard.frame.height, photoFrame.height, accuracy: 1)
+        XCTAssertTrue(metrics.descendants(matching: .any)["home_v2_body_fat_graphic"].exists)
+        let add = metrics.buttons["launch_timeline_add_photo"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.tap()
+        let sheet = metrics.descendants(matching: .any)["progress_photo_attach_sheet"]
+        XCTAssertTrue(sheet.waitForExistence(timeout: 8))
+        metrics.buttons["progress_photo_attach_cancel_button"].tap()
+        metrics.terminate()
+
+        let empty = launchStage(fixture: "-lybUITestHomeV2EmptyFixture")
+        let emptyCard = empty.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertEqual(emptyCard.frame.width, photoFrame.width, accuracy: 1)
+        XCTAssertEqual(emptyCard.frame.height, photoFrame.height, accuracy: 1)
+        XCTAssertTrue(empty.buttons["launch_timeline_add_photo"].exists)
+        empty.terminate()
+
+        let loading = launchStage(fixture: "-lybUITestHomeV2Fixture", state: "Loading")
+        let loadingCard = loading.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertEqual(loadingCard.frame.width, photoFrame.width, accuracy: 1)
+        XCTAssertEqual(loadingCard.frame.height, photoFrame.height, accuracy: 1)
+        XCTAssertFalse(loading.buttons["home_v2_loading_dock"].isEnabled)
+    }
+
+    private func launchStage(fixture: String, state: String? = nil) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture", fixture, "-lybUITestSuppressWhatsNew"]
+        if let state { app.launchArguments.append("-lybUITestHomeV2\(state)Fixture") }
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 30))
+        return app
+    }
 }

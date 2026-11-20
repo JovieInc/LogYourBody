@@ -547,51 +547,6 @@ enum HomeV2Layout {
     }
 }
 
-/// One body-stage frame. A photo, an empty day, a load, a failed load and
-/// offline all use it. Presentation does not change the budget.
-enum HomeV2StagePresentation: Equatable, CaseIterable {
-    case photo
-    case noPhoto
-    case loading
-    case failedLoad
-    case offline
-}
-
-enum HomeV2StageReservation {
-    /// Home's reader is the scroll viewport above the pinned check-in dock.
-    /// `stageHeight` subtracts that dock inside `belowPhotoHeight`, so the
-    /// reservation adds it back. The stage stays 4:5 when the column can hold
-    /// it and drops only to the short-screen floor.
-    static var dockAllowance: CGFloat {
-        JovieTokens.controlHeight + HomeV2Tokens.Space.tight * 2
-    }
-
-    static func size(
-        width: CGFloat,
-        contentHeight: CGFloat,
-        presentation: HomeV2StagePresentation = .photo
-    ) -> CGSize {
-        switch presentation {
-        case .photo, .noPhoto, .loading, .failedLoad, .offline:
-            break
-        }
-        let safeWidth = sanitized(width)
-        let safeContent = sanitized(contentHeight)
-        guard safeWidth > 0, safeContent > 0 else {
-            return CGSize(width: safeWidth, height: 0)
-        }
-        let height = HomeV2Layout.stageHeight(
-            width: safeWidth,
-            height: safeContent + dockAllowance + HomeV2Layout.belowPhotoHeight
-        )
-        return CGSize(width: safeWidth, height: sanitized(height))
-    }
-
-    private static func sanitized(_ value: CGFloat) -> CGFloat {
-        value.isFinite ? max(value, 0) : 0
-    }
-}
-
 /// Values for the editorial fallback come from stored readings, never photo
 /// appearance, a target, or interpolated chart caches.
 enum HomeV2EditorialPolicy {

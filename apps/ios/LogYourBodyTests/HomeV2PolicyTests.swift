@@ -383,60 +383,6 @@ final class HomeV2PolicyTests: XCTestCase {
         XCTAssertEqual(HomeV2Layout.stageHeight(width: 320, height: 300), 200, accuracy: 0.01)
     }
 
-    func testReservedStageUsesTheSameBudgetForEveryPhotoState() {
-        let tallContent: CGFloat = 692
-        let tall = HomeV2StageReservation.size(width: 390, contentHeight: tallContent, presentation: .photo)
-        XCTAssertGreaterThan(tall.width, 0)
-        XCTAssertGreaterThan(tall.height, 0)
-        XCTAssertEqual(tall.height, 390 / HomeV2Tokens.photoAspectRatio, accuracy: 0.01)
-        XCTAssertEqual(
-            tall.height,
-            HomeV2Layout.stageHeight(
-                width: 390,
-                height: tallContent + HomeV2StageReservation.dockAllowance + HomeV2Layout.belowPhotoHeight
-            ),
-            accuracy: 0.01
-        )
-        for presentation in HomeV2StagePresentation.allCases {
-            let size = HomeV2StageReservation.size(
-                width: 390, contentHeight: tallContent, presentation: presentation
-            )
-            XCTAssertEqual(size.width, tall.width, accuracy: 0.01, "\(presentation)")
-            XCTAssertEqual(size.height, tall.height, accuracy: 0.01, "\(presentation)")
-        }
-
-        // The reader sits above the dock, so a viewport a few points under 4:5
-        // still keeps the photo ratio. iPhone 16 is 393pt wide.
-        let almostSquare = HomeV2StageReservation.size(width: 393, contentHeight: 488, presentation: .photo)
-        XCTAssertEqual(almostSquare.height, 393 / HomeV2Tokens.photoAspectRatio, accuracy: 0.01)
-
-        let shortContent: CGFloat = 300
-        let short = HomeV2StageReservation.size(width: 375, contentHeight: shortContent, presentation: .noPhoto)
-        let expectedShort = shortContent + HomeV2StageReservation.dockAllowance
-        XCTAssertEqual(short.height, expectedShort, accuracy: 0.01)
-        XCTAssertLessThan(short.height, 375 / HomeV2Tokens.photoAspectRatio)
-        for presentation in [HomeV2StagePresentation.loading, .failedLoad, .offline, .photo] {
-            let size = HomeV2StageReservation.size(
-                width: 375, contentHeight: shortContent, presentation: presentation
-            )
-            XCTAssertEqual(size.height, short.height, accuracy: 0.01, "\(presentation)")
-        }
-
-        let aboveFloor = HomeV2StageReservation.size(width: 320, contentHeight: 232, presentation: .offline)
-        XCTAssertEqual(aboveFloor.height, 232 + HomeV2StageReservation.dockAllowance, accuracy: 0.01)
-        XCTAssertGreaterThan(aboveFloor.height, HomeV2Layout.minimumStageHeight)
-        XCTAssertLessThan(aboveFloor.height, 320 / HomeV2Tokens.photoAspectRatio)
-
-        let floor = HomeV2StageReservation.size(width: 320, contentHeight: 100, presentation: .loading)
-        XCTAssertEqual(floor.height, HomeV2Layout.minimumStageHeight, accuracy: 0.01)
-
-        let blank = HomeV2StageReservation.size(
-            width: .nan, contentHeight: -.infinity, presentation: .failedLoad
-        )
-        XCTAssertEqual(blank.width, 0, accuracy: 0.01)
-        XCTAssertEqual(blank.height, 0, accuracy: 0.01)
-    }
-
     func testFocusContractCopyReadsAsSentences() {
         XCTAssertEqual(HomeV2Copy.loggedSentence(value: "173.4", unit: "lb"), "Logged 173.4 lb for today")
         XCTAssertEqual(HomeV2Copy.latestPhotoCaption(date: "Sep 25"), "Latest photo · Sep 25")
