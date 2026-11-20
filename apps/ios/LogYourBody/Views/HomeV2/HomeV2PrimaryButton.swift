@@ -94,8 +94,7 @@ struct HomeV2DayZero: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     HomeV2DataHero(metric: nil, metrics: [], unit: "")
-                        .frame(width: geometry.size.width,
-                               height: geometry.size.width / HomeV2Tokens.photoAspectRatio)
+                        .homeV2ReservedStage(width: geometry.size.width, presentation: .noPhoto)
                         .accessibilityIdentifier("home_v2_editorial_card")
 
                     VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {

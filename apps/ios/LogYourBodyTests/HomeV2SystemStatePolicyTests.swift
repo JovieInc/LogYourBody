@@ -59,4 +59,28 @@ final class HomeV2SystemStatePolicyTests: XCTestCase {
         XCTAssertEqual(state(arguments: [HomeV2SystemStatePolicy.loadingFixtureArgument]), .loading)
     }
     #endif
+
+    func testReservedStageMatchesForPhotoEmptyLoadingFailedAndOffline() {
+        let reference = HomeV2StageReservation.size(width: 390, presentation: .photo)
+        XCTAssertEqual(reference.width, 390, accuracy: 0.01)
+        XCTAssertEqual(reference.height, 487.5, accuracy: 0.01)
+        XCTAssertEqual(
+            reference.height,
+            HomeV2Layout.stageHeight(width: 390, height: 2_000),
+            accuracy: 0.01
+        )
+        for presentation in HomeV2StagePresentation.allCases {
+            let size = HomeV2StageReservation.size(width: 390, presentation: presentation)
+            XCTAssertEqual(size.width, reference.width, accuracy: 0.01, "\(presentation)")
+            XCTAssertEqual(size.height, reference.height, accuracy: 0.01, "\(presentation)")
+        }
+        for presentation in [HomeV2StagePresentation.loading, .failedLoad, .offline, .noPhoto] {
+            let blank = HomeV2StageReservation.size(width: .nan, presentation: presentation)
+            XCTAssertEqual(blank.width, 0, accuracy: 0.01)
+            XCTAssertEqual(blank.height, 0, accuracy: 0.01)
+            let negative = HomeV2StageReservation.size(width: -12, presentation: presentation)
+            XCTAssertEqual(negative.width, 0, accuracy: 0.01)
+            XCTAssertEqual(negative.height, 0, accuracy: 0.01)
+        }
+    }
 }
