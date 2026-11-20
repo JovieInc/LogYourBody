@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { homeStageAspectGaps } from './home-stage-reservation';
+import { homePhotoStageFindings } from './home-stage-reservation';
 
 const read = (path: string) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8');
 const home = 'apps/ios/LogYourBody/Views/HomeV2/';
@@ -14,7 +14,7 @@ it('composes the glass filmstrip inside the existing ruler and selection callbac
   expect(ruler).toContain('onSelect(index)');
   expect(ruler).not.toMatch(/@State[^\n]*(?:selected|selection)/);
   expect(surface).toContain('photoURLs: timeline.metrics.reversed().map(\\.photoUrl)');
-  expect(homeStageAspectGaps(surface, read(`${home}HomeV2SystemStates.swift`))).toEqual([]);
+  expect(homePhotoStageFindings(surface, read(`${home}HomeV2SystemStates.swift`))).toEqual([]);
   expect(viewer).toContain('photoURLs: chronological.map { bodyMetrics[$0].photoUrl }');
   const strip = surface.slice(
     surface.indexOf('struct HomeV2Filmstrip: View'),
@@ -28,6 +28,20 @@ it('composes the glass filmstrip inside the existing ruler and selection callbac
   const ui = read('apps/ios/LogYourBodyUITests/HomeV2PhotoViewerLayoutUITests.swift');
   expect(ui).toContain('assertGlassFilmstripKeepsPhotoDateAndWeightTogether(in: app)');
   expect(ui).toContain('"-lybUITestGlassFilmstrip"');
+});
+
+it('rejects a Home card that leaves the shared photo-stage reservation', () => {
+  const inline = 'height: geometry.size.width / HomeV2Tokens.photoAspectRatio';
+  const reserved = 'enum HomeV2StageReservation {} func homeV2ReservedStage';
+  expect(homePhotoStageFindings(inline, reserved)).toContain(
+    'HomeV2Surface sizes the timeline outside HomeV2StageReservation',
+  );
+  const surface = 'HomeV2StageReservation.size(\nhasPhoto ? .photo : .noPhoto\n';
+  const dropped =
+    'enum HomeV2StageReservation { case .photo, .noPhoto, .loading, .failedLoad, .offline: height = 1 } func homeV2ReservedStage';
+  expect(homePhotoStageFindings(surface, dropped)).toEqual([
+    'HomeV2StageReservation drops HomeV2Tokens.photoAspectRatio',
+  ]);
 });
 
 it('decodes filmstrip images directly to thumbnail pixels and isolates their cache entries', () => {

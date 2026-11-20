@@ -1,38 +1,46 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { homeStageAspectGaps } from './home-stage-reservation';
+import { homePhotoStageFindings } from './home-stage-reservation';
 
 const read = (path: string) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8');
 
-const sharedArm = `case .photo, .noPhoto, .loading, .failedLoad, .offline:
-            height = safeWidth / HomeV2Tokens.photoAspectRatio`;
+const reservedSurface = `HomeV2StageReservation.size(
+                            width: geometry.size.width,
+                            presentation: hasPhoto ? .photo : .noPhoto`;
 
-const reservedSurface = `size: HomeV2StageReservation.size(
-                            width: geometry.size.width,`;
+const sharedArm = `enum HomeV2StageReservation {
+        case .photo, .noPhoto, .loading, .failedLoad, .offline:
+            height = safeWidth / HomeV2Tokens.photoAspectRatio
+        }
+func homeV2ReservedStage`;
 
-it('accepts the shared Home stage reservation and rejects the old inline height', () => {
-  expect(homeStageAspectGaps(reservedSurface, sharedArm)).toEqual([]);
+it('accepts the shared Home stage reservation and rejects a formula outside that arm', () => {
+  expect(homePhotoStageFindings(reservedSurface, sharedArm)).toEqual([]);
   expect(
-    homeStageAspectGaps(
+    homePhotoStageFindings(
       'size: CGSize(width: geometry.size.width, height: geometry.size.width / HomeV2Tokens.photoAspectRatio),',
       sharedArm,
     ),
-  ).toContain('Home surface does not size the card with HomeV2StageReservation.size');
+  ).toContain('HomeV2Surface sizes the timeline outside HomeV2StageReservation');
   expect(
-    homeStageAspectGaps(reservedSurface, 'case .photo:\n            height = safeWidth'),
-  ).toContain(
-    'Home stage reservation does not share one 4:5 arm for photo, empty, loading, failed and offline',
-  );
-  expect(
-    homeStageAspectGaps(
+    homePhotoStageFindings(
       reservedSurface,
-      'case .photo, .noPhoto, .loading, .failedLoad, .offline:\n            height = safeWidth',
+      'enum HomeV2StageReservation { case .photo: height = safeWidth / HomeV2Tokens.photoAspectRatio } func homeV2ReservedStage',
     ),
-  ).toContain('shared Home stage arm omits height = safeWidth / HomeV2Tokens.photoAspectRatio');
+  ).toContain('HomeV2StageReservation does not keep a photo on the shared frame');
+  const formulaBeforeArm = `enum HomeV2StageReservation {
+        height = safeWidth / HomeV2Tokens.photoAspectRatio
+        case .photo, .noPhoto, .loading, .failedLoad, .offline:
+            height = safeWidth
+        }
+func homeV2ReservedStage`;
+  expect(homePhotoStageFindings(reservedSurface, formulaBeforeArm)).toEqual([
+    'HomeV2StageReservation drops HomeV2Tokens.photoAspectRatio',
+  ]);
 });
 
 it('keeps the checked-in Home card on the shared 4:5 reservation', () => {
   const surface = read('apps/ios/LogYourBody/Views/HomeV2/HomeV2Surface.swift');
   const reservation = read('apps/ios/LogYourBody/Views/HomeV2/HomeV2SystemStates.swift');
-  expect(homeStageAspectGaps(surface, reservation)).toEqual([]);
+  expect(homePhotoStageFindings(surface, reservation)).toEqual([]);
 });
