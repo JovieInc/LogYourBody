@@ -36,6 +36,7 @@ final class MetricStatsSeriesStoreTests: XCTestCase {
         let third = store.summaries(selectedNow)
         XCTAssertEqual(store.buildCount, 1)
         XCTAssertEqual(third[.weight]?.point?.value, 71)
+        XCTAssertEqual(third[.bodyFat]?.point?.value, 20, "A later selected date still reads the daily cache")
         XCTAssertEqual(store.cardPoints(for: .weight, selectedNow).last?.value, 71)
         XCTAssertEqual(store.rangeStats(for: .weight, selectedNow)?.startValue, 70)
         XCTAssertEqual(store.buildCount, 1)
@@ -160,7 +161,7 @@ final class MetricStatsSeriesStoreTests: XCTestCase {
         let earlier = now.addingTimeInterval(-86_400)
         return [
             .weight: [point(earlier, weight.0), point(now, weight.1)],
-            .bodyFat: [point(now, bodyFat)],
+            .bodyFat: [point(earlier, bodyFat), point(now, bodyFat)],
             .steps: [point(now, steps)],
             .ffmi: [point(now, 21)]
         ]
@@ -170,7 +171,7 @@ final class MetricStatsSeriesStoreTests: XCTestCase {
         let earlier = now.addingTimeInterval(-86_400)
         return [
             .weight: [point(earlier, weight.0), point(now, weight.1)],
-            .bodyFat: [point(now, bodyFat)]
+            .bodyFat: [point(earlier, bodyFat), point(now, bodyFat)]
         ]
     }
 
