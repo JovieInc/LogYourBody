@@ -86,7 +86,15 @@ test('repeated main merges retain every earlier receipt and reject one-sided res
     }
     writeFileSync(ledger, resolved);
     git('add', ledgerPath);
-    assert.equal(runClassifier(['--check-merge', root], quiet), 0);
+    const messages = [];
+    assert.equal(runClassifier(['--check-merge', root], {
+      log: (message) => messages.push(message),
+      error: (message) => assert.fail(message),
+    }), 0);
+    assert.equal(
+      messages.at(-1),
+      `correction-classifier: verified ${expected.length} staged receipts against merge parents ${git('rev-parse', 'HEAD').trim()} ${git('rev-parse', 'MERGE_HEAD').trim()}`,
+    );
     assert.equal(runClassifier(['--resolve-merge', root, '--stage'], quiet), 0);
     assert.deepEqual(JSON.parse(git('show', `:0:${ledgerPath}`)), expected);
     git('commit', '-m', `test: integrate main ${round}`);
@@ -372,6 +380,20 @@ test('configured git merge unions consecutive correction ledgers and keeps diver
     [rows[2].fingerprint, rows[0].fingerprint, shared.fingerprint],
   );
   assert.equal(git('diff', '--name-only', '--diff-filter=U'), '');
+  const quiet = { log() {}, error: (message) => assert.fail(message) };
+  assert.equal(runClassifier(['--check-merge', root], quiet), 0);
+  const mergedLedger = readFileSync(ledger, 'utf8');
+  writeLedger([rows[2], rows[0]]);
+  git('add', '--', 'packages/shared-lib/corrections.json');
+  const errors = [];
+  assert.equal(runClassifier(['--check-merge', root], {
+    log() {},
+    error: (message) => errors.push(message),
+  }), 1);
+  assert.match(errors.at(-1), /regression: removed (?:rule|receipt)/);
+  writeFileSync(ledger, mergedLedger);
+  git('add', '--', 'packages/shared-lib/corrections.json');
+  assert.equal(runClassifier(['--check-merge', root], quiet), 0);
   git('commit', '-m', 'test: first automatic ledger merge');
   git('switch', 'right');
   writeFileSync(join(root, rows[3].guard.path), rows[3].guard.anchor);

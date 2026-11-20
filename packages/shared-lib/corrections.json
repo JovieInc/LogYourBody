@@ -1,27 +1,5 @@
 [
   {
-    "fingerprint": "launch-repair-required-model-fixture",
-    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44637333971/job/135960119530",
-    "correction": "PR #1831 / LYB-379, fix-red-5df69c1e5f: Launch Quality failed saving a body metric fixture with nil required timestamps before the repair ran; CI Summary reflects that failure.",
-    "mechanization": "Use valid required timestamps and retain the missing localDate repair scenario. Extend the existing required metric boundary suite to inspect directly inserted body metric fixtures against the current Core Data model and reject explicit nil assignments to required attributes before a save. The real fixture fails for createdAt, date and updatedAt before the repair and passes afterwards; negative controls cover required and optional fields. The harness owns push and PR edits and must add exactly one line: Machine: built packages/shared-lib/src/metric-correction-boundary.test.ts. Native execution remains unverified on Linux.",
-    "classification": {
-      "codebase": {
-        "feasible": false,
-        "rationale": "Core Data already enforces mandatory fields at save time; intentional validation-failure tests must remain possible, so the fixture cannot be made valid by a production model change."
-      },
-      "static": {
-        "feasible": true,
-        "rationale": "The existing required metric boundary suite can compare direct fixture insertions and explicit nil assignments against the active model before native execution."
-      }
-    },
-    "guard": {
-      "path": "packages/shared-lib/src/metric-correction-boundary.test.ts",
-      "anchor": "keeps inserted body metric test fixtures compatible with the current model"
-    },
-    "level": "static",
-    "ruleId": "ci-invariant"
-  },
-  {
     "fingerprint": "uptime-probe-clean-merge-source-map-repair",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44613098410/job/135874773505",
     "correction": "PR #1828 LYB-386, fix-red-1423773703 occurrence 22: merge main and repair Detect Changes, CI Summary and parity after a bot commit leaves the repository source map stale. The harness owns push and PR updates.",
@@ -8697,5 +8675,115 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-380-automatic-ledger-merge-verification",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1830",
+    "correction": "PR #1830 LYB-380, fix-red-e3b0c44298 occurrence 116: merge origin/main without rebasing to resolve a correction ledger conflict; no checks have failed.",
+    "mechanization": "Use the existing correction ledger merge driver and extend its required real-Git regression to run the staged verifier after an automatic union, reject a staged ledger missing a parent receipt, and accept the restored union. Verify this merge against both parents with the same classifier. The harness owns PR edits and must add exactly one line: Machine: built scripts/correction-classifier-concurrency.test.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The existing driver already automatically unions additive receipts and the verifier rejects regressions; the missing protection is a combined regression exercising both in the same Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required classifier fixture can exercise an automatic merge and assert that staged verification rejects a dropped parent receipt."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier-concurrency.test.mjs",
+      "anchor": "configured git merge unions consecutive correction ledgers and keeps divergent edits conflicted"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "xctest-await-and-optional-accuracy",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44617120870",
+    "correction": "PR #1830 / LYB-380, fix-red-5df69c1e5f occurrence 14: Launch Quality run 44617120870 fails to compile ProgressPhotoImagePipelineTests and ImageCacheServiceTests. await sits inside XCTUnwrap, and optional pixel widths are passed to XCTAssertEqual accuracy. CI Summary fails only because that job fails. origin/main is already merged. The harness owns push and PR edits.",
+    "mechanization": "Extend the existing optional-CGFloat launch audit to reject await inside an XCTest autoclosure and an uncoalesced optional chain in an accuracy assertion. The audit reports those five findings on the failing sources and none after awaiting outside XCTUnwrap and unwrapping the bitmap. Coalesced values and XCTUnwrap or Double wrappers stay allowed. The existing required launch UI behavior suite covers the failing shapes, the repaired calls and the wired contribute hook. Keep every product assertion, selector, timeout and gate. The harness must add exactly one PR-body line: Machine: built scripts/ios/launch_ui_opacity_audit.py. Native execution remains for the macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Sized photo decode stays async. Production code cannot stop a later test from placing await inside an XCTest autoclosure or passing an optional pixel width to an accuracy assertion."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing launch UI opacity audit already rejects optional CGFloat conversions that fail to compile. Extending that audit rejects both recorded XCTest shapes before Launch Quality builds."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_opacity_audit.py",
+      "anchor": "Await outside an XCTest autoclosure; unwrap optional pixels before accuracy."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "performance-signpost-registry-contract-merge",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1830",
+    "correction": "PR #1830 / LYB-380, fix-red-e3b0c44298 occurrence 114: merge main's opt-in performance tracing with timeline photo instrumentation and retain the decode signpost in the surface contract.",
+    "mechanization": "Extend the required Swift performance audit to reject a missing or nonliteral Swift signpost registry and names absent from the performance contract. Its behavior tests cover missing and valid registrations. The merged checkout failed both the existing call check and the new registry check before the contract entry was added; both pass afterward. The harness owns the PR body and must add exactly one line: Machine: built scripts/ios/swift_performance_scan.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The Swift registry and JSON surface contract are maintained in different languages and cannot share a runtime definition without changing the instrumentation architecture."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing performance audit can compare the literal Swift registry against the contract during the required static audit."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/swift_performance_scan.py",
+      "anchor": "Keep the Swift test registry aligned with the merged performance contract."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "launch-repair-required-model-fixture",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44637333971/job/135960119530",
+    "correction": "PR #1831 / LYB-379, fix-red-5df69c1e5f: Launch Quality failed saving a body metric fixture with nil required timestamps before the repair ran; CI Summary reflects that failure.",
+    "mechanization": "Use valid required timestamps and retain the missing localDate repair scenario. Extend the existing required metric boundary suite to inspect directly inserted body metric fixtures against the current Core Data model and reject explicit nil assignments to required attributes before a save. The real fixture fails for createdAt, date and updatedAt before the repair and passes afterwards; negative controls cover required and optional fields. The harness owns push and PR edits and must add exactly one line: Machine: built packages/shared-lib/src/metric-correction-boundary.test.ts. Native execution remains unverified on Linux.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Core Data already enforces mandatory fields at save time; intentional validation-failure tests must remain possible, so the fixture cannot be made valid by a production model change."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required metric boundary suite can compare direct fixture insertions and explicit nil assignments against the active model before native execution."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/metric-correction-boundary.test.ts",
+      "anchor": "keeps inserted body metric test fixtures compatible with the current model"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "merge-independent-python-functions",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1831",
+    "correction": "PR #1831 / LYB-379, fix-red-e3b0c44298 occurrence 118: merge main without rebasing and preserve independent performance scanner functions and tests from both parents.",
+    "mechanization": "Extend the existing merge repair resolver with a review-only union for independently inserted Python functions. The real Git regression fails against the previous resolver and passes with the extension, including refusal of conflicting replacements. Use the resolver for both performance scanner conflicts. The required pre-commit lint suite imports the resolver tests. The harness owns PR edits and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Independent branch additions cannot be prevented from colliding at a shared insertion point by production code."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing merge repair tool can propose a conservative union from immutable Git stages and refuse overlapping changes."
+      }
+    },
+    "guard": {
+      "path": "scripts/python_union.py",
+      "anchor": "Propose a reviewed union of independently inserted Python functions."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

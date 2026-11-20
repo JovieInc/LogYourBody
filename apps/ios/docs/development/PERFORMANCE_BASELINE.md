@@ -24,14 +24,15 @@ unverified. The static guard is `scripts/ios/swift-performance-guard.py`.
 Thin wrapper over `OSSignposter` (category `perf`). Use it to time hot paths so they
 show up as intervals in Instruments' **os_signpost** / **Points of Interest** track.
 
-| Signpost name                  | Where                                            | Measures                                            |
-| ------------------------------ | ------------------------------------------------ | --------------------------------------------------- |
-| `launch_first_dashboard_frame` | `LaunchMetrics.markFirstDashboardFrame()`        | Launch → first dashboard frame (point event)        |
-| `launch_repair`                | `BodyMetricLaunchRepair.runOnBackgroundContext`  | Once-per-generation body-metric repair, or the skip |
-| `scrub_select_closest`         | `selectClosestMetric(to:)`                       | Timeline header cursor → metric selection           |
-| `scrub_update_animated_values` | `updateAnimatedValues(for:)`                     | Per-index hero value recompute (3× interpolation)   |
-| `dashboard_derived_refresh`    | `scheduleDashboardDerivedStateRefresh(...)`      | Derived-state rebuild on data/index change          |
-| `chart_generate` / `_async`    | `MetricChartDataHelper.generateChartData[Async]` | Sparkline/chart compute (cache miss cost)           |
+| Signpost name                  | Where                                               | Measures                                            |
+| ------------------------------ | --------------------------------------------------- | --------------------------------------------------- |
+| `launch_first_dashboard_frame` | `LaunchMetrics.markFirstDashboardFrame()`           | Launch → first dashboard frame (point event)        |
+| `launch_repair`                | `BodyMetricLaunchRepair.runOnBackgroundContext`     | Once-per-generation body-metric repair, or the skip |
+| `scrub_select_closest`         | `selectClosestMetric(to:)`                          | Timeline header cursor → metric selection           |
+| `scrub_update_animated_values` | `updateAnimatedValues(for:)`                        | Per-index hero value recompute (3× interpolation)   |
+| `dashboard_derived_refresh`    | `scheduleDashboardDerivedStateRefresh(...)`         | Derived-state rebuild on data/index change          |
+| `chart_generate` / `_async`    | `MetricChartDataHelper.generateChartData[Async]`    | Sparkline/chart compute (cache miss cost)           |
+| `timeline_photo_decode`        | `ProgressPhotoImagePipeline.decodeAndOptimizeImage` | Timeline photo decode at the destination pixel size |
 
 API: `PerfSignpost.measure("name") { ... }`, `begin/end`, `event("name", "msg")`.
 

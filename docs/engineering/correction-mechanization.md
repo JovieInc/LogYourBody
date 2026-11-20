@@ -147,6 +147,11 @@ The staged source-map check verifies the same parent binding inputs.
 
 For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
 merges and classifies the correction ledger after other conflicts are resolved.
+For independent Python function insertions at the same location,
+`python3 scripts/resolve-repository-docs.py --union-python <path>` prints a
+proposal from the three indexed parents. It refuses changes to existing conflict
+content, duplicate names in the conflict, incomplete functions, and invalid
+Python. Review the proposal and stage it explicitly; it never writes the file.
 `python3 scripts/resolve-repository-docs.py --merge-sections docs/<path>.md`
 prints a proposal retaining both parents' independent paragraph insertions, or
 new incoming standalone sections. Review and stage the proposal explicitly;

@@ -18,6 +18,12 @@ import Foundation
 import os
 
 enum PerfSignpost {
+    /// Instruments names this binary is allowed to emit. Photo decode tests fail
+    /// if `timeline_photo_decode` drops out of this list.
+    static let registeredNames = [
+        "timeline_photo_decode"
+    ]
+
     #if LYB_PERF_TRACE
     private static let signposter = OSSignposter(
         subsystem: Bundle.main.bundleIdentifier ?? "LogYourBody",

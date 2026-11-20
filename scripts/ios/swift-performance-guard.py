@@ -22,6 +22,7 @@ from swift_performance_scan import (  # noqa: E402
     fall_only_errors,
     mask_non_code,
     ratchet_errors,
+    registered_signpost_errors,
     scan_source,
     signpost_errors,
     signpost_surface_errors,
@@ -348,7 +349,9 @@ def evaluate(root: Path, base_ref: str | None = "origin/main", device_payload: o
         errors.extend(signpost_surface_errors(text, relative, signpost_owners, surface_files))
     signpost_path = root / "apps/ios/LogYourBody/Utils/PerfSignpost.swift"
     if signpost_path.is_file():
-        errors.extend(trace_gate_errors(signpost_path.read_text(errors="replace")))
+        signpost_text = signpost_path.read_text(errors="replace")
+        errors.extend(trace_gate_errors(signpost_text))
+        errors.extend(registered_signpost_errors(signpost_text, allowed_signposts(contract)))
     else:
         errors.append("PerfSignpost.swift is missing")
     report = interaction_report(root, contract, base_ref=base_ref)

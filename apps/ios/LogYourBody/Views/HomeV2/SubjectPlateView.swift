@@ -37,6 +37,7 @@ struct SubjectPlateView: View {
     @State private var focus: CGPoint?
     @State private var stageSized = false
     @State private var showsRetry = false
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         ZStack {
@@ -132,7 +133,11 @@ struct SubjectPlateView: View {
         plate = nil
         stageSized = false
 
-        guard let image = await ImageCacheService.shared.loadImage(from: urlString), !Task.isCancelled else {
+        guard let pixels = ProgressPhotoImagePipeline.targetMaxPixelSize(points: safeSize, scale: displayScale) else {
+            return
+        }
+        guard let image = await ImageCacheService.shared.loadImage(from: urlString, maxPixelSize: pixels),
+              !Task.isCancelled else {
             return
         }
         original = image

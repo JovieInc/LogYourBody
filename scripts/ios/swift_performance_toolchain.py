@@ -172,4 +172,3 @@ def toolchain_drift_errors(live: dict, committed: dict) -> list[str]:
     if live == committed:
         return []
     return ["toolchain receipt drifted from the Xcode project: " + json.dumps(live, sort_keys=True)]
-

@@ -78,6 +78,13 @@ class SwiftPerformanceContractTests(unittest.TestCase):
         covered = guard.signpost_surface_errors(text, path, owners, {"launch-auth-onboarding": {path}})
         self.assertEqual(covered, [])
 
+    def test_registered_signposts_must_survive_contract_merges(self):
+        source = 'static let registeredNames = ["timeline_photo_decode"]'
+        self.assertTrue(guard.registered_signpost_errors(source, set()))
+        self.assertEqual(guard.registered_signpost_errors(source, {"timeline_photo_decode"}), [])
+        self.assertTrue(guard.registered_signpost_errors('static let registeredNames = [dynamicName]', set()))
+        self.assertTrue(guard.registered_signpost_errors('', set()))
+
     def test_drifted_toolchain_receipt(self):
         project = (ROOT / guard.PROJECT_REL).read_text()
         live = guard.build_toolchain_receipt(project)
