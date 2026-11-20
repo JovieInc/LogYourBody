@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Selected-date body fat must come from the daily chart, not a later or trend sample.
+"""Selected-date observations must come from the daily chart, not a later or trend sample.
 
-Launch Quality run 44689925709 failed
-MetricStatsSeriesStoreTests.testSummariesBuildOnceForTheSameFingerprintAndSkipASelectedDateChange
-because the only daily body-fat point was after the selected date. The summary
-correctly returned nil. This check fails before that native suite runs.
+Launch Quality run 44689925709 failed the body-fat summary because its only daily
+sample was after the selected date. Run 44695708691 then showed the weight card
+at the smoothed trend (181.7) while the detail headline stayed on the daily
+sample (181.0). This check fails before that native suite runs.
 """
 
 from pathlib import Path
@@ -18,8 +18,11 @@ WRONG_EXPECTATION = 'selected-date body-fat assertion does not expect the daily 
 LOST_DAILY = 'body-fat summary lost the daily chart'
 LOST_DATE = 'body-fat summary lost the selected date'
 READS_TREND = 'body-fat summary reads the trend cache'
-LOST_WEIGHT = 'weight summary lost the trend series'
+LOST_WEIGHT = 'weight summary lost the daily chart'
 LOST_WEIGHT_DATE = 'weight summary lost the selected date'
+READS_WEIGHT_TREND = 'weight summary reads the trend cache'
+SAME_WEIGHT = 'daily and trend weight values must differ'
+WRONG_WEIGHT = 'selected-date weight assertion does not expect the daily cache value'
 
 STORE = Path('apps/ios/LogYourBody/Helpers/MetricStatsSeriesStore.swift')
 TESTS = Path('apps/ios/LogYourBodyTests/MetricStatsSeriesStoreTests.swift')
@@ -54,6 +57,20 @@ def _body_fat_literal(method, function):
     return match.group(1).replace('_', '') if match else ''
 
 
+def _weight_pair(method, function):
+    match = re.search(
+        rf'\b{function}\(\s*weight:\s*\(\s*([0-9][0-9_]*)\s*,\s*([0-9][0-9_]*)',
+        method)
+    if not match:
+        return None
+    return tuple(part.replace('_', '') for part in match.groups())
+
+
+def _weight_assertion(method, name):
+    match = re.search(rf'{name}\[\.weight\]\?\.point\?\.value,\s*([0-9_]+)', method)
+    return match.group(1).replace('_', '') if match else ''
+
+
 def findings(store, tests):
     """Return contract misses. An empty list is the only passing result."""
     found = []
@@ -61,8 +78,10 @@ def findings(store, tests):
     summaries = match.group(0) if match else ''
     weight = _between(summaries, '.weight:', '.bodyFat:')
     fat = _between(summaries, '.bodyFat:', '.ffmi:')
-    if 'weightSeries(usesTrend:' not in summaries:
+    if 'points: chart[.weight]' not in weight:
         found.append(LOST_WEIGHT)
+    if 'weightSeries' in weight or 'trend[.weight]' in weight:
+        found.append(READS_WEIGHT_TREND)
     if 'selectedDate: input.selectedDate' not in weight:
         found.append(LOST_WEIGHT_DATE)
     if 'points: chart[.bodyFat]' not in fat:
@@ -83,6 +102,19 @@ def findings(store, tests):
     expected = re.search(r'first\[\.bodyFat\]\?\.point\?\.value,\s*([0-9_]+)', method)
     if not expected or expected.group(1).replace('_', '') != daily:
         found.append(WRONG_EXPECTATION)
+    daily_weight = _weight_pair(method, 'chart')
+    trend_weight = _weight_pair(method, 'trend')
+    if (
+        not daily_weight or not trend_weight
+        or daily_weight[0] == trend_weight[0] or daily_weight[1] == trend_weight[1]
+    ):
+        found.append(SAME_WEIGHT)
+    if (
+        not daily_weight
+        or _weight_assertion(method, 'first') != daily_weight[0]
+        or _weight_assertion(method, 'third') != daily_weight[1]
+    ):
+        found.append(WRONG_WEIGHT)
     return found
 
 
@@ -110,6 +142,19 @@ def check_repository(root):
         'points: chart[.bodyFat] ?? [], range: input.range,',
         1)
     _require(findings(dropped_date, tests), LOST_DATE)
+    trend_weight = store.replace(
+        'points: chart[.weight]',
+        'points: weightSeries(usesTrend: input.weightUsesTrend)',
+        1)
+    _require(findings(trend_weight, tests), READS_WEIGHT_TREND)
+    _require(findings(trend_weight, tests), LOST_WEIGHT)
+    _require(
+        findings(store, tests.replace(
+            'third[.weight]?.point?.value, 81', 'third[.weight]?.point?.value, 71', 1)),
+        WRONG_WEIGHT)
+    _require(
+        findings(store, tests.replace('trend(weight: (70, 71)', 'trend(weight: (80, 81)', 1)),
+        SAME_WEIGHT)
 
 
 def main():

@@ -96,12 +96,13 @@ final class MetricStatsSeriesStore {
 
     func summaries(_ input: Input) -> [ContextualMetricKind: MetricObservationSummary] {
         guard adopt(input) else { return [:] }
-        let weight = weightSeries(usesTrend: input.weightUsesTrend)
+        // The detail headline reads this daily chart. A smoothed trend must not
+        // replace a measured weight on the stats card.
         return [
             .steps: MetricObservationSummary(
                 points: chart[.steps] ?? [], range: input.range, now: input.now, calendar: input.calendar),
             .weight: MetricObservationSummary(
-                points: weight, range: input.range, selectedDate: input.selectedDate,
+                points: chart[.weight] ?? [], range: input.range, selectedDate: input.selectedDate,
                 now: input.now, calendar: input.calendar),
             .bodyFat: MetricObservationSummary(
                 points: chart[.bodyFat] ?? [], range: input.range, selectedDate: input.selectedDate,

@@ -26,7 +26,7 @@ final class MetricStatsSeriesStoreTests: XCTestCase {
         let second = store.summaries(input)
         XCTAssertEqual(store.buildCount, 1)
         XCTAssertEqual(misses, 0)
-        XCTAssertEqual(first[.weight]?.point?.value, 70)
+        XCTAssertEqual(first[.weight]?.point?.value, 80, "Weight observation stays on the daily cache")
         XCTAssertEqual(second[.weight]?.point?.date, first[.weight]?.point?.date)
         XCTAssertEqual(first[.steps]?.point?.value, 1_000)
         XCTAssertEqual(first[.bodyFat]?.point?.value, 20, "Body fat stays on the daily cache")
@@ -35,7 +35,7 @@ final class MetricStatsSeriesStoreTests: XCTestCase {
         selectedNow.selectedDate = now
         let third = store.summaries(selectedNow)
         XCTAssertEqual(store.buildCount, 1)
-        XCTAssertEqual(third[.weight]?.point?.value, 71)
+        XCTAssertEqual(third[.weight]?.point?.value, 81, "A later selected date still reads the daily weight cache")
         XCTAssertEqual(third[.bodyFat]?.point?.value, 20, "A later selected date still reads the daily cache")
         XCTAssertEqual(store.cardPoints(for: .weight, selectedNow).last?.value, 71)
         XCTAssertEqual(store.rangeStats(for: .weight, selectedNow)?.startValue, 70)
@@ -54,7 +54,7 @@ final class MetricStatsSeriesStoreTests: XCTestCase {
             selectedDate: now,
             onMiss: { misses += 1 }
         )
-        XCTAssertEqual(store.summaries(warm)[.weight]?.point?.value, 71)
+        XCTAssertEqual(store.summaries(warm)[.weight]?.point?.value, 81)
         XCTAssertEqual(store.buildCount, 1)
 
         var gap = warm
@@ -66,13 +66,13 @@ final class MetricStatsSeriesStoreTests: XCTestCase {
         let during = store.summaries(gap)
         XCTAssertEqual(misses, 1)
         XCTAssertEqual(store.buildCount, 1)
-        XCTAssertEqual(during[.weight]?.point?.value, 70)
-        XCTAssertEqual(store.summaries(gap)[.weight]?.point?.value, 70)
+        XCTAssertEqual(during[.weight]?.point?.value, 80)
+        XCTAssertEqual(store.summaries(gap)[.weight]?.point?.value, 80)
         XCTAssertEqual(misses, 1)
 
         var stillReady = gap
         stillReady.ready = true
-        XCTAssertEqual(store.summaries(stillReady)[.weight]?.point?.value, 70)
+        XCTAssertEqual(store.summaries(stillReady)[.weight]?.point?.value, 80)
         XCTAssertEqual(misses, 1)
         XCTAssertEqual(store.buildCount, 1)
 
@@ -85,7 +85,7 @@ final class MetricStatsSeriesStoreTests: XCTestCase {
 
         var rebuilt = warm
         rebuilt.fingerprint = 9
-        XCTAssertEqual(store.summaries(rebuilt)[.weight]?.point?.value, 71)
+        XCTAssertEqual(store.summaries(rebuilt)[.weight]?.point?.value, 81)
         XCTAssertEqual(store.buildCount, 2)
     }
 
@@ -104,8 +104,8 @@ final class MetricStatsSeriesStoreTests: XCTestCase {
             chart: chart, trend: trend, fingerprint: fingerprint, ready: true,
             selectedDate: now, onMiss: { misses += 1 }
         )
-        XCTAssertEqual(store.summaries(input)[.weight]?.point?.value, 71)
-        XCTAssertEqual(store.summaries(input)[.weight]?.point?.value, 71)
+        XCTAssertEqual(store.summaries(input)[.weight]?.point?.value, 81)
+        XCTAssertEqual(store.summaries(input)[.weight]?.point?.value, 81)
         XCTAssertEqual(store.buildCount, 1)
         XCTAssertEqual(misses, 0)
 
