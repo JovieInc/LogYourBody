@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "home-photo-stage-reserved-aspect",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44709065326/job/136197157671",
+    "correction": "PR #1837 / LYB-291 repair, fix-red-1a39536f40 occurrence 6: JavaScript/TypeScript run 44709065326 failed glass-filmstrip and personal-body-estimate source contracts after main moved the Home card onto HomeV2StageReservation. CI Summary failed only because that job failed. Merge origin/main without rebasing and keep the adherence-window detector.",
+    "mechanization": "Extend the Home source contracts with one reservation checker. The surface must size the timeline through HomeV2StageReservation, and that reservation must keep a photo on the shared frame with HomeV2Tokens.photoAspectRatio. The estimate canvas must stay on that reserved stage. The inline call-site formula fails the checker; dropping the aspect ratio fails it; the merged tree passes. Both existing required shared-lib tests call the checker. No gate, timeout, or assertion outside this contract is relaxed. The harness owns push and PR edits and must add exactly one line: Machine: built packages/shared-lib/src/home-stage-reservation.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The Home view cannot stop a shared-lib source contract from pinning a call-site formula after an iOS-only change moves that formula into HomeV2StageReservation. The JavaScript job does not run for that iOS-only change."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib suite can require the surface and the estimate overlay to use HomeV2StageReservation, and require that reservation to keep the photo presentation on HomeV2Tokens.photoAspectRatio."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/home-stage-reservation.ts",
+      "anchor": "Source contracts follow HomeV2StageReservation"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
     "fingerprint": "uptime-probe-clean-merge-source-map-repair",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44613098410/job/135874773505",
     "correction": "PR #1828 LYB-386, fix-red-1423773703 occurrence 22: merge main and repair Detect Changes, CI Summary and parity after a bot commit leaves the repository source map stale. The harness owns push and PR updates.",
