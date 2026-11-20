@@ -47,13 +47,13 @@ extension DashboardViewLiquid {
             .photoUrl
     }
 
-    /// Weekly check-in attaches to today, even if the timeline is scrubbed elsewhere.
+    /// A weekly check-in creates a photo observation, independent of the selected entry.
     func presentWeeklyPhotoCheckIn() {
         if isDatedTimelineEnabled {
             guard datedTimelineIsOwned else { return }
         }
         progressPhotoAttachFallbackOverride = Date()
-        progressPhotoAttachTarget = homeV2DisplayedTodayMetric()
+        progressPhotoAttachTarget = nil
         HapticManager.shared.selection()
         isProgressPhotoAttachPresented = true
     }
