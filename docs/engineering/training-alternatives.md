@@ -6,7 +6,7 @@ It offers at most one different exercise and one same-exercise setup for
 non-pain back/trunk fatigue. `setupOf` establishes movement identity; shared
 muscle targeting does not make two exercises the same movement.
 
-The existing 25 curated catalog metadata entries bound this first release:
+The existing 26 curated catalog metadata entries bound this first release:
 upper chest, lateral delts, lats, arms and lower body. There is no new library,
 biomechanical simulator or numerical SFR score. Expected qualitative trunk
 requirements remain separate from observed trunk fatigue and do not measure

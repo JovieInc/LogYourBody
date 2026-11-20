@@ -180,6 +180,18 @@
     }
   },
   {
+    "id": "supported_cable_floor_curl",
+    "targetRegion": "biceps",
+    "support": "back",
+    "romSetupCaveat": "Floor contact limits upper-arm travel, and the cable needs clearance at the bottom. Record that clearance and the chosen range before comparing this setup with a standing or bench-supported curl.",
+    "toleranceTags": {
+      "axialTrunkFatigue": ["floor contact may reduce trunk demand"],
+      "jointDiscomfort": [],
+      "stability": ["torso on floor"],
+      "rom": ["floor-limited upper-arm travel", "cable clearance at the bottom"]
+    }
+  },
+  {
     "id": "preacher_machine_curl",
     "targetRegion": "biceps",
     "support": "none",
