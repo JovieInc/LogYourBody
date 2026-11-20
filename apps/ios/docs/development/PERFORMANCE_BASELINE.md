@@ -32,6 +32,7 @@ show up as intervals in Instruments' **os_signpost** / **Points of Interest** tr
 | `scrub_update_animated_values` | `updateAnimatedValues(for:)`                        | Per-index hero value recompute (3× interpolation)   |
 | `dashboard_derived_refresh`    | `scheduleDashboardDerivedStateRefresh(...)`         | Derived-state rebuild on data/index change          |
 | `chart_generate` / `_async`    | `MetricChartDataHelper.generateChartData[Async]`    | Sparkline/chart compute (cache miss cost)           |
+| `stats_series`                 | `MetricStatsSeriesStore.adopt`                      | Stats cards adopt the prewarmed series once         |
 | `timeline_photo_decode`        | `ProgressPhotoImagePipeline.decodeAndOptimizeImage` | Timeline photo decode at the destination pixel size |
 
 API: `PerfSignpost.measure("name") { ... }`, `begin/end`, `event("name", "msg")`.

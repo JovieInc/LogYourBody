@@ -44,14 +44,6 @@ extension DashboardViewLiquid {
         )
     }
 
-    func generateFullScreenWeightTrendChartData() -> [MetricChartDataPoint] {
-        buildFullScreenWeightTrendChartData(
-            from: sortedBodyMetricsAscending,
-            bodyMetrics: bodyMetrics,
-            measurementSystem: currentMeasurementSystem
-        )
-    }
-
     func generateFullScreenBodyFatChartData() -> [MetricChartDataPoint] {
         buildFullScreenBodyFatChartData(
             sortedBodyMetrics: sortedBodyMetricsAscending,
@@ -124,16 +116,15 @@ extension DashboardViewLiquid {
         let buildID = UUID()
         metricCacheBuildID = buildID
         let userIdSnapshot = authManager.currentUser?.id
-        guard !sortedBodyMetricsAscending.isEmpty || !recentDailyMetrics.isEmpty || !glp1DoseLogs.isEmpty else {
-            fullChartCache = [:]
-            fullTrendChartCache = [:]
-            metricEntriesCache = [:]
+        let hasHistory = !sortedBodyMetricsAscending.isEmpty
+            || !recentDailyMetrics.isEmpty || !glp1DoseLogs.isEmpty
+        guard hasHistory else {
+            guard !Task.isCancelled, metricCacheBuildID == buildID,
+                  authManager.currentUser?.id == userIdSnapshot else { return }
+            clearPublishedChartCaches(publishingEmpty: true)
             return
         }
-
-        fullChartCache = [:]
-        fullTrendChartCache = [:]
-        metricEntriesCache = [:]
+        clearPublishedChartCaches(publishingEmpty: false)
 
         let sortedMetrics = sortedBodyMetricsAscending
         let bodyMetricsSnapshot = bodyMetrics
@@ -147,9 +138,7 @@ extension DashboardViewLiquid {
             heightUnit: heightUnitSnapshot
         )
 
-        let (chartCache, trendChartCache, bodyScoreEntries) = await Task.detached(
-            priority: .utility
-        ) { () -> ([MetricType: [MetricChartDataPoint]], [MetricType: [MetricChartDataPoint]], MetricEntriesPayload?) in
+        let built = await Task.detached(priority: .utility) { () -> MetricStatsSeriesStore.BuiltCharts in
             var cache: [MetricType: [MetricChartDataPoint]] = [:]
             var trendCache: [MetricType: [MetricChartDataPoint]] = [:]
             var bodyScoreEntries: MetricEntriesPayload?
@@ -210,18 +199,24 @@ extension DashboardViewLiquid {
                 bodyScoreEntries = bodyScoreResult.entriesPayload
             }
 
-            return (cache, trendCache, bodyScoreEntries)
+            return MetricStatsSeriesStore.BuiltCharts(
+                chart: cache,
+                trend: trendCache,
+                entries: bodyScoreEntries,
+                fingerprint: MetricStatsSeriesStore.contentFingerprint(chart: cache, trend: trendCache)
+            )
         }.value
 
         // Detached work can finish after a newer measurement, unit or account
         // update. Only the current build may publish display values.
         guard !Task.isCancelled, metricCacheBuildID == buildID,
               authManager.currentUser?.id == userIdSnapshot else { return }
-        fullChartCache = chartCache
-        fullTrendChartCache = trendChartCache
+        statsSeriesStore.publish(built)
+        fullChartCache = built.chart
+        fullTrendChartCache = built.trend
 
-        if let bodyScoreEntries {
-            metricEntriesCache[.bodyScore] = bodyScoreEntries
+        if let entries = built.entries {
+            metricEntriesCache[.bodyScore] = entries
         }
     }
 

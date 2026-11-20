@@ -342,6 +342,7 @@
 		AD9E00112F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9E00102F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift */; };
 		AD9E00132F20001100ABCDEF /* BulkImportManagerBoundsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9E00122F20001100ABCDEF /* BulkImportManagerBoundsTests.swift */; };
 		AD9E00212F20002000ABCDEF /* HeroMetricInterpolationCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9E00202F20002000ABCDEF /* HeroMetricInterpolationCache.swift */; };
+		A38220261120000000000002 /* MetricStatsSeriesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38220261120000000000001 /* MetricStatsSeriesStore.swift */; };
 		AD9E00312F20003000ABCDEF /* HeroMetricInterpolationCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9E00302F20003000ABCDEF /* HeroMetricInterpolationCacheTests.swift */; };
 		ADA4B7372ECC3A7A00F4262A /* EntryVisibilityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */; };
 		ADA4B7392ECD44C800F4262A /* BodyScoreCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */; };
@@ -571,6 +572,7 @@
 		FCE2872B32CFB9AD2CE87012 /* MetricChartDataPointPresenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EECB82E4C8977D7158475EFB /* MetricChartDataPointPresenceTests.swift */; };
 		FE01A1A100000000000000B1 /* TimelineDataProviderScrubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE01A1A100000000000000F1 /* TimelineDataProviderScrubTests.swift */; };
 		FE02A2A200000000000000B2 /* DashboardMetricFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE02A2A200000000000000F2 /* DashboardMetricFormattingTests.swift */; };
+		A38220261120000000000004 /* MetricStatsSeriesStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38220261120000000000003 /* MetricStatsSeriesStoreTests.swift */; };
 		FE03A3A300000000000000B3 /* BatterySyncIntervalPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE03A3A300000000000000F3 /* BatterySyncIntervalPolicy.swift */; };
 		E1A2630100000000000000A2 /* EarnedWinDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A2630100000000000000A1 /* EarnedWinDetector.swift */; };
 		E1A2630100000000000000B2 /* EarnedWinDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A2630100000000000000B1 /* EarnedWinDetectorTests.swift */; };
@@ -1073,6 +1075,7 @@
 		AD9E00102F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProgressPhotoCarouselPreloadRangeTests.swift; sourceTree = "<group>"; };
 		AD9E00122F20001100ABCDEF /* BulkImportManagerBoundsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BulkImportManagerBoundsTests.swift; sourceTree = "<group>"; };
 		AD9E00202F20002000ABCDEF /* HeroMetricInterpolationCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroMetricInterpolationCache.swift; sourceTree = "<group>"; };
+		A38220261120000000000001 /* MetricStatsSeriesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricStatsSeriesStore.swift; sourceTree = "<group>"; };
 		AD9E00302F20003000ABCDEF /* HeroMetricInterpolationCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroMetricInterpolationCacheTests.swift; sourceTree = "<group>"; };
 		ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryVisibilityManager.swift; sourceTree = "<group>"; };
 		ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreCache.swift; sourceTree = "<group>"; };
@@ -1313,6 +1316,7 @@
 		FD8E482BE1E84E0DEAF9819D /* LegalSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LegalSection.swift; path = DesignSystem/Organisms/LegalSection.swift; sourceTree = "<group>"; };
 		FE01A1A100000000000000F1 /* TimelineDataProviderScrubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineDataProviderScrubTests.swift; sourceTree = "<group>"; };
 		FE02A2A200000000000000F2 /* DashboardMetricFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricFormattingTests.swift; sourceTree = "<group>"; };
+		A38220261120000000000003 /* MetricStatsSeriesStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricStatsSeriesStoreTests.swift; sourceTree = "<group>"; };
 		FE03A3A300000000000000F3 /* BatterySyncIntervalPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySyncIntervalPolicy.swift; sourceTree = "<group>"; };
 		E1A2630100000000000000A1 /* EarnedWinDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarnedWinDetector.swift; sourceTree = "<group>"; };
 		E1A2630100000000000000B1 /* EarnedWinDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarnedWinDetectorTests.swift; sourceTree = "<group>"; };
@@ -2179,6 +2183,7 @@
 				FE04A4A400000000000000F4 /* SyncIntervalAndChunkingTests.swift */,
 				A62E114302EC00A5A0070102 /* SyncQueueRetentionPreparedTests.swift */,
 				FE02A2A200000000000000F2 /* DashboardMetricFormattingTests.swift */,
+				A38220261120000000000003 /* MetricStatsSeriesStoreTests.swift */,
 				FE01A1A100000000000000F1 /* TimelineDataProviderScrubTests.swift */,
 				3CBF4E377107434EA53A2F1B /* PaidWeightLoggerMVPPolicyTests.swift */,
 				FE07A7A700000000000000F7 /* PhotoTimelineHUDPolicyTests.swift */,
@@ -2414,6 +2419,7 @@
 				AD4B1C7D2FFC0A4E00A3B9E1 /* LRUCache.swift */,
 				AD0B7BF62EC692ED008B29E7 /* MetricChartDataHelper.swift */,
 				AD9E00202F20002000ABCDEF /* HeroMetricInterpolationCache.swift */,
+				A38220261120000000000001 /* MetricStatsSeriesStore.swift */,
 				ADE1464A2EBF0BDF00B64DA0 /* TimelinePhotoSampler.swift */,
 				ADE1464B2EBF0BDF00B64DA0 /* TimelineZoomLevel.swift */,
 			);
@@ -2681,6 +2687,7 @@
 				FE04A4A400000000000000B4 /* SyncIntervalAndChunkingTests.swift in Sources */,
 				A62E114302EC00A5A0070101 /* SyncQueueRetentionPreparedTests.swift in Sources */,
 				FE02A2A200000000000000B2 /* DashboardMetricFormattingTests.swift in Sources */,
+				A38220261120000000000004 /* MetricStatsSeriesStoreTests.swift in Sources */,
 				FE01A1A100000000000000B1 /* TimelineDataProviderScrubTests.swift in Sources */,
 				5DB1A0B114B3417EAE9E143B /* PaidWeightLoggerMVPPolicyTests.swift in Sources */,
 				FE07A7A700000000000000B7 /* PhotoTimelineHUDPolicyTests.swift in Sources */,
@@ -3177,6 +3184,7 @@
 				AD4B1C7E2FFC0A4E00A3B9E1 /* LRUCache.swift in Sources */,
 				AD0B7BF72EC692ED008B29E7 /* MetricChartDataHelper.swift in Sources */,
 				AD9E00212F20002000ABCDEF /* HeroMetricInterpolationCache.swift in Sources */,
+				A38220261120000000000002 /* MetricStatsSeriesStore.swift in Sources */,
 				AD8F12F52ED7C987003C4559 /* BugReportManager.swift in Sources */,
 				AD8872D02EB946BE0041C426 /* MarkdownView.swift in Sources */,
 				AD8872D12EB946BE0041C426 /* StandardCard.swift in Sources */,
