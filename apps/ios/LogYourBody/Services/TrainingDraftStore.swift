@@ -176,6 +176,23 @@ final class TrainingDraftStore {
         } catch let error as CocoaError where error.code == .fileNoSuchFile { return }
     }
 
+    /// `/next` with no session must not wipe a cache that still has logged or pending sets.
+    func clearActiveSessionIfNoUnfinishedWork(ownerId: String) throws {
+        let cached = try? activeSession(ownerId: ownerId)
+        let rows: [String: TrainingSetDraft]
+        if let cached {
+            rows = (try? load(ownerId: ownerId, sessionId: cached.id)) ?? [:]
+        } else {
+            rows = [:]
+        }
+        guard !TrainingActiveSessionRetentionPolicy.shouldRetainCache(
+            cached: cached,
+            serverSessionPresent: false,
+            draftRows: rows
+        ) else { return }
+        try clearActiveSession(ownerId: ownerId)
+    }
+
     private func validateCachedSession(_ session: TrainingSession) throws {
         try TrainingCardAdapter.workout(session).validate()
         guard (1...6).contains(session.week), (0...5).contains(session.slot), session.exercises.count <= 30,

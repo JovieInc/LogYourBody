@@ -102,6 +102,77 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertEqual(try reopened.activeSession(ownerId: "owner-A"), current)
     }
 
+    func testCoachEntryCTAContinuesWhenSessionAlreadyHasLoggedSets() {
+        XCTAssertFalse(TrainingCoachEntryPolicy.hasRecordedProgress(session()))
+        XCTAssertEqual(
+            TrainingCoachEntryPolicy.primaryActionTitle(hasRecordedProgress: false),
+            "Start session"
+        )
+        XCTAssertEqual(
+            TrainingCoachEntryPolicy.accessibilityIdentifier(hasRecordedProgress: false),
+            "training_start_session"
+        )
+
+        let saved = TrainingSavedSet(
+            sessionId: sessionId, exerciseId: exercise.id, setNumber: 1,
+            reps: 10, loadKg: 60, rir: 2, revision: 0, corrections: []
+        )
+        let inProgress = session(saved: [saved])
+        XCTAssertTrue(TrainingCoachEntryPolicy.hasRecordedProgress(inProgress))
+        XCTAssertEqual(
+            TrainingCoachEntryPolicy.primaryActionTitle(hasRecordedProgress: true),
+            "Continue session"
+        )
+        XCTAssertEqual(
+            TrainingCoachEntryPolicy.accessibilityIdentifier(hasRecordedProgress: true),
+            "training_continue_session"
+        )
+    }
+
+    func testNilServerSessionRetainsCacheWithLoggedOrPendingSets() throws {
+        let directory = root()
+        let store = TrainingDraftStore(rootURL: directory)
+        let saved = TrainingSavedSet(
+            sessionId: sessionId, exerciseId: exercise.id, setNumber: 1,
+            reps: 10, loadKg: 60, rir: 2, revision: 0, corrections: []
+        )
+        let current = session(saved: [saved])
+        try store.cacheActiveSession(current, ownerId: "owner-A")
+
+        XCTAssertTrue(TrainingActiveSessionRetentionPolicy.shouldRetainCache(
+            cached: current, serverSessionPresent: false, draftRows: [:]
+        ))
+        try store.clearActiveSessionIfNoUnfinishedWork(ownerId: "owner-A")
+        XCTAssertEqual(try store.activeSession(ownerId: "owner-A"), current)
+
+        try store.clearActiveSession(ownerId: "owner-A")
+        try store.cacheActiveSession(session(), ownerId: "owner-A")
+        var pending = TrainingSetDraft(
+            exerciseId: exercise.id, setNumber: 1, repsText: "10", loadText: "60", rir: 2
+        )
+        pending.pendingRequest = TrainingSetLogRequest(
+            sessionId: sessionId, exerciseId: exercise.id, setNumber: 1, reps: 10, loadKg: 60, rir: 2
+        )
+        try store.put(pending, ownerId: "owner-A", sessionId: sessionId)
+        XCTAssertTrue(TrainingActiveSessionRetentionPolicy.shouldRetainCache(
+            cached: session(), serverSessionPresent: false,
+            draftRows: try store.load(ownerId: "owner-A", sessionId: sessionId)
+        ))
+        try store.clearActiveSessionIfNoUnfinishedWork(ownerId: "owner-A")
+        XCTAssertEqual(try store.activeSession(ownerId: "owner-A")?.id, sessionId)
+
+        try store.clearActiveSession(ownerId: "owner-A")
+        try store.cacheActiveSession(session(), ownerId: "owner-A")
+        XCTAssertFalse(TrainingActiveSessionRetentionPolicy.shouldRetainCache(
+            cached: session(), serverSessionPresent: false, draftRows: [:]
+        ))
+        try store.clearActiveSessionIfNoUnfinishedWork(ownerId: "owner-A")
+        XCTAssertNil(try store.activeSession(ownerId: "owner-A"))
+        XCTAssertFalse(TrainingActiveSessionRetentionPolicy.shouldRetainCache(
+            cached: session(), serverSessionPresent: true, draftRows: [:]
+        ))
+    }
+
     private func model(_ store: TrainingDraftStore, owner: String = "owner-A") -> TrainingSessionDraft {
         TrainingSessionDraft(session: session(), ownerId: owner, store: store, isCurrent: { true })
     }
