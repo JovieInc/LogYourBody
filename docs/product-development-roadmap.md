@@ -84,7 +84,9 @@ Each feature specification must record:
   or device-handoff level. Mark unsupported actions explicitly. A CLI is optional
   only for a demonstrated scripting gap.
 - Authenticated subject, resource audience, least-privilege scopes, explicit LYB
-  connection/consent, ownership, entitlement and default-off gates. Shared Jovie
+  connection/consent, ownership, entitlement and (for non-launch/core work) default-off
+  gates. Launch and core capabilities follow contract v2 §1.16 in `AGENTS.md`: they ship
+  live or the PR stays a draft. Shared Jovie
   identity alone grants no LYB connection or delegated permission.
 - Validation, units, measured time, local date/zone, source/provenance and stable
   measurement identity; distinguish measured values, estimates and selected goals.
@@ -290,7 +292,7 @@ Do not build a food logger or a general-purpose workout tracker. The hypertrophy
 ## Agent Build Rules
 
 - Build the smallest iOS-native product increment that improves activation, retention, paid conversion, or reliability.
-- Put risky/new user-visible behavior behind Statsig gates.
+- Put risky or new user-visible behavior behind Statsig gates only when it is not launch or core work. Launch and core work follows contract v2 §1.16 in `AGENTS.md`: ship live or keep the PR a draft. Do not hide Golden Path stages, signup, onboarding, the paywall, the Home canvas, or their dependencies behind a flag.
 - Prefer follow-up PRs over bloating an active PR.
 - Treat App Store/TestFlight, RevenueCat, Jovie Auth, HealthKit, Neon, and device validation as real closeout surfaces.
 - Open issues only after the roadmap item has a clear trigger, KPI, and acceptance criteria.
