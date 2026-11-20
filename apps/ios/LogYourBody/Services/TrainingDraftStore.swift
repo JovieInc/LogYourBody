@@ -16,6 +16,34 @@ struct TrainingSetDraft: Codable, Equatable {
     var key: String { "\(exerciseId)-\(setNumber)" }
 }
 
+/// Entry CTA for the coach card: continue when the session already has recorded sets.
+enum TrainingCoachEntryPolicy {
+    static func hasRecordedProgress(_ session: TrainingSession) -> Bool {
+        !(session.loggedSets ?? []).isEmpty
+    }
+
+    static func primaryActionTitle(hasRecordedProgress: Bool) -> String {
+        hasRecordedProgress ? "Continue session" : "Start session"
+    }
+
+    static func accessibilityIdentifier(hasRecordedProgress: Bool) -> String {
+        hasRecordedProgress ? "training_continue_session" : "training_start_session"
+    }
+}
+
+/// Keep a device cache when `/next` omits a session but unfinished local work remains.
+enum TrainingActiveSessionRetentionPolicy {
+    static func shouldRetainCache(
+        cached: TrainingSession?,
+        serverSessionPresent: Bool,
+        draftRows: [String: TrainingSetDraft]
+    ) -> Bool {
+        guard !serverSessionPresent, cached != nil else { return false }
+        if !(cached?.loggedSets ?? []).isEmpty { return true }
+        return draftRows.values.contains { $0.pendingRequest != nil || $0.pendingCorrection != nil }
+    }
+}
+
 struct TrainingFeedbackDraft: Codable, Equatable {
     let request: TrainingFeedbackRequest
     var response: TrainingFeedbackResponse?
@@ -174,6 +202,23 @@ final class TrainingDraftStore {
         do {
             try FileManager.default.removeItem(at: activeSessionURL(ownerId))
         } catch let error as CocoaError where error.code == .fileNoSuchFile { return }
+    }
+
+    /// `/next` with no session must not wipe a cache that still has logged or pending sets.
+    func clearActiveSessionIfNoUnfinishedWork(ownerId: String) throws {
+        let cached = try? activeSession(ownerId: ownerId)
+        let rows: [String: TrainingSetDraft]
+        if let cached {
+            rows = (try? load(ownerId: ownerId, sessionId: cached.id)) ?? [:]
+        } else {
+            rows = [:]
+        }
+        guard !TrainingActiveSessionRetentionPolicy.shouldRetainCache(
+            cached: cached,
+            serverSessionPresent: false,
+            draftRows: rows
+        ) else { return }
+        try clearActiveSession(ownerId: ownerId)
     }
 
     private func validateCachedSession(_ session: TrainingSession) throws {
