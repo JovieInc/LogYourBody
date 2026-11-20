@@ -32,7 +32,13 @@ export function homePhotoStageFindings(
   if (!stage.includes('case .photo, .noPhoto, .loading, .failedLoad, .offline:')) {
     findings.push('HomeV2StageReservation does not keep a photo on the shared frame');
   }
-  const sharesBudget = stage.includes('HomeV2Layout.stageHeight(');
+  const sharedSwitch =
+    /switch\s+presentation\s*\{\s*case\s+\.photo,\s*\.noPhoto,\s*\.loading,\s*\.failedLoad,\s*\.offline:\s*break\s*\}/.exec(
+      stage,
+    );
+  const sharesBudget =
+    sharedSwitch !== null &&
+    stage.indexOf('HomeV2Layout.stageHeight(', sharedSwitch.index + sharedSwitch[0].length) >= 0;
   const keepsRatio =
     budget.includes('width / HomeV2Tokens.photoAspectRatio') &&
     budget.includes('return min(fourByFive, available)');

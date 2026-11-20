@@ -63,8 +63,8 @@ it('rejects a Home card that leaves the shared photo-stage reservation', () => {
     'HomeV2StageReservation drops HomeV2Tokens.photoAspectRatio',
   ]);
   const shared =
-    'enum HomeV2StageReservation { case .photo, .noPhoto, .loading, .failedLoad, .offline:\n' +
-    'let height = HomeV2Layout.stageHeight(\n} func homeV2ReservedStage';
+    'enum HomeV2StageReservation { switch presentation { case .photo, .noPhoto, .loading, .failedLoad, .offline:\n' +
+    'break } let height = HomeV2Layout.stageHeight(\n} func homeV2ReservedStage';
   const bareLayout =
     'static func stageHeight(width: CGFloat, height: CGFloat) -> CGFloat {\n' +
     'return min(fourByFive, available)\n}';

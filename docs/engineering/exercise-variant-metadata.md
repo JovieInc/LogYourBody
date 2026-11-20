@@ -77,3 +77,15 @@ The metadata schema rejects a record that stores objective spinal load or a
 numeric stimulus-to-fatigue score, including under the tolerance tags. It still
 does not rank exercises, estimate axial load, or add a score field. Check-in
 observations and the training engine are unchanged.
+
+## Narrow curated seed (LYB-297)
+
+The seed stays limited to upper chest, lateral delts, lats, arms, and lower
+body. It includes distinct biceps records for the standing cable curl, standing
+barbell curl, and machine preacher curl, plus the incline dumbbell curl and
+bench-supported cable curl setups. `supported_cable_floor_curl` is the separate
+floor-lying cable-curl setup. Its caveat records the floor range limit and the
+cable clearance at the bottom. Tolerance tags may say a setup can reduce trunk
+demand. They do not claim zero axial or spinal stress, that a belt eliminates
+axial load, or that symptomatic loading is safe. `catalog-variant-seed.test.ts`
+is the allow-list fixture. This slice adds no selector rule and no UI.
