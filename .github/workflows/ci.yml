@@ -413,6 +413,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Test iOS toolchain and App Store SDK guards
+        run: |
+          node --test apps/ios/Scripts/verify-app-store-min-sdk.test.mjs
+          node --test .github/scripts/ios-toolchain-guards.test.mjs
+          ruby apps/ios/fastlane/tests/beta_split_test.rb
+
       # Swift architecture ratchet (JovieInc/Jovie ADR swift-architecture-adr-2026-10-29):
       # fails on new main-thread / data-flow violations and on a stale-high baseline.
       - name: Swift architecture guard
@@ -480,7 +486,7 @@ jobs:
       - name: Setup simulator build environment
         uses: ./.github/actions/setup-ios-build
         with:
-          xcode-version: 'latest-stable'
+          xcode-version: '27.1'
           working-directory: apps/ios
           setup-ruby: 'false'
           create-config-files: 'true'

@@ -43,7 +43,7 @@ jobs:
       - name: Setup iOS build environment
         uses: ./.github/actions/setup-ios-build
         with:
-          xcode-version: '15.4'
+          xcode-version: '27.1'
 
       - name: Install Ruby dependencies
         working-directory: apps/ios

@@ -113,6 +113,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Pin Xcode 27.1
+        shell: bash
+        run: bash .github/scripts/pin-xcode-27.sh
+
       - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v7
@@ -186,7 +190,7 @@ jobs:
       - name: Setup iOS Build Environment
         uses: ./.github/actions/setup-ios-build
         with:
-          xcode-version: 'latest-stable'
+          xcode-version: '27.1'
           working-directory: apps/ios
           create-config-files: 'false'
 
@@ -302,6 +306,10 @@ jobs:
             --ipa "${ipas[0]}" \
             --expected-build "$EXPECTED_BUILD" \
             --expected-version "$EXPECTED_VERSION"
+
+      - name: Verify App Store minimum SDK (LYB-376)
+        shell: bash
+        run: bash .github/scripts/verify-ios-ipa-min-sdk.sh apps/ios/build
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v5

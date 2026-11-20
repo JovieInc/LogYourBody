@@ -115,7 +115,7 @@ jobs:
     - name: Setup iOS Build Environment
       uses: ./.github/actions/setup-ios-build
       with:
-        xcode-version: 'latest-stable'
+        xcode-version: '27.1'
         working-directory: apps/ios
         create-config-files: 'true'
         setup-ruby: 'true'
@@ -269,6 +269,11 @@ jobs:
         # Verify build configuration
         echo "✅ Production release checks passed"
     
+    - name: Verify App Store minimum SDK (LYB-376)
+      if: ${{ !inputs.resume_only }}
+      shell: bash
+      run: bash .github/scripts/verify-ios-ipa-min-sdk.sh build
+
     - name: Upload to TestFlight
       if: ${{ !inputs.resume_only }}
       run: |
