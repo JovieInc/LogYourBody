@@ -81,6 +81,28 @@ struct HomeV2DisclosureLink: View {
     }
 }
 
+/// The reserved stage's add action. Same identifier as the legacy empty stage.
+struct HomeV2AddPhotoButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(HomeV2EmptyPhotoLibrary.title)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, weight: .semibold, relativeTo: .subheadline)
+                .foregroundStyle(HomeV2Tokens.Colors.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .padding(.horizontal, HomeV2Tokens.Space.compact)
+                .frame(minHeight: JovieTokens.minimumHitTarget)
+                .background(HomeV2Tokens.Colors.shell.opacity(0.92), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(HomeV2EmptyPhotoLibrary.title)
+        .accessibilityHint(HomeV2EmptyPhotoLibrary.captureOrImport)
+        .accessibilityIdentifier("launch_timeline_add_photo")
+    }
+}
+
 /// H0: the first check-in. One sentence, one quiet alternative, one action.
 struct HomeV2DayZero: View {
     let stepsValue: String
@@ -88,14 +110,23 @@ struct HomeV2DayZero: View {
     let onViewSteps: () -> Void
     let onConnectHealth: () -> Void
     let onLogWeight: () -> Void
+    var onAddPhoto: () -> Void = {}
 
     var body: some View {
         GeometryReader { geometry in
+            let stage = HomeV2StageReservation.size(
+                width: geometry.size.width,
+                contentHeight: geometry.size.height,
+                presentation: .noPhoto
+            )
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     HomeV2DataHero(metric: nil, metrics: [], unit: "")
-                        .frame(width: geometry.size.width,
-                               height: geometry.size.width / HomeV2Tokens.photoAspectRatio)
+                        .frame(width: stage.width, height: stage.height)
+                        .overlay(alignment: .bottom) {
+                            HomeV2AddPhotoButton(action: onAddPhoto)
+                                .padding(.bottom, HomeV2Tokens.Space.tight)
+                        }
                         .accessibilityIdentifier("home_v2_editorial_card")
 
                     VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {

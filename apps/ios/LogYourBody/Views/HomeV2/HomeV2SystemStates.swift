@@ -98,26 +98,44 @@ struct HomeV2HealthOffRow: View {
     }
 }
 
-/// Home while the first load runs (Pencil RuP46): skeleton hero, an honest
-/// line, a disabled dock.
+/// Home while the first load runs (Pencil RuP46): the same stage bounds as a
+/// photo, an honest line, and a disabled dock. The skeleton stays inside the stage.
 struct HomeV2LoadingHome: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: HomeV2Tokens.Space.row) {
-                skeleton(width: 150, height: 56)
-                skeleton(width: 190, height: 14)
-                skeleton(width: 150, height: 12)
-                Text(HomeV2SystemCopy.loadingHistory)
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    .padding(.top, HomeV2Tokens.Space.tight)
-                    .accessibilityIdentifier("home_v2_loading")
+        GeometryReader { geometry in
+            let stage = HomeV2StageReservation.size(
+                width: geometry.size.width,
+                contentHeight: geometry.size.height,
+                presentation: .loading
+            )
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ZStack(alignment: .topLeading) {
+                        HomeV2Tokens.Colors.card
+                        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.row) {
+                            skeleton(width: min(150, stage.width * 0.4), height: 56)
+                            skeleton(width: min(190, stage.width * 0.5), height: 14)
+                            skeleton(width: min(150, stage.width * 0.4), height: 12)
+                        }
+                        .padding(HomeV2Tokens.Space.margin)
+                    }
+                    .frame(width: stage.width, height: stage.height)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(HomeV2SystemCopy.loadingHistory)
+                    .accessibilityIdentifier("home_v2_editorial_card")
+
+                    Text(HomeV2SystemCopy.loadingHistory)
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
+                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                        .padding(.horizontal, HomeV2Tokens.Space.margin)
+                        .padding(.top, HomeV2Tokens.Space.margin)
+                        .accessibilityIdentifier("home_v2_loading")
+                }
             }
-            .padding(.horizontal, HomeV2Tokens.Space.margin)
-            .padding(.top, 56)
-
-            Spacer(minLength: 0)
-
+            .scrollBounceBehavior(.basedOnSize)
+            .accessibilityIdentifier("home_v2_content_scroll")
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             HomeV2PrimaryButton(
                 title: HomeV2SystemCopy.loading,
                 isEnabled: false,
@@ -126,13 +144,14 @@ struct HomeV2LoadingHome: View {
             )
             .padding(.horizontal, HomeV2Tokens.Space.margin)
             .padding(.vertical, HomeV2Tokens.Space.tight)
+            .background(HomeV2Tokens.Colors.shell)
         }
         .accessibilityElement(children: .contain)
     }
 
     private func skeleton(width: CGFloat, height: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: HomeV2Tokens.Space.tight, style: .continuous)
-            .fill(HomeV2Tokens.Colors.card)
+            .fill(HomeV2Tokens.Colors.elevated)
             .frame(width: width, height: height)
             .accessibilityHidden(true)
     }

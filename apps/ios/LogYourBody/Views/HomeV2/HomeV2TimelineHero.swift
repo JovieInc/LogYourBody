@@ -137,6 +137,7 @@ struct HomeV2TimelinePager: View {
     let unit: String
     let dateText: (BodyMetrics) -> String
     let onOpenPhoto: () -> Void
+    var onAddPhoto: () -> Void = {}
     var isNavigating = false
     var bodyDisplays: [String: PersonalBodyDisplay] = [:]
     var bodyEstimateEnabled = false
@@ -156,11 +157,11 @@ struct HomeV2TimelinePager: View {
         ) { isScrubbing in
             Group {
                 if isScrubbing, let metric = snapshot.metric(for: selectedID) {
-                    page(for: metric, openPhoto: {}, preparedOnly: true)
+                    page(for: metric, openPhoto: {}, onAddPhoto: onAddPhoto, preparedOnly: true)
                 } else {
                     TabView(selection: $selectedID) {
                         ForEach(snapshot.metrics) { metric in
-                            page(for: metric, openPhoto: onOpenPhoto)
+                            page(for: metric, openPhoto: onOpenPhoto, onAddPhoto: onAddPhoto)
                                 .tag(HomeV2TimelinePolicy.EntryID(metric))
                                 .accessibilityHidden(HomeV2TimelinePolicy.EntryID(metric) != selectedID)
                         }
@@ -212,7 +213,12 @@ struct HomeV2TimelinePager: View {
         }
     }
 
-    private func page(for metric: BodyMetrics, openPhoto: @escaping () -> Void, preparedOnly: Bool = false) -> some View {
+    private func page(
+        for metric: BodyMetrics,
+        openPhoto: @escaping () -> Void,
+        onAddPhoto: @escaping () -> Void = {},
+        preparedOnly: Bool = false
+    ) -> some View {
         HomeV2TimelinePage(
             metric: metric,
             metrics: snapshot.metrics,
@@ -220,6 +226,7 @@ struct HomeV2TimelinePager: View {
             unit: unit,
             dateText: dateText(metric),
             onOpenPhoto: openPhoto,
+            onAddPhoto: onAddPhoto,
             preparedOnly: preparedOnly,
             bodyMode: $bodyMode,
             bodyYaw: $bodyYaw,
@@ -241,6 +248,7 @@ private struct HomeV2TimelinePage: View {
     let unit: String
     let dateText: String
     let onOpenPhoto: () -> Void
+    var onAddPhoto: () -> Void = {}
     var preparedOnly = false
     @Binding var bodyMode: String
     @Binding var bodyYaw: Double
@@ -287,6 +295,12 @@ private struct HomeV2TimelinePage: View {
         .overlay { estimateCanvas }
         .overlay(alignment: .top) { estimateMode }
         .overlay(alignment: .bottom) { estimateFallback }
+        .overlay(alignment: .bottom) {
+            if !PhotoTimelineHUDPolicy.hasUsablePhoto(metric) {
+                HomeV2AddPhotoButton(action: onAddPhoto)
+                    .padding(.bottom, HomeV2Tokens.Space.tight)
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home_v2_editorial_card")
         .id(HomeV2TimelinePolicy.EntryID(metric))
@@ -346,11 +360,14 @@ private struct HomeV2TimelinePage: View {
                     }
             } else {
                 HomeV2DataHero(metric: metric, metrics: metrics, unit: unit)
-                Text(failed ? "Photo unavailable" : "Loading photo…")
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
-                    .foregroundStyle(HomeV2Tokens.Colors.ink)
-                    .padding(HomeV2Tokens.Space.tight)
-                    .background(HomeV2Tokens.Colors.shell)
+                if !failed {
+                    Text("Loading photo…")
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                        .foregroundStyle(HomeV2Tokens.Colors.ink)
+                        .padding(HomeV2Tokens.Space.tight)
+                        .background(HomeV2Tokens.Colors.shell)
+                        .allowsHitTesting(false)
+                }
             }
         }
         .frame(width: size.width, height: size.height)
@@ -368,6 +385,9 @@ private struct HomeV2TimelinePage: View {
             guard showsRetry else { return }
             Task { await retry(url: url) }
         }
+        .modifier(HomeV2PhotoLoadFailureChrome(failed: failed) {
+            Task { await retry(url: url) }
+        })
         .task(id: "\(key)|\(photoPixels)") { await load(url: url, key: key) }
     }
 
@@ -432,6 +452,42 @@ private struct HomeV2TimelinePage: View {
             LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
         }
         .allowsHitTesting(false)
+    }
+}
+
+/// Load-failure controls sit above the photo tap. They exist only after a failure,
+/// so a loaded photo does not advertise a retry.
+private struct HomeV2PhotoLoadFailureChrome: ViewModifier {
+    let failed: Bool
+    let retry: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if failed {
+            content
+                .accessibilityAction(named: Text(HomeV2PhotoCopy.tryPhotoAgain), retry)
+                .overlay(alignment: .top) { failureChrome }
+        } else {
+            content
+        }
+    }
+
+    private var failureChrome: some View {
+        VStack(spacing: HomeV2Tokens.Space.tight) {
+            Text("Photo unavailable")
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                .foregroundStyle(HomeV2Tokens.Colors.ink)
+                .padding(HomeV2Tokens.Space.tight)
+                .background(HomeV2Tokens.Colors.shell)
+                .allowsHitTesting(false)
+            Button(HomeV2PhotoCopy.tryPhotoAgain, action: retry)
+                .buttonStyle(.plain)
+                .padding(.horizontal, HomeV2Tokens.Space.row)
+                .frame(minHeight: JovieTokens.minimumHitTarget)
+                .background(HomeV2Tokens.Colors.shell, in: Capsule())
+                .accessibilityIdentifier("home_v2_photo_load_retry")
+        }
+        .padding(.top, HomeV2Tokens.Space.tight)
     }
 }
 
