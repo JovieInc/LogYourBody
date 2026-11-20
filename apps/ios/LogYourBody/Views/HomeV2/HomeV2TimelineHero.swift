@@ -283,7 +283,10 @@ private struct HomeV2TimelinePage: View {
                     .accessibilityIdentifier("home_v2_metric_first")
             }
         }
-        .frame(width: size.width, height: size.height)
+        .homeV2ReservedStage(
+            width: size.width,
+            presentation: PhotoTimelineHUDPolicy.hasUsablePhoto(metric) ? .photo : .noPhoto
+        )
         .overlay { estimateCanvas }
         .overlay(alignment: .top) { estimateMode }
         .overlay(alignment: .bottom) { estimateFallback }
@@ -353,7 +356,10 @@ private struct HomeV2TimelinePage: View {
                     .background(HomeV2Tokens.Colors.shell)
             }
         }
-        .frame(width: size.width, height: size.height)
+        .homeV2ReservedStage(
+            width: size.width,
+            presentation: failed ? .failedLoad : (editorialPhoto?.image == nil ? .loading : .photo)
+        )
         .clipped()
         .contentShape(Rectangle())
         .gesture(HomeV2PhotoTap(onTap: onOpenPhoto))
@@ -372,6 +378,13 @@ private struct HomeV2TimelinePage: View {
     }
 
     private func load(url: String, key: String) async {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains(HomeV2StageReservation.photoLoadFailedFixtureArgument) {
+            editorialPhoto = (key, nil)
+            showsRetry = false
+            return
+        }
+        #endif
         if preparedOnly {
             showsRetry = false
             if let prepared = SubjectPlateStore.shared.scrubImage(for: url, target: size) {
