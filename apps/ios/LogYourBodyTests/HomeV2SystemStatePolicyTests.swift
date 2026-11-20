@@ -66,6 +66,7 @@ final class HomeV2SystemStatePolicyTests: XCTestCase {
         XCTAssertGreaterThan(tall.width, 0)
         XCTAssertGreaterThan(tall.height, 0)
         XCTAssertEqual(tall.height, 390 / HomeV2Tokens.photoAspectRatio, accuracy: 0.01)
+        XCTAssertEqual(tall.height, 487.5, accuracy: 0.01)
         XCTAssertEqual(
             tall.height,
             HomeV2Layout.stageHeight(
@@ -110,6 +111,17 @@ final class HomeV2SystemStatePolicyTests: XCTestCase {
         )
         XCTAssertEqual(blank.width, 0, accuracy: 0.01)
         XCTAssertEqual(blank.height, 0, accuracy: 0.01)
+        for presentation in [HomeV2StagePresentation.loading, .failedLoad, .offline, .noPhoto] {
+            let negative = HomeV2StageReservation.size(
+                width: -12, contentHeight: 800, presentation: presentation
+            )
+            XCTAssertEqual(negative.width, 0, accuracy: 0.01, "\(presentation)")
+            XCTAssertEqual(negative.height, 0, accuracy: 0.01, "\(presentation)")
+        }
+        XCTAssertEqual(
+            HomeV2StageReservation.photoLoadFailedFixtureArgument,
+            "-lybUITestHomeV2PhotoLoadFailedFixture"
+        )
     }
 
     func testEmptyPhotoLibraryOffersAddInsteadOfTheBrowseHint() {

@@ -291,7 +291,7 @@ private struct HomeV2TimelinePage: View {
                     .accessibilityIdentifier("home_v2_metric_first")
             }
         }
-        .frame(width: size.width, height: size.height)
+        .homeV2ReservedStage(size)
         .overlay { estimateCanvas }
         .overlay(alignment: .top) { estimateMode }
         .overlay(alignment: .bottom) { estimateFallback }
@@ -370,7 +370,7 @@ private struct HomeV2TimelinePage: View {
                 }
             }
         }
-        .frame(width: size.width, height: size.height)
+        .homeV2ReservedStage(size)
         .clipped()
         .contentShape(Rectangle())
         .gesture(HomeV2PhotoTap(onTap: onOpenPhoto))
@@ -392,6 +392,11 @@ private struct HomeV2TimelinePage: View {
     }
 
     private func load(url: String, key: String) async {
+        if HomeV2StageReservation.photoLoadFailedFixture {
+            editorialPhoto = (key, nil)
+            showsRetry = false
+            return
+        }
         if preparedOnly {
             showsRetry = false
             if let prepared = SubjectPlateStore.shared.scrubImage(for: url, target: size) {

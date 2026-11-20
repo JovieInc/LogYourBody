@@ -12,6 +12,23 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class HomeInteractionAuditTests:
+    def test_reserved_stage_keeps_one_content_aware_budget(self):
+        from launch_ui_home_interaction_audit import check_home_interactions
+        from test_launch_ui_audit_support import AUDIT
+        path = self.app / "Views/HomeV2/HomeV2Tokens.swift"
+        source = path.read_text()
+
+        def rejected(text):
+            path.write_text(text)
+            found = []
+            check_home_interactions(self.root, found, AUDIT.AuditViolation)
+            return any(item.check == "home.reserved_stage_budget" for item in found)
+
+        self.assertFalse(rejected(source))
+        self.assertTrue(rejected(source.replace("contentHeight: CGFloat,", "presentation: HomeV2StagePresentation", 1)))
+        self.assertTrue(rejected(source.replace("func homeV2ReservedStage(_ stage: CGSize)", "func size(width: CGFloat, presentation:", 1)))
+        self.assertFalse(rejected(source))
+
     def test_synthetic_batch_retains_focus_exact_readback_and_partial_input_recovery(self):
         destination = self.root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
         destination.parent.mkdir(parents=True, exist_ok=True)

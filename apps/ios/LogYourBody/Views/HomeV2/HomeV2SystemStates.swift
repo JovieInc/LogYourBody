@@ -119,7 +119,8 @@ struct HomeV2LoadingHome: View {
                         }
                         .padding(HomeV2Tokens.Space.margin)
                     }
-                    .frame(width: stage.width, height: stage.height)
+                    .homeV2ReservedStage(stage)
+                    .contentShape(Rectangle())
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(HomeV2SystemCopy.loadingHistory)
                     .accessibilityIdentifier("home_v2_editorial_card")

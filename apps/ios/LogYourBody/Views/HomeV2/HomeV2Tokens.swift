@@ -69,12 +69,24 @@ enum HomeV2StagePresentation: Equatable, CaseIterable {
 }
 
 enum HomeV2StageReservation {
+    /// UI tests pass this to show the failed-load stage without a network error.
+    static let photoLoadFailedFixtureArgument = "-lybUITestHomeV2PhotoLoadFailedFixture"
+
     /// Home's reader is the scroll viewport above the pinned check-in dock.
     /// `stageHeight` subtracts that dock inside `belowPhotoHeight`, so the
     /// reservation adds it back. The stage stays 4:5 when the column can hold
-    /// it and drops only to the short-screen floor.
+    /// it and drops only to the short-screen floor. Presentation does not
+    /// change the budget: a width-only 4:5 frame would overflow a short screen.
     static var dockAllowance: CGFloat {
         JovieTokens.controlHeight + HomeV2Tokens.Space.tight * 2
+    }
+
+    static var photoLoadFailedFixture: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains(photoLoadFailedFixtureArgument)
+        #else
+        false
+        #endif
     }
 
     static func size(
@@ -100,5 +112,13 @@ enum HomeV2StageReservation {
 
     private static func sanitized(_ value: CGFloat) -> CGFloat {
         value.isFinite ? max(value, 0) : 0
+    }
+}
+
+extension View {
+    /// Apply a size already returned by `HomeV2StageReservation.size`. Callers
+    /// pass the content height there; this does not recompute a width-only 4:5.
+    func homeV2ReservedStage(_ stage: CGSize) -> some View {
+        frame(width: stage.width, height: stage.height)
     }
 }

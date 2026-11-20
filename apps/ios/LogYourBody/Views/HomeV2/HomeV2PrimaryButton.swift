@@ -122,7 +122,7 @@ struct HomeV2DayZero: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     HomeV2DataHero(metric: nil, metrics: [], unit: "")
-                        .frame(width: stage.width, height: stage.height)
+                        .homeV2ReservedStage(stage)
                         .overlay(alignment: .bottom) {
                             HomeV2AddPhotoButton(action: onAddPhoto)
                                 .padding(.bottom, HomeV2Tokens.Space.tight)
