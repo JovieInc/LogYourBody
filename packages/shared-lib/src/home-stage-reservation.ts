@@ -3,11 +3,24 @@
 
 const RESERVATION_START = 'enum HomeV2StageReservation';
 const RESERVATION_END = 'func homeV2ReservedStage';
+const SHARED_ARM = 'case .photo, .noPhoto, .loading, .failedLoad, .offline:';
+const ASPECT_FORMULA = 'height = safeWidth / HomeV2Tokens.photoAspectRatio';
 
 function reservation(states: string): string {
   const start = states.indexOf(RESERVATION_START);
   const end = states.indexOf(RESERVATION_END);
   return start >= 0 && end > start ? states.slice(start, end) : '';
+}
+
+// The formula has to live in the shared arm. A copy earlier in the enum still
+// leaves photo, empty, loading, failed and offline cards on another height.
+function aspectInSharedArm(stage: string): boolean {
+  const arm = stage.indexOf(SHARED_ARM);
+  if (arm < 0) return false;
+  const formula = stage.indexOf(ASPECT_FORMULA, arm);
+  if (formula < 0) return false;
+  const nextCase = stage.indexOf('\n        case ', arm + SHARED_ARM.length);
+  return nextCase < 0 || formula < nextCase;
 }
 
 export function homePhotoStageFindings(surface: string, states: string): string[] {
@@ -19,10 +32,10 @@ export function homePhotoStageFindings(surface: string, states: string): string[
   if (!surface.includes('hasPhoto ? .photo : .noPhoto')) {
     findings.push('HomeV2Surface omits the photo presentation for a usable photo');
   }
-  if (!stage.includes('case .photo, .noPhoto, .loading, .failedLoad, .offline:')) {
+  if (!stage.includes(SHARED_ARM)) {
     findings.push('HomeV2StageReservation does not keep a photo on the shared frame');
   }
-  if (!stage.includes('height = safeWidth / HomeV2Tokens.photoAspectRatio')) {
+  if (!aspectInSharedArm(stage)) {
     findings.push('HomeV2StageReservation drops HomeV2Tokens.photoAspectRatio');
   }
   return findings;
