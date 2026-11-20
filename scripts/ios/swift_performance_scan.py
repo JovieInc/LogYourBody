@@ -262,6 +262,19 @@ def signpost_errors(text: str, allowed: set[str], path: str) -> list[str]:
     return errors
 
 
+def registered_signpost_errors(text: str, allowed: set[str]) -> list[str]:
+    """Keep the Swift test registry aligned with the merged performance contract."""
+    masked = mask_comments(text)
+    matches = list(re.finditer(r'\bstatic\s+let\s+registeredNames\s*=\s*\[([^\]]*)\]', masked))
+    if len(matches) != 1:
+        return ["PerfSignpost.registeredNames must be one literal array"]
+    entries = matches[0].group(1).strip()
+    if entries and not re.fullmatch(r'\s*"[A-Za-z0-9_]+"\s*(?:,\s*"[A-Za-z0-9_]+"\s*)*,?\s*', entries):
+        return ["PerfSignpost.registeredNames must contain string literals"]
+    names = re.findall(r'"([A-Za-z0-9_]+)"', entries)
+    return [f"registered signpost {name} is absent from the performance contract" for name in names if name not in allowed]
+
+
 def validate_device_receipt(payload: object) -> tuple[str, list[str]]:
     """Return (status, errors). Missing data is unverified and is not a failure."""
     if payload is None:
@@ -287,4 +300,3 @@ def validate_device_receipt(payload: object) -> tuple[str, list[str]]:
 
 def uses_concurrent(text: str) -> bool:
     return CONCURRENT.search(mask_non_code(text)) is not None
-

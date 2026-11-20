@@ -376,14 +376,17 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
         );
         const current = readSource(LEDGER_PATH, { root });
         const staged = readLedgers().get(`:0:${LEDGER_PATH}`);
-        verifyMerge(JSON.parse(staged));
+        const receipts = JSON.parse(staged);
+        verifyMerge(receipts);
         assert.equal(
           current,
           staged,
           'staged retry refuses unstaged ledger edits; review and stage them explicitly',
         );
         assertMergeUnchanged();
-        logger.log('correction-classifier: verified staged ledger against both merge parents');
+        logger.log(
+          `correction-classifier: verified ${receipts.length} staged receipts against merge parents ${parents.join(' ')}`,
+        );
         return 0;
       }
       if (!/^(?:<+|\|+|=+|>+)(?: |$)/m.test(working)) {

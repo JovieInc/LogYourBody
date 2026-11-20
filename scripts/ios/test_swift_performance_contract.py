@@ -63,6 +63,13 @@ class SwiftPerformanceContractTests(unittest.TestCase):
         self.assertTrue(any("string literal" in error for error in errors))
         self.assertFalse(any("custom_span" in error or "launch_first_dashboard_frame" in error for error in errors))
 
+    def test_registered_signposts_must_survive_contract_merges(self):
+        source = 'static let registeredNames = ["timeline_photo_decode"]'
+        self.assertTrue(guard.registered_signpost_errors(source, set()))
+        self.assertEqual(guard.registered_signpost_errors(source, {"timeline_photo_decode"}), [])
+        self.assertTrue(guard.registered_signpost_errors('static let registeredNames = [dynamicName]', set()))
+        self.assertTrue(guard.registered_signpost_errors('', set()))
+
     def test_drifted_toolchain_receipt(self):
         project = (ROOT / guard.PROJECT_REL).read_text()
         live = guard.build_toolchain_receipt(project)

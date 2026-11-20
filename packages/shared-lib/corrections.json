@@ -8675,5 +8675,71 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-380-automatic-ledger-merge-verification",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1830",
+    "correction": "PR #1830 LYB-380, fix-red-e3b0c44298 occurrence 116: merge origin/main without rebasing to resolve a correction ledger conflict; no checks have failed.",
+    "mechanization": "Use the existing correction ledger merge driver and extend its required real-Git regression to run the staged verifier after an automatic union, reject a staged ledger missing a parent receipt, and accept the restored union. Verify this merge against both parents with the same classifier. The harness owns PR edits and must add exactly one line: Machine: built scripts/correction-classifier-concurrency.test.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The existing driver already automatically unions additive receipts and the verifier rejects regressions; the missing protection is a combined regression exercising both in the same Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required classifier fixture can exercise an automatic merge and assert that staged verification rejects a dropped parent receipt."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier-concurrency.test.mjs",
+      "anchor": "configured git merge unions consecutive correction ledgers and keeps divergent edits conflicted"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "xctest-await-and-optional-accuracy",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44617120870",
+    "correction": "PR #1830 / LYB-380, fix-red-5df69c1e5f occurrence 14: Launch Quality run 44617120870 fails to compile ProgressPhotoImagePipelineTests and ImageCacheServiceTests. await sits inside XCTUnwrap, and optional pixel widths are passed to XCTAssertEqual accuracy. CI Summary fails only because that job fails. origin/main is already merged. The harness owns push and PR edits.",
+    "mechanization": "Extend the existing optional-CGFloat launch audit to reject await inside an XCTest autoclosure and an uncoalesced optional chain in an accuracy assertion. The audit reports those five findings on the failing sources and none after awaiting outside XCTUnwrap and unwrapping the bitmap. Coalesced values and XCTUnwrap or Double wrappers stay allowed. The existing required launch UI behavior suite covers the failing shapes, the repaired calls and the wired contribute hook. Keep every product assertion, selector, timeout and gate. The harness must add exactly one PR-body line: Machine: built scripts/ios/launch_ui_opacity_audit.py. Native execution remains for the macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Sized photo decode stays async. Production code cannot stop a later test from placing await inside an XCTest autoclosure or passing an optional pixel width to an accuracy assertion."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing launch UI opacity audit already rejects optional CGFloat conversions that fail to compile. Extending that audit rejects both recorded XCTest shapes before Launch Quality builds."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_opacity_audit.py",
+      "anchor": "Await outside an XCTest autoclosure; unwrap optional pixels before accuracy."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "performance-signpost-registry-contract-merge",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1830",
+    "correction": "PR #1830 / LYB-380, fix-red-e3b0c44298 occurrence 114: merge main's opt-in performance tracing with timeline photo instrumentation and retain the decode signpost in the surface contract.",
+    "mechanization": "Extend the required Swift performance audit to reject a missing or nonliteral Swift signpost registry and names absent from the performance contract. Its behavior tests cover missing and valid registrations. The merged checkout failed both the existing call check and the new registry check before the contract entry was added; both pass afterward. The harness owns the PR body and must add exactly one line: Machine: built scripts/ios/swift_performance_scan.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The Swift registry and JSON surface contract are maintained in different languages and cannot share a runtime definition without changing the instrumentation architecture."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing performance audit can compare the literal Swift registry against the contract during the required static audit."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/swift_performance_scan.py",
+      "anchor": "Keep the Swift test registry aligned with the merged performance contract."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

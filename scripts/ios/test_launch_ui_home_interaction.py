@@ -90,6 +90,48 @@ class HomeInteractionAuditTests:
                     path.write_text(originals[path])
         self.assertEqual(findings(), [])
 
+    def test_xctest_compile_shapes_reject_await_and_optional_accuracy(self):
+        import launch_ui_opacity_audit as opacity
+        import launch_ui_timeline_audit as sources
+
+        root = Path(__file__).resolve().parents[2]
+        paths = [
+            root / "apps/ios/LogYourBodyTests/ProgressPhotoImagePipelineTests.swift",
+            root / "apps/ios/LogYourBodyTests/ImageCacheServiceTests.swift",
+        ]
+        texts = {path: path.read_text() for path in paths}
+        clean = []
+        opacity.check_xctest_compile_shapes(root, paths, clean, texts)
+        self.assertEqual(clean, [])
+        samples = (
+            ({paths[0]: "let image = try XCTUnwrap(\n    await decode(from: data)\n)\n"},
+             "swift.xctest_async_autoclosure"),
+            ({paths[1]: "XCTAssertEqual(small?.size.width, 40, accuracy: 0.5)\n"},
+             "swift.xctest_optional_accuracy"),
+        )
+        for sample, check in samples:
+            found = []
+            opacity.check_xctest_compile_shapes(root, list(sample), found, sample)
+            self.assertEqual([item.check for item in found], [check])
+        allowed = {paths[1]: (
+            "let image = await decode(from: data)\n"
+            "let decoded = try XCTUnwrap(image)\n"
+            "XCTAssertEqual(decoded.size.width, 40, accuracy: 0.5)\n"
+            "XCTAssertEqual(rows.first?.weight ?? 0, 1, accuracy: 0.1)\n"
+            "XCTAssertEqual(try XCTUnwrap(item?.value), 1, accuracy: 0.1)\n"
+        )}
+        found = []
+        opacity.check_xctest_compile_shapes(root, list(allowed), found, allowed)
+        self.assertEqual(found, [])
+        previous = sources.SWIFT_SOURCES
+        try:
+            sources.SWIFT_SOURCES = samples[0][0]
+            wired = []
+            opacity.contribute(root, root, wired, None, None)
+            self.assertEqual([item.check for item in wired], ["swift.xctest_async_autoclosure"])
+        finally:
+            sources.SWIFT_SOURCES = previous
+
     def test_opacity_binding_parses_reuse_content_without_hiding_type_changes(self):
         from unittest.mock import patch
         import launch_ui_opacity_audit as opacity

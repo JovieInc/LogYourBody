@@ -67,7 +67,8 @@
         "scrub_select_closest",
         "scrub_update_animated_values",
         "dashboard_scrub_refresh",
-        "dashboard_derived_refresh"
+        "dashboard_derived_refresh",
+        "timeline_photo_decode"
       ],
       "localAcknowledgement": "Timeline cursor selection updates the on-screen hero before any network round trip.",
       "targets": {
