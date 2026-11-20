@@ -58,7 +58,10 @@ struct HomeV2Surface: View {
                     systemBanner
                     HomeV2TimelinePager(
                         snapshot: timeline, selectedID: userSelection,
-                        size: CGSize(width: geometry.size.width, height: geometry.size.width / HomeV2Tokens.photoAspectRatio),
+                        size: HomeV2StageReservation.size(
+                            width: geometry.size.width,
+                            presentation: systemState == .offline ? .offline : (hasPhoto ? .photo : .noPhoto)
+                        ),
                         unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto,
                         isNavigating: isPhotoScrubNavigating || showsProvenance,
                         bodyDisplays: personalBodyDisplays,
