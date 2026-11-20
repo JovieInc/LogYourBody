@@ -98,56 +98,28 @@ struct HomeV2HealthOffRow: View {
     }
 }
 
-/// One Home card. A real photo, an empty day, a load, a failed load and offline
-/// all keep this frame. Copy and pixels change inside it.
-enum HomeV2StagePresentation: Equatable, CaseIterable {
-    case photo
-    case noPhoto
-    case loading
-    case failedLoad
-    case offline
-}
-
-enum HomeV2StageReservation {
-    #if DEBUG
-    static let photoLoadFailedFixtureArgument = "-lybUITestHomeV2PhotoLoadFailedFixture"
-    #endif
-
-    static func size(width: CGFloat, presentation: HomeV2StagePresentation) -> CGSize {
-        let safeWidth = width.isFinite ? max(width, 0) : 0
-        let height: CGFloat
-        switch presentation {
-        case .photo, .noPhoto, .loading, .failedLoad, .offline:
-            height = safeWidth / HomeV2Tokens.photoAspectRatio
-        }
-        return CGSize(width: safeWidth, height: height.isFinite ? height : 0)
-    }
-}
-
-extension View {
-    func homeV2ReservedStage(width: CGFloat, presentation: HomeV2StagePresentation) -> some View {
-        let stage = HomeV2StageReservation.size(width: width, presentation: presentation)
-        return frame(width: stage.width, height: stage.height)
-    }
-}
-
-/// Home while the first load runs (Pencil RuP46): the same 4:5 card as a photo,
-/// an honest line, and a disabled dock.
+/// Home while the first load runs (Pencil RuP46): the same stage bounds as a
+/// photo, an honest line, and a disabled dock. The skeleton stays inside the stage.
 struct HomeV2LoadingHome: View {
     var body: some View {
         GeometryReader { geometry in
+            let stage = HomeV2StageReservation.size(
+                width: geometry.size.width,
+                contentHeight: geometry.size.height,
+                presentation: .loading
+            )
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     ZStack(alignment: .topLeading) {
                         HomeV2Tokens.Colors.card
                         VStack(alignment: .leading, spacing: HomeV2Tokens.Space.row) {
-                            skeleton(width: min(150, geometry.size.width * 0.4), height: 56)
-                            skeleton(width: min(190, geometry.size.width * 0.5), height: 14)
-                            skeleton(width: min(150, geometry.size.width * 0.4), height: 12)
+                            skeleton(width: min(150, stage.width * 0.4), height: 56)
+                            skeleton(width: min(190, stage.width * 0.5), height: 14)
+                            skeleton(width: min(150, stage.width * 0.4), height: 12)
                         }
                         .padding(HomeV2Tokens.Space.margin)
                     }
-                    .homeV2ReservedStage(width: geometry.size.width, presentation: .loading)
+                    .homeV2ReservedStage(stage)
                     .contentShape(Rectangle())
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(HomeV2SystemCopy.loadingHistory)
