@@ -68,6 +68,7 @@
         "$TURBO_ROOT$/apps/ios/LogYourBody/Services/VoicePlaybackService.swift",
         "$TURBO_ROOT$/scripts/ios/launch-quality-evidence.py",
         "$TURBO_ROOT$/scripts/ios/test_launch_quality_evidence.py",
+        "$TURBO_ROOT$/scripts/ios/stats_series_daily_cache.py",
         "$TURBO_ROOT$/.github/workflows/deploy.yml",
         "$TURBO_ROOT$/.github/workflows/web-release-loop.yml",
         "$TURBO_ROOT$/.github/scripts/web-production-smoke*.mjs",

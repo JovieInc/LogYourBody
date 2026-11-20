@@ -8807,5 +8807,41 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44689925709/job/136134110584",
+    "correction": "PR #1834 / LYB-382, fix-red-5df69c1e5f occurrence 16: Launch Quality run 44689925709 failed MetricStatsSeriesStoreTests because the only daily body-fat sample was after the selected date, so the summary returned nil instead of 20. CI Summary failed only because that job failed. origin/main is already merged. The harness owns push and PR edits.",
+    "mechanization": "Keep the selected-date observation rule and place a daily body-fat sample of 20 on that date, distinct from the trend sample of 99. Extend the existing launch-quality evidence suite to reject a future-only daily sample, a trend-cache body-fat summary, a dropped selected date, and an assertion that expects the trend value. The real fixture failed those checks before the repair and passes after it. The evidence file stays at its size baseline by loading scripts/ios/stats_series_daily_cache.py. Keep every native assertion, selector, timeout and gate. The harness must add exactly one PR-body line: Machine: built scripts/ios/test_launch_quality_evidence.py. Native execution remains for the macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture launcher owns deadlines, diagnostics and descendant lifetime for every shell contract case, preventing opaque timeouts and orphan pipelines by construction without changing product behavior or native qualification gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "os.killpg(process.pid, signal.SIGKILL)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44695708691/job/136153002163",
+    "correction": "PR #1834 / LYB-382, fix-red-5df69c1e5f occurrence 17: Launch Quality run 44695708691 failed testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance because the weight card showed the smoothed trend 181.7 while the detail headline stayed on the daily sample 181.0. CI Summary failed only because that job failed. origin/main is already merged. The harness owns push and PR edits.",
+    "mechanization": "Keep the selected-date observation rule and read weight summaries from the daily chart, distinct from the trend samples 70 and 71. Extend the existing launch-quality evidence suite to reject a trend-cache weight summary, a dropped selected date, matching daily and trend weights, and an assertion that expects the trend value. The real fixture failed those checks before the repair and passes after it. The evidence file stays at its size baseline by loading scripts/ios/stats_series_daily_cache.py. Keep every native assertion, selector, timeout and gate. The harness must add exactly one PR-body line: Machine: built scripts/ios/stats_series_daily_cache.py. Native execution remains for the macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture launcher owns deadlines, diagnostics and descendant lifetime for every shell contract case, preventing opaque timeouts and orphan pipelines by construction without changing product behavior or native qualification gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "os.killpg(process.pid, signal.SIGKILL)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

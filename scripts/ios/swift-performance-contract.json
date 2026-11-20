@@ -121,7 +121,7 @@
     {
       "id": "stats-chart-detail",
       "name": "stats/chart detail",
-      "signposts": ["chart_generate", "chart_generate_async"],
+      "signposts": ["chart_generate", "chart_generate_async", "stats_series"],
       "localAcknowledgement": "Chart detail shows the prepared series for the selected metric.",
       "targets": {
         "kind": "proposed-target",
@@ -141,6 +141,7 @@
         "apps/ios/LogYourBody/Components/DatedOutcomeStatsView.swift",
         "apps/ios/LogYourBody/Components/PeriodSelector.swift",
         "apps/ios/LogYourBody/Helpers/MetricChartDataHelper.swift",
+        "apps/ios/LogYourBody/Helpers/MetricStatsSeriesStore.swift",
         "apps/ios/LogYourBody/Services/DatedOutcomeStats.swift",
         "apps/ios/LogYourBody/Services/DatedOutcomeStore.swift",
         "apps/ios/LogYourBody/Services/MetricsInterpolationService.swift",
