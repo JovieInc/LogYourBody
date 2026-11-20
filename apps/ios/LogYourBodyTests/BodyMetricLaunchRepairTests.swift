@@ -110,9 +110,9 @@ final class BodyMetricLaunchRepairTests: XCTestCase {
             row.id = metricID
             row.userId = "launch-repair-owner"
             row.weight = 81.5
-            row.date = nil
-            row.createdAt = nil
-            row.updatedAt = nil
+            row.date = repairedAt
+            row.createdAt = repairedAt
+            row.updatedAt = repairedAt
             row.localDate = nil
             row.lastModified = repairedAt
             try context.save()

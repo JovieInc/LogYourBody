@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "launch-repair-required-model-fixture",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44637333971/job/135960119530",
+    "correction": "PR #1831 / LYB-379, fix-red-5df69c1e5f: Launch Quality failed saving a body metric fixture with nil required timestamps before the repair ran; CI Summary reflects that failure.",
+    "mechanization": "Use valid required timestamps and retain the missing localDate repair scenario. Extend the existing required metric boundary suite to inspect directly inserted body metric fixtures against the current Core Data model and reject explicit nil assignments to required attributes before a save. The real fixture fails for createdAt, date and updatedAt before the repair and passes afterwards; negative controls cover required and optional fields. The harness owns push and PR edits and must add exactly one line: Machine: built packages/shared-lib/src/metric-correction-boundary.test.ts. Native execution remains unverified on Linux.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Core Data already enforces mandatory fields at save time; intentional validation-failure tests must remain possible, so the fixture cannot be made valid by a production model change."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required metric boundary suite can compare direct fixture insertions and explicit nil assignments against the active model before native execution."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/metric-correction-boundary.test.ts",
+      "anchor": "keeps inserted body metric test fixtures compatible with the current model"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "uptime-probe-clean-merge-source-map-repair",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44613098410/job/135874773505",
     "correction": "PR #1828 LYB-386, fix-red-1423773703 occurrence 22: merge main and repair Detect Changes, CI Summary and parity after a bot commit leaves the repository source map stale. The harness owns push and PR updates.",
@@ -8657,5 +8679,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "lyb-64-installed-evidence-nonpassing-traces",
+    "source": "https://linear.app/jovie/issue/LYB-64",
+    "correction": "LYB-64 requires failed, skipped, timed-out, unavailable and stale native coverage never to be reported as passing. The installed-build xcresult adapter accepted a passing trace while discarding a non-passing repetition and manufactured negative retry and infrastructure-skip accounting when those fields were absent.",
+    "mechanization": "Extend the existing installed-build xcresult adapter to reject every non-passing trace and require explicit negative retry and infrastructure-skip accounting. Its existing required shared-lib suite runs a deliberate-red regression that fails on the previous adapter and passes after repair. This is evidence-accounting protection only; native, installed-device and TestFlight certification remain unverified. Machine: built packages/shared-lib/src/installed-build-xcresult.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing receipt adapter owns conversion of native traces and run accounting into certification evidence and can refuse incomplete or non-passing inputs before emitting a receipt."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/installed-build-xcresult.ts",
+      "anchor": "non-passing-trace:"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
