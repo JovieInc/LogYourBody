@@ -24,7 +24,7 @@
     {
       "id": "launch-auth-onboarding",
       "name": "launch/auth/onboarding",
-      "signposts": ["launch_first_dashboard_frame"],
+      "signposts": ["launch_first_dashboard_frame", "launch_repair"],
       "localAcknowledgement": "First dashboard frame after auth and onboarding have resolved to a route.",
       "targets": {
         "kind": "proposed-target",
@@ -48,10 +48,12 @@
         "apps/ios/LogYourBody/Views/BiometricLockView.swift",
         "apps/ios/LogYourBody/Features/Onboarding/**/*.swift",
         "apps/ios/LogYourBody/Services/AuthManager.swift",
+        "apps/ios/LogYourBody/Services/BodyMetricLaunchRepair.swift",
         "apps/ios/LogYourBody/Services/LaunchJourney.swift",
         "apps/ios/LogYourBody/Services/LaunchJourneyUI.swift",
         "apps/ios/LogYourBody/Services/OnboardingStateManager.swift",
         "apps/ios/LogYourBody/Services/PreAuthOnboardingStore.swift",
+        "apps/ios/LogYourBody/Utils/PerfSignpost.swift",
         "apps/ios/LogYourBody/DesignSystem/Organisms/LoadingScreen.swift",
         "apps/ios/LogYourBody/DesignSystem/Organisms/BiometricAuthView.swift",
         "apps/ios/LogYourBody/DesignSystem/Organisms/VerificationForm.swift",

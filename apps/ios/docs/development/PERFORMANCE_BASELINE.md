@@ -27,6 +27,7 @@ show up as intervals in Instruments' **os_signpost** / **Points of Interest** tr
 | Signpost name                  | Where                                               | Measures                                            |
 | ------------------------------ | --------------------------------------------------- | --------------------------------------------------- |
 | `launch_first_dashboard_frame` | `LaunchMetrics.markFirstDashboardFrame()`           | Launch → first dashboard frame (point event)        |
+| `launch_repair`                | `BodyMetricLaunchRepair.runOnBackgroundContext`     | Once-per-generation body-metric repair, or the skip |
 | `scrub_select_closest`         | `selectClosestMetric(to:)`                          | Timeline header cursor → metric selection           |
 | `scrub_update_animated_values` | `updateAnimatedValues(for:)`                        | Per-index hero value recompute (3× interpolation)   |
 | `dashboard_derived_refresh`    | `scheduleDashboardDerivedStateRefresh(...)`         | Derived-state rebuild on data/index change          |

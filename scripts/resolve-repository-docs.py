@@ -12,6 +12,7 @@ from pathlib import Path
 import repository_docs
 from dependency_pr_body import dependency_pr_body
 from json_union import _unmerged_texts, union_json
+from python_union import union_python
 # Additive manifest union keeps every parent test input; retain the shared implementation.
 from manifest_union import apply_manifest_union as union_manifests, projection_is_unmerged, restore_dependency_artifacts_on_failure
 
@@ -260,6 +261,8 @@ def reviewed_conflicted_pin(root, expected, explicit_audit=None):
         project = staged_bytes(root, DIAGNOSTIC_PROJECT)
     except subprocess.CalledProcessError as error:
         raise ValueError("resolve source conflicts first: " + DIAGNOSTIC_PROJECT) from error
+    if repository_docs.local(root, DIAGNOSTIC_PROJECT).read_bytes() != project:
+        raise ValueError("reviewed project repair refuses unstaged project edits")
     if re.search(rb"(?m)^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |\r?$)", project):
         raise ValueError("resolve staged conflict markers first: " + DIAGNOSTIC_PROJECT)
     assert_merged_project_keeps_parent_files(root, project)
@@ -445,6 +448,7 @@ def main():
     mode.add_argument("--dependency-pr-body", metavar="PATH", help="print dependency release notes with HTML code converted to Markdown; never edit the PR")
     mode.add_argument("--merge-sections", metavar="PATH", help="print a proposed docs merge retaining additive paragraphs or new incoming sections; review and stage explicitly")
     mode.add_argument("--union-json", metavar="PATH", help="print an additive JSON merge from index stages; review and stage explicitly")
+    mode.add_argument("--union-python", metavar="PATH", help="print an independent Python function union; review and stage explicitly")
     mode.add_argument("--union-manifests", action="store_true", help="keep every parent shared-lib test input and turbo string, then regenerate the source projection")
     mode.add_argument("--union-project", action="store_true", help="union additive Xcode file membership from both parents and stage the project")
     mode.add_argument("--merge-ledger", action="store_true", help="refresh staged docs, then preserve and classify both merge parents' correction receipts")
@@ -452,7 +456,7 @@ def main():
     parser.add_argument("--reviewed-audit-sha256", help="refresh every current reviewed audit pin using an explicitly reviewed audit digest")
     args = parser.parse_args()
     exclusive = any((
-        args.staged, args.refresh_lockfile, args.verify_lockfile, args.merge_sections, args.union_json,
+        args.staged, args.refresh_lockfile, args.verify_lockfile, args.merge_sections, args.union_json, args.union_python,
         args.union_manifests, args.union_project, args.dependency_pr_body,
     ))
     if exclusive and (args.reviewed_project_sha256 or args.reviewed_audit_sha256):
@@ -464,6 +468,8 @@ def main():
             print(merge_sections(args.root, args.merge_sections), end="")
         elif args.union_json:
             print(union_json(args.root, args.union_json), end="")
+        elif args.union_python:
+            print(union_python(args.root, args.union_python), end="")
         elif args.merge_ledger:
             from manifest_union import merge_ledger
             git_bytes(args.root, "rev-parse", "--verify", "MERGE_HEAD")

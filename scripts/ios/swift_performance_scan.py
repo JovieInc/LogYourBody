@@ -262,6 +262,20 @@ def signpost_errors(text: str, allowed: set[str], path: str) -> list[str]:
     return errors
 
 
+def signpost_surface_errors(text: str, path: str, owners: dict[str, str], surface_files: dict[str, set[str]]) -> list[str]:
+    """A contract signpost literal must be emitted from a file on the surface that owns it."""
+    masked = mask_comments(text)
+    errors = []
+    for match in SIGNPOST_LITERAL.finditer(masked):
+        name = match.group(1)
+        owner = owners.get(name)
+        if not owner:
+            continue
+        if path not in surface_files.get(owner, ()):
+            errors.append(f"signpost {name} at {path}:{line_of(text, match.start())} is outside surface {owner}")
+    return errors
+
+
 def registered_signpost_errors(text: str, allowed: set[str]) -> list[str]:
     """Keep the Swift test registry aligned with the merged performance contract."""
     masked = mask_comments(text)

@@ -25,6 +25,7 @@ from swift_performance_scan import (  # noqa: E402
     registered_signpost_errors,
     scan_source,
     signpost_errors,
+    signpost_surface_errors,
     uses_concurrent,
     validate_device_receipt,
 )
@@ -327,6 +328,16 @@ def evaluate(root: Path, base_ref: str | None = "origin/main", device_payload: o
     app_enabled = bool(live_receipt.get("concurrentAttributeEnabled"))
     widget_rows = [row for row in rows if row["target"] == "LogYourBodyRestTimer"]
     widget_enabled = bool(widget_rows) and all(row_enables_concurrent(row) for row in widget_rows)
+    resolved_surfaces, _empty_surfaces = resolve_surface_files(root, contract)
+    surface_files = {
+        sid: {item.relative_to(root).as_posix() for item in paths}
+        for sid, paths in resolved_surfaces.items()
+    }
+    signpost_owners: dict[str, str] = {}
+    for surface in contract.get("surfaces") or []:
+        sid = str(surface.get("id") or "")
+        for name in surface.get("signposts") or []:
+            signpost_owners[str(name)] = sid
     for path in production_swift(root):
         text = path.read_text(errors="replace")
         relative = path.relative_to(root).as_posix()
@@ -335,6 +346,7 @@ def evaluate(root: Path, base_ref: str | None = "origin/main", device_payload: o
             if not enabled:
                 errors.append(f"@concurrent in {relative} while the toolchain receipt does not enable it")
         errors.extend(signpost_errors(text, allowed_signposts(contract), relative))
+        errors.extend(signpost_surface_errors(text, relative, signpost_owners, surface_files))
     signpost_path = root / "apps/ios/LogYourBody/Utils/PerfSignpost.swift"
     if signpost_path.is_file():
         signpost_text = signpost_path.read_text(errors="replace")

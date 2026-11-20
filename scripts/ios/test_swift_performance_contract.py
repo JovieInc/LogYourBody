@@ -63,6 +63,21 @@ class SwiftPerformanceContractTests(unittest.TestCase):
         self.assertTrue(any("string literal" in error for error in errors))
         self.assertFalse(any("custom_span" in error or "launch_first_dashboard_frame" in error for error in errors))
 
+    def test_signpost_must_be_emitted_from_its_surface(self):
+        text = "\n".join([
+            '// PerfSignpost.event("launch_repair", "hidden")',
+            'PerfSignpost.event("launch_repair", "skipped")',
+            'PerfSignpost.begin("launch_repair")',
+        ])
+        path = "apps/ios/LogYourBody/Services/BodyMetricLaunchRepair.swift"
+        owners = {"launch_repair": "launch-auth-onboarding"}
+        outside = guard.signpost_surface_errors(text, path, owners, {"launch-auth-onboarding": set()})
+        self.assertEqual(len(outside), 2)
+        self.assertTrue(all("outside surface launch-auth-onboarding" in error for error in outside))
+        self.assertFalse(any("hidden" in error for error in outside))
+        covered = guard.signpost_surface_errors(text, path, owners, {"launch-auth-onboarding": {path}})
+        self.assertEqual(covered, [])
+
     def test_registered_signposts_must_survive_contract_merges(self):
         source = 'static let registeredNames = ["timeline_photo_decode"]'
         self.assertTrue(guard.registered_signpost_errors(source, set()))

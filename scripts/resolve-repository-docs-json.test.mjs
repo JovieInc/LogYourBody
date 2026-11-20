@@ -8,6 +8,37 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { manifestRepo, env, resolver } from './resolve-repository-docs.test.mjs';
 
+test('Python merge proposes both independent functions and refuses conflicting replacements', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-python-merge-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
+  const path = 'scan.py';
+  const commit = (source) => { writeFileSync(join(root, path), source); git('add', path); git('commit', '-qm', 'fixture'); };
+  git('init', '-q', '-b', 'ours');
+  git('config', 'core.hooksPath', '/dev/null');
+  commit('def existing():\n    return 1\n');
+  git('switch', '-qc', 'theirs');
+  commit('def incoming():\n    return 2\n\ndef existing():\n    return 1\n');
+  git('switch', '-q', 'ours');
+  commit('def branch():\n    return 3\n\ndef existing():\n    return 1\n');
+  assert.equal(spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: root, env }).status, 1);
+  const before = git('ls-files', '--stage');
+  const resolve = () => spawnSync('python3', [resolver, '--root', root, '--union-python', path], { env, encoding: 'utf8' });
+  const result = resolve();
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /def branch\(\):/);
+  assert.match(result.stdout, /def incoming\(\):/);
+  assert.equal(git('ls-files', '--stage'), before);
+  git('merge', '--abort');
+  git('switch', '-q', 'theirs');
+  commit('def existing():\n    return 2\n');
+  git('switch', '-q', 'ours');
+  commit('def existing():\n    return 3\n');
+  assert.equal(spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: root, env }).status, 1);
+  assert.notEqual(resolve().status, 0);
+});
+
+
 function jsonConflict(t, base, ours, theirs, path = 'config/inputs.json') {
   const root = mkdtempSync(join(tmpdir(), 'lyb-json-union-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));

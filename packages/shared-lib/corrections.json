@@ -8741,5 +8741,49 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "launch-repair-required-model-fixture",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44637333971/job/135960119530",
+    "correction": "PR #1831 / LYB-379, fix-red-5df69c1e5f: Launch Quality failed saving a body metric fixture with nil required timestamps before the repair ran; CI Summary reflects that failure.",
+    "mechanization": "Use valid required timestamps and retain the missing localDate repair scenario. Extend the existing required metric boundary suite to inspect directly inserted body metric fixtures against the current Core Data model and reject explicit nil assignments to required attributes before a save. The real fixture fails for createdAt, date and updatedAt before the repair and passes afterwards; negative controls cover required and optional fields. The harness owns push and PR edits and must add exactly one line: Machine: built packages/shared-lib/src/metric-correction-boundary.test.ts. Native execution remains unverified on Linux.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Core Data already enforces mandatory fields at save time; intentional validation-failure tests must remain possible, so the fixture cannot be made valid by a production model change."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required metric boundary suite can compare direct fixture insertions and explicit nil assignments against the active model before native execution."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/metric-correction-boundary.test.ts",
+      "anchor": "keeps inserted body metric test fixtures compatible with the current model"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "merge-independent-python-functions",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1831",
+    "correction": "PR #1831 / LYB-379, fix-red-e3b0c44298 occurrence 118: merge main without rebasing and preserve independent performance scanner functions and tests from both parents.",
+    "mechanization": "Extend the existing merge repair resolver with a review-only union for independently inserted Python functions. The real Git regression fails against the previous resolver and passes with the extension, including refusal of conflicting replacements. Use the resolver for both performance scanner conflicts. The required pre-commit lint suite imports the resolver tests. The harness owns PR edits and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Independent branch additions cannot be prevented from colliding at a shared insertion point by production code."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing merge repair tool can propose a conservative union from immutable Git stages and refuse overlapping changes."
+      }
+    },
+    "guard": {
+      "path": "scripts/python_union.py",
+      "anchor": "Propose a reviewed union of independently inserted Python functions."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
