@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
+import { homeStageAspectGaps } from './home-stage-reservation';
 
 const read = (path: string) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8');
 const home = 'apps/ios/LogYourBody/Views/HomeV2/';
@@ -13,7 +14,7 @@ it('composes the glass filmstrip inside the existing ruler and selection callbac
   expect(ruler).toContain('onSelect(index)');
   expect(ruler).not.toMatch(/@State[^\n]*(?:selected|selection)/);
   expect(surface).toContain('photoURLs: timeline.metrics.reversed().map(\\.photoUrl)');
-  expect(surface).toContain('height: geometry.size.width / HomeV2Tokens.photoAspectRatio');
+  expect(homeStageAspectGaps(surface, read(`${home}HomeV2SystemStates.swift`))).toEqual([]);
   expect(viewer).toContain('photoURLs: chronological.map { bodyMetrics[$0].photoUrl }');
   const strip = surface.slice(
     surface.indexOf('struct HomeV2Filmstrip: View'),

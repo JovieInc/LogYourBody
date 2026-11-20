@@ -29,6 +29,7 @@ import {
   type Identity,
   type Shape,
 } from './personal-body-estimate';
+import { homeStageAspectGaps } from './home-stage-reservation';
 
 const root = fileURLToPath(new URL('../../..', import.meta.url));
 const read = (path: string) => readFileSync(`${root}/${path}`, 'utf8');
@@ -297,7 +298,12 @@ it('keeps the estimate inside the photo stage and off the scrubber hot path', ()
   const domain = read('apps/ios/LogYourBody/Components/PersonalBodyEstimate.swift');
   const emptyStage = read('apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift');
   expect(surface).toContain('PersonalBodyEstimateStore');
-  expect(surface).toContain('photoAspectRatio');
+  expect(
+    homeStageAspectGaps(
+      surface,
+      read('apps/ios/LogYourBody/Views/HomeV2/HomeV2SystemStates.swift'),
+    ),
+  ).toEqual([]);
   expect(hero).not.toContain('stepJob');
   expect(hero).not.toContain('PersonalBodyJobs');
   expect(domain).toContain('adjust the personal outline for this date');
