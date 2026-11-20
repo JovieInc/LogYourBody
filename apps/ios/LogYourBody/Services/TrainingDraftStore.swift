@@ -16,6 +16,34 @@ struct TrainingSetDraft: Codable, Equatable {
     var key: String { "\(exerciseId)-\(setNumber)" }
 }
 
+/// Entry CTA for the coach card: continue when the session already has recorded sets.
+enum TrainingCoachEntryPolicy {
+    static func hasRecordedProgress(_ session: TrainingSession) -> Bool {
+        !(session.loggedSets ?? []).isEmpty
+    }
+
+    static func primaryActionTitle(hasRecordedProgress: Bool) -> String {
+        hasRecordedProgress ? "Continue session" : "Start session"
+    }
+
+    static func accessibilityIdentifier(hasRecordedProgress: Bool) -> String {
+        hasRecordedProgress ? "training_continue_session" : "training_start_session"
+    }
+}
+
+/// Keep a device cache when `/next` omits a session but unfinished local work remains.
+enum TrainingActiveSessionRetentionPolicy {
+    static func shouldRetainCache(
+        cached: TrainingSession?,
+        serverSessionPresent: Bool,
+        draftRows: [String: TrainingSetDraft]
+    ) -> Bool {
+        guard !serverSessionPresent, cached != nil else { return false }
+        if !(cached?.loggedSets ?? []).isEmpty { return true }
+        return draftRows.values.contains { $0.pendingRequest != nil || $0.pendingCorrection != nil }
+    }
+}
+
 struct TrainingFeedbackDraft: Codable, Equatable {
     let request: TrainingFeedbackRequest
     var response: TrainingFeedbackResponse?
