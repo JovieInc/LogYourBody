@@ -103,6 +103,7 @@ jobs:
           # exact policy hunk are independently reviewed. Never a caller input.
           REVIEWED_AUDIT_SHA256 = 'cbf29ca6fbdc6c521c6206c3e7c9bfceacf1535d76ef6dfd11f62d8dd8377a0c'
           DEPENDENCIES = {
+              '.github/scripts/pin-xcode-27.sh': 'c9a4ad201a56cddbef670aeee211f68a6a874c65fc91064530e6d34425e35494',
               'scripts/ios/xcodebuild-command-timeout.py': '66abf226c296005bbf50ca277d1e597f90c74269d26cb1afa039e999cbbc35fa',
               'scripts/ios/bootstrap-local-config.sh': 'aad028c0eff7f9d2a043711a8735963dc66b9bd664f11bf98b7ada67a60ab8db',
               'scripts/ios/launch-quality-diagnostic-seven.sh': 'c50c0af8f80b9649488398c1a4ab6f6a344a51da187c4e64be7b8871f779815b',
@@ -142,9 +143,8 @@ jobs:
           DIAGNOSTIC_TOOLING_PY
 
       - name: Select hosted Xcode
-        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
-        with:
-          xcode-version: latest-stable
+        shell: bash
+        run: bash .github/scripts/pin-xcode-27.sh
 
       # No local composite setup, Ruby/Bundler install, dependency cache restore,
       # evidence validator CLI, coverage ratchet or performance invocation here.

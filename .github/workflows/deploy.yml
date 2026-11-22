@@ -153,7 +153,7 @@ jobs:
       - name: Setup iOS build environment
         uses: ./.github/actions/setup-ios-build
         with:
-          xcode-version: 'latest-stable'
+          xcode-version: '27.1'
           working-directory: apps/ios
           setup-ruby: 'true'
           create-config-files: 'true'
@@ -190,10 +190,26 @@ jobs:
           BUILD_NUMBER=$(date -u +%Y%m%d%H%M%S)
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy to TestFlight
+      - name: Archive beta
         run: |
           cd apps/ios
-          bundle exec fastlane beta build_number:${{ steps.build.outputs.build_number }}
+          bundle exec fastlane beta_archive build_number:${{ steps.build.outputs.build_number }}
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_IDENTIFIER: com.logyourbody.app
+          APP_STORE_APP_ID: "6755209876"
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+
+      - name: Verify App Store minimum SDK (LYB-376)
+        shell: bash
+        run: bash .github/scripts/verify-ios-ipa-min-sdk.sh apps/ios/build
+
+      - name: Upload beta to TestFlight
+        run: |
+          cd apps/ios
+          bundle exec fastlane beta_upload
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_IDENTIFIER: com.logyourbody.app

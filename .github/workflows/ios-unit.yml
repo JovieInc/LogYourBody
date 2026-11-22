@@ -61,7 +61,7 @@ jobs:
       - name: Setup iOS build environment
         uses: ./.github/actions/setup-ios-build
         with:
-          xcode-version: 'latest-stable'
+          xcode-version: '27.1'
           working-directory: apps/ios
           setup-ruby: 'true'
           create-config-files: 'true'

@@ -1594,6 +1594,11 @@ def _diagnostic_repository(tmp_path: Path) -> tuple[Path, str]:
     root = (tmp_path / 'repo').resolve()
     (root / 'scripts/ios').mkdir(parents=True)
     (root / 'apps/ios').mkdir(parents=True)
+    (root / '.github/scripts').mkdir(parents=True)
+    # The trusted diagnostic fence hashes this pin before the synthetic helpers.
+    # It must be committed so a missing file does not escape as an uncaught lstat error.
+    (root / '.github/scripts/pin-xcode-27.sh').write_bytes(
+        (_REPO_ROOT / '.github/scripts/pin-xcode-27.sh').read_bytes())
     (root / 'scripts/ios/launch-quality-audit.sh').write_bytes((_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes())
     (root / 'scripts/ios/launch-quality-diagnostic-seven.sh').write_bytes(
         (_REPO_ROOT / 'scripts/ios/launch-quality-diagnostic-seven.sh').read_bytes())
@@ -2021,7 +2026,11 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert build_seconds + ui_seconds + 180 + 60 <= step_minutes * 60
     assert step_minutes + 7 == job_minutes
     uses = re.findall(r'uses: ([^\s]+)', source)
-    assert len(uses) == 3 and all(re.fullmatch(r'[\w-]+/[\w-]+@[0-9a-f]{40}', value) for value in uses)
+    # Checkout and artifact upload stay SHA-pinned. Xcode selection is the reviewed
+    # pin script, so setup-xcode / latest-stable is not a third action.
+    assert len(uses) == 2 and all(re.fullmatch(r'[\w-]+/[\w-]+@[0-9a-f]{40}', value) for value in uses)
+    assert 'maxim-lobanov/setup-xcode' not in source and 'latest-stable' not in source
+    assert 'run: bash .github/scripts/pin-xcode-27.sh\n' in source
 
 
 def _reviewed_diagnostic_candidate_bytes() -> bytes:
@@ -2252,7 +2261,9 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     expected = 'cbf29ca6fbdc6c521c6206c3e7c9bfceacf1535d76ef6dfd11f62d8dd8377a0c'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
-    assert len(dependencies) == 9
+    assert len(dependencies) == 10
+    pin_name = '.github/scripts/pin-xcode-27.sh'
+    assert dependencies[pin_name] == 'c9a4ad201a56cddbef670aeee211f68a6a874c65fc91064530e6d34425e35494'
     project_name = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj'
     # Admission must exercise current source bytes, as the real main diagnostic does.
     # Refreshing the policy digest remains an explicit review of the project diff.
@@ -2345,7 +2356,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
 
     fixtures = ['positive', 'previous-reviewed-project', 'frozen-main-audit', 'frozen-branch-audit', 'previous-main-audit', 'previous-branch-audit', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
-                'dependency-symlink', 'changed-project', 'wrong-resolver', 'previous-reviewed-resolver']
+                'dependency-symlink', 'changed-project', 'wrong-resolver', 'previous-reviewed-resolver', 'changed-xcode-pin']
     for scenario in fixtures:
         root = (tmp_path / scenario / 'repo').resolve()
         root.mkdir(parents=True)
@@ -2387,6 +2398,9 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
             audit.symlink_to(helper)
         elif scenario == 'wrong-dependency':
             helper.write_bytes(helper.read_bytes() + b'\n')
+        elif scenario == 'changed-xcode-pin':
+            pin = root / pin_name
+            pin.write_bytes(pin.read_bytes() + b'\n')
         elif scenario == 'wrong-resolver':
             resolver = root / 'scripts/ios/resolve-simulator-destination.sh'
             resolver.write_bytes(resolver.read_bytes() + b'\n')

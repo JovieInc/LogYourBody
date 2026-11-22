@@ -91,7 +91,7 @@ jobs:
       - name: Setup iOS build environment
         uses: ./.github/actions/setup-ios-build
         with:
-          xcode-version: 'latest-stable'
+          xcode-version: '27.1'
           working-directory: apps/ios
           setup-ruby: 'true'
           create-config-files: 'true'
@@ -106,9 +106,9 @@ jobs:
             apps/ios/.build
             ~/Library/Developer/Xcode/DerivedData
             ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-quality-spm-xcode-latest-stable-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
+          key: ${{ runner.os }}-quality-spm-xcode-27.1-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
           restore-keys: |
-            ${{ runner.os }}-quality-spm-xcode-latest-stable-
+            ${{ runner.os }}-quality-spm-xcode-27.1-
             ${{ runner.os }}-spm-
 
       - name: Run launch quality audit
