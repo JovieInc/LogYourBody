@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A0B100000000000000000002 /* TimelineAxis.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B100000000000000000001 /* TimelineAxis.swift */; };
+		A0B100000000000000000004 /* UnifiedTimelinePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B100000000000000000003 /* UnifiedTimelinePolicy.swift */; };
+		A0B100000000000000000006 /* TimelinePlayheadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B100000000000000000005 /* TimelinePlayheadStore.swift */; };
+		A0B100000000000000000008 /* TimelinePlayheadStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B100000000000000000007 /* TimelinePlayheadStoreTests.swift */; };
 		B37120261111000000000002 /* BodyParameterModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B37120261111000000000001 /* BodyParameterModel.swift */; };
 		B37120261111000000000004 /* BodyParameterModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B37120261111000000000003 /* BodyParameterModelTests.swift */; };
 		B34320261102000000000008 /* DatedOutcomeStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34320261102000000000007 /* DatedOutcomeStatsTests.swift */; };
@@ -779,6 +783,10 @@
 		45999DF3001C2F424CBB44DB /* SyncIntegrationTestDoubles.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncIntegrationTestDoubles.swift; sourceTree = "<group>"; };
 		4877512DEE0F7236151A15AA /* HomeV2PolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2PolicyTests.swift; sourceTree = "<group>"; };
 		FF6016BB00000000000000F1 /* HomeV2TimelinePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2TimelinePolicyTests.swift; sourceTree = "<group>"; };
+		A0B100000000000000000001 /* TimelineAxis.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TimelineAxis.swift; sourceTree = "<group>"; };
+		A0B100000000000000000003 /* UnifiedTimelinePolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UnifiedTimelinePolicy.swift; sourceTree = "<group>"; };
+		A0B100000000000000000005 /* TimelinePlayheadStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TimelinePlayheadStore.swift; sourceTree = "<group>"; };
+		A0B100000000000000000007 /* TimelinePlayheadStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TimelinePlayheadStoreTests.swift; sourceTree = "<group>"; };
 		492B105B3BA25B5B5864B9BA /* MobileProfileNamePayloadTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileProfileNamePayloadTests.swift; sourceTree = "<group>"; };
 		4C3BCDDCDB314367722653A8 /* ValidationServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ValidationServiceTests.swift; sourceTree = "<group>"; };
 		4C87F359CE5509C2457AB583 /* PaywallSavingsPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaywallSavingsPolicyTests.swift; sourceTree = "<group>"; };
@@ -1549,6 +1557,9 @@
 				B313F11E0000000000000A31 /* SubjectPlateView.swift */,
 				F0165C8B0000000000000002 /* HomeV2PhotoScrubber.swift */,
 				FF6016AA00000000000000F1 /* HomeV2TimelineHero.swift */,
+				A0B100000000000000000001 /* TimelineAxis.swift */,
+				A0B100000000000000000003 /* UnifiedTimelinePolicy.swift */,
+				A0B100000000000000000005 /* TimelinePlayheadStore.swift */,
 				CA50D84A24CA405046D5EAFA /* HomeV2PhotoViewer.swift */,
 				BA9844F348C4675E22E4592F /* HomeV2TrendChart.swift */,
 				ACBA870282ED5F613A82213D /* HomeV2PrimaryButton.swift */,
@@ -1773,6 +1784,7 @@
 				EC326F70438A47EBD30E41A7 /* TimelineScrollJankRegressionTests.swift */,
 				4877512DEE0F7236151A15AA /* HomeV2PolicyTests.swift */,
 				FF6016BB00000000000000F1 /* HomeV2TimelinePolicyTests.swift */,
+				A0B100000000000000000007 /* TimelinePlayheadStoreTests.swift */,
 				AB73CC33EB688034C7B8512F /* SubjectPlateRendererTests.swift */,
 				B313F11E0000000000000B01 /* BodyPhotoPresentationTests.swift */,
 				B313F11E0000000000000B11 /* BodyPhotoPresentationTests+Alignment.swift */,
@@ -2844,6 +2856,7 @@
 				F80E7F3EED8BA23533A7C1D0 /* TimelineScrollJankRegressionTests.swift in Sources */,
 				CB2DAC6AFD2CCDD76F568339 /* HomeV2PolicyTests.swift in Sources */,
 				FF6016BB00000000000000B1 /* HomeV2TimelinePolicyTests.swift in Sources */,
+				A0B100000000000000000008 /* TimelinePlayheadStoreTests.swift in Sources */,
 				A3B2D419E2AED6266506624B /* SubjectPlateRendererTests.swift in Sources */,
 				B313F11E0000000000000B02 /* BodyPhotoPresentationTests.swift in Sources */,
 				B313F11E0000000000000B12 /* BodyPhotoPresentationTests+Alignment.swift in Sources */,
@@ -3236,6 +3249,9 @@
 				F1B245000000000000000006 /* HomeV2RecentReadings.swift in Sources */,
 				F0165C8B0000000000000001 /* HomeV2PhotoScrubber.swift in Sources */,
 				FF6016AA00000000000000B1 /* HomeV2TimelineHero.swift in Sources */,
+				A0B100000000000000000002 /* TimelineAxis.swift in Sources */,
+				A0B100000000000000000004 /* UnifiedTimelinePolicy.swift in Sources */,
+				A0B100000000000000000006 /* TimelinePlayheadStore.swift in Sources */,
 				F38F981DE886318E350B7CF8 /* DashboardViewLiquid+HomeV2.swift in Sources */,
 				87977666693C1FD6C5DDAA8B /* SubjectPlateRenderer.swift in Sources */,
 				B313F11E0000000000000A22 /* AspectFillCropper.swift in Sources */,
