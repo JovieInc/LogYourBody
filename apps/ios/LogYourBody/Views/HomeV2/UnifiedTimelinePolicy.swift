@@ -43,8 +43,13 @@ enum UnifiedTimelinePolicy {
                 }
                 .map(HomeV2TimelinePolicy.EntryID.init)
         case .metric(let kind):
-            let members: [(id: HomeV2TimelinePolicy.EntryID, value: Double, date: Date, record: String)] = owned.compactMap { metric in
-                guard let value = recordedValue(kind, in: metric, owner: owner, heightCm: heightCm) else {
+            typealias Member = (
+                id: HomeV2TimelinePolicy.EntryID, value: Double, date: Date, record: String
+            )
+            let members: [Member] = owned.compactMap { metric in
+                guard let value = recordedValue(
+                    kind, in: metric, owner: owner, heightCm: heightCm
+                ) else {
                     return nil
                 }
                 return (HomeV2TimelinePolicy.EntryID(metric), value, metric.date, metric.id)
