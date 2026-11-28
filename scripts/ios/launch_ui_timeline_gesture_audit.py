@@ -36,6 +36,18 @@ def check_timeline_gestures(root: Path, hud_path: Path, hud: str, violations: li
     content_chain = root_body.split("photoTimelineHomeContent\n", 1)[-1].split(
         "if !isHomeV2CheckIn", 1
     )[0]
+    # Clipping only controls drawing. Bound content hit testing after sizing,
+    # and keep the header above native scroll/pager descendants at that boundary.
+    content_bounds = content_chain.split(".overlay(alignment: .leading)", 1)[0]
+    if (
+        ".zIndex(1)" not in header_call
+        or ".zIndex(0)" not in content_chain
+        or not re.search(r"\.frame\([^\n]+\)\s*\.contentShape\(Rectangle\(\)\)", content_bounds)
+    ):
+        violations.append(violation_cls(
+            check="timeline.header_hit_test_priority", file=str(hud_path.relative_to(root)), line=1,
+            detail="Bound the sized content's hit region and keep the navigation header above its scroll and pager descendants.",
+        ))
     parent_chain = root_body.split("if !isHomeV2CheckIn", 1)[-1]
     edge = ".highPriorityGesture(photoTimelineSwipe)"
     overlay = content_chain.split(".overlay(alignment: .leading)", 1)[-1].split("\n        }", 1)[0]
@@ -53,3 +65,11 @@ def check_timeline_gestures(root: Path, hud_path: Path, hud: str, violations: li
             check="timeline.edge_swipe_excludes_header", file=str(hud_path.relative_to(root)), line=1,
             detail="Attach the edge swipe to the content below the header, with its hit shape before any padding.",
         ))
+
+
+def contribute(root: Path, app_dir: Path, violations: list, violation_cls, _line_number) -> None:
+    """Run header and edge swipe checks from the one-pass Swift snapshot."""
+    from launch_ui_timeline_audit import text_for
+
+    hud_path = app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift"
+    check_timeline_gestures(root, hud_path, text_for(hud_path), violations, violation_cls)

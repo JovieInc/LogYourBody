@@ -7,15 +7,20 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct PersonalBodyModeControl: View {
     let mode: String
+    var showsAppearance = false
     let onChange: (String) -> Void
 
     var body: some View {
         HStack(spacing: 4) {
             chip("Photo", mode: "photo", id: "personal_body_mode_photo")
             chip("Estimated 3D", mode: "estimate", id: "personal_body_mode_estimate")
+            if showsAppearance {
+                chip("Photo 3D", mode: "appearance", id: "personal_body_mode_appearance")
+            }
         }
         .accessibilityElement(children: .contain)
     }
@@ -216,6 +221,8 @@ struct PersonalBodyCaptureOffer: View {
         let photo = photoId
         let date = PersonalBodyDay.key(effectiveDate)
         let identityFrame = frame
+        let appearanceOn = PhotographicAppearancePolicy.isEnabled()
+        let source = image.cgImage
         Task {
             let pose = await PersonalBodyPoseReader.read(image: image, view: view)
             var capture = pose
@@ -230,10 +237,57 @@ struct PersonalBodyCaptureOffer: View {
                 now: PersonalBodyClock.now,
                 deadline: PersonalBodyClock.deadline
             )
+            if appearanceOn, let source {
+                await cacheAppearance(
+                    source: source, view: view, account: account, photo: photo, date: date, quality: capture.quality
+                )
+            }
             await MainActor.run {
                 message = receipt.journey == "estimate" ? "Outline saved for this date." : "This photo stays in the timeline."
             }
         }
+    }
+
+    private func cacheAppearance(
+        source: CGImage,
+        view: PersonalBodyViewKind,
+        account: String,
+        photo: String,
+        date: String,
+        quality: PersonalBodyCaptureQuality
+    ) async {
+        guard let snapshot = await PersonalBodyEstimateStore.shared.acceptedSnapshot(
+            accountId: account, effectiveDate: date
+        ) else { return }
+        let tones = await Task.detached(priority: .utility) {
+            PhotographicAppearanceSampler.tones(cgImage: source, count: PhotographicAppearance.cellsPerRegion)
+        }.value
+        guard let tones else { return }
+        let sample = PhotographicAppearanceSample(
+            accountId: account,
+            photoId: photo,
+            view: view.rawValue,
+            effectiveDate: date,
+            captureDate: date,
+            framingId: PhotographicAppearance.framingId,
+            quality: quality.rawValue,
+            samples: tones,
+            sourceDigest: tones.map { String(format: "%.3f", $0) }.joined(separator: ",")
+        )
+        let geometry = PhotographicAppearanceGeometry(
+            snapshotId: snapshot.id,
+            accountId: snapshot.accountId,
+            bodyId: snapshot.bodyId,
+            effectiveDate: snapshot.effectiveDate,
+            captureDate: date,
+            modelId: snapshot.modelId,
+            modelVersion: snapshot.modelVersion,
+            topologyId: snapshot.topologyId,
+            rigId: snapshot.rigId,
+            framingId: PhotographicAppearance.framingId,
+            shape: snapshot.shape
+        )
+        _ = await PhotographicAppearanceStore.shared.remember(sample, geometry: geometry)
     }
 
     private func retainDiary() {

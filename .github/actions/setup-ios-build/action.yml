@@ -44,12 +44,15 @@ runs:
 
     - name: Install SwiftLint and xcbeautify
       shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         # Pin SwiftLint to a known-good version instead of Homebrew's
         # floating latest: an unpinned `brew install swiftlint` silently
         # picks up new/renamed default-enabled rules (e.g. legacy_swiftui_aspect_ratio)
         # and breaks --strict CI on unrelated PRs with no local repro.
         SWIFTLINT_VERSION="0.63.3"
+        SWIFTLINT_SHA256="fb045e85e7cb3374f42a4840b6b85a0106302afa69035c0c6f29af4a44c810b6"
         # The tool cache is user-writable on hosted and self-hosted runners;
         # /usr/local/bin is root-owned on the self-hosted Macs.
         SWIFTLINT_DIR="${RUNNER_TOOL_CACHE}/swiftlint/${SWIFTLINT_VERSION}"
@@ -57,7 +60,10 @@ runs:
           if [[ ! -x "$SWIFTLINT_DIR/swiftlint" ]]; then
             echo "Installing SwiftLint ${SWIFTLINT_VERSION}..."
             mkdir -p "$SWIFTLINT_DIR"
-            curl -L "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip
+            bash "$GITHUB_WORKSPACE/scripts/download-release-asset.sh" \
+              "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" \
+              "https://api.github.com/repos/realm/SwiftLint/releases/assets/430524024" \
+              "$SWIFTLINT_SHA256" swiftlint.zip
             unzip -o swiftlint.zip -d "$SWIFTLINT_DIR"
             chmod +x "$SWIFTLINT_DIR/swiftlint"
           fi

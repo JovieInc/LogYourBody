@@ -365,6 +365,9 @@ class RevenueCatManager: NSObject, ObservableObject {
     /// Loading state for purchases
     @Published var isPurchasing: Bool = false
 
+    /// One purchase or restore provider call at a time. Admission is synchronous.
+    let billingAdmission = BillingProviderAdmission()
+
     /// Error message for display
     @Published var errorMessage: String?
 
@@ -506,12 +509,6 @@ class RevenueCatManager: NSObject, ObservableObject {
         self.cachedPaywallOfferingDisplay = loadCachedPaywallOfferingDisplay()
         // print("💰 Loaded cached subscription status: \(cachedIsSubscribed)")
     }
-
-
-    #if DEBUG
-
-
-    #endif
 }
 
 typealias SubscriptionManager = RevenueCatManager

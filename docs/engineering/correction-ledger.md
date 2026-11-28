@@ -57,6 +57,43 @@ A different rule id leaves the earlier count unchanged. This step does not emit
 or change checks. Coverage and the recurrence intake still derive repeat counts
 from distinct source URLs per fingerprint.
 
+For receipt intake (LYB-362), call `recordCorrectionReceipt` in the same module
+with the prior receipt list, the new classified correction, and a synchronous
+internal `enqueueMechanize` callback. It appends the receipt with `isRecurrence`
+and a numeric `recurrence` count. Matching uses correction text normalized with
+Unicode NFKC, trimmed and collapsed whitespace, and lowercase, plus the exact
+classifier `level`. Different text at the same level, or the same text at a
+different level, starts at zero. Rule IDs do not determine receipt matching.
+The first matching receipt emits no request; each newly recorded repeat emits
+one `{ type: 'mechanize', correction: receipt }` request. Retain the returned list
+for the next intake. This callback is the internal queue boundary; it performs
+no UI, outbound messaging, check generation, or Linear filing. The tracked Git
+ledger schema and fingerprint/source-based recurrence intake remain unchanged.
+
+`classifyCorrectionRecords` in that same module saves one `level` on each ledger
+record using its reviewed `classification` assessments, in the existing order:
+`codebase`, `static` (lint/typecheck/CI), `prose`, then `human`. It returns updated
+records, preserves rule ids and recurrence counts, and replaces stale saved labels
+with the first feasible level. Missing or wholly infeasible assessments fail
+instead of defaulting to human review. This pure operation emits no checks.
+
+`correctionPyramidCoverage` (LYB-363) in the same module accepts classified ledger
+rows and returns `levels` counts for `codebase`, `static`, `prose`, and `human`,
+plus `total`, `mechanized`, and `mechanizedShare`. Mechanized means codebase or
+lint/typecheck/CI (`static`); its share is `(codebase + static) / total` on a 0–1
+scale. An empty ledger returns all zero counts and a zero share. Each row counts
+once regardless of its recurrence count. This pure metric reads saved levels
+without checking guard files or changing the existing guard-coverage report,
+CI gates, or UI.
+
+The single [coverage-floor decision (LYB-364)](../../packages/shared-lib/correction-coverage-floor.json)
+records the recommended default: no absolute percentage floor; fail only when
+the unrounded `correctionPyramidCoverage.mechanizedShare` is lower than the last
+recorded baseline. Equal or higher shares pass this floor rule. The decision is
+inactive and reserves a default-off feature gate. The guard-coverage CI child
+owns enforcement, baseline recording and flag wiring; this record adds no CI
+job or metric implementation and preserves existing coverage and guard checks.
+
 For a merge conflict in the ledger, run
 `node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger` before
 staging it. The resolver retains receipts from both Git conflict stages and
@@ -218,6 +255,11 @@ missing guards and broken scanners fail regardless of severity. Existing hard
 checks retain their own invocations; guards with finding-baseline ratchets must
 use the existing ratchet runner and cannot be wrapped by this emitter. The normal
 shared-lib test task runs the CLI regression fixtures and emitter coverage gate.
+
+The single [warn-to-ratchet promotion decision (LYB-361)](../../packages/shared-lib/correction-promotion-rule.json)
+records the recommended default for the auto-mechanize child. It is inactive,
+reserves a default-off feature gate, and leaves the current emitter behavior
+above unchanged. That child owns implementation and flag wiring.
 
 The JSON report and existing CI/owner tables expose sources, lessons, selected
 levels, guards and recurrence. Required coverage CI compares against the exact

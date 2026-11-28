@@ -71,9 +71,13 @@ extension DashboardViewLiquid {
                 .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.top, 8)
                 .padding(.bottom, 4)
+                // Keep header buttons above native scroll and pager hit regions.
+                .zIndex(1)
 
             photoTimelineHomeContent
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? 0 : .infinity)
+                .contentShape(Rectangle())
+                .zIndex(0)
                 // The edge swipe lives on the content, below the header. A
                 // high-priority drag that shares the menu button's edge drops
                 // the Open Menu tap before the sidebar can present.
@@ -166,6 +170,9 @@ extension DashboardViewLiquid {
         } message: {
             Text("Your entry is still saved. Try Undo again.")
         }
+        .task(id: authManager.currentUser?.id) {
+            await refreshWeeklyPhotoProvenanceIfNeeded()
+        }
     }
 
     private var isComposerLoggingPrototypeEnabled: Bool {
@@ -207,7 +214,8 @@ extension DashboardViewLiquid {
     @ViewBuilder
     private var photoTimelineHomeContent: some View {
         ZStack {
-            if isDatedTimelineEnabled && !datedTimelineCanShowHistory {
+            if isDatedTimelineEnabled && (!datedTimelineIsOwned || datedTimelineSnapshot == nil ||
+                (!isDatedStatsSurface && !datedTimelineCanShowHistory)) {
                 ProgressView()
             } else {
                 switch selectedPhotoTimelineRootPage {
@@ -235,7 +243,9 @@ extension DashboardViewLiquid {
                             id: "photo_timeline_root_page_analytics",
                             label: "Stats page"
                         )
-                        if HomeV2Policy.isEnabled() {
+                        if isDatedTimelineEnabled {
+                            photoTimelineAnalyticsPage
+                        } else if HomeV2Policy.isEnabled() {
                             homeV2ProgressView
                         } else {
                             photoTimelineAnalyticsPage

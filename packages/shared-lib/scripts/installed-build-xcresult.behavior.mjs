@@ -226,6 +226,26 @@ test('the not_verified placeholder is an absent installed build id', () => {
   console.log('installed-build-id-absent');
 });
 
+test('failed, skipped, and unaccounted installed-build runs cannot become passing receipts', () => {
+  const manifest = emitLaunchManifest(bindings());
+  for (const result of ['Failed', 'Skipped', 'Timed Out', undefined]) {
+    const xcresult = installedExport(manifest);
+    xcresult.traces.push({ ...xcresult.traces[0], result });
+    const checked = check(xcresult, manifest).result;
+    assert.equal(checked.ok, false, `unexpected pass for ${result}`);
+    assert.equal(checked.receipt, null);
+    assert.ok(checked.reasons.includes(`non-passing-trace:${xcresult.traces[0].testId}`));
+  }
+  for (const field of ['recoveredAfterRetry', 'infrastructureSkip']) {
+    const xcresult = installedExport(manifest);
+    delete xcresult[field];
+    const checked = check(xcresult, manifest).result;
+    assert.equal(checked.ok, false, `unexpected pass without ${field}`);
+    assert.equal(checked.receipt, null);
+    assert.ok(checked.reasons.includes(`missing-run-accounting:${field}`));
+  }
+});
+
 test('denial, no-data, offline, stale, conflicting, unsafe, impossible, expired, and maintenance need both traces', () => {
   const manifest = emitLaunchManifest(bindings());
   const xcresult = installedExport(manifest);

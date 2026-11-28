@@ -1,0 +1,28 @@
+{
+  "issue": "LYB-316",
+  "selectedEngineId": "lyb.personal.parametric.wireframe.v1",
+  "fallbackEngineId": "lyb.wireframe.torso",
+  "personalizedProduction": false,
+  "addsCaptureStep": false,
+  "mapsToBodyFat": false,
+  "mapsToDexa": false,
+  "topologyId": "lyb.wireframe.torso.v1",
+  "releaseStage": "disabled",
+  "flagKey": "personal_body_engine",
+  "killSwitchKey": "personal_body_engine_kill_switch",
+  "pose": "neutral-identity",
+  "crop": "torso-chest-to-waist",
+  "clothing": "unsupported",
+  "candidates": [
+    { "id": "bodygram", "status": "rejected", "executed": false },
+    { "id": "parametric-wireframe", "status": "selected", "executed": true },
+    { "id": "digs-avatar", "status": "rejected", "executed": false }
+  ],
+  "unsupported": {
+    "omniFlashVerifiedMeshApi": false,
+    "gnmPublicBody": false,
+    "mojuloIsBodyReconstruction": false,
+    "meshlibTimingIsReconstruction": false,
+    "exactRememberedDemoConfirmed": false
+  }
+}

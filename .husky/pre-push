@@ -1,3 +1,7 @@
+# Company Guards size-500, pinned to the exact JovieInc/ci SHA CI runs. Runs
+# first: it is fast and must fail before auto-versioning touches the tree.
+bash scripts/hooks/company-size-local.sh
+
 echo "🔄 Running auto-versioning..."
 node apps/web/scripts/version-manager.cjs --skip-tag
 
