@@ -7,6 +7,7 @@ final class MetricCorrectionTests: XCTestCase {
     private var manager: CoreDataManager!
     private var service: MetricCorrectionService!
     private var syncCount = 0
+    private var invalidatedEvidence: [(String, [String])] = []
     private let owner = "metric-correction-owner"
 
     override func setUp() async throws {
@@ -17,7 +18,10 @@ final class MetricCorrectionTests: XCTestCase {
         manager = CoreDataManager(persistentStoreDescriptions: [store])
         service = MetricCorrectionService(
             coreDataManager: manager, isEnabled: { true }, admission: { _ in {} },
-            syncTrigger: { self.syncCount += 1 }
+            syncTrigger: { self.syncCount += 1 },
+            invalidateVisualizationDerivatives: { accountId, evidenceIds in
+                self.invalidatedEvidence.append((accountId, evidenceIds))
+            }
         )
     }
 
@@ -30,6 +34,8 @@ final class MetricCorrectionTests: XCTestCase {
     func testExcludeThenUndoRestoresPriorCorrectionAndEveryOriginalField() async throws {
         let original = try await seed()
         let correction = try await service.correct(original, to: .init(weight: 79.125))
+        XCTAssertEqual(invalidatedEvidence.first?.0, owner)
+        XCTAssertEqual(invalidatedEvidence.first?.1, [original.id])
         let excluded = try await service.exclude(correction.metrics)
         XCTAssertTrue(excluded.metrics.isExcluded)
         XCTAssertEqual(excluded.metrics.correctedValue, correction.metrics.correctedValue)

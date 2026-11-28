@@ -18,6 +18,7 @@ struct HomeV2AllPhotosView: View {
     let onSelect: (Int) -> Void
     let onClose: () -> Void
     var onTools: (() -> Void)?
+    var onAddPhoto: (() -> Void)?
     var pickHint = HomeV2PhotoCopy.chooseBefore
 
     private var chronological: [Int] { HomeV2PhotoIndex.chronologicalPhotoIndices(in: bodyMetrics) }
@@ -53,37 +54,48 @@ struct HomeV2AllPhotosView: View {
                 topBar
 
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: HomeV2Tokens.Space.row) {
-                        ForEach(sections, id: \.title) { section in
-                            HStack(alignment: .lastTextBaseline, spacing: HomeV2Tokens.Space.tight) {
-                                Text(section.title)
-                                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
-                                    .foregroundStyle(HomeV2Tokens.Colors.ink)
-                                Spacer(minLength: HomeV2Tokens.Space.tight)
-                                if let delta = section.delta {
-                                    Text(delta)
-                                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                                }
-                            }
-                            .padding(.horizontal, HomeV2Tokens.Space.inset)
-                            .padding(.top, HomeV2Tokens.Space.compact)
-
-                            LazyVGrid(
-                                columns: Array(repeating: GridItem(.fixed(cell.width), spacing: spacing), count: columns),
-                                spacing: spacing
-                            ) {
-                                ForEach(section.indices, id: \.self) { index in
-                                    photoCell(index, size: cell)
-                                }
-                            }
-                            .padding(.horizontal, spacing)
+                    VStack(alignment: .leading, spacing: 0) {
+                        if HomeV2EmptyPhotoLibrary.showsEmptyState(photoCount: chronological.count) {
+                            emptyLibrary
                         }
+                        LazyVStack(alignment: .leading, spacing: HomeV2Tokens.Space.row) {
+                            ForEach(sections, id: \.title) { section in
+                                HStack(alignment: .lastTextBaseline, spacing: HomeV2Tokens.Space.tight) {
+                                    Text(section.title)
+                                        .scaledSystemFont(
+                                            size: HomeV2Tokens.TypeSize.title,
+                                            weight: .semibold,
+                                            relativeTo: .headline
+                                        )
+                                        .foregroundStyle(HomeV2Tokens.Colors.ink)
+                                    Spacer(minLength: HomeV2Tokens.Space.tight)
+                                    if let delta = section.delta {
+                                        Text(delta)
+                                            .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                                    }
+                                }
+                                .padding(.horizontal, HomeV2Tokens.Space.inset)
+                                .padding(.top, HomeV2Tokens.Space.compact)
+
+                                LazyVGrid(
+                                    columns: Array(repeating: GridItem(.fixed(cell.width), spacing: spacing), count: columns),
+                                    spacing: spacing
+                                ) {
+                                    ForEach(section.indices, id: \.self) { index in
+                                        photoCell(index, size: cell)
+                                    }
+                                }
+                                .padding(.horizontal, spacing)
+                            }
+                        }
+                        .padding(.bottom, HomeV2Tokens.Space.margin)
                     }
-                    .padding(.bottom, HomeV2Tokens.Space.margin)
                 }
 
-                hint
+                if !HomeV2EmptyPhotoLibrary.showsEmptyState(photoCount: chronological.count) {
+                    hint
+                }
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
         }
@@ -145,6 +157,42 @@ struct HomeV2AllPhotosView: View {
         .accessibilityIdentifier("home_v2_all_photos_cell")
     }
 
+    private var emptyLibrary: some View {
+        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
+            Text(HomeV2EmptyPhotoLibrary.title)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetTitle, weight: .semibold, relativeTo: .title2)
+                .foregroundStyle(HomeV2Tokens.Colors.ink)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("home_v2_empty_photo_library")
+            Text(HomeV2EmptyPhotoLibrary.why)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .body)
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(HomeV2EmptyPhotoLibrary.privacy)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(HomeV2EmptyPhotoLibrary.posing)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                .foregroundStyle(HomeV2Tokens.Colors.quiet)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(HomeV2EmptyPhotoLibrary.captureOrImport)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                .foregroundStyle(HomeV2Tokens.Colors.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            if let onAddPhoto {
+                HomeV2PrimaryButton(
+                    title: HomeV2EmptyPhotoLibrary.title,
+                    identifier: "home_v2_empty_library_add",
+                    action: onAddPhoto
+                )
+                .padding(.top, HomeV2Tokens.Space.tight)
+            }
+        }
+        .padding(HomeV2Tokens.Space.margin)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var hint: some View {
         Text(hintText)
             .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
@@ -155,6 +203,9 @@ struct HomeV2AllPhotosView: View {
     }
 
     private var hintText: String {
+        if HomeV2EmptyPhotoLibrary.showsEmptyState(photoCount: chronological.count) {
+            return HomeV2EmptyPhotoLibrary.captureOrImport
+        }
         switch mode {
         case .browse: return HomeV2PhotoCopy.tapToOpen
         case .pick: return pickHint
