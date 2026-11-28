@@ -8879,5 +8879,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-unmerged-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1722",
+    "correction": "PR #1722 (fix-red-1423773703 occurrence 48): the @typescript-eslint/eslint-plugin 8.71.2 bump left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, parity and CI Summary. Merging origin/main can also leave that generated projection unmerged while the lockfile auto-merges and stays frozen-valid. Dependency repair must rebuild that projection from the merged index instead of treating the conflict as an unstaged edit.",
+    "mechanization": "Extend both dependency repair modes to ignore an unmerged source projection in the preflight and rebuild it from staged sources after the frozen lockfile check. Two real-Git regressions fail with the previous unstaged-edit refusal and pass after the extension, keeping the auto-merged lockfile, both parent fingerprints and unrelated unstaged bytes. A resolved unstaged projection edit still refuses before pnpm. Use --verify-lockfile on this bump so the valid merged lockfile stays intact and the source map matches the merged manifests. Retain every frozen-install and parity gate. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dependency repair helper already verifies the lockfile and stages the projection. Skipping only an unmerged projection in that preflight lets the existing index renderer replace either parent's map without accepting an unresolved manifest or a hand-edited projection."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "An unmerged source projection does not block dependency repair; rebuild it from the index."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
