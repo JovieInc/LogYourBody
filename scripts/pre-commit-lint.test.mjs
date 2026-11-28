@@ -10,7 +10,6 @@ import { lintArguments } from './pre-commit-lint.mjs';
 import { resolver, sourceMapFixture } from './resolve-repository-docs.test.mjs';
 import './resolve-repository-docs-json.test.mjs';
 import './resolve-repository-docs-dependency.test.mjs';
-import './resolve-repository-docs-dependency-merge.test.mjs';
 import './resolve-repository-docs-index-flags.test.mjs';
 import './resolve-repository-docs-ledger.test.mjs';
 import './resolve-repository-docs-pin.test.mjs';
@@ -18,6 +17,7 @@ import './resolve-repository-docs-project.test.mjs';
 import './resolve-repository-docs-pin-union.test.mjs';
 import './resolve-repository-docs-manifest.test.mjs';
 import './resolve-repository-docs-merged-dependency.test.mjs';
+import './resolve-repository-docs-dependency-merge.test.mjs';
 
 const env = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
