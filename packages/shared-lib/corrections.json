@@ -9099,5 +9099,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-ignored-workspace-config",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1760",
+    "correction": "PR #1760, fix-red-1423773703 occurrence 58: preserve the ai 7.0.164 update and repair the stale generated source map reported by Detect Changes and parity, which also fails CI Summary. Extend and use the existing dependency-repair machine in the same PR.",
+    "mechanization": "Reuse the existing dependency repair guard that refuses ignored pnpm-workspace.yaml before invoking pnpm in both modes. The required real-Git regressions verify refusal, preservation of local workspace input and generated artifacts, reviewed retry and idempotence. Verify the scoped AI SDK 7.0.164 lockfile with frozen pnpm and regenerate the source projection. The harness must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper owns dependency preflight and artifact staging. Rejecting ignored workspace configuration before pnpm runs prevents local-only workspace definitions, catalogs or resolver settings from authorizing committed dependency artifacts."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Ignored workspace configuration must not alter package discovery."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

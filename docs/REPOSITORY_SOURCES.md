@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1e812450abd5cb9a358a0dfaa247c5d41d3481433d867a456c67985cd1e9ad3c`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `ccdcded61b0e47f7750fa196eb018a6db20ced6f981f07376514f9db7c7f8415`)
 
 ### `apps/web/package.json`: engines
 
@@ -116,7 +116,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@types/react-syntax-highlighter": "^15.5.13",
   "@vercel/analytics": "^1.6.1",
   "@vercel/speed-insights": "^1.3.1",
-  "ai": "^7.0.114",
+  "ai": "^7.0.164",
   "class-variance-authority": "^0.7.1",
   "clsx": "^2.1.1",
   "cmdk": "^1.1.1",
@@ -190,7 +190,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `422f586dcf91736f0787841a46c2b3db885c5ddac4189f474793accec77dadb8`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `44b594445680532ea5ddad02d94cf72ca020d986cb5a33fe0edd53dff0735426`)
 
 ### `package.json`: packageManager
 
@@ -258,7 +258,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "ai": "^7.0.114",
+  "ai": "^7.0.164",
   "eve": "0.27.13",
   "zod": "^4.6.7"
 }
