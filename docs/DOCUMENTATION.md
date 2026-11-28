@@ -112,11 +112,10 @@ the lockfile and projection together; verify mode stages only the projection.
 For dependency PRs, stage the reviewed manifests and run
 `python3 scripts/resolve-repository-docs.py --refresh-lockfile`. This explicit
 repair first verifies the existing lockfile offline with pinned Corepack pnpm.
-A confirmed manifest mismatch (`ERR_PNPM_OUTDATED_LOCKFILE`) or pnpm's
-configuration mismatch naming `overrides` permits regeneration without
-lifecycle scripts. Either path requires a second frozen offline check.
-Valid lockfiles keep their resolutions. Other configuration or installation
-failures stop repair.
+A confirmed manifest mismatch or pnpm's configuration mismatch naming
+`overrides` permits regeneration without lifecycle scripts. Either path requires
+a second frozen offline check. Valid lockfiles keep their resolutions. Other
+configuration or installation failures stop repair.
 Both dependency repair modes refuse index or manifest edits made while pnpm is
 verifying inputs. They preserve those edits and restore the original generated
 artifacts; stage the reviewed inputs and retry the same command.
@@ -133,10 +132,13 @@ the same command.
 Both modes recheck for new untracked or ignored dependency inputs after verification
 and rendering, before writing artifacts. A newly created hook, npmrc file, patch or
 manifest refuses repair; the local file survives and generated artifacts are restored.
-Frozen verification also refuses lockfile changes before regenerating or staging
-the source map. Filtered worktree hashes reject assume-unchanged and skip-worktree
-edits that a diff listing omits. Retry after a refusal with the original
-reviewed artifacts.
+Each frozen verification checks that lockfile bytes are unchanged, including a
+failed refresh probe and the final verification after regeneration. If either
+rewrites or deletes the lockfile, repair restores the original lockfile and source
+map and stops before regenerating or staging anything else. Filtered worktree
+hashes also reject assume-unchanged and skip-worktree edits that a diff listing
+omits. Only an unchanged frozen probe that reports an outdated manifest or
+names the `overrides` configuration permits refresh mode to write new resolutions.
 If resolution, frozen verification, projection generation or Git staging fails,
 the helper restores the original lockfile and projection bytes (or absence) so
 the same command can be retried without manual cleanup. Another writer's index

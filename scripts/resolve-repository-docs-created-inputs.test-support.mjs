@@ -40,12 +40,18 @@ if not marker.exists():
 }
 
 export function testLateDependencyInputs(mode, fixture, env) {
+  const dependencyInputs = [
+    '.pnpmfile.cjs',
+    'apps/web/.npmrc',
+    'patches/example.patch',
+    'apps/local/package.json',
+  ];
+  const cases = ['untracked', 'ignored'].flatMap((state) =>
+    dependencyInputs.map((input) => [state, input]));
+  cases.push(['ignored', 'pnpm-workspace.yaml']);
+
   for (const phase of ['verification', 'rendering']) {
-    for (const [state, input] of [
-      ['untracked', '.pnpmfile.cjs'],
-      ['ignored', 'apps/web/.npmrc'],
-      ['ignored', 'pnpm-workspace.yaml'],
-    ]) {
+    for (const [state, input] of cases) {
       test(`dependency repair ${mode} refuses new ${state} ${input} inputs during ${phase}`, (t) => {
         const f = fixture(t, '.npmrc', 'staged');
         if (state === 'ignored') {
