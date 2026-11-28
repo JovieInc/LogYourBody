@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -33,8 +33,7 @@ function conflict(t, ours, theirs, base = manifest('^2.11.9'), otherConflict = f
   if (otherConflict) writeFileSync(file('README.md'), 'Theirs\n');
   f.git('commit', '-qam', 'theirs');
   f.git('switch', '-q', 'dependency');
-  const merge = spawnSync('git', ['merge', '--no-commit', 'theirs'], { cwd: f.root, encoding: 'utf8' });
-  assert.equal(merge.status, 1, merge.stderr);
+  assert.throws(() => f.git('merge', '--no-commit', 'theirs'), { status: 1 });
   assert.match(f.git('ls-files', '-u'), /package\.json/);
   assert.equal(f.git('show', 'AUTO_MERGE:package.json'), readFileSync(file('package.json'), 'utf8'));
   writeFileSync(file('bin/corepack'), `#!/usr/bin/env python3
