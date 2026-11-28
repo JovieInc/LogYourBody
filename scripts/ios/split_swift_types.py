@@ -104,12 +104,12 @@ def declaration_chunks(text):
         start = keyword
         while start > 0:
             prev = lines[start - 1].strip()
-            if prev.startswith(("///", "//", "@")):
+            if prev.startswith(("///", "//", "@")) and not re.match(r"@\w+\s+import\b", prev):
                 start -= 1
                 continue
             if prev == "":
                 before = lines[start - 2].strip() if start >= 2 else ""
-                if before.startswith(("///", "//", "@")):
+                if before.startswith(("///", "//", "@")) and not re.match(r"@\w+\s+import\b", before):
                     start -= 1
                     continue
                 start -= 1
@@ -288,7 +288,8 @@ def source_lines(text):
 
 
 def _import_header(header):
-    imports = [line for line in header.splitlines(keepends=True) if line.startswith("import ")]
+    imports = [line for line in header.splitlines(keepends=True)
+               if line.startswith(("import ", "@testable import "))]
     if not imports:
         return ""
     text = "".join(imports)

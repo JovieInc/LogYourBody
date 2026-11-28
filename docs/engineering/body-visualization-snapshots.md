@@ -10,6 +10,28 @@ no new reconstruction provider, credential, or upload. Home photo visibility
 stays with [home photo visibility](../product/home-photo-visibility.md). This
 slice does not change Home or `AvatarBodyRenderer`.
 
+## Continuous illustration parameters (LYB-371)
+
+`BodyParameterModel.current.project` is a pure native model with explicitly
+selected male and female families. Adiposity, muscularity, and proportion are
+independent continuous coordinates in `0...1`, with no calibrated physiological
+meaning. Each requested coordinate is clamped independently to its supported
+range. A canonical caller may supply narrower ranges supported by height,
+weight, DXA, or source estimates; this model does not infer coordinates or
+select between sources from those inputs.
+
+`BodyParameterPresentation` is a Codable value containing the family, parameters,
+reconstruction model id and version, and the existing evidence links. It has no
+observation id or observation date. Reprojection under another version preserves
+the source identities; it does not record body change or rewrite the sources.
+
+Optional FFMI uses the existing normalized calculation from one height in cm,
+one weight in kg, and one body-fat percentage. Missing, invalid, ambiguous,
+stale, or conflicting inputs omit that calculation. FFMI retains those three
+input ids as lineage and never becomes a separate evidence link. Supplying FFMI
+as input evidence is rejected. This slice adds no store or UI consumer; future
+consumers remain subject to the visualization gates and claims boundary above.
+
 ## Interface
 
 Wireframes and personal reconstruction use `BodyVisualizationConsumer` and

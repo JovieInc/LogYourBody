@@ -119,10 +119,7 @@ extension DashboardViewLiquid {
                 unit: weightUnit,
                 currentDate: formatDate(currentMetric?.date ?? Date()),
                 chartData: cachedChartData(for: .weight, generator: generateFullScreenWeightChartData),
-                trendChartData: cachedTrendChartData(
-                    for: .weight,
-                    generator: generateFullScreenWeightTrendChartData
-                ),
+                trendChartData: cachedTrendChartData(for: .weight),
                 onAdd: {
                     presentAddEntrySheet(initialTab: 0)
                 },
@@ -287,16 +284,7 @@ extension DashboardViewLiquid {
 
     var metricTruthSummaries: [ContextualMetricKind: MetricObservationSummary] {
         guard MetricStatsTruthPolicy.isEnabled() else { return [:] }
-        let now = Date()
-        return [
-            .steps: MetricObservationSummary(points: generateFullScreenStepsChartData(), range: selectedRange, now: now),
-            .weight: MetricObservationSummary(
-                points: generateFullScreenWeightChartData(), range: selectedRange, selectedDate: currentMetric?.date, now: now),
-            .bodyFat: MetricObservationSummary(
-                points: generateFullScreenBodyFatChartData(), range: selectedRange, selectedDate: currentMetric?.date, now: now),
-            .ffmi: MetricObservationSummary(
-                points: generateFullScreenFFMIChartData(), range: selectedRange, selectedDate: currentMetric?.date, now: now)
-        ]
+        return statsSeriesStore.summaries(statsSeriesInput(selectedDate: currentMetric?.date))
     }
 
     func metricTruthSnapshots(summaries: [ContextualMetricKind: MetricObservationSummary]) -> [ContextualMetricSnapshot] {

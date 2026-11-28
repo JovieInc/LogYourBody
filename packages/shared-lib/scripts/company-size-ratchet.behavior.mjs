@@ -49,3 +49,9 @@ test('company size ratchet accepts the recorded size, 500 lines, and skipped pat
   };
   assert.deepEqual(scan(sourceSnapshot(files)), []);
 });
+
+test('company size ratchet refuses unreadable listed source files', () => {
+  const snapshot = sourceSnapshot({ [BASELINE_PATH]: baseline({}) });
+  snapshot.files.push('apps/web/src/missing.ts');
+  assert.throws(() => scan(snapshot), /missing apps\/web\/src\/missing\.ts/);
+});

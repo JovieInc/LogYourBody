@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The launch-quality checks that need no Xcode or simulator: SwiftLint (strict), the SwiftUI performance smell
-# audit, the static launch UI regression audit, the optical-grid ratchet, the evidence validator tests, the
-# size-500 split ratchet, and the static performance budget summary. CI runs this on ubuntu so hosted macOS
+# audit, the per-surface Swift performance contract guard, the static launch UI regression audit, the
+# optical-grid ratchet, the evidence validator tests, the size-500 split ratchet, and the static performance
+# budget summary. CI runs this on ubuntu so hosted macOS
 # minutes go only to xcodebuild.
 # launch-quality-audit.sh and performance-audit.sh run the same checks when ios-quality.yml is called with
 # static-audits=true (post-merge and manual dispatch).
@@ -20,6 +21,8 @@ python3 "$ROOT_DIR/scripts/ios/launch-ui-regression-audit.py" --root "$ROOT_DIR"
   tee "$ARTIFACT_DIR/launch-ui-regression-audit.log"
 python3 "$ROOT_DIR/scripts/ios/optical-grid-audit.py" --root "$ROOT_DIR" --artifact-dir "$ARTIFACT_DIR" |
   tee "$ARTIFACT_DIR/optical-grid-audit.log"
+python3 "$ROOT_DIR/scripts/ios/test_swift_performance_contract.py"
+python3 "$ROOT_DIR/scripts/ios/swift-performance-guard.py" --check --root "$ROOT_DIR" --artifact-dir "$ARTIFACT_DIR"
 python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
 python3 "$ROOT_DIR/scripts/ios/test_xcodebuild_command_timeout.py"
 python3 "$ROOT_DIR/scripts/ios/test_split_size_ratchet.py"

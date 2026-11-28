@@ -82,9 +82,11 @@ struct LoginView: View {
     @State private var showTerms = false
     @State private var showPrivacy = false
     @State private var hasAppeared = false
+    @State private var datedOutcomeGateToken = UUID()
 
     var body: some View {
-        ZStack {
+        _ = datedOutcomeGateToken
+        return ZStack {
             theme.colors.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -92,7 +94,7 @@ struct LoginView: View {
 
                 VStack(spacing: JovieTokens.sectionGap) {
                     AuthHeader(
-                        title: LaunchPromiseCopy.headline,
+                        title: LaunchPromiseCopy.nativeHeadline,
                         subtitle: LaunchPromiseCopy.explanation
                     )
                     .opacity(hasAppeared ? 1 : 0)
@@ -167,6 +169,9 @@ struct LoginView: View {
                     hasAppeared = true
                 }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            datedOutcomeGateToken = UUID()
         }
         .worldClassScreen(.signIn)
     }

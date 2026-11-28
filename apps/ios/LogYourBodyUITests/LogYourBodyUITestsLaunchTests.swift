@@ -440,6 +440,11 @@ final class LogYourBodyUITestsLaunchTests: XCTestCase {
 }
 
 extension XCUIApplication {
+    /// Trigger alert handling above the content, without opening a card at screen center.
+    func activateSystemAlertMonitor() {
+        coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.02)).tap()
+    }
+
     /// Forward native XCTest context without inventing a marker for ordinary launches.
     func forwardActualXCTestContext() {
         for key in ["XCTestConfigurationFilePath", "XCTestSessionIdentifier", "XCTestBundlePath"] {
