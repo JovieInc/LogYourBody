@@ -335,6 +335,16 @@ print(json.dumps({'accepted': 1, 'rejected': len(failures)}))
     );
     expect(result.accepted).toEqual(expect.arrayContaining(['matching-appex', 'no-appex']));
   });
+  it('creates the Apple Distribution certificate the release lanes sign with', () => {
+    const script = fileURLToPath(
+      new URL('../../../scripts/ios/test_distribution_cert_identity.rb', import.meta.url),
+    );
+    const result = JSON.parse(
+      execFileSync('ruby', [script], { encoding: 'utf8', timeout: 20_000 }),
+    );
+    expect(result.identity).toBe('Apple Distribution');
+    expect(result.cases).toBe(12);
+  });
   // The Ruby/project check took 6.2s on CI; bound the subprocess below the test budget.
   it('resolves the rest-timer exclusion project path absolutely from the release Fastfile', () => {
     const script = fileURLToPath(

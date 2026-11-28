@@ -99,6 +99,18 @@ the prompt implementation slice. The current selector still permits a two-week
 offer; that threshold, prompt presentation, remembered responses and committed
 switch/back behavior remain implementation gaps, not shipped behavior.
 
+`detectAdherenceWindow` (LYB-291) is the separate window detector. It compares
+requested capacity with completions that the rolling queue and a completion fact
+both record, over the newest two to four complete weeks. Three consecutive weeks
+at four of five requested emit one reversible consolidate proposal. A repeated
+six-requested/one-achieved pattern emits one reversible capacity-review proposal
+and does not suggest a one-visit prescription. One short week emits nothing. A
+week marked as travel is a calendar disruption: it is not attendance and it
+breaks the run. The proposal id is stable for that pattern. Detection returns
+the same program snapshot, including prescribed sessions and weekly set volume.
+This module chooses no user-facing sentence. Offer copy stays on the
+adherence-offer renderer. Calling the detector does not change the selector.
+
 ## Persistence and remaining acceptance
 
 The existing optimizer acceptance certifies and returns the complete allocation

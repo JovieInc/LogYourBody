@@ -685,54 +685,6 @@ func cleanInvalidBodyMetrics() -> Int {
         }
     }
 
-func repairCorruptedEntries() async -> Int {
-        let context = persistentContainer.viewContext
-        return await context.perform {
-            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-
-            do {
-                let allMetrics = try context.fetch(request)
-                var repairedCount = 0
-
-                for metric in allMetrics {
-                    var wasRepaired = false
-
-                    if metric.date == nil {
-                        metric.date = Date()
-                        wasRepaired = true
-                    }
-
-                    if metric.createdAt == nil {
-                        metric.createdAt = metric.date ?? Date()
-                        wasRepaired = true
-                    }
-
-                    if metric.updatedAt == nil {
-                        metric.updatedAt = metric.lastModified ?? metric.date ?? Date()
-                        wasRepaired = true
-                    }
-
-                    if metric.localDate == nil, let date = metric.date {
-                        metric.localDate = BodyMetricLocalDate.key(for: date)
-                        wasRepaired = true
-                    }
-
-                    if wasRepaired {
-                        repairedCount += 1
-                    }
-                }
-
-                if context.hasChanges {
-                    try context.save()
-                }
-
-                return repairedCount
-            } catch {
-                return 0
-            }
-        }
-    }
-
 func saveGlp1DoseLogs(
         _ logs: [Glp1DoseLog],
         userId: String,

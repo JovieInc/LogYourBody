@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Static SwiftUI performance smell checks for launch-critical iOS surfaces."""
+"""Static SwiftUI performance smell checks for launch-critical and per-surface iOS files."""
 
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import sys
@@ -144,6 +145,17 @@ def main() -> int:
             print(f"- {smell.check}: {smell.file}:{smell.line} {smell.detail}")
     else:
         print("SwiftUI performance smell audit passed.")
+    spec = importlib.util.spec_from_file_location("swift_performance_guard", Path(__file__).with_name("swift-performance-guard.py"))
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    report = module.interaction_report(root)
+    if not report["ok"]:
+        print(f"SwiftUI performance smell audit failed with {len(report['errors'])} surface error(s).")
+        for error in report["errors"]:
+            print(f"- {error}")
+        return 1
+    print(f"SwiftUI performance smell audit covered {report['files']} surface files.")
     return 1 if smells else 0
 
 

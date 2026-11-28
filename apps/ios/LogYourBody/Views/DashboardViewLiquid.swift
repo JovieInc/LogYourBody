@@ -22,6 +22,8 @@ struct DashboardViewLiquid: View {
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @StateObject var viewModel = DashboardViewModel()
     @StateObject var globalTimelineStore = GlobalTimelineStore()
+    @State var healthSyncPresentation = HealthSyncPresentationStore()
+    @State var showsRecentHealthReadings = false
 
     // Core data / selection
     @State var selectedIndex: Int = 0
@@ -47,6 +49,7 @@ struct DashboardViewLiquid: View {
     @State var metricEntriesCache: [MetricType: MetricEntriesPayload] = [:]
     @State var fullChartCache: [MetricType: [MetricChartDataPoint]] = [:]
     @State var fullTrendChartCache: [MetricType: [MetricChartDataPoint]] = [:]
+    @State var statsSeriesStore = MetricStatsSeriesStore()
     @State var metricCacheBuildID = UUID()
     @State private var metricCacheRefreshTask: Task<Void, Never>?
     @State var glp1DoseLogs: [Glp1DoseLog] = []
@@ -124,6 +127,9 @@ struct DashboardViewLiquid: View {
     @State var isStatsDestinationActive = false
     @State var isProgressPhotoAttachPresented = false
     @State var progressPhotoAttachTarget: BodyMetrics?
+    @State var progressPhotoAttachFallbackOverride: Date?
+    @State var pendingWeeklyPhotoMoment: Date?
+    @State var pendingWeeklyCompare = false
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
     @State var bodyScoreShareCapture = AccountBoundShareCapture()
@@ -268,11 +274,13 @@ struct DashboardViewLiquid: View {
                 invalidateDashboardShareContext()
                 syncBannerDismissTask?.cancel()
                 metricCacheRefreshTask?.cancel()
+                statsSeriesStore.cancelRefresh()
                 metricCacheBuildID = UUID()
                 datedTimelineRefreshTask?.cancel()
             }
 
         let withSyncAndState = withLifecycle
+            .onReceive(HealthSyncCoordinator.shared.$syncStatus, perform: healthSyncPresentation.updateSyncStatus)
             .onChange(of: realtimeSyncManager.syncStatus) { oldStatus, newStatus in
                 previousSyncStatus = oldStatus
                 handleSyncStatusChange(from: oldStatus, to: newStatus)
@@ -297,27 +305,23 @@ struct DashboardViewLiquid: View {
                 scheduleDashboardDerivedStateRefresh(rebuildDailyMetricsLookup: true)
                 scheduleMetricCacheRefresh()
             }
-            .onReceive(viewModel.$bodyMetrics) { metrics in
-                scheduleDatedTimelineRefresh(metrics: metrics)
-                reconcileHomeV2Timeline(with: metrics)
-                scheduleDashboardDerivedStateRefresh()
-                scheduleMetricCacheRefresh()
-            }
+            .onReceive(viewModel.$bodyMetrics, perform: handleDashboardBodyMetricsChange)
             .onChange(of: authManager.captureAccountSession()) { _, owner in
                 clearDatedTimelineContext()
                 scheduleDatedTimelineRefresh()
                 invalidateDashboardShareContext(currentOwner: owner)
                 homeV2EditingSession = nil
+                healthSyncPresentation.reset()
+                showsRecentHealthReadings = false
                 homeV2TimelineSelection = nil
                 isMetricDetailActive = false
                 isStatsDestinationActive = false
-                selectedPhotoTimelineRootPage = .timeline
+                selectedPhotoTimelineRootPage = Self.pageAfterAccountChange()
                 isHomeV2MetricProvenancePresented = false
                 metricCacheRefreshTask?.cancel()
+                statsSeriesStore.cancelRefresh()
                 metricCacheBuildID = UUID()
-                fullChartCache = [:]
-                fullTrendChartCache = [:]
-                metricEntriesCache = [:]
+                clearPublishedChartCaches(publishingEmpty: true)
                 reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
             }
             .onChange(of: selectedRange) { _, newValue in
@@ -328,9 +332,8 @@ struct DashboardViewLiquid: View {
                 // discard them immediately when Settings changes units so a
                 // returning user cannot see a mixed kg/lbs detail screen while
                 // the next cache build completes.
-                fullChartCache = [:]
-                fullTrendChartCache = [:]
-                metricEntriesCache = [:]
+                statsSeriesStore.invalidate()
+                clearPublishedChartCaches(publishingEmpty: false)
                 scheduleMetricCacheRefresh()
             }
             .onChange(of: selectedIndex) { _, newIndex in
@@ -356,44 +359,34 @@ struct DashboardViewLiquid: View {
                 loadGlp1WeeklyCheckInDataIfNeeded()
             }
 
-        let withSheetsAndNavigation = withSyncAndState
-            .sheet(isPresented: $showAddEntrySheet) {
-                if !isDatedTimelineEnabled || datedTimelineIsOwned {
-                    AddEntrySheet(
-                        isPresented: $showAddEntrySheet,
-                        initialTab: addEntryInitialTab,
-                        includesGlp1Entry: addEntryIncludesGlp1Entry,
-                        initialDate: addEntryInitialDate,
-                        initialWeight: addEntryInitialWeight,
-                        initialBodyFat: addEntryInitialBodyFat,
-                        initialBodyFatMethod: addEntryInitialBodyFatMethod,
-                        isHomeV2LogEntry: isHomeV2LoggingWeight,
-                        onWeightSaved: handleHomeV2WeightEntrySaved,
-                        onBodyFatSaved: handleHomeV2BodyFatEntrySaved,
-                        presentationOwner: isDatedTimelineEnabled ? datedTimelineOwner : nil
-                    )
+        let withSheetsAndNavigation = weeklyPhotoAttachSheet(
+            on: withSyncAndState
+                .sheet(isPresented: $showAddEntrySheet) {
+                    if !isDatedTimelineEnabled || datedTimelineIsOwned {
+                        AddEntrySheet(
+                            isPresented: $showAddEntrySheet,
+                            initialTab: addEntryInitialTab,
+                            includesGlp1Entry: addEntryIncludesGlp1Entry,
+                            initialDate: addEntryInitialDate,
+                            initialWeight: addEntryInitialWeight,
+                            initialBodyFat: addEntryInitialBodyFat,
+                            initialBodyFatMethod: addEntryInitialBodyFatMethod,
+                            isHomeV2LogEntry: isHomeV2LoggingWeight,
+                            onWeightSaved: handleHomeV2WeightEntrySaved,
+                            onBodyFatSaved: handleHomeV2BodyFatEntrySaved,
+                            presentationOwner: isDatedTimelineEnabled ? datedTimelineOwner : nil
+                        )
                         .environmentObject(authManager)
+                    }
                 }
-            }
-            .sheet(isPresented: $showSyncDetails) {
-                DashboardSyncDetailsSheet(
-                    isPresented: $showSyncDetails,
-                    syncManager: realtimeSyncManager
-                )
-            }
-            .sheet(isPresented: $isProgressPhotoAttachPresented) {
-                if !isDatedTimelineEnabled || datedTimelineIsOwned {
-                    ProgressPhotoAttachSheet(
-                        targetMetric: progressPhotoAttachTarget,
-                        fallbackDate: progressPhotoAttachFallbackDate,
-                        onComplete: {
-                            await handleProgressPhotoAttachComplete()
-                        },
-                        presentationOwner: isDatedTimelineEnabled ? datedTimelineOwner : nil
+                .sheet(isPresented: $showSyncDetails) {
+                    DashboardSyncDetailsSheet(
+                        isPresented: $showSyncDetails,
+                        syncManager: realtimeSyncManager
                     )
-                    .environmentObject(authManager)
                 }
-            }
+                .sheet(isPresented: $showsRecentHealthReadings) { homeV2RecentReadingsSheet }
+        )
             .navigationDestination(isPresented: $isMetricDetailActive) {
                 fullMetricChartView
             }
@@ -601,16 +594,38 @@ struct DashboardViewLiquid: View {
         }
     }
 
+    func clearPublishedChartCaches(publishingEmpty: Bool) {
+        fullChartCache = [:]
+        fullTrendChartCache = [:]
+        metricEntriesCache = [:]
+        if publishingEmpty {
+            statsSeriesStore.publishEmpty()
+        } else {
+            statsSeriesStore.markRefreshing()
+        }
+    }
+
     @MainActor
-    private func scheduleMetricCacheRefresh() {
+    func scheduleMetricCacheRefresh() {
         // Published values arrive before the model finishes updating its sorted
         // history. Coalesce that burst and snapshot only after the update completes.
+        let generation = statsSeriesStore.beginRefresh()
         metricCacheBuildID = UUID()
         metricCacheRefreshTask?.cancel()
         metricCacheRefreshTask = Task { @MainActor in
+            defer { statsSeriesStore.endRefresh(generation) }
             await Task.yield()
             guard !Task.isCancelled else { return }
             await prewarmMetricCaches()
+        }
+    }
+
+    /// Body evaluation must not cancel an in-flight prewarm.
+    func scheduleMetricCacheRefreshIfIdle() {
+        guard !statsSeriesStore.isRefreshInFlight else { return }
+        Task { @MainActor in
+            guard !statsSeriesStore.isRefreshInFlight else { return }
+            scheduleMetricCacheRefresh()
         }
     }
 

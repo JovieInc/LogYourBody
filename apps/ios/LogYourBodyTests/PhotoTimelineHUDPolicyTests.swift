@@ -31,33 +31,36 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         XCTAssertEqual(DefaultHomeMode(timelineMode: .photo), .photo)
     }
 
-    func testAvatarBodyFatCatalogSelectsNearestMaleBucket() {
+    func testAvatarBodyFatCatalogDoesNotTreatPercentageAsAMaleShape() {
         XCTAssertEqual(
             AvatarBodyFatCatalog.match(bodyFatPercentage: 16.4, gender: "male"),
-            AvatarBodyFatCatalog.Match(sex: .male, bucket: 15)
+            AvatarBodyFatCatalog.Match(sex: .male, bucket: 18)
         )
         XCTAssertEqual(
             AvatarBodyFatCatalog.match(bodyFatPercentage: 20.2, gender: "male").assetName,
-            "avatar_male_22"
+            "avatar_male_18"
         )
         XCTAssertEqual(
             AvatarBodyFatCatalog.match(bodyFatPercentage: 80, gender: "male").bucket,
-            55
+            18
+        )
+        XCTAssertFalse(
+            AvatarBodyFatCatalog.match(bodyFatPercentage: 16.4, gender: "male").badgeText.contains("%")
         )
     }
 
-    func testAvatarBodyFatCatalogSelectsNearestFemaleBucket() {
+    func testAvatarBodyFatCatalogDoesNotTreatPercentageAsAFemaleShape() {
         XCTAssertEqual(
             AvatarBodyFatCatalog.match(bodyFatPercentage: 22.4, gender: "female"),
-            AvatarBodyFatCatalog.Match(sex: .female, bucket: 21)
+            AvatarBodyFatCatalog.Match(sex: .female, bucket: 28)
         )
         XCTAssertEqual(
             AvatarBodyFatCatalog.match(bodyFatPercentage: 45.2, gender: "woman").assetName,
-            "avatar_female_50"
+            "avatar_female_28"
         )
         XCTAssertEqual(
             AvatarBodyFatCatalog.match(bodyFatPercentage: 72, gender: "f").bucket,
-            60
+            28
         )
     }
 

@@ -1,0 +1,30 @@
+{
+  "schema": "lyb.correction-promotion/v1",
+  "decision": "LYB-361",
+  "status": "recommended-default",
+  "scope": "Promotion of warn-mode mechanized LYB checks to blocking lint/CI failures.",
+  "activation": {
+    "featureGate": "lyb_warn_to_ratchet_promotion",
+    "defaultEnabled": false,
+    "implemented": false
+  },
+  "rules": [
+    {
+      "id": "warn-to-ratchet",
+      "from": "warn",
+      "to": "blocking",
+      "repeatCountAtLeast": 2,
+      "excludedLevels": ["prose", "human"]
+    }
+  ],
+  "counting": {
+    "identity": "The same normalized correction fingerprint, using existing ledger recurrence semantics.",
+    "repeatCount": "Repeats exclude the first receipt: two repeats means three distinct canonical source receipts. Duplicate replays do not increment the count."
+  },
+  "compatibility": [
+    "This decision records policy only; the auto-mechanize child owns implementation and flag wiring.",
+    "First-receipt mechanization remains required when feasible.",
+    "Existing hard gates and finding-baseline ratchets remain enforced and must not be downgraded.",
+    "The current correction-checks.mjs emitter uses one repeat; its behavior is unchanged by this record."
+  ]
+}

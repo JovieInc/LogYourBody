@@ -427,11 +427,17 @@ jobs:
           swift-version: '6.1.2'
 
       - name: Install SwiftLint (version pinned with setup-ios-build)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           version="$(sed -n 's/^ *SWIFTLINT_VERSION="\([^"]*\)".*/\1/p' .github/actions/setup-ios-build/action.yml | head -1)"
           [[ -n "$version" ]]
-          curl -fsSL "https://github.com/realm/SwiftLint/releases/download/${version}/swiftlint_linux_amd64.zip" -o "$RUNNER_TEMP/swiftlint.zip"
+          bash "$GITHUB_WORKSPACE/scripts/download-release-asset.sh" \
+            "https://github.com/realm/SwiftLint/releases/download/${version}/swiftlint_linux_amd64.zip" \
+            "https://api.github.com/repos/realm/SwiftLint/releases/assets/430524036" \
+            "26db741d43f2f2dc26c0cf16911100a3e186c3d1dbb59e55ad3ac87b0de4538f" \
+            "$RUNNER_TEMP/swiftlint.zip"
           mkdir -p "$RUNNER_TEMP/swiftlint"
           unzip -q "$RUNNER_TEMP/swiftlint.zip" -d "$RUNNER_TEMP/swiftlint"
           echo "SWIFTLINT=$RUNNER_TEMP/swiftlint/swiftlint" >> "$GITHUB_ENV"

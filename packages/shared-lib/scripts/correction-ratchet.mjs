@@ -42,7 +42,7 @@ function assertSubset(current, baseline, reason) {
   }
   for (const finding of current) {
     const key = JSON.stringify(finding);
-    assert.ok(available.get(key) > 0, `${reason}: ${finding.path}`);
+    assert.ok(available.get(key) > 0, `${reason}: ${finding.path}: ${finding.key}`);
     available.set(key, available.get(key) - 1);
   }
 }
