@@ -106,7 +106,7 @@
       "apps/ios/LogYourBody/Services/CoreDataManager+Part01.swift": 14,
       "apps/ios/LogYourBody/Services/CoreDataManager+Part02.swift": 14,
       "apps/ios/LogYourBody/Services/CoreDataManager+Part03.swift": 13,
-      "apps/ios/LogYourBody/Services/CoreDataManager+Part04.swift": 12,
+      "apps/ios/LogYourBody/Services/CoreDataManager+Part04.swift": 11,
       "apps/ios/LogYourBody/Services/CoreDataManager+Part05.swift": 4,
       "apps/ios/LogYourBody/Services/CoreDataManager+Part06.swift": 1,
       "apps/ios/LogYourBody/Services/HealthKitManager+Part02.swift": 1
@@ -124,7 +124,6 @@
       "apps/ios/LogYourBody/Services/BodySpecDexaImporter.swift": 1,
       "apps/ios/LogYourBody/Services/CoreDataWorkoutReconciliationStore.swift": 2,
       "apps/ios/LogYourBody/Services/PhotoUploadManager.swift": 2,
-      "apps/ios/LogYourBody/Services/ProductAPIClient+DatedOutcome.swift": 3,
       "apps/ios/LogYourBody/Services/ProductAPIClient+Part01.swift": 11,
       "apps/ios/LogYourBody/Services/ProductAPIClient.swift": 10,
       "apps/ios/LogYourBody/Services/RealtimeSyncManager+Part02.swift": 2,
@@ -132,12 +131,11 @@
       "apps/ios/LogYourBody/Services/RevenueCatManager+Part02.swift": 1,
       "apps/ios/LogYourBody/Services/TrainingDraftStore.swift": 4,
       "apps/ios/LogYourBody/Views/DashboardViewLiquid.swift": 2,
-      "apps/ios/LogYourBody/Views/ExportDataView.swift": 1,
       "apps/ios/LogYourBody/Views/MesocycleCanvas.swift": 2
     },
     "main-actor-sync-io": {
       "apps/ios/LogYourBody/Services/TrainingDraftStore.swift": 5,
-      "apps/ios/LogYourBody/Views/ExportDataView.swift": 9,
+      "apps/ios/LogYourBody/Views/ExportDataView.swift": 2,
       "apps/ios/LogYourBody/Views/MainTabView.swift": 2
     },
     "observable-object-type": {

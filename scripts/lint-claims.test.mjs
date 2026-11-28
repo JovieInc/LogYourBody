@@ -23,7 +23,7 @@ test('all curated variant text passes the shared claims policy and exercise bann
   const seed = JSON.parse(
     await readFile(new URL('../' + variantSeedPath, import.meta.url), 'utf8'),
   );
-  assert.equal(seed.length, 25);
+  assert.equal(seed.length, 26);
   for (const entry of seed) {
     for (const text of variantStrings(entry)) {
       assert.deepEqual(scanExerciseVariantText(text), [], entry.id + ': ' + text);

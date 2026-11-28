@@ -14,6 +14,8 @@ import {
   releaseTargetMode,
 } from './ios-release-tag.mjs';
 
+import { findCompletedRelease } from './find-completed-testflight-release.mjs';
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const pinScript = join(root, '.github/scripts/pin-ios-release-tag.sh');
 const createScript = join(root, '.github/scripts/create-ios-github-release.sh');
@@ -340,4 +342,75 @@ test('release workflow pins the tag before validation and publishes through the 
   assert.match(workflow, /create-ios-github-release\.sh/);
   assert.doesNotMatch(workflow, /gh release create/);
   assert.match(workflow, /created_tag == 'true'/);
+});
+
+const identity = {
+  version: '1.2.0',
+  sha,
+  repository: 'JovieInc/LogYourBody',
+  server: 'https://example.com',
+};
+const build = '20261120121249';
+const tag = `ios-v1.2.0-testflight.${build}`;
+const workflowUrl = `${identity.server}/${identity.repository}/actions/runs/44814702869`;
+const publishedRelease = {
+  tag_name: tag,
+  draft: false,
+  prerelease: true,
+  body: [
+    `**Build Number**: ${build}`,
+    '**Deployment**: testflight',
+    '**Version**: ios-v1.2.0',
+    `- **Commit**: ${sha}`,
+    `- **Workflow**: [View Run](${workflowUrl})`,
+  ].join('\n'),
+};
+const tagRef = (name, commit) =>
+  [`${otherSha}\trefs/tags/${name}`, `${commit}\trefs/tags/${name}^{}`].join('\n');
+
+test('completed TestFlight release selects the exact version, build and peeled commit', () => {
+  const newer = 'ios-v1.2.0-testflight.20261120121250';
+  const reads = [];
+  const selected = findCompletedRelease(identity, (pattern) => {
+    assert.equal(pattern, 'refs/tags/ios-v1.2.0-testflight.*');
+    return [tagRef(tag, sha), tagRef(newer, sha)].join('\n');
+  }, (repository, selectedTag) => {
+    assert.equal(repository, identity.repository);
+    reads.push(selectedTag);
+    return selectedTag === tag ? publishedRelease : null;
+  });
+  assert.deepEqual(reads, [newer, tag]);
+  assert.deepEqual(selected, { tag, build, url: workflowUrl });
+});
+
+test('completed TestFlight release ignores tags for a different commit or marketing version', () => {
+  const refs = [tagRef(tag, otherSha), tagRef(tag.replace('1.2.0', '1.3.0'), sha)].join('\n');
+  assert.equal(findCompletedRelease(identity, () => refs, () => {
+    assert.fail('Unrelated tags must never be read as candidates');
+  }), null);
+});
+
+test('completed TestFlight release rejects missing, draft, and stale receipts', () => {
+  const stale = { ...publishedRelease, body: publishedRelease.body.replace(build, '20261120121248') };
+  const wrongCommit = { ...publishedRelease, body: publishedRelease.body.replace(sha, otherSha) };
+  for (const receipt of [null, { ...publishedRelease, draft: true }, stale, wrongCommit]) {
+    assert.equal(findCompletedRelease(identity, () => tagRef(tag, sha), () => receipt), null);
+  }
+});
+
+test('completed TestFlight release stops on a lookup error before pinning another build', () => {
+  assert.throws(() => findCompletedRelease(identity, () => tagRef(tag, sha), () => {
+    throw new Error('receipt read failed');
+  }), /receipt read failed/);
+});
+
+test('verified TestFlight receipt skips the dependency chain and cleanup targets the build workspace', () => {
+  const workflow = readFileSync(join(root, '.github/workflows/ios-release-loop.yml'), 'utf8');
+  assert.match(workflow, /id: completed[\s\S]*find-completed-testflight-release\.mjs/);
+  assert.match(workflow, /Pin the release tag to this commit\n        if: steps\.completed\.outputs\.already_deployed == 'false'/);
+  assert.match(workflow, /validate-release:[\s\S]*needs\.pin-release-tag\.outputs\.already_deployed == 'false'/);
+  assert.match(workflow, /bind-release-version:[\s\S]*needs: \[pin-release-tag, validate-release\]/);
+  assert.match(workflow, /build-release:[\s\S]*needs: bind-release-version/);
+  assert.match(workflow, /deploy-testflight:[\s\S]*needs: \[bind-release-version, build-release\]/);
+  assert.match(workflow, /Cleanup\n        if: always\(\)\n        run: \|\n          rm -f apps\/ios\/fastlane\/api_key\.json/);
 });

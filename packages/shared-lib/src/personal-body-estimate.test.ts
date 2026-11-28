@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
+import { estimateOnPhotoStageFindings, homePhotoStageFindings } from './home-stage-reservation';
 import {
   BENEFIT_COPY,
   ENGINE,
@@ -297,7 +298,14 @@ it('keeps the estimate inside the photo stage and off the scrubber hot path', ()
   const domain = read('apps/ios/LogYourBody/Components/PersonalBodyEstimate.swift');
   const emptyStage = read('apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift');
   expect(surface).toContain('PersonalBodyEstimateStore');
-  expect(surface).toContain('photoAspectRatio');
+  expect(
+    homePhotoStageFindings(
+      surface,
+      read('apps/ios/LogYourBody/Views/HomeV2/HomeV2Tokens.swift'),
+      read('apps/ios/LogYourBody/Views/HomeV2/HomeV2Policy.swift'),
+    ),
+  ).toEqual([]);
+  expect(estimateOnPhotoStageFindings(hero)).toEqual([]);
   expect(hero).not.toContain('stepJob');
   expect(hero).not.toContain('PersonalBodyJobs');
   expect(domain).toContain('adjust the personal outline for this date');

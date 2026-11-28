@@ -88,8 +88,7 @@ final class HomeV2LayoutUITests: XCTestCase {
         XCTAssertEqual(field.value as? String, "182.4")
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         let save = app.buttons["home_v2_log_sheet_save"]
-        XCTAssertTrue(save.isEnabled)
-        XCTAssertTrue(save.isHittable)
+        assertSaveReady(save)
         XCTAssertLessThanOrEqual(save.frame.maxY, app.keyboards.firstMatch.frame.minY)
         capture(app, named: "polished-log-weight-keyboard")
 
@@ -279,11 +278,9 @@ final class HomeV2LayoutUITests: XCTestCase {
         app.buttons["home_v2_log_weight"].tap()
         assertBodyFatEntry(in: app, expected: "15.8")
         let field = app.textFields["Body fat percentage value"]
-        field.tap()
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "17.0")
+        replacePrefilledText("17.0", in: field)
         let save = app.buttons["home_v2_log_sheet_save"]
-        XCTAssertTrue(save.isEnabled)
-        XCTAssertTrue(save.isHittable)
+        assertSaveReady(save)
         save.tap()
         let refreshed = expectation(
             for: NSPredicate(format: "label CONTAINS %@", "17.0 percent"), evaluatedWith: graphic
@@ -342,13 +339,11 @@ final class HomeV2LayoutUITests: XCTestCase {
             }
             let field = app.textFields["Body fat percentage value"]
             assertSheetControlReachable(field, in: app, screenshot: "body-fat-ax5-value-\(value)")
-            field.tap()
-            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + value)
+            replacePrefilledText(value, in: field)
             capture(app, named: "body-fat-ax5-keyboard-\(value)")
             let save = app.buttons["home_v2_log_sheet_save"]
             XCTAssertEqual(save.label, "Save Body Fat")
-            XCTAssertTrue(save.isEnabled)
-            XCTAssertTrue(save.isHittable)
+            assertSaveReady(save)
             XCTAssertTrue(app.windows.firstMatch.frame.contains(save.frame))
             XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
             XCTAssertLessThanOrEqual(save.frame.maxY, app.keyboards.firstMatch.frame.minY)
@@ -387,11 +382,11 @@ final class HomeV2LayoutUITests: XCTestCase {
 
     private func assertSheetControlReachable(_ target: XCUIElement, in app: XCUIApplication, screenshot: String) {
         let scroll = app.scrollViews["add_entry_content"]
-        XCTAssertTrue(scroll.waitForExistence(timeout: 8))
-        XCTAssertTrue(target.waitForExistence(timeout: 5))
-        let save = app.buttons["home_v2_log_sheet_save"]
-        let viewport = CGRect(x: scroll.frame.minX, y: scroll.frame.minY, width: scroll.frame.width,
-                              height: max(0, min(scroll.frame.maxY, save.frame.minY) - scroll.frame.minY))
+        XCTAssertTrue(scroll.exists || scroll.waitForExistence(timeout: 8))
+        XCTAssertTrue(target.exists || target.waitForExistence(timeout: 5))
+        let frame = scroll.frame
+        let viewport = CGRect(x: frame.minX, y: frame.minY, width: frame.width,
+                              height: max(0, min(frame.maxY, app.buttons["home_v2_log_sheet_save"].frame.minY) - frame.minY))
         XCTAssertGreaterThan(viewport.height, 88)
         let attempts = scrollToContain(target, in: viewport, app: app)
         let geometry = XCTAttachment(string: attempts.joined(separator: "\n"))
@@ -451,15 +446,15 @@ final class HomeV2LayoutUITests: XCTestCase {
     }
 
     private func selectSheetChoice(_ option: XCUIElement, in app: XCUIApplication) {
-        XCTAssertTrue(option.waitForExistence(timeout: 5))
+        XCTAssertTrue(option.exists || option.waitForExistence(timeout: 5))
         let scroll = app.scrollViews["add_entry_content"]
         let save = app.buttons["home_v2_log_sheet_save"]
-        XCTAssertTrue(scroll.waitForExistence(timeout: 5))
-        let lowerBound = save.exists ? save.frame.minY : scroll.frame.maxY
+        XCTAssertTrue(scroll.exists || scroll.waitForExistence(timeout: 5))
+        let frame = scroll.frame
+        let lowerBound = save.exists ? save.frame.minY : frame.maxY
         let viewport = CGRect(
-            x: scroll.frame.minX, y: scroll.frame.minY, width: scroll.frame.width,
-            height: max(0, min(scroll.frame.maxY, lowerBound) - scroll.frame.minY)
-        )
+            x: frame.minX, y: frame.minY, width: frame.width,
+            height: max(0, min(frame.maxY, lowerBound) - frame.minY))
         XCTAssertGreaterThan(viewport.height, 88)
         let attempts = scrollToContain(option, in: viewport, app: app)
         XCTAssertTrue(option.isEnabled)
@@ -472,27 +467,32 @@ final class HomeV2LayoutUITests: XCTestCase {
 
     private func replacePrefilledText(_ replacement: String, in field: XCUIElement) {
         let existing = field.value as? String ?? ""
-        // The reading is trailing-aligned. A center tap leaves the caret before
-        // it, so delete keys do nothing and the next entry is prepended.
         let trailing = field.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: 0.5))
         trailing.tap()
+        let focused = XCUIApplication().descendants(matching: field.elementType)
+            .matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
+        if !focused.waitForExistence(timeout: 1) { field.tap() }
+        XCTAssertTrue(focused.waitForExistence(timeout: 5))
         deletePrefilledText(existing, in: field)
         if !isFieldCleared(field), !existing.isEmpty {
             let leading = field.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5))
             trailing.press(forDuration: 0.4, thenDragTo: leading)
             deletePrefilledText(existing, in: field)
         }
-        let cleared = field.value as? String ?? ""
-        XCTAssertTrue(
-            cleared.isEmpty || cleared == field.placeholderValue,
-            "The prefilled reading must be removed before typing the replacement: \(cleared)"
-        )
+        XCTAssertTrue(isFieldCleared(field), "The prefilled reading must be removed before typing: \(field.value ?? "")")
         field.typeText(replacement)
+        let entered = expectation(for: NSPredicate(format: "value == %@", replacement), evaluatedWith: field)
+        XCTAssertEqual(XCTWaiter.wait(for: [entered], timeout: 5), .completed)
+    }
+
+    private func assertSaveReady(_ save: XCUIElement) {
+        let ready = expectation(for: NSPredicate(format: "enabled == true AND hittable == true"), evaluatedWith: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
     }
 
     private func deletePrefilledText(_ existing: String, in field: XCUIElement) {
         guard !existing.isEmpty, existing != field.placeholderValue else { return }
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: max(existing.count, 8)))
     }
 
     private func isFieldCleared(_ field: XCUIElement) -> Bool {
@@ -656,7 +656,7 @@ final class HomeV2LayoutUITests: XCTestCase {
             let upward = below > 0
             let margin = min(CGFloat(12), max(0, (viewport.height - frame.height) / 2))
             let distance = min(viewport.height - 80, (upward ? below : above) + margin)
-            let startY = upward ? viewport.maxY - 40 : viewport.minY + 40
+            let startY = upward ? viewport.maxY - 12 : viewport.minY + 40 // Drag below the rotating avatar.
             let endY = startY + (upward ? -distance : distance)
             attempts.append("distance=\(distance), startY=\(startY), endY=\(endY)")
             let start = origin.withOffset(CGVector(dx: viewport.midX, dy: startY))

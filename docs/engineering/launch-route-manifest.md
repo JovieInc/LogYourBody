@@ -79,7 +79,9 @@ pinned launch contract. Every contract path, and every route state (`ready`,
 coach, needs one passed native-interaction trace and one passed service trace.
 The check fails when a path or state has no xcresult entry, when a trace is a
 fixture substitute (`fixture`, `override`, `bypass`, or `-lybUITest`), or when
-the installed build id is absent. A passing result is a
+the installed build id is absent. It also rejects any failed, skipped, timed-out,
+or unaccounted trace, and requires explicit retry and infrastructure-skip
+accounting; a passing repetition cannot erase an earlier failure. A passing result is a
 `lyb-native-certification/v2` receipt the pinned oracle can read. Checker tests
 use synthetic exports and are not installed-build proof. JOV-6013 stays open.
 

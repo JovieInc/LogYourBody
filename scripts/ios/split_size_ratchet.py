@@ -33,16 +33,36 @@ DEFAULT_REF_RE = re.compile(
 )
 
 
-def extract_declarations(text, names, owner=None):
+def extract_declarations(text, names, owner=None, internalize=()):
     """Move whole types or computed members; never widen access implicitly."""
     if not names or len(set(names)) != len(names):
         raise ValueError("declaration names must be unique")
+    if len(set(internalize)) != len(internalize) or not set(internalize) <= set(names) or (owner and internalize):
+        raise ValueError("internalize requires unique extracted top-level type names")
     if owner is None:
         header, chunks = declaration_chunks(text)
         moved = [chunk for chunk in chunks if _type_name(chunk) in names]
         if len(moved) != len(names):
             raise ValueError("missing or ambiguous type declaration")
-        return (header + "".join(c for c in chunks if c not in moved)).rstrip() + "\n", (_import_header(header) + "".join(moved).lstrip("\n")).rstrip() + "\n"
+        output = []
+        for chunk in moved:
+            name = _type_name(chunk)
+            declaration = re.search(
+                r"(?m)^(?P<modifiers>(?:(?:public|open|internal|fileprivate|private|final|nonisolated)[ \t]+)*)"
+                r"(?:struct|enum|class|actor|extension|protocol)[ \t]+" + re.escape(name) + r"\b", chunk,
+            )
+            modifiers = declaration["modifiers"]
+            restricted = re.search(r"\b(private|fileprivate)\b", modifiers)
+            if restricted and name not in internalize:
+                raise ValueError("review type access before extraction: " + name)
+            if name in internalize:
+                if not restricted:
+                    raise ValueError("type is already accessible across files: " + name)
+                # Only the reviewed type declaration changes; member access stays intact.
+                start, end = declaration.span("modifiers")
+                chunk = chunk[:start] + re.sub(r"\b(?:private|fileprivate)[ \t]+", "", modifiers) + chunk[end:]
+            output.append(chunk)
+        return (header + "".join(c for c in chunks if c not in moved)).rstrip() + "\n", (_import_header(header) + "".join(output).lstrip("\n")).rstrip() + "\n"
     pattern = r"(?m)^(?:(?:public|internal|final) +)*(?:struct|class|enum|actor|extension) +" + re.escape(owner) + r"\b[^\n{]*\{"
     owners = list(re.finditer(pattern, text))
     if not owners:
@@ -288,12 +308,14 @@ def main():
                         help="move a cross-file XCTestCase extension to an independent superclass")
     parser.add_argument("--extract", nargs="+", help="move named types or --owner computed members to --sibling")
     parser.add_argument("--owner", help="type whose computed members are extracted")
+    parser.add_argument("--internalize", nargs="+", default=[],
+                        help="explicitly make selected private/fileprivate extracted types internal")
     args = parser.parse_args()
     try:
         if args.extract:
             if args.source is None or args.sibling is None or args.sibling.exists():
                 raise ValueError("extract needs a source and a new --sibling")
-            kept, moved = extract_declarations(args.source.read_text(), args.extract, args.owner)
+            kept, moved = extract_declarations(args.source.read_text(), args.extract, args.owner, args.internalize)
             if source_lines(moved) > args.limit:
                 raise ValueError("extracted sibling exceeds limit")
             if not args.dry_run:

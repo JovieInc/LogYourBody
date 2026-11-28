@@ -461,21 +461,27 @@ struct SettingsButtonRow: View {
 
     var body: some View {
         Button(role: role, action: action) {
-            if let icon, let titleAccessibilityIdentifier {
-                Label {
-                    Text(title).accessibilityIdentifier(titleAccessibilityIdentifier)
-                } icon: {
-                    Image(systemName: icon)
-                }
-            } else if let icon {
-                Label(title, systemImage: icon)
-            } else if let titleAccessibilityIdentifier {
-                Text(title).accessibilityIdentifier(titleAccessibilityIdentifier)
-            } else {
-                Text(title)
-            }
+            settingsButtonLabel
+                .frame(maxWidth: .infinity, minHeight: SettingsLayout.rowMinHeight, alignment: .leading)
+                .contentShape(Rectangle())
         }
-        .frame(minHeight: SettingsLayout.rowMinHeight, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var settingsButtonLabel: some View {
+        if let icon, let titleAccessibilityIdentifier {
+            Label {
+                Text(title).accessibilityIdentifier(titleAccessibilityIdentifier)
+            } icon: {
+                Image(systemName: icon)
+            }
+        } else if let icon {
+            Label(title, systemImage: icon)
+        } else if let titleAccessibilityIdentifier {
+            Text(title).accessibilityIdentifier(titleAccessibilityIdentifier)
+        } else {
+            Text(title)
+        }
     }
 }
 
@@ -689,21 +695,15 @@ private struct SettingsRowStyleModifier: ViewModifier {
 }
 
 private struct SettingsCardStyleModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-    }
+    func body(content: Content) -> some View { content }
 }
 
 private struct SettingsSectionStyleModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-    }
+    func body(content: Content) -> some View { content }
 }
 
 private struct SettingsBackgroundModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-    }
+    func body(content: Content) -> some View { content }
 }
 
 private struct SettingsInputStyleModifier: ViewModifier {
