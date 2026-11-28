@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `6b5264c2ab1e207a342ccef78496aa70e861e3f1805a13c20a39a2b418706b12`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `7e294c0d6c3326b515d2d855a03d1ff98d6e130a26eb46f0ff07bd500751b73d`)
 
 ### `apps/web/package.json`: engines
 
@@ -167,7 +167,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@testing-library/dom": "^10.4.2",
   "@testing-library/jest-dom": "^6.9.1",
   "@testing-library/react": "^16.3.3",
-  "@testing-library/user-event": "^14.6.8",
+  "@testing-library/user-event": "^14.6.13",
   "@types/jest": "^30.0.0",
   "@types/js-yaml": "4.0.9",
   "@types/lodash": "^4.17.27",
