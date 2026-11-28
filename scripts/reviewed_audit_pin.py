@@ -20,6 +20,26 @@ def _staged_bytes(root, name):
     ).stdout
 
 
+def assert_staged_project_pin(root, read_staged, project):
+    """Refuse stale diagnostic trust before a commit can refresh its source map."""
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z", "--", project],
+        cwd=root, check=True, capture_output=True,
+    ).stdout
+    if not tracked:
+        return
+    source = read_staged(root, DIAGNOSTIC_WORKFLOW).decode()
+    pins = re.findall(
+        r"(?m)^ +'" + re.escape(project) + r"': '([0-9a-f]{64})',$", source,
+    )
+    if pins != [repository_docs.digest(read_staged(root, project))]:
+        raise ValueError(
+            "staged diagnostic project pin is stale or ambiguous; review the project diff, "
+            "then run python3 scripts/resolve-repository-docs.py "
+            "--reviewed-project-sha256 <reviewed-digest>"
+        )
+
+
 def _snapshot(root, name):
     path = root / name
     if any(parent.is_symlink() for parent in (path, *path.parents) if parent != root.parent):
@@ -115,7 +135,7 @@ def _choose_audit(base_audit, ours_audit, theirs_audit, explicit_audit):
 
 
 def _dependency_union(base, ours, theirs):
-    """One-sided dependency lines stay; divergent audit pins need an explicit digest."""
+    """Keep one-sided dependency additions and hash updates; refuse deletions or divergence."""
     def skeleton(text):
         return [line for line in text.splitlines() if not _DEP_LINE.fullmatch(line)]
 
@@ -135,7 +155,7 @@ def _dependency_union(base, ours, theirs):
     base_entries, ours_entries, theirs_entries = entries(base), entries(ours), entries(theirs)
     if base_entries is None or ours_entries is None or theirs_entries is None:
         return None
-    extra = []
+    extra, replacements = [], {}
     for key in set(base_entries) | set(ours_entries) | set(theirs_entries):
         base_line = base_entries.get(key)
         ours_line = ours_entries.get(key)
@@ -144,12 +164,17 @@ def _dependency_union(base, ours, theirs):
             if base_line not in (None, ours_line):
                 return None
             continue
-        if base_line == ours_line and theirs_line is not None and ours_line is None:
-            extra.append(theirs_line)
-        elif base_line == theirs_line and ours_line is not None and theirs_line is None:
+        if base_line == ours_line and theirs_line is not None:
+            if ours_line is None:
+                extra.append(theirs_line)
+            else:
+                replacements[ours_line] = theirs_line
+        elif base_line == theirs_line and ours_line is not None:
             continue
         else:
             return None
+    for original, updated in replacements.items():
+        ours = ours.replace(original, updated)
     if not extra:
         return ours
     result = ours.splitlines()

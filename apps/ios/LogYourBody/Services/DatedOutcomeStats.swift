@@ -118,3 +118,149 @@ struct DatedOutcomeStats {
         String(value.formatted(.iso8601).prefix(10))
     }
 }
+
+/// Runs inside DatedTimelineProjector. It explains only the existing planner's
+/// hold/review decision; it never creates or adjusts a numeric training prescription.
+struct DatedCoachReview {
+    var presentation: LaunchJourney.Presentation
+    var destination: DatedTimelineProjector.Destination
+    var actionToSave: DatedCoachAction?
+    var nextCheckIn: Date?
+    var evidence: String?
+    var uncertainty: String?
+    var note: String?
+    var wakeAt: Date?
+
+    static func project(
+        owner: String, input: LaunchJourney.Input,
+        decision: (state: LaunchJourney.RouteState, action: LaunchJourney.Action), saved: DatedOutcomeSnapshot?
+    ) -> Self {
+        var result = recovery(input: input, state: decision.state, action: decision.action)
+        guard decision.state == .ready else { return result }
+        guard input.safetyAvailable, !owner.isEmpty, let saved, saved.value == input.outcome,
+              let baseline = input.planBaseline, let outcome = input.outcome,
+              outcome.outcome.metric == .weightKg,
+              let plan = LaunchJourney.weightPlanResult(outcome, readings: input.readings, input: input),
+              [.onTrack, .behind, .ahead].contains(plan.status), let evaluatedAt = plan.evaluatedAt,
+              let measurement = input.readings.first(where: { $0.metric == baseline.metric && $0.date == evaluatedAt }) else {
+            return unavailable(input)
+        }
+        if let previous = saved.coachAction {
+            guard previous.userId == owner, previous.productId == LaunchJourney.productId else {
+                return unavailable(input)
+            }
+            if previous.outcomeRevision == saved.revision, previous.outcome == outcome, previous.baseline == baseline {
+                guard previous.reviewedAt <= input.now, previous.evaluatedAt <= evaluatedAt,
+                      previous.nextCheckIn > previous.reviewedAt,
+                      authorizedEvidence(previous, safetyAvailable: input.safetyAvailable) else {
+                    return unavailable(input)
+                }
+                if input.now < previous.nextCheckIn {
+                    guard input.readings.contains(where: {
+                        $0.metric == previous.measurement.metric && $0.date == previous.measurement.date &&
+                            $0.value == previous.measurement.value
+                    }) else { return unavailable(input) }
+                    return presentation(previous, actionToSave: nil)
+                }
+                if evaluatedAt <= previous.evaluatedAt {
+                    result = recovery(input: input, state: .stale, action: .init(
+                        title: "Record a fresh measurement",
+                        detail: "Your weekly review needs a new reading. The action and date have not changed."))
+                    result.nextCheckIn = previous.nextCheckIn
+                    result.note = "Weekly review due. " + LaunchPromiseCopy.framing
+                    return result
+                }
+            }
+        }
+        let rationale: String
+        switch plan.status {
+        case .behind:
+            rationale = "The reviewed measurement is behind the original dated trajectory. " +
+                "Review progress before changing the plan."
+        case .ahead:
+            rationale = "The reviewed measurement is ahead of the original dated trajectory. Hold the plan for this review."
+        default:
+            rationale = "The reviewed measurement follows the original dated trajectory. Hold the plan for this review."
+        }
+        let evidence = claims(owner: owner, input: input, baseline: baseline, rationale: rationale, evaluatedAt: evaluatedAt)
+        let action = DatedCoachAction(
+            id: UUID(), userId: owner, productId: LaunchJourney.productId, outcomeRevision: saved.revision,
+            outcome: outcome, baseline: baseline,
+            measurement: .init(date: measurement.date, metric: measurement.metric, value: measurement.value),
+            nextAction: plan.nextAction, rationale: rationale,
+            evidence: evidence, reviewedAt: input.now, evaluatedAt: evaluatedAt,
+            nextCheckIn: input.now.addingTimeInterval(7 * 24 * 60 * 60))
+        guard authorizedEvidence(action, safetyAvailable: input.safetyAvailable) else { return unavailable(input) }
+        return presentation(action, actionToSave: action)
+    }
+
+    private static func authorizedEvidence(_ action: DatedCoachAction, safetyAvailable: Bool) -> Bool {
+        var memory = HealthMemoryStore()
+        for claim in action.evidence {
+            guard claim.userId == action.userId, claim.productId == action.productId,
+                  claim.provenance != .coachInferred,
+                  memory.remember(claim, safetyAvailable: safetyAvailable) else { return false }
+        }
+        guard case .records(let records) = memory.retrieve(
+            userId: action.userId, productId: LaunchJourney.productId, safetyAvailable: safetyAvailable
+        ) else { return false }
+        return records.contains { $0.provenance == .measured && $0.recordedAt == action.evaluatedAt } &&
+            records.contains { $0.provenance == .engineDerived && $0.text == action.rationale }
+    }
+
+    private static func claims(
+        owner: String, input: LaunchJourney.Input, baseline: DatedOutcome.PlanBaseline,
+        rationale: String, evaluatedAt: Date
+    ) -> [HealthMemoryClaim] {
+        var claims = input.readings.filter { $0.metric == baseline.metric && $0.date == evaluatedAt }.map {
+            HealthMemoryClaim(userId: owner, productId: LaunchJourney.productId,
+                              text: "Recorded \($0.value.formatted()) kg", provenance: .measured, recordedAt: $0.date)
+        }
+        claims.append(.init(userId: owner, productId: LaunchJourney.productId,
+                            text: "Original baseline: \(baseline.value.formatted()) kg",
+                            provenance: .measured, recordedAt: baseline.date))
+        claims.append(.init(userId: owner, productId: LaunchJourney.productId,
+                            text: rationale, provenance: .engineDerived, recordedAt: input.now))
+        return claims
+    }
+
+    private static func presentation(_ action: DatedCoachAction, actionToSave: DatedCoachAction?) -> Self {
+        let title = action.nextAction == .hold ? "Hold the plan" : "Review progress"
+        let measuredDate = String(action.evaluatedAt.formatted(.iso8601).prefix(10))
+        let baselineDate = String(action.baseline.date.formatted(.iso8601).prefix(10))
+        let evidence = "Recorded \(action.measurement.value.formatted()) kg · \(measuredDate). " +
+            "Original baseline \(action.baseline.value.formatted()) kg · \(baselineDate). " +
+            "Target date · \(action.outcome.outcomeDate)."
+        let checkIn = "Next review · " + String(action.nextCheckIn.formatted(.iso8601).prefix(10))
+        let deadline = DatedOutcome.calendarDate(action.outcome.outcomeDate) ?? action.nextCheckIn
+        return Self(
+            presentation: .init(surface: .coach, state: .ready, title: "Your next action",
+                                action: .init(title: title, detail: action.rationale)),
+            destination: .timeline, actionToSave: actionToSave, nextCheckIn: action.nextCheckIn,
+            evidence: evidence, uncertainty: LaunchPromiseCopy.framing,
+            note: evidence + " " + checkIn + ". " + LaunchPromiseCopy.framing,
+            wakeAt: min(deadline, action.nextCheckIn))
+    }
+
+    private static func unavailable(_ input: LaunchJourney.Input) -> Self {
+        recovery(input: input, state: .unsafeDate, action: .init(
+            title: "Review your outcome",
+            detail: "Planning checks are unavailable. The target and date have not changed."))
+    }
+
+    private static func recovery(
+        input: LaunchJourney.Input, state: LaunchJourney.RouteState, action: LaunchJourney.Action
+    ) -> Self {
+        // Reuse the canonical claim-limited presentation, including maintenance.
+        let stats = DatedOutcomeStats.project(input: input, state: state, action: action, entries: [:], metrics: [])
+        var presentation = stats.presentation
+        presentation.surface = .coach
+        let needsManualBaseline = state == .offline && input.outcome != nil && !input.readings.contains {
+            $0.metric == input.outcome?.outcome.metric
+        }
+        return Self(presentation: presentation,
+                    destination: needsManualBaseline ? .measurement :
+                        (state == .maintenance ? .editor : DatedTimelineProjector.destination(
+                            for: state, hasOutcome: input.outcome != nil)))
+    }
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   classifyCorrectionRecords,
+  correctionPyramidCoverage,
   recordCorrection,
   recordCorrectionReceipt,
 } from './correction-ledger';
@@ -81,6 +82,48 @@ it('classifies every record in a mixed ledger without dropping or reordering cor
 
 it('returns an empty ledger when there are no corrections', () => {
   expect(classifyCorrectionRecords([])).toEqual([]);
+});
+
+describe('pyramid coverage (LYB-363)', () => {
+  it('counts classified ledger records by level and reports the mechanized share', () => {
+    const records = [0, 0, 1, 1, 1, 2, 3].map((fixtureIndex, index) => {
+      const { ruleId, correction, classification } = classificationFixtures[fixtureIndex];
+      return { ruleId: `${ruleId}-${index}`, correction, classification, recurrence: index * 10 };
+    });
+    const ledger = Object.freeze(
+      classifyCorrectionRecords(records).map((record) => Object.freeze(record)),
+    );
+
+    expect(correctionPyramidCoverage(ledger)).toEqual({
+      levels: { codebase: 2, static: 3, prose: 1, human: 1 },
+      total: 7,
+      mechanized: 5,
+      mechanizedShare: 5 / 7,
+    });
+  });
+
+  it('returns defined zero counts and share for an empty ledger', () => {
+    expect(correctionPyramidCoverage([])).toEqual({
+      levels: { codebase: 0, static: 0, prose: 0, human: 0 },
+      total: 0,
+      mechanized: 0,
+      mechanizedShare: 0,
+    });
+  });
+
+  it.each([
+    { level: 'codebase', mechanized: 1 },
+    { level: 'static', mechanized: 1 },
+    { level: 'prose', mechanized: 0 },
+    { level: 'human', mechanized: 0 },
+  ] as const)('reports a share of $mechanized for a $level correction', ({ level, mechanized }) => {
+    expect(correctionPyramidCoverage([{ level }])).toEqual({
+      levels: { codebase: 0, static: 0, prose: 0, human: 0, [level]: 1 },
+      total: 1,
+      mechanized,
+      mechanizedShare: mechanized,
+    });
+  });
 });
 
 it.each([{}, { codebase: infeasible, static: infeasible, prose: infeasible, human: infeasible }])(

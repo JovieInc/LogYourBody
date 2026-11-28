@@ -29,13 +29,13 @@ XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
 # missed every Swift package cache and was still compiling test targets at 600s.
 # Allow 15m for compilation; keep test timeouts, retries and the outer step cap.
 BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"
-# Every bounded command below also honors this audit-level deadline. The
-# workflow step kills the whole audit at 52 minutes with zero diagnostics (Mac
-# runs upload no artifacts and job logs are admin-gated), so the audit must
-# always reach its own timeouts first and emit phase evidence as it goes.
-# 2760s (46m) stays above the slowest passing hosted run (38m) and inside the
-# 52-minute step cap. This caps waste, it never extends a bound.
-AUDIT_DEADLINE_SECONDS="${AUDIT_DEADLINE_SECONDS:-2760}"
+# Keep the 1800s UI hang cap after a cold hosted prefix. Run 42695073821's
+# 1168s prefix left only 1590s for passing UI cases at 2760s. Run 42795533093
+# reached UI at 1375s; deadline 2940 left 1565s and killed still-passing UI
+# cases. The same SHA's retry finished those cases in 1697s. 3240s leaves the
+# 1800s cap intact and reserves 180s finalization inside the 57-minute step.
+# Per-test limits and the UI hang cap still apply.
+AUDIT_DEADLINE_SECONDS="${AUDIT_DEADLINE_SECONDS:-3240}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
@@ -46,7 +46,8 @@ if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
   TEST_TIMEOUTS_ENABLED=YES
   DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE=90
   MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE=180
-  BUILD_FOR_TESTING_TIMEOUT_SECONDS=600
+  # Run 42724350244 was still Swift-compiling at 600s. Same 15m cold allowance as the full audit.
+  BUILD_FOR_TESTING_TIMEOUT_SECONDS=900
 fi
 
 read -r -a XCODEBUILD_SETTINGS_ARRAY <<< "$XCODEBUILD_SETTINGS"
@@ -65,7 +66,10 @@ AUDIT_STARTED_AT="$(date +%s)"
 # Phase and budget helpers must exist before the first phase_start call below.
 remaining_budget_seconds() {
   local remaining=$(( AUDIT_DEADLINE_SECONDS - $(date +%s) + AUDIT_STARTED_AT ))
-  (( remaining < 60 )) && remaining=60
+  if (( remaining <= 0 )); then
+    echo "launch-quality audit deadline exhausted" >&2
+    return 124
+  fi
   printf '%s\n' "$remaining"
 }
 
@@ -74,7 +78,7 @@ remaining_budget_seconds() {
 # silent runner-side step kill.
 bounded_seconds() {
   local bound="$1" remaining
-  remaining="$(remaining_budget_seconds)"
+  remaining="$(remaining_budget_seconds)" || return "$?"
   (( bound < remaining )) && printf '%s\n' "$bound" || printf '%s\n' "$remaining"
 }
 
@@ -277,6 +281,7 @@ run_xcodebuild_test() {
     fi
 
     echo "Running $label (attempt $attempt)" | tee -a "$log_file"
+    effective_timeout="$(bounded_seconds "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS")" || return "$?"
     start_launch_probe "$label"
     xcodebuild_command=(
       xcodebuild
@@ -288,7 +293,6 @@ run_xcodebuild_test() {
     )
 
     set +e
-    effective_timeout="$(bounded_seconds "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS")"
     XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS="${XCODEBUILD_RESULT_FINALIZATION_GRACE_SECONDS:-180}" \
     run_with_timeout \
       "$effective_timeout" \
@@ -346,8 +350,8 @@ build_for_testing_once() {
     build-for-testing
   )
 
+  effective_timeout="$(bounded_seconds "$BUILD_FOR_TESTING_TIMEOUT_SECONDS")" || return "$?"
   set +e
-  effective_timeout="$(bounded_seconds "$BUILD_FOR_TESTING_TIMEOUT_SECONDS")"
   run_with_timeout \
     "$effective_timeout" \
     "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
@@ -460,6 +464,8 @@ LAUNCH_QUALITY_UI_TESTS=(
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces"
+  "LogYourBodyUITests/testDatedOutcomeFirstLaunchCancelBackAndManualBaseline"
+  "LogYourBodyUITests/testDatedOutcomeGateOffKeepsExistingFirstRun"
   "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn"
   "LogYourBodyUITests/testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation"
   "LogYourBodyUITests/testDatedTimelineExpiredOutcomeOpensEditorWithoutExtendingDate"
@@ -503,8 +509,8 @@ done
 UI_RESULT_BUNDLE="$ARTIFACT_DIR/launch-quality-ui.xcresult"
 UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")
 # One UI launch carries the dated-state matrix. Per-test allowances and the
-# 52-minute step cap stay; finalization grace is not part of this hang cap.
-UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1800}" # dated-state matrix; per-test and 52m caps stay
+# 57-minute step cap stay; finalization grace is not part of this hang cap.
+UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1800}" # dated-state matrix; per-test and 57m caps stay
 phase_start ui-tests
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_xcodebuild_test \
   "launch-quality-ui" \

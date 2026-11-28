@@ -14,6 +14,41 @@ import UIKit
 
 @MainActor
 final class ProgressPhotoImagePipelineTests: XCTestCase {
+    func testTargetPixelSizeThumbnailOptionMatchesDecode() async throws {
+        let requested = 320
+        let options = ProgressPhotoImagePipeline.thumbnailSourceOptions(maxPixelSize: requested)
+        XCTAssertEqual(options[kCGImageSourceThumbnailMaxPixelSize] as? Int, requested)
+        XCTAssertEqual(options[kCGImageSourceCreateThumbnailFromImageAlways] as? Bool, true)
+        XCTAssertEqual(options[kCGImageSourceCreateThumbnailWithTransform] as? Bool, true)
+        XCTAssertEqual(options[kCGImageSourceShouldCacheImmediately] as? Bool, true)
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 2_400, height: 1_800), format: format).image { context in
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 2_400, height: 1_800))
+        }
+        let data = try XCTUnwrap(image.jpegData(compressionQuality: 0.8))
+        let decodedImage = await ProgressPhotoImagePipeline.decodeAndOptimizeImage(
+            from: data,
+            maxPixelSize: requested
+        )
+        let decoded = try XCTUnwrap(decodedImage)
+
+        XCTAssertEqual(decoded.size.width, 320, accuracy: 1)
+        XCTAssertEqual(decoded.size.height, 240, accuracy: 1)
+        XCTAssertLessThan(max(decoded.size.width, decoded.size.height), 1_200)
+        XCTAssertEqual(
+            ProgressPhotoImagePipeline.targetMaxPixelSize(points: CGSize(width: 200, height: 400), scale: 3),
+            1_200
+        )
+        XCTAssertNil(ProgressPhotoImagePipeline.targetMaxPixelSize(points: .zero, scale: 3))
+    }
+
+    func testTimelinePhotoDecodeSignpostIsRegistered() {
+        XCTAssertTrue(PerfSignpost.registeredNames.contains("timeline_photo_decode"))
+    }
+
     func testFilmstripDecodesTargetSizedPixelsAndRejectsMalformedData() async throws {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1

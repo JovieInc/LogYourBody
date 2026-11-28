@@ -4,6 +4,38 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 
+it('captures chaos candidate attributes once per discovery without weakening photo-import safety', () => {
+  const source = readFileSync(
+    new URL('../../../apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift', import.meta.url),
+    'utf8',
+  );
+  const discovery =
+    source.split('private func snapshotElements(')[1]?.split('/// `.isHittable`')[0] ?? '';
+  // Native run 43355101470 resolved elements 736 and 571 times in the two
+  // photo-import probes. Attribute reads during filtering must use one capture.
+  expect(discovery).toContain('throws -> StepSnapshot');
+  expect(discovery).toContain('let captured = try elements.map');
+  expect(discovery).toContain('(element: element, attributes: try element.snapshot())');
+  expect(discovery.match(/\.snapshot\(\)/g)).toHaveLength(1);
+  const filters = discovery.split('let protectedFrames =')[1] ?? '';
+  expect(filters).not.toMatch(/\belement\.(?:frame|identifier|label|elementType)\b/);
+  expect(filters).not.toMatch(
+    /(?:hasFiniteNonZeroFrame|isDenylisted)\((?:element|candidate\.element)\)/,
+  );
+  expect(filters).toContain('captured.compactMap');
+  expect(filters).toContain('attributes.elementType == .button');
+  expect(filters).toContain('isDenylisted(attributes), hasFiniteNonZeroFrame(attributes)');
+  expect(filters).toContain('attributes.frame.intersects(windowFrame)');
+  expect(filters).toContain('!isDenylisted(attributes), attributes.elementType != .key');
+  expect(filters).toContain('attributes.elementType == .other || attributes.elementType == .cell');
+  expect(filters).toContain('protectedFrames.contains(where: { $0.intersects(attributes.frame) })');
+  expect(filters).toContain('return candidate.element.isHittable ? candidate.element : nil');
+  expect(discovery).not.toMatch(/try[!?]|catch/);
+  expect(source.match(/try snapshotElements\(in: app\)/g)).toHaveLength(4);
+  expect(source).toContain('hasFiniteNonZeroFrame(_ element: XCUIElementAttributes)');
+  expect(source).toContain('isDenylisted(_ element: XCUIElementAttributes)');
+});
+
 it('keeps voice hardware dormant during ordinary chat construction and dismissal', () => {
   const source = readFileSync(
     new URL('../../../apps/ios/LogYourBody/Services/VoiceCaptureService.swift', import.meta.url),
@@ -82,6 +114,122 @@ it('requires verified native text entry before testing draft preservation', () =
   expect(action).not.toContain('field.typeText(');
 });
 
+it('keeps paced chat typing focused and gives nested launch scenarios the audit time cap', () => {
+  const tests = readFileSync(
+    new URL('../../../apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift', import.meta.url),
+    'utf8',
+  );
+  const typing =
+    tests
+      .split('for character in addition {')[1]
+      ?.split('composer.typeText(String(character))')[0] ?? '';
+  expect(typing).toContain('hasKeyboardFocus == true');
+  expect(typing).toContain('if !focused.exists');
+  expect(typing).toContain('guard focused.waitForExistence(timeout: 2) else { break }');
+  const timeline =
+    tests
+      .split('func testLaunchQualityGateCapturesTimelineSurfaces()')[1]
+      ?.split('try testDatedTimelineManualBaselineAndInterruptedPhotoReturn()')[0] ?? '';
+  expect(timeline).toContain('executionTimeAllowance = 180');
+  const audit = readFileSync(
+    new URL('../../../scripts/ios/launch_ui_home_interaction_audit.py', import.meta.url),
+    'utf8',
+  );
+  expect(audit).toContain('uitest.character_type_keyboard_focus');
+  expect(audit).toContain('uitest.progress_share_readiness');
+  expect(audit).toContain('check_progress_share_readiness(root, violations, violation)');
+  expect(audit).toContain('uitest.nested_launch_time_allowance');
+  expect(audit).toContain('uitest.synthetic_chat_lifecycle_time_allowance');
+  expect(audit).toContain('uitest.viewer_history_navigation');
+  expect(audit).toContain('check_viewer_history_navigation(root, violations, violation)');
+  expect(audit).toContain('check_character_type_keyboard_focus(root, violations, violation)');
+  expect(audit).toContain('check_nested_launch_time_allowance(root, violations, violation)');
+});
+
+it('waits for exact metric text and Save readiness before testing Home check-in outcomes', () => {
+  const source = readFileSync(
+    new URL('../../../apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift', import.meta.url),
+    'utf8',
+  );
+  const method = (name: string) =>
+    source.split(`func ${name}(`)[1]?.split(/\n {4}(?:private )?func /)[0] ?? '';
+  // Run 42854027238: 17.0 was visible in the recording, but the immediate
+  // enabled snapshot still saw Save disabled after the delete/type transaction.
+  const readiness = method('assertSaveReady');
+  expect(readiness).toContain('NSPredicate(format: "enabled == true AND hittable == true")');
+  expect(readiness).toContain('evaluatedWith: save');
+  expect(readiness).toContain('XCTWaiter.wait(for: [ready], timeout: 5), .completed');
+  const replacement = method('replacePrefilledText');
+  expect(replacement).toContain('XCTAssertTrue(isFieldCleared(field),');
+  expect(replacement.indexOf('XCTAssertTrue(isFieldCleared(field),')).toBeLessThan(
+    replacement.indexOf('field.typeText(replacement)'),
+  );
+  expect(replacement).toContain('NSPredicate(format: "value == %@", replacement)');
+  expect(replacement).toContain('XCTWaiter.wait(for: [entered], timeout: 5), .completed');
+  // Run 43636675575: the trailing inset never focused the padded body-fat field,
+  // so delete keys failed before either body-fat case could save.
+  const trailingTap = replacement.indexOf('trailing.tap()');
+  const focusProbe = replacement.indexOf('hasKeyboardFocus == true');
+  const centerTap = replacement.indexOf('field.tap()');
+  const deleteCall = replacement.indexOf('deletePrefilledText(existing, in: field)');
+  expect(trailingTap).toBeGreaterThan(-1);
+  expect(focusProbe).toBeGreaterThan(trailingTap);
+  expect(centerTap).toBeGreaterThan(focusProbe);
+  expect(deleteCall).toBeGreaterThan(centerTap);
+  expect(method('deletePrefilledText')).toContain('count: max(existing.count, 8)');
+  for (const name of [
+    'testLogSheetEditsUnitsWithKeyboardAndCancelsWithoutChangingHome',
+    'testBodyFatCheckInRefreshesDataHeroWithoutSavingWeight',
+    'testBodyFatEditorAtLargestTextPreservesMethodUntilExplicitSelection',
+  ]) {
+    const body = method(name);
+    expect(body).toContain('replacePrefilledText(');
+    expect(body).toContain('assertSaveReady(save)');
+    expect(body).not.toContain('field.typeText(');
+    expect(body.indexOf('replacePrefilledText(')).toBeLessThan(
+      body.indexOf('assertSaveReady(save)'),
+    );
+    if (body.includes('save.tap()')) {
+      expect(body.indexOf('assertSaveReady(save)')).toBeLessThan(body.indexOf('save.tap()'));
+    }
+  }
+});
+
+it('waits for a stable hittable sidebar before each single dismissal tap', () => {
+  const source = readFileSync(
+    new URL(
+      '../../../apps/ios/LogYourBodyUITests/HomeV2TimelineIntegrationUITests.swift',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  const helper =
+    source.split('private func dismissSidebar(')[1]?.split('\n    private func ')[0] ?? '';
+  expect(helper).toContain('guard scrim.exists, scrim.isHittable else { return false }');
+  expect(helper).toContain('var previousFrame = CGRect.null');
+  expect(helper).toContain('let frame = scrim.frame');
+  expect(helper).toContain('defer { previousFrame = frame }');
+  expect(helper).toContain(
+    '!frame.isEmpty && window.frame.contains(frame) && frame == previousFrame',
+  );
+  expect(helper).toContain('XCTWaiter.wait(for: [ready], timeout: 5), .completed');
+  expect(helper).toContain(
+    'window.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()',
+  );
+  expect(helper.match(/\.tap\(\)/g)).toHaveLength(1);
+  expect(helper.indexOf('XCTWaiter.wait(')).toBeLessThan(helper.indexOf('.tap()'));
+  expect(helper).toContain('XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))');
+  expect(helper.indexOf('.tap()')).toBeLessThan(helper.indexOf('scrim.waitForNonExistence('));
+  const journey = source
+    .split('func testPhotoScrubResetsWhenNavigatingToTheMenuAndBack()')[1]
+    .split('\n    func ')[0];
+  expect(journey).toContain('for _ in 0..<3 {');
+  expect(journey.match(/dismissSidebar\(scrim, in: app\)/g)).toHaveLength(2);
+  expect(journey).not.toContain('scrim.coordinate(');
+  expect(journey).toContain('"Header swipes must still open the sidebar"');
+  expect(journey).toContain('app.buttons["home_v2_viewer_close"].waitForExistence(timeout: 5)');
+});
+
 it('checks Stats composition, card styling and provenance dismissal through the launch audit with executed coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
@@ -93,10 +241,12 @@ it('checks Stats composition, card styling and provenance dismissal through the 
     '$TURBO_ROOT$/.company-guards/size-baseline.json',
     '$TURBO_ROOT$/scripts/ios/launch_ui_opacity_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_timeline_gesture_audit.py',
+    '$TURBO_ROOT$/scripts/ios/launch_ui_home_interaction_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_offline_pin_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch_ui_dated_stats_audit.py',
     '$TURBO_ROOT$/scripts/ios/launch-ui-regression-report.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_regression_audit.py',
+    '$TURBO_ROOT$/scripts/ios/test_launch_ui_audit_support.py',
     '$TURBO_ROOT$/scripts/ios/test_launch_ui_home_interaction.py',
     '$TURBO_ROOT$/apps/ios/LogYourBodyWidget/**/*.swift',
     '$TURBO_ROOT$/apps/ios/LogYourBody/Components/FullMetricChartView+Part01.swift',
@@ -185,4 +335,21 @@ sys.exit(status)
   } finally {
     rmSync(coverage, { recursive: true, force: true });
   }
+}, 30_000);
+
+it('repairs additive audit and manifest conflicts while rejecting lost parent checks', () => {
+  const output = execFileSync(
+    process.execPath,
+    [
+      '--test',
+      'scripts/resolve-repository-docs-manifest.test.mjs',
+      'scripts/resolve-repository-docs-json.test.mjs',
+    ],
+    { cwd: fileURLToPath(new URL('../../..', import.meta.url)), encoding: 'utf8', timeout: 30_000 },
+  );
+  expect(output).toContain('# fail 0');
+  expect(output).toContain('manifest union keeps both launch-audit sibling registrations');
+  expect(output).toContain(
+    'manifest union refuses a non-additive launch-audit conflict without staging',
+  );
 }, 30_000);

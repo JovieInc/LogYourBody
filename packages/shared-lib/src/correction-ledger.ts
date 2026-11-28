@@ -36,6 +36,25 @@ export function classifyCorrectionRecords<
   }));
 }
 
+export type CorrectionPyramidCoverage = {
+  levels: Record<CorrectionLevel, number>;
+  total: number;
+  mechanized: number;
+  /** `(codebase + static) / total` on a 0–1 scale; zero for an empty ledger. */
+  mechanizedShare: number;
+};
+
+/** Count each classified ledger row once, without weighting recurrence or checking guards. */
+export function correctionPyramidCoverage(
+  ledger: readonly { level: CorrectionLevel }[],
+): CorrectionPyramidCoverage {
+  const levels = { codebase: 0, static: 0, prose: 0, human: 0 };
+  for (const { level } of ledger) levels[level] += 1;
+  const total = ledger.length;
+  const mechanized = levels.codebase + levels.static;
+  return { levels, total, mechanized, mechanizedShare: total === 0 ? 0 : mechanized / total };
+}
+
 function requiredRuleId(ruleId: string): string {
   if (typeof ruleId !== 'string' || ruleId.trim() === '') {
     throw new Error('correction rule id is required');

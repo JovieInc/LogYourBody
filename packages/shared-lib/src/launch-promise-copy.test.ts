@@ -7,6 +7,8 @@ const source = (path: string) => readFileSync(new URL(path, app), 'utf8');
 // JovieInc/Jovie#21838, docs/product/lyb-launch-contract.md at
 // 197a96ff21c53cb4ccd8f6c1e3d733058b8c1cf7. Dates guide planning, never guarantee a result.
 const approved = {
+  // LYB-273 adopted native sentence, 2026-10-30; legacy strings stay gated off.
+  datedOutcomePromise: 'Pick a date. We build the plan backward from it and adjust every week.',
   headline: 'Your body-composition goal, planned around your next date.',
   explanation:
     'Set an outcome and a date. LogYourBody follows your photos and measurements, spots drift, and gives you one next action.',
@@ -71,14 +73,17 @@ describe('LYB-286 approved date-driven launch promise', () => {
       'Views/LoginView.swift',
       'Features/Onboarding/Views/BodyScoreHookView.swift',
     ]) {
-      expect(source(path)).toMatch(/title:\s*LaunchPromiseCopy\.headline\s*,/);
+      expect(source(path)).toMatch(/title:\s*LaunchPromiseCopy\.nativeHeadline\s*,/);
       expect(source(path)).toMatch(/subtitle:\s*LaunchPromiseCopy\.explanation\s*[,\n]/);
     }
     const signIn = source('Views/HomeV2/HomeV2OnboardingViews.swift');
     expect(signIn).toMatch(/static let signInTitle = LaunchPromiseCopy\.headline\s/);
     expect(signIn).toMatch(/static let signInBody = LaunchPromiseCopy\.explanation\s/);
-    expect(signIn).toContain('Text(HomeV2OnboardingCopy.signInTitle)');
+    expect(signIn).toContain('Text(LaunchPromiseCopy.nativeHeadline)');
     expect(signIn).toContain('Text(HomeV2OnboardingCopy.signInBody)');
+    expect(source('Features/Onboarding/Views/BodyScoreHookView.swift')).toMatch(
+      /title:\s*showsSavedOutcome\s*\?\s*"Your outcome and date"\s*:\s*LaunchPromiseCopy\.datedOutcomePromise/,
+    );
     expect(source('Views/MainTabView.swift')).toContain(
       'text: "\\(LaunchPromiseCopy.headline) \\(LaunchPromiseCopy.explanation)",',
     );

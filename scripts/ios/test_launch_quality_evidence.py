@@ -327,9 +327,9 @@ class EvidenceTests(unittest.TestCase):
         command = source[start:source.index('\n\npython3 ', start)]
         setup_start = source.index('CHAT_QUALIFICATION_UNIT_TESTS=(')
         setup = source[setup_start:source.index('\n# StoreKitPurchaseRestoreTests', setup_start)]
-        # Replay the real, populated argument construction. Bash3 treats an empty
-        # array as unset under nounset; the former synthetic empty array failed
-        # before exercising the command on hosted macOS.
+        daily_spec = importlib.util.spec_from_file_location('stats_series_daily_cache', Path(__file__).with_name('stats_series_daily_cache.py'))
+        daily_cache = importlib.util.module_from_spec(daily_spec); daily_spec.loader.exec_module(daily_cache); daily_cache.check_repository(Path(__file__).resolve().parents[2])
+        # Replay the real argument array. Bash 3 treats an empty array as unset under nounset.
         result = run_shell(['-c', 'set -euo pipefail\nARTIFACT_DIR=/tmp\n' + setup +
                             '\nassert_xcresult_evidence() { printf "%s\\n" "$@"; }\n' + command])
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -626,9 +626,7 @@ echo 'ready for native tests'
 
     def test_shell_preserves_failed_attempt_and_stops_after_two(self):
         # Execute the real function definitions without running the product build.
-        # The extracted range includes the diagnostic launch probe. Its simctl
-        # calls can block longer than this timeout while CoreSimulatorService
-        # is still cold (CI run 38551518501), and they are not the retry contract.
+        # Stub cold CoreSimulator probes outside the retry contract (run 38551518501).
         source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
         functions = source[source.index('is_simulator_infra_failure() {'):source.index('assert_xcresult_evidence() {')]
         result_bundle = self.root / 'retry.xcresult'
@@ -640,6 +638,7 @@ XCODEBUILD_SETTINGS_ARRAY=(fixture)
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS=10
 LQ_LAUNCH_PROBE=false
 cleanup_booted_simulator_apps() { :; }
+bounded_seconds() { printf '%s\n' "$1"; }
 sleep() { :; }
 run_with_timeout() {
   mkdir -p "$RESULT_BUNDLE"
@@ -673,6 +672,7 @@ XCODEBUILD_SETTINGS_ARRAY=(fixture)
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS=10
 LQ_LAUNCH_PROBE=false
 cleanup_booted_simulator_apps() { :; }
+bounded_seconds() { printf '%s\n' "$1"; }
 sleep() { :; }
 run_with_timeout() {
   mkdir -p "$RESULT_BUNDLE"

@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
+import { savedCacheRowsMissingLastModified } from './saved-cache-row-last-modified';
 
 // The trace CLI swallows SystemExit. Keep coverage while propagating suite failures.
 const driver = `
@@ -28,6 +29,69 @@ function checkedTrace(test: string, coverage: string, root: string) {
     timeout: 90_000,
   });
 }
+
+// XCTest's assertion arguments are synchronous autoclosures. Await the value first.
+const directAwaitInXCTestAssertion = (source: string) =>
+  /\bXCT(?:Assert\w*|Unwrap)\s*\(\s*(?:try[?!]?\s+)?await\b/.test(
+    source.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\/|"""[\s\S]*?"""|"(?:\\[\s\S]|[^"\\])*"/g, ''),
+  );
+
+it('detects direct awaits in XCTest autoclosures and permits awaited locals', () => {
+  expect(directAwaitInXCTestAssertion('XCTAssertTrue(\n try await task.value)')).toBe(true);
+  expect(directAwaitInXCTestAssertion('XCTUnwrap(await value())')).toBe(true);
+  expect(directAwaitInXCTestAssertion('let value = await task.value\nXCTAssertTrue(value)')).toBe(
+    false,
+  );
+  expect(directAwaitInXCTestAssertion('// XCTAssertTrue(await task.value)')).toBe(false);
+});
+
+it.each(['LogYourBodyTests', 'LogYourBodyUITests'])(
+  'keeps direct awaits out of XCTest autoclosures in %s',
+  (target) => {
+    const root = fileURLToPath(new URL(`../../../apps/ios/${target}/`, import.meta.url));
+    const violations = readdirSync(root, { recursive: true })
+      .map(String)
+      .filter((path) => path.endsWith('.swift'))
+      .filter((path) => directAwaitInXCTestAssertion(readFileSync(`${root}/${path}`, 'utf8')));
+    expect(violations, 'Await each result before passing it to an XCTest assertion').toEqual([]);
+  },
+);
+
+it('saves cached body and daily metrics with required lastModified', () => {
+  const missing = [
+    'func seed() {',
+    ' let metric = CachedBodyMetrics(context: context)',
+    ' let log = CachedDailyMetrics(context: context)',
+    ' try context.save()',
+    '}',
+  ].join('\n');
+  expect(savedCacheRowsMissingLastModified(missing)).toEqual([
+    'seed: metric is saved without lastModified',
+    'seed: log is saved without lastModified',
+  ]);
+  const repaired = missing
+    .replace('let metric = CachedBodyMetrics(context: context)', '$&\n metric.lastModified = date')
+    .replace('let log = CachedDailyMetrics(context: context)', '$&\n log.lastModified = date');
+  expect(savedCacheRowsMissingLastModified(repaired)).toEqual([]);
+  const commented = missing.replace(
+    'try context.save()',
+    '// metric.lastModified = date\n try context.save()',
+  );
+  expect(savedCacheRowsMissingLastModified(commented)).toEqual([
+    'seed: metric is saved without lastModified',
+    'seed: log is saved without lastModified',
+  ]);
+  const root = fileURLToPath(new URL('../../../apps/ios/LogYourBodyTests/', import.meta.url));
+  const violations = readdirSync(root, { recursive: true })
+    .map(String)
+    .filter((path) => path.endsWith('.swift'))
+    .flatMap((path) =>
+      savedCacheRowsMissingLastModified(readFileSync(`${root}/${path}`, 'utf8')).map(
+        (finding) => `${path}: ${finding}`,
+      ),
+    );
+  expect(violations).toEqual([]);
+});
 
 it('invalidates native source guards for every app and native test source and build policy', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
@@ -180,6 +244,88 @@ it('pins shared offline UI fixtures before late network callbacks can replace th
   expect(release).not.toMatch(/usesOfflineUITestFixture|applyOfflineUITestFixture/);
 });
 
+it('prefills the dated Stats editor from its DEBUG fixture without inventing a saved revision', () => {
+  const read = (path: string) =>
+    readFileSync(
+      new URL(`../../../apps/ios/LogYourBody/Services/${path}`, import.meta.url),
+      'utf8',
+    );
+  const host = read('LaunchJourneyUI.swift')
+    .split('struct DatedOutcomeEditorHost: View')[1]
+    .split('extension DashboardViewLiquid')[0];
+  expect(host).toContain('existing: existingOutcome, errorText: model.errorText');
+  expect(host).toMatch(
+    /#if DEBUG\s*return DatedStatsUITestFixture\.editorOutcome\(saved: model\.snapshot\?\.value\)\s*#else\s*return model\.snapshot\?\.value\s*#endif/,
+  );
+  const fixture = read('DatedStatsUITestFixture.swift');
+  expect(fixture.trim()).toMatch(/^#if DEBUG[\s\S]*#endif$/);
+  expect(fixture).toContain('outcome: outcome(for: state)');
+  expect(fixture).toContain('return selectedState(arguments).map { outcome(for: $0) }');
+  expect(fixture).toContain('if let saved { return saved }');
+  expect(fixture).not.toMatch(
+    /DatedOutcomeSnapshot|saveForPresentation|acceptRemoteForPresentation/,
+  );
+});
+
+it('qualifies native scenarios independently instead of sharing another XCTest case budget', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const nestedCalls = (source: string) =>
+    [...source.matchAll(/^\s*(?:(?:try[!?]?|await)\s+)*(?:self\.)?(test\w+)\s*\(/gm)].map(
+      (match) => match[1],
+    );
+  expect(
+    nestedCalls(
+      '        try testNested()\n        testDirect()\n        try await self.testAsync()',
+    ),
+  ).toEqual(['testNested', 'testDirect', 'testAsync']);
+  expect(
+    nestedCalls('// try testComment()\nfunc testIndependent() {}\ntry assertSurface()'),
+  ).toEqual([]);
+  const sources = execFileSync('git', ['ls-files', '--', 'apps/ios/LogYourBodyUITests'], {
+    cwd: root,
+    encoding: 'utf8',
+  })
+    .trim()
+    .split('\n')
+    .filter((path) => path.endsWith('.swift'));
+  expect(sources.length).toBeGreaterThan(0);
+  const nested = sources.flatMap((path) =>
+    nestedCalls(readFileSync(`${root}/${path}`, 'utf8')).map((method) => `${path}: ${method}`),
+  );
+  expect(
+    nested,
+    'Select each scenario directly so XCTest owns its timeout and execution receipt',
+  ).toEqual([]);
+  const audit = readFileSync(`${root}/scripts/ios/launch-quality-audit.sh`, 'utf8');
+  const selection = audit.slice(
+    audit.indexOf('LAUNCH_QUALITY_UI_TESTS=('),
+    audit.indexOf('UI_RESULT_BUNDLE='),
+  );
+  const output = execFileSync(
+    '/bin/bash',
+    [
+      '-c',
+      'set -euo pipefail\n' +
+        selection +
+        '\nprintf "%s\\n" "${UI_SELECTORS[@]}" "${UI_EVIDENCE_ARGS[@]}"',
+    ],
+    { encoding: 'utf8', env: { PATH: '/usr/bin:/bin' } },
+  ).split('\n');
+  for (const method of [
+    'testDatedOutcomeFirstLaunchCancelBackAndManualBaseline',
+    'testDatedOutcomeGateOffKeepsExistingFirstRun',
+    'testDatedTimelineManualBaselineAndInterruptedPhotoReturn',
+    'testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation',
+  ]) {
+    expect(
+      output.filter(
+        (line) => line === `-only-testing:LogYourBodyUITests/LogYourBodyUITests/${method}`,
+      ),
+    ).toHaveLength(1);
+    expect(output.filter((line) => line === `LogYourBodyUITests/${method}()`)).toHaveLength(1);
+  }
+});
+
 function barrierBody(source: string): string | undefined {
   const marker = 'final class Barrier';
   const start = source.indexOf(marker);
@@ -330,3 +476,13 @@ it('propagates evidence assertion failures and nonzero exits despite passing sui
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+it('runs the audit deadline regressions before native execution', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const output = execFileSync('python3', ['scripts/ios/test_xcodebuild_command_timeout.py'], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  expect(output).toContain('xcodebuild deadline behavior tests executed: 13');
+}, 30_000);

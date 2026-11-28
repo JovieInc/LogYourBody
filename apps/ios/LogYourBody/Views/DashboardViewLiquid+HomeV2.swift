@@ -94,6 +94,7 @@ extension DashboardViewLiquid {
                 showsRecentHealthReadings = true
             },
             onOpenPhoto: { isHomeV2ViewerPresented = true },
+            onAddPhoto: { presentProgressPhotoAttach(for: metric) },
             onViewProgress: { openHomeV2Progress() },
             onViewMetric: { openHomeV2Progress(metric: $0) },
             onTodayDetails: { openHomeV2Context() },
@@ -191,7 +192,8 @@ extension DashboardViewLiquid {
             onConnectHealth: {
                 Task { _ = await HealthKitManager.shared.requestAuthorization() }
             },
-            onLogWeight: { presentHomeV2LogSheet(initialTab: 1) }
+            onLogWeight: { presentHomeV2LogSheet(initialTab: 1) },
+            onAddPhoto: { presentProgressPhotoAttach(for: nil) }
         )
         .task(id: homeV2StepsRequest(on: date)) {
             guard let ownership = authManager.captureAccountSession() else { return }

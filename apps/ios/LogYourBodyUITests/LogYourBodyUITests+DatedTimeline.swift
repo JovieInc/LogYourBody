@@ -2,6 +2,76 @@ import XCTest
 import UIKit
 
 extension LogYourBodyUITests {
+    func testDatedOutcomeFirstLaunchCancelBackAndManualBaseline() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestBodyScoreOnboardingFixture", "-lybUITestDatedOutcomeEntryFixture",
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestPhotoTimelineEmptyFixture", "-lybUITestDatedTimelineFixture"
+        ])
+        let promise = app.staticTexts["Pick a date. We build the plan backward from it and adjust every week."]
+        XCTAssertTrue(promise.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["body_score_onboarding_import_scan_button"].exists)
+        let next = app.buttons["dated_launch_continue"]
+        next.tap()
+        let date = app.textFields["launch_outcome_date"]
+        let target = app.textFields["launch_outcome_value"]
+        XCTAssertTrue(target.waitForExistence(timeout: 8))
+        target.tap()
+        target.typeText("76")
+        date.tap()
+        date.typeText("2099-12-27")
+        app.buttons["launch_outcome_cancel"].tap()
+        XCTAssertTrue(promise.waitForExistence(timeout: 8))
+        next.tap()
+        XCTAssertTrue(target.waitForExistence(timeout: 8))
+        XCTAssertNotEqual(target.value as? String, "76", "Cancel must not persist a draft")
+        target.tap()
+        target.typeText("76")
+        date.tap()
+        date.typeText("2099-12-27")
+        app.buttons["launch_outcome_save"].tap()
+        let saved = app.staticTexts["dated_launch_saved_outcome"]
+        XCTAssertTrue(saved.waitForExistence(timeout: 8))
+        XCTAssertTrue(saved.label.contains("2099-12-27"))
+        XCTAssertTrue(app.staticTexts["dated_outcome_pending"].exists)
+        app.buttons["Edit outcome and date"].tap()
+        XCTAssertTrue(date.waitForExistence(timeout: 8))
+        XCTAssertEqual(date.value as? String, "2099-12-27")
+        date.tap()
+        date.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 10) + "2099-12-28")
+        app.buttons["launch_outcome_cancel"].tap()
+        XCTAssertTrue(saved.waitForExistence(timeout: 8))
+        XCTAssertTrue(saved.label.contains("2099-12-27"))
+        app.buttons["Back"].tap()
+        XCTAssertTrue(promise.waitForExistence(timeout: 8))
+        next.tap()
+        XCTAssertTrue(date.waitForExistence(timeout: 8))
+        XCTAssertEqual(date.value as? String, "2099-12-27")
+        date.tap()
+        date.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 10) + "2099-12-28")
+        app.buttons["launch_outcome_save"].tap()
+        XCTAssertTrue(saved.waitForExistence(timeout: 8))
+        XCTAssertTrue(saved.label.contains("2099-12-28"))
+        next.tap()
+        let weight = app.textFields["Weight value"]
+        XCTAssertTrue(weight.waitForExistence(timeout: 8))
+        weight.tap()
+        weight.typeText("172")
+        app.buttons["add_entry_save_button"].tap()
+        XCTAssertTrue(app.buttons["dated_timeline_outcome"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["dated_timeline_outcome"].label.contains("2099-12-28"))
+        attachScreenshot(named: "dated-launch-manual-baseline", from: app)
+        app.terminate()
+    }
+
+    func testDatedOutcomeGateOffKeepsExistingFirstRun() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestBodyScoreOnboardingFixture"])
+        XCTAssertTrue(app.buttons["body_score_onboarding_import_scan_button"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["dated_launch_continue"].exists)
+        app.terminate()
+    }
+
     func testDatedStatsReadyHasOneReachableRecovery() throws {
         assertDatedStatsRecovery(state: "ready")
     }
@@ -47,10 +117,10 @@ extension LogYourBodyUITests {
         launch(app, with: [
             "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestPhotoTimelineAnalyticsFixture", "-lybUITestDatedTimelineFixture",
-            "-lybUITestDatedStatsState", state
+            "-lybUITestDatedStatsState", state, "-lybUITestChatFirstFixture"
         ])
         let surface = app.descendants(matching: .any)["dated_stats_\(state)"]
-        XCTAssertTrue(surface.waitForExistence(timeout: 15), state)
+        XCTAssertTrue(surface.exists || surface.waitForExistence(timeout: 15), state)
         XCTAssertEqual(app.buttons.matching(identifier: "launch_next_action").count, 1, state)
         XCTAssertFalse(app.descendants(matching: .any)["dashboard_body_score_hero"].exists)
         if state != "ready" {
@@ -63,21 +133,59 @@ extension LogYourBodyUITests {
         switch state {
         case "unsafe-date", "impossible-date", "expired-date", "maintenance":
             let date = app.textFields["launch_outcome_date"]
-            XCTAssertTrue(date.waitForExistence(timeout: 8), state)
+            XCTAssertTrue(date.exists || date.waitForExistence(timeout: 8), state)
             XCTAssertEqual(date.value as? String,
                            state == "expired-date" ? "2026-10-01" : state == "impossible-date" ? "2026-11-08" : "2026-12-27")
             XCTAssertTrue(app.switches["launch_outcome_maintenance"].exists)
             app.buttons["launch_outcome_cancel"].tap()
-            XCTAssertTrue(surface.waitForExistence(timeout: 8), state)
+            XCTAssertTrue(surface.exists || surface.waitForExistence(timeout: 8), state)
         case "denial", "no-data", "stale", "conflicting":
-            XCTAssertTrue(app.textFields["Weight value"].waitForExistence(timeout: 8), state)
+            let weight = app.textFields["Weight value"]
+            XCTAssertTrue(weight.exists || weight.waitForExistence(timeout: 8), state)
             app.buttons["Cancel"].tap()
-            XCTAssertTrue(surface.waitForExistence(timeout: 8), state)
+            XCTAssertTrue(surface.exists || surface.waitForExistence(timeout: 8), state)
         case "offline":
-            XCTAssertTrue(surface.waitForExistence(timeout: 8))
+            XCTAssertTrue(surface.exists || surface.waitForExistence(timeout: 8))
         default:
             let returned = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: surface)
             XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 8), .completed)
+        }
+        assertDatedCoachRecovery(in: app, state: state)
+    }
+
+    private func assertDatedCoachRecovery(in app: XCUIApplication, state: String) {
+        app.buttons["photo_timeline_root_menu"].tap()
+        let timeline = app.buttons["photo_timeline_root_nav_timeline"]
+        XCTAssertTrue(timeline.exists || timeline.waitForExistence(timeout: 5))
+        timeline.tap()
+        let composer = app.textFields["chat_composer"]
+        XCTAssertTrue(composer.exists || composer.waitForExistence(timeout: 5))
+        composer.tap()
+        composer.typeText("Review my dated outcome")
+        app.buttons["chat_send_button"].tap()
+        let coach = app.descendants(matching: .any)["launch_directive_coach"]
+        XCTAssertTrue(coach.exists || coach.waitForExistence(timeout: 8), state)
+        XCTAssertEqual(app.buttons.matching(identifier: "launch_next_action").count, 1, state)
+        let action = app.buttons["launch_next_action"]
+        if !action.isHittable {
+            app.scrollViews["launch_directive_scroll"].swipeUp()
+        }
+        XCTAssertTrue(action.isHittable, state)
+        attachScreenshot(named: "dated-coach-\(state)", from: app)
+        action.tap()
+        switch state {
+        case "denial", "no-data", "stale", "conflicting":
+            let weight = app.textFields["Weight value"]
+            XCTAssertTrue(weight.exists || weight.waitForExistence(timeout: 5), state)
+            app.buttons["Cancel"].tap()
+        case "offline":
+            XCTAssertTrue(coach.exists || coach.waitForExistence(timeout: 5))
+        default:
+            // The arithmetic-only UI fixture owns no persisted outcome revision.
+            // Even ready arithmetic must not produce an unbound saved action.
+            let date = app.textFields["launch_outcome_date"]
+            XCTAssertTrue(date.exists || date.waitForExistence(timeout: 5), state)
+            app.buttons["launch_outcome_cancel"].tap()
         }
     }
 
@@ -194,7 +302,8 @@ extension LogYourBodyUITests {
     func testDatedTimelineSwipeProvenanceOfflineRetryAndAccountIsolation() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture", "-lybUITestDatedTimelineFixture"
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture", "-lybUITestDatedTimelineFixture",
+            "-lybUITestHomeV2OfflineFixture"
         ])
         XCTAssertTrue(app.descendants(matching: .any)["dated_timeline_provenance"].waitForExistence(timeout: 15))
         app.buttons["launch_next_action"].tap()

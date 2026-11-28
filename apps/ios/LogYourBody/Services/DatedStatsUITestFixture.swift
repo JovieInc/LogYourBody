@@ -4,13 +4,23 @@ import Foundation
 /// Synthetic arithmetic and records for mounted UI states. These bounds are
 /// test-only examples and provide no production policy or certification.
 enum DatedStatsUITestFixture {
-    static func apply(owner: String, input: inout LaunchJourney.Input, metrics: inout [BodyMetrics]) {
-        let arguments = ProcessInfo.processInfo.arguments
+    private static func selectedState(_ arguments: [String]) -> LaunchJourney.RouteState? {
         guard arguments.contains("-lybUITestDatedTimelineFixture"),
               let index = arguments.firstIndex(of: "-lybUITestDatedStatsState"),
-              arguments.indices.contains(index + 1),
-              let state = LaunchJourney.RouteState(rawValue: arguments[index + 1]),
-              let now = DatedOutcome.calendarDate("2026-11-01") else { return }
+              arguments.indices.contains(index + 1) else { return nil }
+        return LaunchJourney.RouteState(rawValue: arguments[index + 1])
+    }
+
+    /// A mounted arithmetic fixture has no journal revision. Prefill only its
+    /// unsaved draft; an actual saved outcome always wins.
+    static func editorOutcome(
+        saved: DatedOutcome?, arguments: [String] = ProcessInfo.processInfo.arguments
+    ) -> DatedOutcome? {
+        if let saved { return saved }
+        return selectedState(arguments).map { outcome(for: $0) }
+    }
+
+    private static func outcome(for state: LaunchJourney.RouteState) -> DatedOutcome {
         var outcome = DatedOutcome(outcome: .init(metric: .weightKg, targetValue: 76), outcomeDate: "2026-12-27")
         if state == .impossibleDate {
             outcome.outcome.targetValue = 60
@@ -20,7 +30,16 @@ enum DatedStatsUITestFixture {
         if state == .maintenance {
             outcome.constraints.maintenance = [.init(start: "2026-11-01", end: "2026-11-14")]
         }
-        input = .init(now: now, outcome: outcome, offline: state == .offline,
+        return outcome
+    }
+
+    static func apply(
+        owner: String, input: inout LaunchJourney.Input, metrics: inout [BodyMetrics],
+        arguments: [String] = ProcessInfo.processInfo.arguments
+    ) {
+        guard let state = selectedState(arguments),
+              let now = DatedOutcome.calendarDate("2026-11-01") else { return }
+        input = .init(now: now, outcome: outcome(for: state), offline: state == .offline,
                       permissionDenied: state == .denial, safetyAvailable: state != .unsafeDate,
                       freshnessWindow: state == .stale ? nil : 365 * 24 * 60 * 60,
                       thresholds: [.weightKg: .init(minimumTarget: 40, maximumTarget: 250,

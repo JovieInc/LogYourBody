@@ -415,11 +415,9 @@ struct LogYourBodyApp: App {
 
     @MainActor
     private func scheduleDeferredMaintenance() {
+        let container = persistenceController.persistentContainer
         Task.detached(priority: .utility) {
-            let repairedCount = await CoreDataManager.shared.repairCorruptedEntries()
-            if repairedCount > 0 {
-                // print("🔧 App startup: Repaired \(repairedCount) corrupted entries")
-            }
+            await BodyMetricLaunchRepair.runOnBackgroundContext(container: container)
         }
 
         Task.detached(priority: .utility) {
@@ -840,7 +838,7 @@ struct LogYourBodyApp: App {
             isAuthenticated: authManager.isAuthenticated,
             user: user,
             hasCompletedOnboarding: OnboardingStateManager.shared.hasCompletedCurrentVersion(for: user?.id),
-            isSubscribed: subscriptionManager.isSubscribed
+            isSubscribed: subscriptionManager.isSubscribed, datedOutcomeEnabled: DatedOutcomeEntry.isEnabled()
         )
     }
 }

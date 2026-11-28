@@ -106,6 +106,15 @@ export const endpoints = {
   },
   allowlist: [
     {
+      value: 'https://linear.app/jovie/issue/LYB-273',
+      reason:
+        'Adopted native promise and outer rejection ceiling; not complete feasibility policy or a runtime endpoint.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-341',
+      reason: 'Native dated-outcome entry source and correction receipt; not a runtime endpoint.',
+    },
+    {
       value: 'https://app.bodyspec.com',
       reason:
         'LYB-246 public OpenAPI and Scalar docs for the BodySpec capability finding. Host only; not a new runtime endpoint.',
@@ -477,6 +486,10 @@ export const endpoints = {
       reason: 'LYB-44 source evidence for chart responsiveness and playhead label mapping.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-64',
+      reason: 'LYB-64 source receipt for installed-build certification evidence accounting.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-74',
       reason:
         'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.',
@@ -544,6 +557,11 @@ export const endpoints = {
       value: 'https://linear.app/jovie/issue/LYB-362',
       reason:
         'LYB-362 source evidence for normalized correction-text and classifier-level recurrence matching and internal mechanize requests.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-365',
+      reason:
+        "Tim's post-Apple sign-in initialization failure report and retained endpoint regression receipt; not a runtime endpoint.",
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet',

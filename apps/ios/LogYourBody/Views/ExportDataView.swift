@@ -12,6 +12,7 @@ struct ExportDataView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.openURL) private var openURL
     @State private var isExporting = false
+    @State private var exportFlight = LocalExportFlight()
     @State private var showShareSheet = false
     @State private var exportedFileURL: URL?
     @State private var showError = false
@@ -230,9 +231,10 @@ struct ExportDataView: View {
     // MARK: - Export Functionality
 
     private func exportData() {
-        Task {
-            await performExport()
-        }
+        guard LocalExportCoordinator.start(flight: exportFlight, operation: { @MainActor in
+            await self.performExport()
+        }) != nil else { return }
+        isExporting = true
     }
 
     private func requestExportViaEmail() {
@@ -261,13 +263,10 @@ struct ExportDataView: View {
 
     @MainActor
     private func performExport() async {
-        isExporting = true
-
+        defer { isExporting = false }
         if exportMethod == .email {
-            // Use edge function for email export
             await performEmailExport()
         } else {
-            // Use local export for direct download
             await performLocalExport()
         }
     }
@@ -302,12 +301,8 @@ struct ExportDataView: View {
             exportedFileURL = fileURL
 
             successMessage = "Your export is ready."
-            try await Task.sleep(nanoseconds: 500_000_000)
-
-            isExporting = false
             showShareSheet = true
         } catch {
-            isExporting = false
             errorMessage = error.localizedDescription
             showError = true
         }
@@ -319,128 +314,41 @@ struct ExportDataView: View {
             guard isDirectDownloadSupported else {
                 throw ExportError.unsupportedDirectDownload
             }
-
-            // Get all user data
             guard let user = authManager.currentUser else {
                 throw ExportError.noUserData
             }
 
-            // Fetch all data from Core Data
-            let bodyMetrics = await CoreDataManager.shared.fetchAllBodyMetrics(for: user.id)
-            let dailyLogs = await CoreDataManager.shared.fetchAllDailyLogs(for: user.id)
-
-            // Create export data structure
-            let exportData = ExportData(
-                exportDate: Date(),
+            let formats = localExportFormats()
+            let heightCm = user.profile?.height
+            let includePhotoFiles = includePhotos
+            let read = await CoreDataManager.shared.fetchExportValueSnapshots(for: user.id)
+            let result = try await LocalExportWork.write(LocalExportRequest(
                 user: user,
-                bodyMetrics: bodyMetrics,
-                dailyLogs: dailyLogs,
-                photoURLs: includePhotos ? extractPhotoURLs(from: bodyMetrics) : []
-            )
-
-            // Create temporary directory
-            let tempDir = FileManager.default.temporaryDirectory
-            let exportDir = tempDir.appendingPathComponent("LogYourBody_Export_\(Date().timeIntervalSince1970)")
-            try FileManager.default.createDirectory(at: exportDir, withIntermediateDirectories: true)
-
-            // Export files based on selected formats
-            var exportedFiles: [URL] = []
-
-            for format in selectedFormats {
-                switch format {
-                case .json:
-                    let jsonURL = try exportAsJSON(exportData, to: exportDir)
-                    exportedFiles.append(jsonURL)
-                case .csv:
-                    let csvURLs = try exportAsCSV(exportData, to: exportDir)
-                    exportedFiles.append(contentsOf: csvURLs)
-                }
-            }
-
-            // Download photos if requested
-            if includePhotos && !exportData.photoURLs.isEmpty {
-                let photosDir = exportDir.appendingPathComponent("photos")
-                try FileManager.default.createDirectory(at: photosDir, withIntermediateDirectories: true)
-
-                // Note: In a real implementation, you would download the photos here
-                // For now, we'll just create a manifest
-                let photoManifest = exportData.photoURLs.joined(separator: "\n")
-                let manifestURL = photosDir.appendingPathComponent("photo_urls.txt")
-                try photoManifest.write(to: manifestURL, atomically: true, encoding: .utf8)
-                exportedFiles.append(manifestURL)
-            }
-
-            guard exportedFiles.count == 1, let finalExportURL = exportedFiles.first else {
+                snapshots: read.snapshots,
+                formats: formats,
+                includePhotos: includePhotoFiles,
+                heightCm: heightCm
+            ))
+            guard case .file(let file) = result else {
                 throw ExportError.unsupportedDirectDownload
             }
-
-            // Show share sheet
-            exportedFileURL = finalExportURL
-
-            // Small delay for visual feedback
-            try await Task.sleep(nanoseconds: 500_000_000)
-
-            isExporting = false
+            exportedFileURL = file.url
             showShareSheet = true
         } catch {
-            isExporting = false
             errorMessage = error.localizedDescription
             showError = true
         }
     }
 
-    private func exportAsJSON(_ data: ExportData, to directory: URL) throws -> URL {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-
-        let jsonData = try encoder.encode(data)
-        let fileName = "LogYourBody_Export_\(formatDate(Date())).json"
-        let fileURL = directory.appendingPathComponent(fileName)
-
-        try jsonData.write(to: fileURL)
-        return fileURL
-    }
-
-    private func exportAsCSV(_ data: ExportData, to directory: URL) throws -> [URL] {
-        var urls: [URL] = []
-
-        // Export body metrics as CSV
-        let metricsCSV = createBodyMetricsCSV(from: data.bodyMetrics)
-        let metricsFileName = "body_metrics_\(formatDate(Date())).csv"
-        let metricsURL = directory.appendingPathComponent(metricsFileName)
-        try metricsCSV.write(to: metricsURL, atomically: true, encoding: .utf8)
-        urls.append(metricsURL)
-
-        // Export daily logs as CSV
-        if !data.dailyLogs.isEmpty {
-            let logsCSV = createDailyLogsCSV(from: data.dailyLogs)
-            let logsFileName = "daily_logs_\(formatDate(Date())).csv"
-            let logsURL = directory.appendingPathComponent(logsFileName)
-            try logsCSV.write(to: logsURL, atomically: true, encoding: .utf8)
-            urls.append(logsURL)
-        }
-
-        return urls
-    }
-
-    private func createBodyMetricsCSV(from metrics: [BodyMetrics]) -> String {
-        let heightCm = authManager.currentUser?.profile?.height
-        let heightInches: Double?
-        if let heightCm, heightCm > 0 {
-            heightInches = heightCm / 2.54
-        } else {
-            heightInches = nil
-        }
-        return ExportCSVBuilder.makeBodyMetricsCSV(metrics: metrics, heightInches: heightInches)
-    }
-
-    private func createDailyLogsCSV(from logs: [DailyLog]) -> String {
-        ExportCSVBuilder.makeDailyLogsCSV(logs: logs)
-    }
-
-    private func extractPhotoURLs(from metrics: [BodyMetrics]) -> [String] {
-        return metrics.compactMap { $0.photoUrl }
+    private func localExportFormats() -> Set<LocalExportFormat> {
+        Set(selectedFormats.map { format in
+            switch format {
+            case .json:
+                return LocalExportFormat.json
+            case .csv:
+                return LocalExportFormat.csv
+            }
+        })
     }
 
     private func formatDate(_ date: Date) -> String {

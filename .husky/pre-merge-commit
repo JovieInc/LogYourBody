@@ -1,0 +1,8 @@
+#!/bin/sh
+before=$(git write-tree) || exit $?
+python3 scripts/resolve-repository-docs.py --staged || exit $?
+after=$(git write-tree) || exit $?
+if [ "$before" != "$after" ]; then
+  echo "Source map refreshed; review the staged merge and run git commit." >&2
+  exit 1
+fi

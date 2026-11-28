@@ -104,14 +104,20 @@
         "LaunchJourneyTests/testBaselineDenialAndNoDataRecoverToOneAction()",
         "DatedTimelineTests/testDeniedAndInterruptedOptionalInputsAllowManualBaselineWithoutPolicy()",
         "DatedTimelineTests/testManualBodyFatAndFFMIBaselinesUseExistingInputs()",
-        "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()"
+        "LogYourBodyUITests/testDatedTimelineManualBaselineAndInterruptedPhotoReturn()",
+        "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()"
       ]
     },
     {
       "id": "launch.deadline",
       "tier": "simulator_interaction",
       "requiredCaptures": ["outcome-date"],
-      "testIds": ["LaunchJourneyTests/testDatedOutcomeSurvivesAndEditRecomputes()"]
+      "testIds": [
+        "LaunchJourneyTests/testDatedOutcomeSurvivesAndEditRecomputes()",
+        "DatedOutcomeStoreTests/testEditorSaveIsAtomicAndUnchangedSaveCreatesNoRequest()",
+        "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()",
+        "DatedOutcomeStoreTests/testRawEditorDraftPreservesConstraintsAndRejectsInvalidTextWithoutFallback()"
+      ]
     },
     {
       "id": "launch.deadline-replan",
@@ -120,14 +126,19 @@
       "testIds": [
         "LaunchJourneyTests/testDateEditRecomputesWithoutExtendingExpired()",
         "DatedOutcomeStatsTests/testDateEditsAndNewMeasurementsRetainOriginalBaseline()",
-        "DatedOutcomeStoreTests/testPlanBaselineSurvivesEditsAcknowledgementAndRelaunchWithoutWireChanges()"
+        "DatedOutcomeStoreTests/testPlanBaselineSurvivesEditsAcknowledgementAndRelaunchWithoutWireChanges()",
+        "DatedOutcomeStatsTests/testCoachDateEditRecomputesAndRetryDoesNotReplaceBaseline()",
+        "DatedOutcomeStoreTests/testEditorSaveIsAtomicAndUnchangedSaveCreatesNoRequest()"
       ]
     },
     {
       "id": "launch.directive",
       "tier": "simulator_interaction",
       "requiredCaptures": ["next-action"],
-      "testIds": ["LaunchJourneyTests/testOneNextActionForReadyPlan()"]
+      "testIds": [
+        "LaunchJourneyTests/testOneNextActionForReadyPlan()",
+        "DatedOutcomeStatsTests/testCoachFirstActionRestoresOriginalEvidenceAndWeeklyReviewOnReturn()"
+      ]
     },
     {
       "id": "launch.drift",
@@ -135,14 +146,20 @@
       "requiredCaptures": [],
       "testIds": [
         "LaunchJourneyTests/testDriftChangesTheSingleAction()",
-        "DatedOutcomeStatsTests/testDateEditsAndNewMeasurementsRetainOriginalBaseline()"
+        "DatedOutcomeStatsTests/testDateEditsAndNewMeasurementsRetainOriginalBaseline()",
+        "DatedOutcomeStatsTests/testCoachWeeklyOnTrackBehindAndAheadHoldOrReviewWithoutTrainingNumbers()",
+        "DatedOutcomeStatsTests/testCoachWeeklyFreshnessGapDoesNotChangeActionOrPretendToAdjust()"
       ]
     },
     {
       "id": "launch.memory-isolation",
       "tier": "service_integration",
       "requiredCaptures": [],
-      "testIds": ["LaunchJourneyTests/testHealthMemoryIsolationFailClosed()"]
+      "testIds": [
+        "LaunchJourneyTests/testHealthMemoryIsolationFailClosed()",
+        "DatedOutcomeStatsTests/testCoachUnavailablePlannerPolicyAndForeignMemoryFailClosed()",
+        "DatedOutcomeStoreTests/testCoachActionAndNextCheckInSurviveSQLiteReopenWithoutSyncEdit()"
+      ]
     },
     {
       "id": "launch.navigation",
@@ -157,14 +174,21 @@
         "DatedTimelineTests/testDelayedSheetActionsRejectReplacementAccountAndSessionGeneration()",
         "DatedOutcomeStoreTests/testBaselineCannotReplaceExistingRevisionOrCrossAccountSession()",
         "LogYourBodyUITests/testDatedStatsManualMeasurementDateEditExpiryAndAccountReturn()",
-        "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()"
+        "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()",
+        "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()",
+        "DatedOutcomeStoreTests/testEditorAndReconciliationCannotCrossAccountSessions()",
+        "LaunchJourneyTests/testDatedManualTrackingCanProceedWithoutAFullProfile()"
       ]
     },
     {
       "id": "launch.promise",
       "tier": "simulator_interaction",
       "requiredCaptures": ["launch-promise"],
-      "testIds": ["LaunchJourneyTests/testPromiseCopyStatesTheDate()"]
+      "testIds": [
+        "LaunchJourneyTests/testPromiseCopyStatesTheDate()",
+        "LaunchJourneyTests/testDatedOutcomeEntryUsesExistingDefaultOffPlatformGate()",
+        "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()"
+      ]
     },
     {
       "id": "launch.recovery",
@@ -187,7 +211,13 @@
         "LogYourBodyUITests/testDatedStatsExpiredDateHasOneReachableRecovery()",
         "LogYourBodyUITests/testDatedStatsMaintenanceHasOneReachableRecovery()",
         "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()",
-        "DatedOutcomeStatsTests/testNewAcceptedReadingRecoversLatestConflictWithoutReplacingExistingBaseline()"
+        "DatedOutcomeStatsTests/testNewAcceptedReadingRecoversLatestConflictWithoutReplacingExistingBaseline()",
+        "DatedOutcomeStatsTests/testCoachWeeklyFreshnessGapDoesNotChangeActionOrPretendToAdjust()",
+        "DatedOutcomeStatsTests/testEveryStatsManifestStateHasOneRecoveryAndPreservesConstraints()",
+        "DatedOutcomeStoreTests/testEditorInvalidAndFailedSaveKeepOpeningRevisionForRetry()",
+        "DatedOutcomeStoreTests/testStaleEditorCannotReplaceNewerValueOrDuplicateItsPendingRequest()",
+        "DatedOutcomeStoreTests/testConflictRetryKeepsIdentityAndExplicitReconciliationEmitsNoRequest()",
+        "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()"
       ]
     },
     {
@@ -202,7 +232,9 @@
         "DatedOutcomeStatsTests/testExpiryWinsOverDenialOfflineMissingPolicyAndMaintenance()",
         "DatedOutcomeStoreTests/testPlanBaselineSurvivesEditsAcknowledgementAndRelaunchWithoutWireChanges()",
         "LogYourBodyUITests/testDatedStatsManualMeasurementDateEditExpiryAndAccountReturn()",
-        "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()"
+        "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()",
+        "DatedOutcomeStatsTests/testCoachFirstActionRestoresOriginalEvidenceAndWeeklyReviewOnReturn()",
+        "DatedOutcomeStoreTests/testCoachActionAndNextCheckInSurviveSQLiteReopenWithoutSyncEdit()"
       ]
     },
     {
@@ -215,7 +247,10 @@
         "DatedTimelineTests/testSafetyAndMaintenanceWithMissingPolicyRecoverWithoutAdmittingPlan()",
         "DatedOutcomeStatsTests/testRateBoundaryDoesNotBypassTargetEligibilityOrIncompletePolicy()",
         "DatedOutcomeStatsTests/testUnavailablePolicyMaintenanceAndAccountReplacementNeverAdmitAPlan()",
-        "DatedOutcomeStatsTests/testAdoptedCeilingUsesCurrentAcceptedWeightAndElapsedTimeWithoutCompounding()"
+        "DatedOutcomeStatsTests/testAdoptedCeilingUsesCurrentAcceptedWeightAndElapsedTimeWithoutCompounding()",
+        "DatedOutcomeStatsTests/testCoachUnavailablePlannerPolicyAndForeignMemoryFailClosed()",
+        "LaunchJourneyTests/testAdoptedWeightCeilingRejectsBothDirectionsWithoutAdmittingPartialPolicy()",
+        "LaunchJourneyTests/testDatedAdmissionKeepsEligibilityUnavailableExpiryAndNoDataDistinct()"
       ]
     },
     {

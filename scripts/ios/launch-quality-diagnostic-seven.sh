@@ -61,7 +61,12 @@ def strict_diagnostic_cases(payload, selected, log_text):
         if case.get('result') != 'Passed':
             raise ValueError('Skipped, failed or unfinished official case')
         children = list(walk(case.get('children', [])))
-        # A single case-run leaf is understood; hidden repetitions/configurations
+        # Xcode adds named Runtime Warning leaves to passing cases. Keep them
+        # in officialCatalogue, but never count metadata as a case execution.
+        children = [node for node in children if not (
+            node['nodeType'] == 'Runtime Warning' and isinstance(node.get('name'), str)
+            and node['name'].strip() and not node.get('children') and 'result' not in node)]
+        # A single case-run node is understood; hidden repetitions/configurations
         # or a changed schema fail closed rather than inventing execution proof.
         if children and (len(children) != 1 or children[0]['nodeType'] != 'Test Case Run'
                          or children[0].get('result') != 'Passed'):

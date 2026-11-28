@@ -18,25 +18,29 @@ from _runner_routing_fixture import _REPO_ROOT, _coverage_fds, _job_block
 
 @pytest.mark.parametrize("installer", ["macos", "linux"])
 @pytest.mark.parametrize(
-    ("statuses", "fallback_statuses", "valid_archive", "checksum_matches", "success", "requests"),
+    ("statuses", "fallback_statuses", "valid_archive", "checksum_matches", "primary_corrupt", "success", "requests"),
     [
-        ((200,), (200,), True, True, True, (1, 0)),
-        ((504, 200), (200,), True, True, True, (2, 0)),
-        ((504,), (200,), True, True, True, (4, 1)),
-        ((504,), (504,), True, True, False, (4, 4)),
-        ((504,), (403,), True, True, False, (4, 4)),
-        ((504,), (403, 200), True, True, True, (4, 2)),
-        ((200,), (200,), False, True, False, (1, 0)),
-        ((200,), (200,), True, False, False, (1, 0)),
-        ((504,), (200,), True, False, False, (4, 1)),
+        ((200,), (200,), True, True, False, True, (1, 0)),
+        ((504, 200), (200,), True, True, False, True, (2, 0)),
+        ((504,), (200,), True, True, False, True, (4, 1)),
+        ((504,), (504,), True, True, False, False, (4, 4)),
+        ((504,), (403,), True, True, False, False, (4, 4)),
+        ((504,), (403, 200), True, True, False, True, (4, 2)),
+        ((200,), (200,), False, True, False, False, (1, 0)),
+        ((200,), (200,), True, False, False, False, (1, 1)),
+        ((504,), (200,), True, False, False, False, (4, 1)),
+        ((200,), (200,), True, True, True, True, (1, 1)),
+        ((200,), (504,), True, True, True, False, (1, 4)),
     ],
     ids=["success", "transient-504", "asset-api-fallback", "persistent-504",
          "forbidden-api", "transient-forbidden-api",
-         "invalid-archive", "checksum-mismatch", "fallback-checksum-mismatch"],
+         "invalid-archive", "checksum-mismatch", "fallback-checksum-mismatch",
+         "corrupt-200-recovery", "corrupt-200-unavailable-api"],
 )
 def test_swiftlint_download_handles_http_failures(
     tmp_path: Path, installer: str, statuses: tuple[int, ...], fallback_statuses: tuple[int, ...],
-    valid_archive: bool, checksum_matches: bool, success: bool, requests: tuple[int, int],
+    valid_archive: bool, checksum_matches: bool, primary_corrupt: bool,
+    success: bool, requests: tuple[int, int],
 ) -> None:
     action = (_REPO_ROOT / ".github/actions/setup-ios-build/action.yml").read_text()
     version = re.search(r'SWIFTLINT_VERSION="([^"]+)"', action)[1]
@@ -82,11 +86,13 @@ def test_swiftlint_download_handles_http_failures(
                     status = 403
             headers_observed.append((self.path, self.headers.get("Authorization")))
             observed.append(self.path)
+            response = (b"upstream proxy error" if primary_corrupt and self.path == "/swiftlint.zip"
+                        else payload)
             self.send_response(status)
-            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Content-Length", str(len(response)))
             self.end_headers()
             # Even a valid ZIP in an HTTP error response must never be installed.
-            self.wfile.write(payload)
+            self.wfile.write(response)
 
         def log_message(self, *_args: object) -> None:
             pass

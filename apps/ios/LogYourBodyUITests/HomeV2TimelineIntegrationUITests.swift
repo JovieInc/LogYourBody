@@ -47,16 +47,14 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
                 scrim.waitForExistence(timeout: 5),
                 "Each single menu tap must open the sidebar. Hierarchy: \(app.debugDescription)"
             )
-            scrim.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-            XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))
+            dismissSidebar(scrim, in: app)
             XCTAssertEqual(pager.value as? String, "Entry 1 of 1")
             XCTAssertFalse(app.staticTexts["home_v2_photo_scrub_mode"].exists)
         }
         let start = menu.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 280, dy: 22))
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -220, dy: 0)))
         XCTAssertTrue(scrim.waitForExistence(timeout: 5), "Header swipes must still open the sidebar")
-        scrim.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-        XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))
+        dismissSidebar(scrim, in: app)
         app.buttons["home_v2_context_button"].tap()
         XCTAssertTrue(
             app.staticTexts["home_v2_context"].waitForExistence(timeout: 5),
@@ -187,6 +185,22 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         XCTAssertEqual(caption.label, firstCaption)
     }
 
+    private func dismissSidebar(_ scrim: XCUIElement, in app: XCUIApplication) {
+        let window = app.windows.firstMatch
+        var previousFrame = CGRect.null
+        // A cover can exist before presentation settles. Verify two native
+        // frame samples before sending the one dismissal tap from the window.
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            guard scrim.exists, scrim.isHittable else { return false }
+            let frame = scrim.frame
+            defer { previousFrame = frame }
+            return !frame.isEmpty && window.frame.contains(frame) && frame == previousFrame
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))
+    }
+
     private func revealTimelineSteps(_ target: XCUIElement, in app: XCUIApplication) {
         let viewport = timelineViewport(in: app)
         let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
@@ -235,6 +249,92 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
             "Today must stay on today's entry after history loads"
         )
         XCTAssertEqual(pager.value as? String, "Entry 1 of 1")
+    }
+
+    func testStageFrameMatchesAcrossPhotoEmptyLoadingFailedAndOffline() {
+        let photo = launchHome([
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture", "-lybUITestSuppressWhatsNew"
+        ])
+        let photoCard = visibleCard(photo, id: "home_v2_photo_stage")
+        let photoFrame = photoCard.frame
+        XCTAssertGreaterThan(photoFrame.width, 100)
+        let window = photo.windows.firstMatch.frame
+        if window.contains(photoFrame) {
+            XCTAssertEqual(photoFrame.height, photoFrame.width / (4.0 / 5.0), accuracy: 2)
+        }
+        XCTAssertTrue(photo.buttons["photo_timeline_root_menu"].exists)
+        XCTAssertTrue(photo.buttons["home_v2_view_progress"].exists)
+        XCTAssertTrue(photo.buttons["home_v2_log_weight"].exists)
+
+        let empty = launchHome([
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture", "-lybUITestSuppressWhatsNew"
+        ])
+        assertMatches(visibleCard(empty, id: "home_v2_editorial_card"), photoFrame)
+        XCTAssertTrue(empty.buttons["home_v2_log_weight"].exists)
+
+        let offline = launchHome([
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture",
+            "-lybUITestHomeV2OfflineFixture", "-lybUITestSuppressWhatsNew"
+        ])
+        XCTAssertTrue(offline.descendants(matching: .any)["home_v2_offline_banner"].waitForExistence(timeout: 30))
+        assertMatches(visibleCard(offline, id: "home_v2_editorial_card"), photoFrame)
+        XCTAssertTrue(offline.buttons["home_v2_log_weight"].exists)
+
+        let failed = launchHome([
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestHomeV2PhotoLoadFailedFixture", "-lybUITestSuppressWhatsNew"
+        ])
+        let failedCard = visibleCard(failed, id: "home_v2_photo_stage")
+        let unavailable = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "Photo unavailable"), object: failedCard
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [unavailable], timeout: 8), .completed)
+        assertMatches(failedCard, photoFrame)
+
+        let loading = launchHome([
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2LoadingFixture",
+            "-lybUITestSuppressWhatsNew"
+        ])
+        XCTAssertTrue(loading.descendants(matching: .any)["home_v2_loading"].waitForExistence(timeout: 30))
+        let dock = loading.buttons["home_v2_loading_dock"]
+        XCTAssertTrue(dock.waitForExistence(timeout: 5))
+        XCTAssertFalse(dock.isEnabled)
+        XCTAssertTrue(loading.buttons["photo_timeline_root_menu"].exists)
+        assertMatches(visibleCard(loading, id: "home_v2_editorial_card"), photoFrame)
+    }
+
+    private func launchHome(_ arguments: [String]) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = arguments
+        app.launch()
+        return app
+    }
+
+    private func visibleCard(_ app: XCUIApplication, id: String) -> XCUIElement {
+        let cards = app.descendants(matching: .any).matching(identifier: id)
+        XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 30), id)
+        let window = app.windows.firstMatch.frame
+        var chosen = cards.firstMatch
+        var best: CGFloat = -1
+        for index in 0..<cards.count {
+            let card = cards.element(boundBy: index)
+            guard card.exists, card.frame.width > 1, card.frame.height > 1 else { continue }
+            let intersection = card.frame.intersection(window)
+            let area = max(intersection.width, 0) * max(intersection.height, 0)
+            if area > best {
+                best = area
+                chosen = card
+            }
+        }
+        XCTAssertGreaterThan(best, 1, id)
+        return chosen
+    }
+
+    private func assertMatches(
+        _ card: XCUIElement, _ reference: CGRect, file: StaticString = #filePath, line: UInt = #line
+    ) {
+        XCTAssertEqual(card.frame.width, reference.width, accuracy: 1, file: file, line: line)
+        XCTAssertEqual(card.frame.height, reference.height, accuracy: 1, file: file, line: line)
     }
 
     private func launch(largestText: Bool = false, withSteps: Bool = false, holdScrub: Bool = false) -> XCUIApplication {
@@ -306,5 +406,50 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    func testNoPhotoAndLoadingKeepThePhotoStageBounds() {
+        let photo = launchStage(fixture: "-lybUITestHomeV2PhotoFixture")
+        let photoCard = photo.descendants(matching: .any)["home_v2_editorial_card"]
+        let photoFrame = photoCard.frame
+        XCTAssertGreaterThan(photoFrame.width, 1)
+        XCTAssertGreaterThan(photoFrame.height, 1)
+        XCTAssertFalse(photo.buttons["launch_timeline_add_photo"].exists)
+        photo.terminate()
+
+        let metrics = launchStage(fixture: "-lybUITestHomeV2Fixture")
+        let metricsCard = metrics.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertEqual(metricsCard.frame.width, photoFrame.width, accuracy: 1)
+        XCTAssertEqual(metricsCard.frame.height, photoFrame.height, accuracy: 1)
+        XCTAssertTrue(metrics.descendants(matching: .any)["home_v2_body_fat_graphic"].exists)
+        let add = metrics.buttons["launch_timeline_add_photo"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.tap()
+        let sheet = metrics.descendants(matching: .any)["progress_photo_attach_sheet"]
+        XCTAssertTrue(sheet.waitForExistence(timeout: 8))
+        metrics.buttons["progress_photo_attach_cancel_button"].tap()
+        metrics.terminate()
+
+        let empty = launchStage(fixture: "-lybUITestHomeV2EmptyFixture")
+        let emptyCard = empty.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertEqual(emptyCard.frame.width, photoFrame.width, accuracy: 1)
+        XCTAssertEqual(emptyCard.frame.height, photoFrame.height, accuracy: 1)
+        XCTAssertTrue(empty.buttons["launch_timeline_add_photo"].exists)
+        empty.terminate()
+
+        let loading = launchStage(fixture: "-lybUITestHomeV2Fixture", state: "Loading")
+        let loadingCard = loading.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertEqual(loadingCard.frame.width, photoFrame.width, accuracy: 1)
+        XCTAssertEqual(loadingCard.frame.height, photoFrame.height, accuracy: 1)
+        XCTAssertFalse(loading.buttons["home_v2_loading_dock"].isEnabled)
+    }
+
+    private func launchStage(fixture: String, state: String? = nil) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture", fixture, "-lybUITestSuppressWhatsNew"]
+        if let state { app.launchArguments.append("-lybUITestHomeV2\(state)Fixture") }
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 30))
+        return app
     }
 }

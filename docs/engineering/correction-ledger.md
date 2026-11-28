@@ -77,6 +77,23 @@ records, preserves rule ids and recurrence counts, and replaces stale saved labe
 with the first feasible level. Missing or wholly infeasible assessments fail
 instead of defaulting to human review. This pure operation emits no checks.
 
+`correctionPyramidCoverage` (LYB-363) in the same module accepts classified ledger
+rows and returns `levels` counts for `codebase`, `static`, `prose`, and `human`,
+plus `total`, `mechanized`, and `mechanizedShare`. Mechanized means codebase or
+lint/typecheck/CI (`static`); its share is `(codebase + static) / total` on a 0–1
+scale. An empty ledger returns all zero counts and a zero share. Each row counts
+once regardless of its recurrence count. This pure metric reads saved levels
+without checking guard files or changing the existing guard-coverage report,
+CI gates, or UI.
+
+The single [coverage-floor decision (LYB-364)](../../packages/shared-lib/correction-coverage-floor.json)
+records the recommended default: no absolute percentage floor; fail only when
+the unrounded `correctionPyramidCoverage.mechanizedShare` is lower than the last
+recorded baseline. Equal or higher shares pass this floor rule. The decision is
+inactive and reserves a default-off feature gate. The guard-coverage CI child
+owns enforcement, baseline recording and flag wiring; this record adds no CI
+job or metric implementation and preserves existing coverage and guard checks.
+
 For a merge conflict in the ledger, run
 `node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger` before
 staging it. The resolver retains receipts from both Git conflict stages and

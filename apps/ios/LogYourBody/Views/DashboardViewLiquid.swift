@@ -49,6 +49,7 @@ struct DashboardViewLiquid: View {
     @State var metricEntriesCache: [MetricType: MetricEntriesPayload] = [:]
     @State var fullChartCache: [MetricType: [MetricChartDataPoint]] = [:]
     @State var fullTrendChartCache: [MetricType: [MetricChartDataPoint]] = [:]
+    @State var statsSeriesStore = MetricStatsSeriesStore()
     @State var metricCacheBuildID = UUID()
     @State private var metricCacheRefreshTask: Task<Void, Never>?
     @State var glp1DoseLogs: [Glp1DoseLog] = []
@@ -273,6 +274,7 @@ struct DashboardViewLiquid: View {
                 invalidateDashboardShareContext()
                 syncBannerDismissTask?.cancel()
                 metricCacheRefreshTask?.cancel()
+                statsSeriesStore.cancelRefresh()
                 metricCacheBuildID = UUID()
                 datedTimelineRefreshTask?.cancel()
             }
@@ -317,10 +319,9 @@ struct DashboardViewLiquid: View {
                 selectedPhotoTimelineRootPage = Self.pageAfterAccountChange()
                 isHomeV2MetricProvenancePresented = false
                 metricCacheRefreshTask?.cancel()
+                statsSeriesStore.cancelRefresh()
                 metricCacheBuildID = UUID()
-                fullChartCache = [:]
-                fullTrendChartCache = [:]
-                metricEntriesCache = [:]
+                clearPublishedChartCaches(publishingEmpty: true)
                 reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
             }
             .onChange(of: selectedRange) { _, newValue in
@@ -331,9 +332,8 @@ struct DashboardViewLiquid: View {
                 // discard them immediately when Settings changes units so a
                 // returning user cannot see a mixed kg/lbs detail screen while
                 // the next cache build completes.
-                fullChartCache = [:]
-                fullTrendChartCache = [:]
-                metricEntriesCache = [:]
+                statsSeriesStore.invalidate()
+                clearPublishedChartCaches(publishingEmpty: false)
                 scheduleMetricCacheRefresh()
             }
             .onChange(of: selectedIndex) { _, newIndex in
@@ -594,16 +594,38 @@ struct DashboardViewLiquid: View {
         }
     }
 
+    func clearPublishedChartCaches(publishingEmpty: Bool) {
+        fullChartCache = [:]
+        fullTrendChartCache = [:]
+        metricEntriesCache = [:]
+        if publishingEmpty {
+            statsSeriesStore.publishEmpty()
+        } else {
+            statsSeriesStore.markRefreshing()
+        }
+    }
+
     @MainActor
     func scheduleMetricCacheRefresh() {
         // Published values arrive before the model finishes updating its sorted
         // history. Coalesce that burst and snapshot only after the update completes.
+        let generation = statsSeriesStore.beginRefresh()
         metricCacheBuildID = UUID()
         metricCacheRefreshTask?.cancel()
         metricCacheRefreshTask = Task { @MainActor in
+            defer { statsSeriesStore.endRefresh(generation) }
             await Task.yield()
             guard !Task.isCancelled else { return }
             await prewarmMetricCaches()
+        }
+    }
+
+    /// Body evaluation must not cancel an in-flight prewarm.
+    func scheduleMetricCacheRefreshIfIdle() {
+        guard !statsSeriesStore.isRefreshInFlight else { return }
+        Task { @MainActor in
+            guard !statsSeriesStore.isRefreshInFlight else { return }
+            scheduleMetricCacheRefresh()
         }
     }
 

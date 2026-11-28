@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -6,13 +7,16 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { lintArguments } from './pre-commit-lint.mjs';
-import './resolve-repository-docs.test.mjs';
+import { resolver, sourceMapFixture } from './resolve-repository-docs.test.mjs';
+import './resolve-repository-docs-json.test.mjs';
 import './resolve-repository-docs-dependency.test.mjs';
+import './resolve-repository-docs-index-flags.test.mjs';
 import './resolve-repository-docs-ledger.test.mjs';
 import './resolve-repository-docs-pin.test.mjs';
 import './resolve-repository-docs-project.test.mjs';
 import './resolve-repository-docs-pin-union.test.mjs';
 import './resolve-repository-docs-manifest.test.mjs';
+import './resolve-repository-docs-merged-dependency.test.mjs';
 
 const env = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
@@ -24,6 +28,104 @@ const env = {
   GIT_CONFIG_GLOBAL: '/dev/null',
 };
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, env, encoding: 'utf8' }).trim();
+
+test('clean merge hook stages a stale source map and stops for a reviewed commit', (t) => {
+  const f = sourceMapFixture(t);
+  f.git('switch', '-q', 'theirs');
+  fs.writeFileSync(path.join(f.root, 'unrelated.txt'), 'incoming\n');
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  fs.writeFileSync(path.join(f.root, 'a.txt'), 'bot change\n');
+  f.commit();
+  const check = () => spawnSync('python3', [resolver.replace('resolve-repository-docs.py', 'repository_docs.py'),
+    '--root', f.root], { env, encoding: 'utf8' });
+  assert.notEqual(check().status, 0, 'fixture reproduces stale source projection');
+  fs.mkdirSync(path.join(f.root, 'scripts'));
+  const scripts = path.dirname(resolver);
+  for (const file of fs.readdirSync(scripts).filter((name) => name.endsWith('.py'))) {
+    fs.copyFileSync(path.join(scripts, file), path.join(f.root, 'scripts', file));
+  }
+  fs.mkdirSync(path.join(f.root, 'hooks'));
+  fs.copyFileSync(fileURLToPath(new URL('../.husky/pre-merge-commit', import.meta.url)),
+    path.join(f.root, 'hooks/pre-merge-commit'));
+  fs.chmodSync(path.join(f.root, 'hooks/pre-merge-commit'), 0o755);
+  fs.appendFileSync(path.join(f.root, '.git/info/exclude'), '\nscripts/\nhooks/\n');
+  f.git('config', 'core.hooksPath', 'hooks');
+  const merge = spawnSync('git', ['merge', '--no-edit', 'theirs'], { cwd: f.root, env, encoding: 'utf8' });
+  assert.notEqual(merge.status, 0, 'Git must not commit its already prepared stale tree');
+  assert.match(merge.stderr, /Source map refreshed/);
+  assert.equal(check().status, 0, check().stdout + check().stderr);
+  assert.match(f.git('show', ':SOURCES.md'), new RegExp(createHash('sha256').update('bot change\n').digest('hex')));
+  f.git('commit', '-qm', 'finish merge');
+  assert.match(f.git('show', 'HEAD:SOURCES.md'), new RegExp(createHash('sha256').update('bot change\n').digest('hex')));
+  f.git('switch', '-qc', 'next');
+  fs.writeFileSync(path.join(f.root, 'next.txt'), 'next\n');
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  fs.writeFileSync(path.join(f.root, 'ours.txt'), 'ours\n');
+  f.commit();
+  const cleanMerge = spawnSync('git', ['merge', '--no-edit', 'next'], { cwd: f.root, env, encoding: 'utf8' });
+  assert.equal(cleanMerge.status, 0, cleanMerge.stdout + cleanMerge.stderr);
+  assert.equal(check().status, 0, check().stdout + check().stderr);
+});
+
+for (const change of ['edit', 'delete', 'create']) {
+  test(`staged Bundler source-map repair preserves a concurrent projection ${change}`, (t) => {
+    const f = sourceMapFixture(t);
+    const lockfile = 'apps/ios/Gemfile.lock';
+    fs.mkdirSync(path.dirname(path.join(f.root, lockfile)), { recursive: true });
+    const originalLock = 'GEM\n  specs:\n    addressable (2.9.0)\n';
+    const bumpedLock = originalLock.replace('2.9.0', '2.9.1');
+    fs.writeFileSync(path.join(f.root, lockfile), originalLock);
+    const configPath = path.join(f.root, 'repository-docs.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    config.sources.push({ path: lockfile, purpose: 'Bundler dependencies' });
+    fs.writeFileSync(configPath, JSON.stringify(config));
+    f.generate();
+    f.commit();
+    if (change === 'create') f.git('rm', f.output);
+    fs.writeFileSync(path.join(f.root, lockfile), bumpedLock);
+    f.git('add', lockfile);
+    const index = f.git('ls-files', '--stage');
+    const priorProjection = f.git('show', 'HEAD:SOURCES.md');
+    const realGit = execFileSync('which', ['git'], { env, encoding: 'utf8' }).trim();
+    fs.mkdirSync(path.join(f.root, 'bin'));
+    fs.writeFileSync(path.join(f.root, 'bin/git'), `#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+result = subprocess.run([${JSON.stringify(realGit)}, *sys.argv[1:]]).returncode
+if sys.argv[1:] == ['show', ':${lockfile}'] and not Path('changed-once').exists():
+    output = Path('SOURCES.md')
+    ${change === 'delete' ? 'output.unlink()' : "output.write_text('Concurrent projection edit\\n')"}
+    Path('changed-once').touch()
+sys.exit(result)
+`, { mode: 0o755 });
+    const repair = () => spawnSync('python3', [resolver, '--root', f.root, '--staged'], {
+      env: { ...env, PATH: `${path.join(f.root, 'bin')}:${env.PATH}` }, encoding: 'utf8',
+    });
+    const refused = repair();
+    assert.notEqual(refused.status, 0, 'rendering must not overwrite another writer');
+    assert.match(refused.stderr, /projection changed during generation/);
+    assert.equal(f.git('ls-files', '--stage'), index);
+    assert.equal(fs.existsSync(path.join(f.root, f.output)), change !== 'delete');
+    if (change !== 'delete') {
+      assert.equal(fs.readFileSync(path.join(f.root, f.output), 'utf8'), 'Concurrent projection edit\n');
+    }
+    f.git('add', f.output);
+    const retried = repair();
+    assert.equal(retried.status, 0, retried.stderr);
+    assert.equal(f.git('show', `:${lockfile}`), bumpedLock);
+    const projection = f.git('show', ':SOURCES.md');
+    assert.notEqual(projection, priorProjection);
+    assert.ok(projection.includes(createHash('sha256').update(bumpedLock).digest('hex')));
+    const check = spawnSync('python3', [resolver.replace('resolve-repository-docs.py', 'repository_docs.py'),
+      '--root', f.root], { env, encoding: 'utf8' });
+    assert.equal(check.status, 0, check.stdout + check.stderr);
+    const repairedIndex = f.git('ls-files', '--stage');
+    assert.equal(repair().status, 0, 'reviewed repair remains idempotent');
+    assert.equal(f.git('ls-files', '--stage'), repairedIndex);
+  });
+}
 
 function fixture(t, verified = true) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'lyb-merge-lint-'));

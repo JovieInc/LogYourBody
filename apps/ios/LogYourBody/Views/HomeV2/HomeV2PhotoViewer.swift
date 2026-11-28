@@ -44,6 +44,7 @@ struct HomeV2PhotoViewer: View {
     let onTool: (HomeV2PhotoTool) -> Void
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.displayScale) private var displayScale
     @State private var showsDetails = false
     @State private var showsTools = false
     @State private var pendingTool: HomeV2PhotoTool?
@@ -145,10 +146,14 @@ struct HomeV2PhotoViewer: View {
             around: position,
             urls: chronological.map { bodyMetrics[$0].photoUrl }
         )
+        guard let pixels = ProgressPhotoImagePipeline.targetMaxPixelSize(points: target, scale: displayScale) else {
+            return
+        }
         for url in urls {
             guard !Task.isCancelled else { return }
             if SubjectPlateStore.shared.scrubImage(for: url, target: target) != nil { continue }
-            guard let image = await ImageCacheService.shared.loadImage(from: url), !Task.isCancelled else { continue }
+            guard let image = await ImageCacheService.shared.loadImage(from: url, maxPixelSize: pixels),
+                  !Task.isCancelled else { continue }
             _ = await SubjectPlateStore.shared.prepare(
                 urlString: url, image: image, target: target, retaining: urls
             )

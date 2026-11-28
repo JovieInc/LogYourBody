@@ -405,3 +405,59 @@ assert Path('pnpm-lock.yaml').read_text() == 'reviewed bot resolutions\\n'
     assert.equal(f.git('ls-files', '--stage'), index);
   });
 }
+
+for (const mutation of ['additive', 'deleted', 'reordered']) {
+  test(`launch binding union checks ${mutation} parent selectors`, (t) => {
+    const f = manifestRepo(t);
+    const binding = 'scripts/fixtures/lyb-launch-route-bindings.json';
+    const generated = 'scripts/fixtures/lyb-launch-route-manifest.json';
+    mkdirSync(dirname(join(f.root, binding)), { recursive: true });
+    const write = (ids, label) => {
+      writeFileSync(join(f.root, binding), JSON.stringify({ 'launch.deadline': ids }) + '\n');
+      writeFileSync(join(f.root, generated), JSON.stringify({ testIds: ids, label }) + '\n');
+      f.git('add', binding, generated);
+      f.git('commit', '-qm', label);
+    };
+    const base = ['Journey/testFirst()', 'Journey/testSecond()'];
+    write(base, 'base');
+    f.git('switch', '-qc', 'incoming');
+    const incoming = mutation === 'deleted' ? [base[0], 'Journey/testIncoming()']
+      : mutation === 'reordered' ? [...base].reverse().concat('Journey/testIncoming()')
+        : [...base, 'Journey/testIncoming()'];
+    write(incoming, 'incoming');
+    f.git('switch', '-q', 'feature');
+    const branch = [...base, 'Journey/testBranch()'];
+    write(branch, 'branch');
+    const merged = spawnSync('git', ['merge', '--no-commit', 'incoming'], { cwd: f.root, env });
+    assert.equal(merged.status, 1, 'real binding and generated-manifest conflicts are required');
+    const beforeBinding = readFileSync(join(f.root, binding));
+    const beforeGenerated = readFileSync(join(f.root, generated));
+    const index = f.git('ls-files', '--stage');
+    const run = (mode) => spawnSync('python3', [resolver, '--root', f.root, mode], { env, encoding: 'utf8' });
+    const result = run('--union-manifests');
+    if (mutation !== 'additive') {
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /additive manifest union keeps every parent test input/);
+      assert.deepEqual(readFileSync(join(f.root, binding)), beforeBinding);
+      assert.equal(f.git('ls-files', '--stage'), index);
+    } else {
+      assert.equal(result.status, 0, result.stderr);
+      const retained = JSON.parse(f.git('show', `:${binding}`))['launch.deadline'];
+      assert.deepEqual(new Set(retained), new Set([...branch, ...incoming]));
+      assert.deepEqual(retained.slice(0, 2), base);
+      assert.equal(f.git('diff', '--name-only', '--diff-filter=U').trim(), generated);
+      assert.equal(run('--union-manifests').status, 0, 'union remains retryable before generation');
+      writeFileSync(join(f.root, binding), JSON.stringify({ 'launch.deadline': branch }));
+      f.git('add', binding);
+      const dropped = run('--staged');
+      assert.notEqual(dropped.status, 0, 'staging only one parent cannot hide lost tests');
+      assert.match(dropped.stderr, /additive manifest union keeps every parent test input/);
+      writeFileSync(join(f.root, binding), '{}\n');
+      f.git('add', binding);
+      const missingPath = run('--staged');
+      assert.notEqual(missingPath.status, 0, 'dropping a whole launch path cannot hide lost tests');
+      assert.match(missingPath.stderr, /additive manifest union keeps every parent test input/);
+    }
+    assert.deepEqual(readFileSync(join(f.root, generated)), beforeGenerated, 'regenerate from reviewed bindings explicitly');
+  });
+}

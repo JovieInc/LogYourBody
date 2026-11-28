@@ -3,9 +3,42 @@ import * as Sentry from '@sentry/nextjs';
 import {
   captureSyntheticError,
   initSentry,
+  isThirdPartyExtensionError,
+  prepareSentryEvent,
   redactSentryEvent,
   sentryRuntimeConfig,
 } from '../sentry';
+
+/** LOG-YOUR-BODY-WEB-2: extension rejection on `/`, with no application frame. */
+function extensionToLowerCaseEvent(): Sentry.ErrorEvent {
+  return {
+    type: undefined,
+    exception: {
+      values: [
+        {
+          type: 'TypeError',
+          value: "Cannot read properties of undefined (reading 'toLowerCase')",
+          mechanism: {
+            type: 'auto.browser.global_handlers.onunhandledrejection',
+            handled: false,
+          },
+          stacktrace: {
+            frames: [
+              { filename: 'ext:core/01_core.js', abs_path: 'ext:core/01_core.js', in_app: true },
+              { filename: '<script>', abs_path: '<script>', in_app: true },
+              {
+                filename: '<obscura:bootstrap>',
+                abs_path: '<obscura:bootstrap>',
+                in_app: true,
+              },
+              { filename: '<script>', abs_path: '<script>', function: 'sN', in_app: true },
+            ],
+          },
+        },
+      ],
+    },
+  };
+}
 
 describe('sentry adapter', () => {
   afterEach(async () => {
@@ -54,6 +87,54 @@ describe('sentry adapter', () => {
       queues: false,
       stackFrameVariables: false,
     });
+  });
+
+  it('drops the homepage extension toLowerCase rejection', () => {
+    const event = extensionToLowerCaseEvent();
+    expect(isThirdPartyExtensionError(event)).toBe(true);
+    expect(prepareSentryEvent(event)).toBeNull();
+  });
+
+  it('drops a chrome-extension stack that has no application frame', () => {
+    const event = extensionToLowerCaseEvent();
+    event.exception!.values![0].stacktrace = {
+      frames: [
+        { filename: 'chrome-extension://abc/content.js', in_app: true },
+        { filename: '<script>', in_app: true },
+      ],
+    };
+    expect(prepareSentryEvent(event)).toBeNull();
+  });
+
+  it('keeps the same toLowerCase error when an application frame is present', () => {
+    const event = extensionToLowerCaseEvent();
+    event.exception?.values?.[0].stacktrace?.frames?.push({
+      filename: 'https://www.logyourbody.com/_next/static/chunks/app/page.js',
+      abs_path: 'https://www.logyourbody.com/_next/static/chunks/app/page.js',
+      in_app: true,
+    });
+    expect(isThirdPartyExtensionError(event)).toBe(false);
+    expect(prepareSentryEvent(event)?.exception?.values?.[0].value).toContain('toLowerCase');
+  });
+
+  it('keeps an inline script error that has no extension runtime frame', () => {
+    const event = extensionToLowerCaseEvent();
+    event.exception!.values![0].stacktrace = {
+      frames: [{ filename: '<script>', abs_path: '<script>', function: 'sN', in_app: true }],
+    };
+    expect(prepareSentryEvent(event)?.exception?.values?.[0].type).toBe('TypeError');
+  });
+
+  it('keeps an error that has no stack to classify', () => {
+    const event = extensionToLowerCaseEvent();
+    delete event.exception?.values?.[0].stacktrace;
+    expect(prepareSentryEvent(event)?.exception?.values?.[0].value).toContain('toLowerCase');
+  });
+
+  it('installs the extension filter on the Sentry client', () => {
+    initSentry({ dsn: 'https://k@o0.ingest.sentry.io/1' });
+    const beforeSend = Sentry.getClient()?.getOptions().beforeSend;
+    expect(beforeSend?.(extensionToLowerCaseEvent(), {})).toBeNull();
   });
 
   it('strips user, cookies, bodies and credential headers', () => {

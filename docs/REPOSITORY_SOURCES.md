@@ -22,13 +22,13 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `86c9b97d1058a55f4e972f97dbeb88fe579a904b1f763df28b2a8af948e67022`)
 - `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e0bb808dbf7af075758496e127915b978f7927d73d168c6df71bb9b4d284e56a`)
 - `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `23eb9e1bc0b2b2cc62bc426403226c5471b12de6c0a645177cc27d4706aeedbd`)
-- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `345695942021d445210fd765248e6222c80078dfcc631ddc4558f85127995891`)
+- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `763aaeb7df1fcee734539387162bb7a1eb6d97d60045fdd4788fbf287cb0fecf`)
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf3cd24d39d6ff980d4bbc77b5ac72c1aa00aaeb7e92065e7bd467397ac1ac51`)
 - `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `ddc9efbe68915f529f7b828c7df5a88a00b14d20883e4e7ac9268b9278780110`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `65acff97014a9f95d69c9addee251c6dbb4775e14ea8a0695aff6a4ce501cda0`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b19bc8af3d101848df43c691f736c28c5b9abdfa0ed9723b708d35af9983ccb9`)
 
 ### `apps/web/package.json`: engines
 
@@ -72,7 +72,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@ai-sdk/elevenlabs": "^3.0.80",
+  "@ai-sdk/elevenlabs": "^3.0.81",
   "@ai-sdk/gateway": "^4.0.137",
   "@headlessui/react": "^2.2.10",
   "@hookform/resolvers": "^5.9.1",
@@ -89,16 +89,16 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-dialog": "^1.1.23",
   "@radix-ui/react-dropdown-menu": "^2.1.24",
   "@radix-ui/react-hover-card": "^1.1.24",
-  "@radix-ui/react-label": "^2.1.15",
+  "@radix-ui/react-label": "^2.1.17",
   "@radix-ui/react-menubar": "^1.2.1",
-  "@radix-ui/react-navigation-menu": "^1.2.22",
+  "@radix-ui/react-navigation-menu": "^1.4.1",
   "@radix-ui/react-popover": "^1.1.23",
   "@radix-ui/react-progress": "^1.2.1",
   "@radix-ui/react-radio-group": "^1.5.1",
   "@radix-ui/react-scroll-area": "^1.2.18",
   "@radix-ui/react-select": "^2.3.8",
   "@radix-ui/react-separator": "^1.2.0",
-  "@radix-ui/react-slider": "^1.4.7",
+  "@radix-ui/react-slider": "^1.6.1",
   "@radix-ui/react-slot": "^1.3.3",
   "@radix-ui/react-switch": "^1.4.1",
   "@radix-ui/react-tabs": "^1.1.22",
@@ -110,7 +110,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@sentry/nextjs": "^11.9.0",
   "@statsig/js-client": "^3.33.7",
   "@statsig/statsig-node-core": "0.24.2",
-  "@tailwindcss/postcss": "^4.3.3",
+  "@tailwindcss/postcss": "^4.3.5",
   "@tailwindcss/typography": "^0.5.20",
   "@tanstack/react-query": "^5.104.5",
   "@types/react-syntax-highlighter": "^15.5.13",
@@ -127,11 +127,11 @@ A changed fingerprint requires review of its related documentation; it does not 
   "glob": "^14.0.2",
   "idb": "^8.0.4",
   "input-otp": "^1.5.0",
-  "jose": "^6.2.14",
+  "jose": "^6.2.15",
   "js-yaml": "5.4.3",
   "lodash": "^4.18.1",
   "lucide-react": "^1.55.0",
-  "next": "15.5.28",
+  "next": "15.5.29",
   "next-themes": "^0.4.6",
   "openai": "^7.38.0",
   "pdf-lib": "^1.17.1",
@@ -144,7 +144,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "react-markdown": "^10.1.0",
   "react-resizable-panels": "^3.0.6",
   "react-syntax-highlighter": "^16.1.2",
-  "read-excel-file": "^6.0.3",
+  "read-excel-file": "^9.3.14",
   "recharts": "^3.10.1",
   "server-only": "^0.0.1",
   "sonner": "^2.0.8",
@@ -167,7 +167,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@testing-library/dom": "^10.4.2",
   "@testing-library/jest-dom": "^6.9.1",
   "@testing-library/react": "^16.3.3",
-  "@testing-library/user-event": "^14.6.8",
+  "@testing-library/user-event": "^14.6.13",
   "@types/jest": "^30.0.0",
   "@types/js-yaml": "4.0.9",
   "@types/lodash": "^4.17.27",
@@ -182,7 +182,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "eslint-plugin-jsx-a11y": "^6.10.2",
   "jest": "^30.5.2",
   "jest-environment-jsdom": "^30.5.2",
-  "playwright": "^1.63.0",
+  "playwright": "^1.65.0",
   "postcss": "^8.5.30",
   "tailwindcss": "^4.3.3",
   "tsx": "^4.23.15",
@@ -190,7 +190,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `753bf047595be8a3bd599d2248db44c6297df59133d473378de54d886a7d4bd2`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `60db11f2c8455cf6bb137b8cb0073f788820f6c4c1c615b8757f41a1db240866`)
 
 ### `package.json`: packageManager
 
@@ -271,7 +271,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 {
   "@commitlint/cli": "^19.8.1",
   "@commitlint/config-conventional": "^21.2.3",
-  "@typescript-eslint/eslint-plugin": "^8.71.0",
+  "@typescript-eslint/eslint-plugin": "^8.71.2",
   "@typescript-eslint/parser": "^8.71.0",
   "eslint": "^9.39.5",
   "eslint-config-prettier": "^9.1.2",
@@ -282,10 +282,10 @@ A changed fingerprint requires review of its related documentation; it does not 
   "lint-staged": "^15.5.2",
   "prettier": "^3.9.10",
   "prettier-plugin-tailwindcss": "^0.8.1",
-  "rollup": "^4.65.0",
+  "rollup": "^4.67.5",
   "turbo": "^2.11.9",
   "typescript": "^5.9.3",
-  "vitest": "^5.0.5"
+  "vitest": "^5.1.0"
 }
 ```
 
@@ -325,7 +325,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/product-registry/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1a424be8f931f22855a53e0b20c61342d5012a9c34fa8011c08ad9c409683e43`)
+- `packages/product-registry/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a7af4f5df690199f38ee522d697f57a1138868ebbf565089cf51f2ceb61318b5`)
 
 ### `packages/product-registry/package.json`: scripts
 
@@ -346,7 +346,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@typescript-eslint/eslint-plugin": "^8.71.0",
+  "@typescript-eslint/eslint-plugin": "^8.71.2",
   "@typescript-eslint/parser": "^8.71.0",
   "eslint": "^9.39.5",
   "prettier": "^3.9.10",
@@ -354,7 +354,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `4a867438a0446f0f9f0282d4de217bd2216eb4f6687be1d6350744c20a94dcfc`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `70426c30534b712cb4f1c3f0d5c9898c6c0982fa755ad21afa93a20fed65bdf3`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -362,7 +362,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 {
   "build": "tsc -p tsconfig.json",
   "lint": "eslint --ext .js,.jsx,.ts,.tsx src",
-  "test": "vitest run --maxWorkers=1 --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs ../../.github/scripts/web-production-smoke.test.mjs ../../.github/scripts/verify-public-build-env.test.mjs ../../.github/scripts/signing-expiry.test.mjs ../../.github/scripts/signing-expiry-client.test.mjs ../../.github/scripts/release-signing-provisioned.test.mjs",
+  "test": "vitest run --maxWorkers=1 --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/lyb-uptime-probe.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs ../../.github/scripts/web-production-smoke.test.mjs ../../.github/scripts/verify-public-build-env.test.mjs ../../.github/scripts/signing-expiry.test.mjs ../../.github/scripts/signing-expiry-client.test.mjs ../../.github/scripts/release-signing-provisioned.test.mjs",
   "test:mutation": "node ../../scripts/mutation/run.mjs",
   "typecheck": "tsc --noEmit -p tsconfig.json"
 }
@@ -373,7 +373,8 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@typescript-eslint/eslint-plugin": "^8.71.0",
+  "@types/node": "^22.20.4",
+  "@typescript-eslint/eslint-plugin": "^8.71.2",
   "@typescript-eslint/parser": "^8.71.0",
   "eslint": "^9.39.5",
   "eslint-config-prettier": "^9.1.2",
@@ -381,18 +382,18 @@ A changed fingerprint requires review of its related documentation; it does not 
   "eslint-plugin-react": "^7.37.5",
   "eslint-plugin-react-hooks": "^5.2.0",
   "typescript": "^5.9.3",
-  "vitest": "^5.0.5"
+  "vitest": "^5.1.0"
 }
 ```
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fc5a43b2fed86c3144518403ef49c0b5e2f5709099b2233d7c3db4a4d2f0ae5b`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `aad5b4ee6f4b7754189f2fa3e775f7f96e6db3e792706466eb60dbbb269108df`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `e2aa2e7f4c083546646d0c809080da94348e0b86723487eabf6959a3e8d25950`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
-- `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
+- `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `97f00f67ae13b4f9d54680778af3eb7ad02d75a5e297373a65a0885520c45e65`)
 - `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `0722ee4fa655352cc58f210eaa74b159705dc705506228e38a302d9b82422f59`)
+- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `f94e3e1b6eba651b21c064b0ce52c5c858e94f940ce1daedf9f2cf5bd563711e`)
 - `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `87941ea0acf0ad3f0bf3e729c0c3ca6b33f66b191c838d84bfe18954291587c4`)
 
 ## Pinned shared sources
