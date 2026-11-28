@@ -5,10 +5,45 @@ import Vision
 
 @MainActor
 final class BodyScoreShareExportTests: XCTestCase {
-    private final class Barrier {
-        var continuation: CheckedContinuation<Void, Never>?
-        func wait() async { await withCheckedContinuation { continuation = $0 } }
-        func resume() { continuation?.resume(); continuation = nil }
+    /// One resume, including when the waiter and the test race or the barrier is dropped.
+    /// A leaked checked continuation aborts the launch-quality host even after XCTest restarts.
+    private final class Barrier: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<Void, Never>?
+        private var resumed = false
+        private var waiting = false
+
+        var isWaiting: Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return waiting
+        }
+
+        func wait() async {
+            await withCheckedContinuation { (pending: CheckedContinuation<Void, Never>) in
+                lock.lock()
+                if resumed {
+                    lock.unlock()
+                    pending.resume()
+                    return
+                }
+                continuation = pending
+                waiting = true
+                lock.unlock()
+            }
+        }
+
+        func resume() {
+            lock.lock()
+            let pending = continuation
+            continuation = nil
+            waiting = false
+            resumed = true
+            lock.unlock()
+            pending?.resume()
+        }
+
+        deinit { resume() }
     }
 
     func testRapidDoubleTapAcknowledgesSynchronouslyAndSavesExactlyOnce() async {
@@ -30,7 +65,7 @@ final class BodyScoreShareExportTests: XCTestCase {
         XCTAssertEqual(exporter.state, .preparing)
         XCTAssertTrue(exporter.isBusy)
         for _ in 0..<100 { exporter.start(.save, snapshot: snapshot, isCurrent: { true }) }
-        await waitUntil { barrier.continuation != nil }
+        await waitUntil { barrier.isWaiting }
         XCTAssertEqual(preparations, 1)
         barrier.resume()
         await waitUntil { !exporter.isBusy }
@@ -59,7 +94,7 @@ final class BodyScoreShareExportTests: XCTestCase {
                 return snapshot
             }, render: { _ in captures += 1; return UIImage() })
             exporter.start(.share, snapshot: makeSnapshot(), isCurrent: { true })
-            await waitUntil { barrier.continuation != nil }
+            await waitUntil { barrier.isWaiting }
             exporter.reconcile(edit)
             for _ in 0..<100 { exporter.start(.share, snapshot: edit, isCurrent: { true }) }
             XCTAssertEqual(exporter.state, .cancelled)
@@ -81,7 +116,7 @@ final class BodyScoreShareExportTests: XCTestCase {
             return url
         }, remove: { removed.append($0) })
         exporter.start(.share, snapshot: makeSnapshot(), isCurrent: { true })
-        await waitUntil { barrier.continuation != nil }
+        await waitUntil { barrier.isWaiting }
         exporter.invalidate()
         barrier.resume()
         await waitUntil { !exporter.isBusy }
@@ -100,7 +135,7 @@ final class BodyScoreShareExportTests: XCTestCase {
         })
         let snapshot = makeSnapshot()
         exporter.start(.save, snapshot: snapshot, isCurrent: { true })
-        await waitUntil { barrier.continuation != nil }
+        await waitUntil { barrier.isWaiting }
         XCTAssertEqual(exporter.state, .saving)
         exporter.reconcile(makeSnapshot(score: "91"))
         barrier.resume()
@@ -196,7 +231,7 @@ final class BodyScoreShareExportTests: XCTestCase {
                 return .authorized
             }, write: { writes += 1; return true })
         }
-        await waitUntil { barrier.continuation != nil }
+        await waitUntil { barrier.isWaiting }
         owns = false
         barrier.resume()
         let cancelled = await task.value
@@ -219,7 +254,7 @@ final class BodyScoreShareExportTests: XCTestCase {
             completed = true
             return result
         }
-        await waitUntil { writeBarrier.continuation != nil }
+        await waitUntil { writeBarrier.isWaiting }
         XCTAssertFalse(completed)
         writeBarrier.resume()
         let saved = await pendingWrite.value
@@ -365,7 +400,7 @@ final class BodyScoreShareExportTests: XCTestCase {
             return URL(fileURLWithPath: "/tmp/synthetic-share.png")
         })
         exporter.start(.share, snapshot: makeSnapshot(), isCurrent: { true })
-        await waitUntil { barrier.continuation != nil }
+        await waitUntil { barrier.isWaiting }
         XCTAssertNotNil(rendered)
         exporter.invalidate()
         barrier.resume()

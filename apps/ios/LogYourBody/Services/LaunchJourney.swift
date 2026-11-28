@@ -1,11 +1,30 @@
 import Foundation
 
-/// Approved launch copy: JovieInc/Jovie#21838 at 197a96ff21c53cb4ccd8f6c1e3d733058b8c1cf7.
+/// Native copy table (LYB-286). Legacy strings: JovieInc/Jovie#21838
+/// at 197a96ff21c53cb4ccd8f6c1e3d733058b8c1cf7.
 enum LaunchPromiseCopy {
+    // LYB-273 adopted decision, 2026-10-30. The older contract copy remains for gate-off users.
+    static let datedOutcomePromise = "Pick a date. We build the plan backward from it and adjust every week."
     static let headline = "Your body-composition goal, planned around your next date."
     static let explanation =
         "Set an outcome and a date. LogYourBody follows your photos and measurements, spots drift, and gives you one next action."
     static let framing = "Dates guide the plan. They do not guarantee a result."
+
+    @MainActor
+    static var nativeHeadline: String { DatedOutcomeEntry.isEnabled() ? datedOutcomePromise : headline }
+}
+
+enum DatedOutcomeEntry {
+    @MainActor
+    static func isEnabled(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        checkGate: ((String) -> Bool)? = nil
+    ) -> Bool {
+        #if DEBUG
+        if arguments.contains("-lybUITestDatedOutcomeEntryFixture") { return true }
+        #endif
+        return (checkGate ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) })(DatedOutcomeStore.featureGate)
+    }
 }
 
 /// Dated launch decision for timeline, body score, and Jovi. Optional GLP-1 and
@@ -78,8 +97,13 @@ enum LaunchJourney {
         var thresholds: [DatedOutcome.Metric: OutcomeFeasibility.Thresholds] = [:]
         /// Nil means no approved kilogram rate. The weight planner then fails closed.
         var safeWeeklyChangeKg: ClosedRange<Double>?
+        var planBaseline: DatedOutcome.PlanBaseline?
+        var usesLatestConflictOnly = false
         var glp1Disclosed = false
         var dexaPresent = false
+        /// Gate-on admission also requires positively established eligibility.
+        var enforcesDatedOutcomeDecision = false
+        var isEligible: Bool?
     }
 
     static func presentations(for input: Input) -> [Presentation] {
@@ -126,10 +150,7 @@ enum LaunchJourney {
             return (.noData, Action(title: "Set an outcome and a date", detail: LaunchPromiseCopy.explanation))
         }
         let metricReadings = usable.filter { $0.metric == outcome.outcome.metric }
-        let feasibility = OutcomeFeasibility(now: input.now, thresholds: input.thresholds)
-            .classify(outcome: outcome, history: metricReadings.map {
-                OutcomeFeasibility.Measurement(date: $0.date, metric: $0.metric, value: $0.value)
-            })
+        let feasibility = classify(outcome, input: input, readings: metricReadings)
         switch feasibility {
         case .expired:
             return (.expiredDate, Action(
@@ -141,10 +162,12 @@ enum LaunchJourney {
         case .impossible:
             return (.impossibleDate, Action(
                 title: "Choose a later date or a closer outcome",
-                detail: "This date cannot be reached safely. \(outcome.outcomeDate) was not moved."
+                detail: input.enforcesDatedOutcomeDecision
+                    ? "No plan is available for this date and target. \(outcome.outcomeDate) was not moved."
+                    : "This date cannot be reached safely. \(outcome.outcomeDate) was not moved."
             ))
         case .noData, .ok:
-            if conflicts(metricReadings) {
+            if conflicts(metricReadings, latestOnly: input.usesLatestConflictOnly) {
                 return (.conflicting, Action(
                     title: "Record one new measurement",
                     detail: "Two values share a time. Record one measurement for \(outcome.outcomeDate)."
@@ -153,7 +176,9 @@ enum LaunchJourney {
             if feasibility == .noData {
                 return (.noData, Action(
                     title: "Add one measurement",
-                    detail: "One measurement starts the plan for \(outcome.outcomeDate)."
+                    detail: input.enforcesDatedOutcomeDecision
+                    ? "One measurement starts tracking for \(outcome.outcomeDate)."
+                    : "One measurement starts the plan for \(outcome.outcomeDate)."
                 ))
             }
             if stale(metricReadings, now: input.now, window: input.freshnessWindow) {
@@ -178,23 +203,30 @@ enum LaunchJourney {
         }
     }
 
+    /// Integration of LYB-273's rejection ceiling, never a replacement for the
+    /// classifier's complete reviewed policy. Callers prepare readings off-main.
+    static func classify(_ outcome: DatedOutcome, input: Input, readings: [Reading]) -> OutcomeFeasibility.Classification {
+        let result = OutcomeFeasibility(now: input.now, thresholds: input.thresholds)
+            .classify(outcome: outcome, history: readings.map {
+                .init(date: $0.date, metric: $0.metric, value: $0.value)
+            })
+        guard input.enforcesDatedOutcomeDecision, result != .expired else { return result }
+        guard input.isEligible == true, input.safetyAvailable else { return .unsafe }
+        guard result == .ok, outcome.outcome.metric == .weightKg else { return result }
+        guard let latest = readings.filter({
+            $0.metric == .weightKg && $0.date <= input.now && $0.value.isFinite && $0.value > 0
+        }).max(by: { $0.date < $1.date }),
+              let deadline = DatedOutcome.calendarDate(outcome.outcomeDate) else { return .unsafe }
+        let weeks = deadline.timeIntervalSince(input.now) / 604_800
+        let percentPerWeek = 100 * abs(outcome.outcome.targetValue - latest.value) / (latest.value * weeks)
+        guard percentPerWeek.isFinite else { return .unsafe }
+        return percentPerWeek > 1 ? .impossible : .ok
+    }
+
     private static func weightPlan(
         _ outcome: DatedOutcome, readings: [Reading], input: Input
     ) -> (state: RouteState, action: Action) {
-        guard let start = readings.min(by: { $0.date < $1.date }),
-              let deadline = DatedOutcome.calendarDate(outcome.outcomeDate) else {
-            return unsafe(outcome)
-        }
-        let plan = BackwardPlanner(safeWeeklyChangeKg: input.safeWeeklyChangeKg).plan(
-            outcome: .init(
-                startDate: start.date,
-                startingWeightKg: start.value,
-                targetWeightKg: outcome.outcome.targetValue,
-                targetDate: deadline
-            ),
-            history: readings.map { .init(date: $0.date, weightKg: $0.value) },
-            now: input.now
-        )
+        guard let plan = weightPlanResult(outcome, readings: readings, input: input) else { return unsafe(outcome) }
         switch plan.status {
         case .onTrack, .ahead:
             return (.ready, Action(title: "Hold the plan", detail: "The date stays \(outcome.outcomeDate)."))
@@ -216,7 +248,9 @@ enum LaunchJourney {
         case .needsMeasurement:
             return (.noData, Action(
                 title: "Add one measurement",
-                detail: "One measurement starts the plan for \(outcome.outcomeDate)."
+                detail: input.enforcesDatedOutcomeDecision
+                    ? "One measurement starts tracking for \(outcome.outcomeDate)."
+                    : "One measurement starts the plan for \(outcome.outcomeDate)."
             ))
         case .conflictingMeasurements:
             return (.conflicting, Action(
@@ -228,6 +262,26 @@ enum LaunchJourney {
         }
     }
 
+    /// Shared original-baseline projection for the directive and goal-relative stats.
+    /// A new check-in never becomes a replacement baseline.
+    static func weightPlanResult(_ outcome: DatedOutcome, readings: [Reading], input: Input) -> BackwardPlanner.Plan? {
+        let baseline = input.planBaseline.map { Reading(date: $0.date, metric: $0.metric, value: $0.value) }
+        guard let start = baseline ?? readings.min(by: { $0.date < $1.date }),
+              start.metric == outcome.outcome.metric, readings.contains(start),
+              !readings.contains(where: { $0.date == start.date && $0.value != start.value }),
+              let deadline = DatedOutcome.calendarDate(outcome.outcomeDate) else { return nil }
+        return BackwardPlanner(safeWeeklyChangeKg: input.safeWeeklyChangeKg).plan(
+            outcome: .init(
+                startDate: start.date,
+                startingWeightKg: start.value,
+                targetWeightKg: outcome.outcome.targetValue,
+                targetDate: deadline
+            ),
+            history: readings.map { .init(date: $0.date, weightKg: $0.value) },
+            now: input.now
+        )
+    }
+
     private static func unsafe(_ outcome: DatedOutcome) -> (state: RouteState, action: Action) {
         (.unsafeDate, Action(
             title: "Revise the outcome",
@@ -235,9 +289,10 @@ enum LaunchJourney {
         ))
     }
 
-    static func conflicts(_ readings: [Reading]) -> Bool {
+    static func conflicts(_ readings: [Reading], latestOnly: Bool = false) -> Bool {
+        let latest = latestOnly ? readings.map(\.date).max() : nil
         var seen: [Date: Double] = [:]
-        for reading in readings {
+        for reading in readings where latest == nil || reading.date == latest {
             if let prior = seen[reading.date], prior != reading.value { return true }
             seen[reading.date] = reading.value
         }
@@ -281,8 +336,8 @@ enum LaunchJourney {
     }
 }
 
-struct HealthMemoryClaim: Equatable {
-    enum Provenance: String, Equatable {
+struct HealthMemoryClaim: Codable, Equatable, Sendable {
+    enum Provenance: String, Codable, Equatable, Sendable {
         case measured, engineDerived, userDeclared, coachInferred
     }
 
@@ -294,18 +349,32 @@ struct HealthMemoryClaim: Equatable {
 }
 
 struct HealthMemoryStore {
+    /// Partition fields. A read matches every field, so dropping one allows a cross read.
+    static let isolationKeyFields = ["userId", "productId"]
+    /// Result code when the safety check cannot run. That result has no memory payload.
+    static let failClosedCode = "safetyUnavailable"
+
     private(set) var claims: [HealthMemoryClaim] = []
 
     enum Retrieval: Equatable {
         case records([HealthMemoryClaim])
         case safetyUnavailable
         case isolated
+
+        var code: String {
+            switch self {
+            case .records: return "records"
+            case .safetyUnavailable: return HealthMemoryStore.failClosedCode
+            case .isolated: return "isolated"
+            }
+        }
     }
 
     @discardableResult
-    mutating func remember(_ claim: HealthMemoryClaim) -> Bool {
+    mutating func remember(_ claim: HealthMemoryClaim, safetyAvailable: Bool) -> Bool {
+        guard safetyAvailable else { return false }
         let text = claim.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !claim.userId.isEmpty, claim.productId == LaunchJourney.productId, !text.isEmpty else { return false }
+        guard Self.complete(userId: claim.userId, productId: claim.productId), !text.isEmpty else { return false }
         claims.append(HealthMemoryClaim(
             userId: claim.userId, productId: claim.productId, text: text,
             provenance: claim.provenance, recordedAt: claim.recordedAt
@@ -315,11 +384,29 @@ struct HealthMemoryStore {
 
     func retrieve(userId: String, productId: String, safetyAvailable: Bool) -> Retrieval {
         guard safetyAvailable else { return .safetyUnavailable }
-        guard !userId.isEmpty, productId == LaunchJourney.productId else { return .isolated }
-        return .records(claims.filter { $0.userId == userId && $0.productId == productId })
+        guard Self.complete(userId: userId, productId: productId) else { return .isolated }
+        return .records(claims.filter { Self.matches($0, userId: userId, productId: productId) })
     }
 
     mutating func clearUser(_ userId: String) {
         claims.removeAll { $0.userId == userId }
+    }
+
+    private static func fields(userId: String, productId: String) -> [String: String] {
+        ["userId": userId, "productId": productId]
+    }
+
+    private static func complete(userId: String, productId: String) -> Bool {
+        let values = fields(userId: userId, productId: productId)
+        return isolationKeyFields.allSatisfy { !(values[$0] ?? "").isEmpty }
+    }
+
+    private static func matches(_ claim: HealthMemoryClaim, userId: String, productId: String) -> Bool {
+        let stored = fields(userId: claim.userId, productId: claim.productId)
+        let requested = fields(userId: userId, productId: productId)
+        return isolationKeyFields.allSatisfy { field in
+            guard let left = stored[field], let right = requested[field] else { return false }
+            return left == right
+        }
     }
 }

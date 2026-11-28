@@ -144,11 +144,28 @@ enum Configuration {
         // www: the apex domain 307-redirects to www, and URLSession strips the
         // Authorization header on cross-host redirects, which breaks session
         // registration ("account could not be initialized").
-        stringValue(for: "API_BASE_URL", default: ProductRegistry.Hosts.api)
+        canonicalAPIBaseURL(stringValue(for: "API_BASE_URL", default: ProductRegistry.Hosts.api))
     }
 
     static var apiExpectedHost: String {
-        stringValue(for: "API_EXPECTED_HOST")
+        canonicalAPIHost(stringValue(for: "API_EXPECTED_HOST"))
+    }
+
+    static func canonicalAPIHost(_ host: String) -> String {
+        let canonical = ProductRegistry.Hosts.apiHost
+        guard canonical.hasPrefix("www."),
+              host.lowercased() == String(canonical.dropFirst(4)) else { return host }
+        return canonical
+    }
+
+    /// Older release overrides can still name the apex, which loses bearer auth on redirect.
+    static func canonicalAPIBaseURL(_ value: String) -> String {
+        guard var url = URLComponents(string: value), url.scheme?.lowercased() == "https",
+              let host = url.host, canonicalAPIHost(host) != host,
+              url.port == nil || url.port == 443,
+              url.user == nil, url.password == nil else { return value }
+        url.host = canonicalAPIHost(host)
+        return url.string ?? value
     }
 
     // MARK: - First-party authentication

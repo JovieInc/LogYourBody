@@ -211,4 +211,3 @@ export function loadExerciseVariantRecord(raw: unknown): LoadedExerciseVariant {
       : OMITTED_LOAD_TOLERANCE,
   };
 }
-

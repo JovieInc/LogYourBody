@@ -3,6 +3,14 @@
 require "json"
 require "net/http"
 require "tmpdir"
+require_relative "../../app-store-release-health"
+
+if JSON.parse(ARGV.fetch(0)) == "preflight"
+  # Load the same libraries and initialize signing before timed behavior cases.
+  OpenSSL::PKey::EC.generate("prime256v1")
+  puts JSON.generate(ready: true)
+  exit
+end
 
 $LOADED_FEATURES << "jwt.rb"
 module JWT

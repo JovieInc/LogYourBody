@@ -66,12 +66,12 @@ function jobBlock(name) {
   return end === -1 ? rest : rest.slice(0, end + 1);
 }
 
-function runSummaryGate({ signing, signingResult, signingConclusion, fork }) {
+function runSummaryGate({ signing, signingResult, signingConclusion, fork, event = 'pull_request', detectionResult = 'success' }) {
   const block = jobBlock('ci-summary');
   const script = block.slice(block.indexOf('run: |') + 'run: |'.length).split('\n').map((line) => line.replace(/^ {10}/, '')).join('\n');
   const values = {
-    'github.event_name': 'pull_request',
-    'needs.detect-changes.result': 'success',
+    'github.event_name': event,
+    'needs.detect-changes.result': detectionResult,
     'needs.mac-runner-routing-tests.result': 'success',
     'needs.detect-changes.outputs.web': 'false',
     'needs.detect-changes.outputs.ios_unit': 'false',
@@ -82,7 +82,7 @@ function runSummaryGate({ signing, signingResult, signingConclusion, fork }) {
     'needs.ios.result': 'skipped',
     'needs.ios_quality.result': 'skipped',
     'needs.ios_static.result': 'skipped',
-    'needs.ios_storekit.result': 'skipped',
+    'needs.ios_storekit.result': event === 'push' ? 'success' : 'skipped',
     'needs.detect-changes.outputs.signing': signing,
     'needs.release-signing.result': signingResult,
     'needs.release-signing.outputs.conclusion': signingConclusion,
@@ -131,6 +131,16 @@ test('CI Summary requires release signing only when signing inputs change', () =
   assert.notEqual(runSummaryGate({ signing: 'true', signingResult: 'skipped', signingConclusion: '', fork: 'false' }), 0);
   assert.equal(runSummaryGate({ signing: 'true', signingResult: 'success', signingConclusion: 'neutral', fork: 'true' }), 0);
   assert.notEqual(runSummaryGate({ signing: 'true', signingResult: 'success', signingConclusion: 'success', fork: 'true' }), 0);
+});
+
+test('Company Guards blocking detection fails the real CI Summary shell on every event', () => {
+  const unchanged = { signing: 'false', signingResult: 'skipped', signingConclusion: '', fork: 'false' };
+  for (const event of ['pull_request', 'merge_group', 'push']) {
+    assert.equal(runSummaryGate({ ...unchanged, event }), 0, `${event}: successful detection`);
+    for (const detectionResult of ['skipped', 'failure', 'cancelled', '']) {
+      assert.equal(runSummaryGate({ ...unchanged, event, detectionResult }), 1, `${event}: ${detectionResult || 'missing'} detection`);
+    }
+  }
 });
 
 test('ci.yml wires the release signing job and keeps its tests with change detection', () => {

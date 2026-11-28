@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
+import { homePhotoStageFindings } from './home-stage-reservation';
 
 const read = (path: string) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8');
 const home = 'apps/ios/LogYourBody/Views/HomeV2/';
@@ -13,7 +14,17 @@ it('composes the glass filmstrip inside the existing ruler and selection callbac
   expect(ruler).toContain('onSelect(index)');
   expect(ruler).not.toMatch(/@State[^\n]*(?:selected|selection)/);
   expect(surface).toContain('photoURLs: timeline.metrics.reversed().map(\\.photoUrl)');
-  expect(surface).toContain('height: geometry.size.width / HomeV2Tokens.photoAspectRatio');
+  const states = read(`${home}HomeV2SystemStates.swift`);
+  expect(states).toContain('HomeV2StageReservation.size(');
+  expect(states).toContain('.homeV2ReservedStage(');
+  expect(states).not.toContain('height: geometry.size.width / HomeV2Tokens.photoAspectRatio');
+  expect(
+    homePhotoStageFindings(
+      surface,
+      read(`${home}HomeV2Tokens.swift`),
+      read(`${home}HomeV2Policy.swift`),
+    ),
+  ).toEqual([]);
   expect(viewer).toContain('photoURLs: chronological.map { bodyMetrics[$0].photoUrl }');
   const strip = surface.slice(
     surface.indexOf('struct HomeV2Filmstrip: View'),
@@ -27,6 +38,39 @@ it('composes the glass filmstrip inside the existing ruler and selection callbac
   const ui = read('apps/ios/LogYourBodyUITests/HomeV2PhotoViewerLayoutUITests.swift');
   expect(ui).toContain('assertGlassFilmstripKeepsPhotoDateAndWeightTogether(in: app)');
   expect(ui).toContain('"-lybUITestGlassFilmstrip"');
+});
+
+it('rejects a Home card that leaves the shared photo-stage reservation', () => {
+  const layout =
+    'static func stageHeight(width: CGFloat, height: CGFloat) -> CGFloat {\n' +
+    'let fourByFive = width / HomeV2Tokens.photoAspectRatio\n' +
+    'return min(fourByFive, available)\n}';
+  const inline = 'height: geometry.size.width / HomeV2Tokens.photoAspectRatio';
+  const reserved = 'enum HomeV2StageReservation {} func homeV2ReservedStage';
+  expect(homePhotoStageFindings(inline, reserved, layout)).toContain(
+    'HomeV2Surface sizes the timeline outside HomeV2StageReservation',
+  );
+  const surface = 'HomeV2StageReservation.size(\nhasPhoto ? .photo : .noPhoto\n';
+  const dropped =
+    'enum HomeV2StageReservation { case .photo, .noPhoto, .loading, .failedLoad, .offline: height = 1 } func homeV2ReservedStage';
+  expect(homePhotoStageFindings(surface, dropped, layout)).toEqual([
+    'HomeV2StageReservation drops HomeV2Tokens.photoAspectRatio',
+  ]);
+  const widthOnly =
+    'enum HomeV2StageReservation { case .photo, .noPhoto, .loading, .failedLoad, .offline:\n' +
+    'height = safeWidth / HomeV2Tokens.photoAspectRatio } func homeV2ReservedStage';
+  expect(homePhotoStageFindings(surface, widthOnly, layout)).toEqual([
+    'HomeV2StageReservation drops HomeV2Tokens.photoAspectRatio',
+  ]);
+  const shared =
+    'enum HomeV2StageReservation { switch presentation { case .photo, .noPhoto, .loading, .failedLoad, .offline:\n' +
+    'break } let height = HomeV2Layout.stageHeight(\n} func homeV2ReservedStage';
+  const bareLayout =
+    'static func stageHeight(width: CGFloat, height: CGFloat) -> CGFloat {\n' +
+    'return min(fourByFive, available)\n}';
+  expect(homePhotoStageFindings(surface, shared, bareLayout)).toEqual([
+    'HomeV2StageReservation drops HomeV2Tokens.photoAspectRatio',
+  ]);
 });
 
 it('decodes filmstrip images directly to thumbnail pixels and isolates their cache entries', () => {

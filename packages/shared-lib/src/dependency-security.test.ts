@@ -17,6 +17,27 @@ function expectAtLeast(version: string, minimum: string) {
 }
 
 describe('Dependabot security update resolution', () => {
+  it('keeps web React and React DOM dependency ranges in lockstep', () => {
+    const manifest = JSON.parse(readFileSync(new URL('apps/web/package.json', root), 'utf8'));
+    expect(manifest.dependencies.react).toBe(manifest.dependencies['react-dom']);
+  });
+
+  it('renders HTML with the installed web React and React DOM pair', () => {
+    const webRequire = createRequire(new URL('apps/web/package.json', root));
+    const react = webRequire('react');
+    const { renderToString } = webRequire('react-dom/server');
+
+    expect(renderToString(react.createElement('p', null, 'React dependency probe'))).toBe(
+      '<p>React dependency probe</p>',
+    );
+  });
+
+  it('shares the web React runtime with workspace UI components', () => {
+    const webRequire = createRequire(new URL('apps/web/package.json', root));
+    const uiRequire = createRequire(new URL('packages/jovie-ui/package.json', root));
+    expect(uiRequire('react')).toBe(webRequire('react'));
+  });
+
   it.each([
     ['fast-uri', '3.1.9'],
     ['glob', '14.0.2'],

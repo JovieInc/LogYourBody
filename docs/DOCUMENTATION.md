@@ -36,15 +36,19 @@ other file is unmerged or a shared import fails parity. It stages only the
 generated output; review the source diff before committing.
 
 When a merged Xcode project changes the diagnostic workflow's exact project pin,
-stage the merged project. If that workflow conflict differs only by the pin,
-pass the merged project's digest. The resolver writes that pin and rebuilds a
-conflicted source map from the index, ignoring unstaged source bytes. It refuses
-a digest that does not match the staged project, a merged project that dropped
-a parent file membership, any other workflow difference, and every other
-unmerged path.
+stage the merged project and pass its digest. The resolver keeps branch workflow
+lines, a one-sided reviewed audit pin, and dependency lines added by only one
+parent. Divergent audit pins also need `--reviewed-audit-sha256`. It writes
+those pins and rebuilds a conflicted source map from the index, ignoring
+unstaged source bytes. It refuses a digest that does not match the staged
+project or audit, a merged project that dropped a parent file membership or
+changed a new parent build-file mapping, any other workflow difference, and
+every other unmerged path.
 
 ```sh
-python3 scripts/resolve-repository-docs.py --reviewed-project-sha256 <reviewed-merged-project-sha256>
+python3 scripts/resolve-repository-docs.py \
+  --reviewed-project-sha256 <reviewed-merged-project-sha256> \
+  --reviewed-audit-sha256 <reviewed-merged-audit-sha256>
 ```
 
 Staging the workflow yourself, with one project-pin line, still works. This
@@ -60,12 +64,24 @@ source edits, and refuses unstaged projection edits or pinned-source drift.
 Bot commits created outside local hooks still need this refresh during repair;
 CI continues to reject stale output.
 
+The pre-merge-commit hook runs the same staged repair for clean automatic
+merges, which do not invoke pre-commit. If it changes the map, it stops the
+merge so the staged result can be reviewed and committed: Git has already
+prepared the automatic merge tree before this hook runs. Conflicted merges use
+pre-commit after resolution. Both paths retain the resolver's protections.
+
+Staged repair also refuses a projection edited, deleted or created while sources
+are rendering, preserving that change and the index. Review and stage the edits,
+then retry `--staged`; this also refreshes fingerprints for Bundler lockfile bumps.
+
 When the generated source map and correction ledger both conflict, resolve and
 stage the source inputs, then run the same `--staged` command before the ledger
 resolver. Pre-commit uses that order so a conflicted projection cannot make the
 ledger check fail closed before the projection is rebuilt. It rebuilds only the
 conflicted projection from stage-zero inputs and leaves unrelated conflicts
-untouched. A conflicted input still fails without changing the projection or
+untouched. `--union-manifests` also unions additive launch-audit sibling
+registrations in the parent audit, its Python expectation, and the shared-lib
+input list; any other conflict in those files still refuses the merge. A conflicted input still fails without changing the projection or
 index; ordinary unstaged projection edits remain protected.
 
 For dependency bumps with an already updated lockfile, run
@@ -75,12 +91,50 @@ lifecycle scripts disabled) before regenerating and staging only the source map.
 It retains the refusal of unstaged dependency/output edits and pinned-source drift
 without re-resolving unrelated dependencies.
 
+If dependency release notes contain HTML code spans that the mention guard
+misreads, run `python3 scripts/resolve-repository-docs.py --dependency-pr-body body.md`
+to print a proposed Markdown body. This preserves prose mentions and existing
+Markdown code, refuses ambiguous HTML code, and never edits or publishes the PR.
+The proposal includes exactly one `Machine:` line naming this repair command;
+duplicate or conflicting machine and waiver metadata is refused before output.
+Review the output and run the pinned company mention guard before the harness
+applies it; the normal guard remains required.
+
+Both dependency modes also require staged `repository-docs.json` changes before
+invoking pnpm, keeping parity checks and output selection on reviewed configuration.
+Both modes rebuild a conflicted source map from staged sources after frozen
+dependency verification. Failed verification preserves the conflict stages and
+artifact bytes for retry; resolve source conflicts before using either mode.
+Both dependency modes render the source map from the Git index, preserving
+unrelated unstaged source edits without fingerprinting them. Refresh mode stages
+the lockfile and projection together; verify mode stages only the projection.
+
 For dependency PRs, stage the reviewed manifests and run
 `python3 scripts/resolve-repository-docs.py --refresh-lockfile`. This explicit
 repair first verifies the existing lockfile offline with pinned Corepack pnpm.
 Only a confirmed manifest mismatch (`ERR_PNPM_OUTDATED_LOCKFILE`) triggers
 regeneration without lifecycle scripts and a second frozen offline check.
 Valid lockfiles keep their resolutions; other installation failures stop repair.
+Both dependency repair modes refuse index or manifest edits made while pnpm is
+verifying inputs. They preserve those edits and restore the original generated
+artifacts; stage the reviewed inputs and retry the same command.
+Staged projection generation also rechecks the index before writing. Dependency
+repair carries the verified index through rendering, so an observed concurrent
+staged edit cannot leave the source map describing an older manifest. Review the
+changed inputs and retry; the other writer's staged edit remains intact.
+Both dependency modes also compare the verified lockfile bytes after rendering
+and before writing or staging artifacts. Lockfile changes during rendering refuse
+repair and restore the original artifacts; retry uses the reviewed inputs.
+Tracked dependency edits during rendering also refuse repair before artifact
+writes or staging. The edits remain available for review; stage them and retry
+the same command.
+Both modes recheck for new untracked or ignored dependency inputs after verification
+and rendering, before writing artifacts. A newly created hook, npmrc file, patch or
+manifest refuses repair; the local file survives and generated artifacts are restored.
+Frozen verification also refuses lockfile changes before regenerating or staging
+the source map. Filtered worktree hashes reject assume-unchanged and skip-worktree
+edits that a diff listing omits. Only a confirmed outdated lockfile permits refresh
+mode to write new resolutions; retrying after a refusal uses the original reviewed artifacts.
 If resolution, frozen verification, projection generation or Git staging fails,
 the helper restores the original lockfile and projection bytes (or absence) so
 the same command can be retried without manual cleanup. Another writer's index
@@ -88,6 +142,14 @@ lock and unrelated edits remain untouched.
 It then stages the lockfile and source map, refusing unresolved source conflicts,
 unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift. It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.
+Both dependency modes also refuse ignored lockfiles, workspace configuration, npmrc files, pnpm hooks and patches;
+configuration inside installed `node_modules` and generated `.next` build output
+is excluded from this preflight. Next.js-generated manifests are preserved.
+Both dependency modes check pnpm hooks (`.pnpmfile.cjs`), workspace `.npmrc`
+files and `patches/` as dependency inputs. Stage reviewed changes to these files
+before repair; local edits remain untouched when the preflight refuses them.
+Both modes refuse indexed symlinks before invoking pnpm; dependency inputs must
+be regular indexed files, including executable hooks.
 
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the

@@ -3,6 +3,85 @@ import XCTest
 
 final class LaunchJourneyTests: XCTestCase {
     @MainActor
+    func testDatedOutcomeEntryUsesExistingDefaultOffPlatformGate() {
+        var queried: [String] = []
+        XCTAssertFalse(DatedOutcomeEntry.isEnabled(arguments: []) { queried.append($0); return false })
+        XCTAssertEqual(queried, [DatedOutcomeStore.featureGate])
+        XCTAssertTrue(DatedOutcomeEntry.isEnabled(arguments: []) { $0 == DatedOutcomeStore.featureGate })
+        XCTAssertEqual(
+            LaunchPromiseCopy.datedOutcomePromise,
+            "Pick a date. We build the plan backward from it and adjust every week."
+        )
+    }
+
+    func testAdoptedWeightCeilingRejectsBothDirectionsWithoutAdmittingPartialPolicy() {
+        // These wide arithmetic bounds are deliberately test-only. They are not
+        // reviewed absolute bounds or a production-policy admission receipt.
+        let arithmetic = OutcomeFeasibility.Thresholds(
+            minimumTarget: 40, maximumTarget: 200, minimumWeeklyChange: -10, maximumWeeklyChange: 10
+        )
+        var input = LaunchJourney.Input(
+            now: now, thresholds: [.weightKg: arithmetic],
+            enforcesDatedOutcomeDecision: true, isEligible: true
+        )
+        let readings = [LaunchJourney.Reading(date: now, metric: .weightKg, value: 100)]
+        let cases: [(Double, OutcomeFeasibility.Classification)] = [
+            (91, .ok), (90, .ok), (89.99, .impossible),
+            (109, .ok), (110, .ok), (110.01, .impossible), (100, .ok)
+        ]
+        for (target, expected) in cases {
+            let value = outcome(target: target, date: "2027-01-10") // Exactly ten elapsed weeks.
+            XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: readings), expected)
+            var production = input
+            production.thresholds = [:]
+            XCTAssertEqual(LaunchJourney.classify(value, input: production, readings: readings), .unsafe)
+        }
+        let value = outcome(target: 90, date: "2027-01-10")
+        input.thresholds[.weightKg]?.minimumTarget = nil
+        XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: readings), .unsafe)
+        input.thresholds = [:]
+        XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: readings), .unsafe)
+    }
+
+    func testDatedManualTrackingCanProceedWithoutAFullProfile() {
+        XCTAssertFalse(LaunchSurfacePolicy.requiresCompleteProfile(isProfileComplete: false, datedOutcomeEnabled: true))
+        XCTAssertTrue(LaunchSurfacePolicy.requiresCompleteProfile(isProfileComplete: false, datedOutcomeEnabled: false))
+        XCTAssertTrue(EntryDeepLinkPolicy.canOpenEntrySheet(
+            isAuthenticated: true, user: nil, hasCompletedOnboarding: true,
+            isSubscribed: true, datedOutcomeEnabled: true
+        ))
+        XCTAssertFalse(EntryDeepLinkPolicy.canOpenEntrySheet(
+            isAuthenticated: false, user: nil, hasCompletedOnboarding: true,
+            isSubscribed: true, datedOutcomeEnabled: true
+        ))
+        XCTAssertFalse(EntryDeepLinkPolicy.canOpenEntrySheet(
+            isAuthenticated: true, user: nil, hasCompletedOnboarding: true,
+            isSubscribed: false, datedOutcomeEnabled: true
+        ))
+    }
+
+    func testDatedAdmissionKeepsEligibilityUnavailableExpiryAndNoDataDistinct() {
+        var input = readyInput(outcome(date: "2026-12-27"), current: 78)
+        input.enforcesDatedOutcomeDecision = true
+        input.isEligible = false
+        let value = input.outcome!
+        XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: input.readings), .unsafe)
+        input.isEligible = nil
+        XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: input.readings), .unsafe)
+        input.isEligible = true
+        input.safetyAvailable = false
+        XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: input.readings), .unsafe)
+        let expired = outcome(date: "2000-01-01")
+        XCTAssertEqual(LaunchJourney.classify(expired, input: input, readings: []), .expired)
+        input.safetyAvailable = true
+        XCTAssertEqual(LaunchJourney.classify(value, input: input, readings: []), .noData)
+        input.thresholds = [:]
+        var maintenance = outcome(target: 80, date: "2026-12-27")
+        maintenance.constraints.maintenance = [.init(start: "2026-11-01", end: "2026-11-07")]
+        XCTAssertEqual(LaunchJourney.classify(maintenance, input: input, readings: input.readings), .unsafe)
+    }
+
+    @MainActor
     func testDeadlineJourneyRequiresItsOwnEnableGate() {
         var queriedKeys: [String] = []
         XCTAssertFalse(LaunchJourney.isEnabled(arguments: []) { key in
@@ -90,30 +169,55 @@ final class LaunchJourneyTests: XCTestCase {
 
     func testHealthMemoryIsolationFailClosed() {
         var store = HealthMemoryStore()
+        XCTAssertEqual(HealthMemoryStore.isolationKeyFields, ["userId", "productId"])
+        XCTAssertEqual(HealthMemoryStore.failClosedCode, "safetyUnavailable")
         let recorded = Date(timeIntervalSince1970: 1_700_000_000)
         XCTAssertFalse(store.remember(HealthMemoryClaim(
             userId: "", productId: "lyb", text: "80 kg", provenance: .measured, recordedAt: recorded
-        )))
+        ), safetyAvailable: true))
         XCTAssertFalse(store.remember(HealthMemoryClaim(
-            userId: "user-a", productId: "other", text: "80 kg", provenance: .measured, recordedAt: recorded
-        )))
+            userId: "user-a", productId: "", text: "80 kg", provenance: .measured, recordedAt: recorded
+        ), safetyAvailable: true))
+        XCTAssertFalse(store.remember(HealthMemoryClaim(
+            userId: "user-a", productId: "lyb", text: "80 kg", provenance: .userDeclared, recordedAt: recorded
+        ), safetyAvailable: false))
+        XCTAssertTrue(store.claims.isEmpty)
+
         XCTAssertTrue(store.remember(HealthMemoryClaim(
             userId: "user-a", productId: "lyb", text: "80 kg", provenance: .userDeclared, recordedAt: recorded
-        )))
+        ), safetyAvailable: true))
         XCTAssertTrue(store.remember(HealthMemoryClaim(
-            userId: "user-b", productId: "lyb", text: "secret", provenance: .measured, recordedAt: recorded
-        )))
-        XCTAssertEqual(store.retrieve(userId: "user-a", productId: "lyb", safetyAvailable: false), .safetyUnavailable)
+            userId: "user-b", productId: "other", text: "secret", provenance: .measured, recordedAt: recorded
+        ), safetyAvailable: true))
+        let beforeDeniedWrite = store.claims
+        XCTAssertFalse(store.remember(HealthMemoryClaim(
+            userId: "user-a", productId: "lyb", text: "leaked", provenance: .measured, recordedAt: recorded
+        ), safetyAvailable: false))
+        XCTAssertEqual(store.claims, beforeDeniedWrite)
+
+        let unavailable = store.retrieve(userId: "user-a", productId: "lyb", safetyAvailable: false)
+        XCTAssertEqual(unavailable, .safetyUnavailable)
+        XCTAssertEqual(unavailable.code, HealthMemoryStore.failClosedCode)
+        if case .records = unavailable {
+            XCTFail("Unavailable safety check returned memory")
+        }
         XCTAssertEqual(store.retrieve(userId: "", productId: "lyb", safetyAvailable: true), .isolated)
-        XCTAssertEqual(store.retrieve(userId: "user-a", productId: "other", safetyAvailable: true), .isolated)
+        XCTAssertEqual(store.retrieve(userId: "user-a", productId: "other", safetyAvailable: true), .records([]))
+        XCTAssertEqual(store.retrieve(userId: "user-b", productId: "lyb", safetyAvailable: true), .records([]))
         guard case let .records(records) = store.retrieve(userId: "user-a", productId: "lyb", safetyAvailable: true) else {
             return XCTFail("Expected the caller's records")
         }
         XCTAssertEqual(records.map(\.text), ["80 kg"])
+        XCTAssertEqual(records.map(\.userId), ["user-a"])
+        XCTAssertEqual(records.map(\.productId), ["lyb"])
         XCTAssertEqual(records.map(\.provenance), [.userDeclared])
+        guard case let .records(otherProduct) = store.retrieve(userId: "user-b", productId: "other", safetyAvailable: true) else {
+            return XCTFail("Expected the other product partition")
+        }
+        XCTAssertEqual(otherProduct.map(\.text), ["secret"])
         store.clearUser("user-a")
         XCTAssertEqual(store.retrieve(userId: "user-a", productId: "lyb", safetyAvailable: true), .records([]))
-        guard case let .records(remaining) = store.retrieve(userId: "user-b", productId: "lyb", safetyAvailable: true) else {
+        guard case let .records(remaining) = store.retrieve(userId: "user-b", productId: "other", safetyAvailable: true) else {
             return XCTFail("Expected the other user to keep their record")
         }
         XCTAssertEqual(remaining.map(\.text), ["secret"])
