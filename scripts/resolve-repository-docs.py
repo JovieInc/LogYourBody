@@ -14,11 +14,8 @@ from dependency_pr_body import dependency_pr_body
 from json_union import _unmerged_texts, union_json
 from python_union import union_python
 # Additive manifest union keeps every parent test input; retain the shared implementation.
-from manifest_union import apply_manifest_union as union_manifests
-from manifest_union import (
-    dependency_verification_drift, projection_is_unmerged,
-    restore_dependency_artifacts_on_failure, run_dependency_lockfile_install,
-)
+from manifest_union import apply_manifest_union as union_manifests, dependency_verification_drift, projection_is_unmerged, restore_dependency_artifacts_on_failure
+from manifest_union import read_verified_react_lockfile, run_dependency_lockfile_install
 
 
 def staged_bytes(root, name):
@@ -382,6 +379,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                       "pnpm-lock.yaml", ".npmrc", "**/.npmrc", ".pnpmfile.cjs",
                       "**/.pnpmfile.cjs", "patches/**", "repository-docs.json"]
             # Rebuild a conflicted projection only after frozen dependency verification.
+            # An unmerged source projection does not block dependency repair; rebuild it from the index.
             if not projection_is_unmerged(root, output):
                 inputs.append(output)
             dirty = subprocess.run(
@@ -423,7 +421,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                 raise ValueError("dependency inputs changed during verification; stage reviewed inputs and retry")
             # Dependency repairs fingerprint only staged sources, preserving unrelated edits.
             resolve_staged(root, ["pnpm-lock.yaml"] if refresh_lockfile else [], expected_index=verified_index,
-                           expected_lockfile=(root / "pnpm-lock.yaml").read_bytes(), dependency_inputs=inputs)
+                           expected_lockfile=read_verified_react_lockfile(root / "pnpm-lock.yaml"), dependency_inputs=inputs)
             return
         if pin_update:
             repository_docs.local(root, pin_update[0]).write_text(pin_update[1])
@@ -493,7 +491,6 @@ def main():
                     args.reviewed_project_sha256, args.reviewed_audit_sha256)
     except (ValueError, KeyError, TypeError, OSError, subprocess.CalledProcessError) as exc:
         parser.exit(1, "repository-docs: " + str(exc) + "\n")
-
 
 if __name__ == "__main__":
     main()

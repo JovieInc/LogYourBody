@@ -10,12 +10,15 @@ import { lintArguments } from './pre-commit-lint.mjs';
 import { resolver, sourceMapFixture } from './resolve-repository-docs.test.mjs';
 import './resolve-repository-docs-json.test.mjs';
 import './resolve-repository-docs-dependency.test.mjs';
+import './resolve-repository-docs-react-lockfile.test.mjs';
+import './resolve-repository-docs-frozen-lockfile.test-support.mjs';
 import './resolve-repository-docs-index-flags.test.mjs';
 import './resolve-repository-docs-ledger.test.mjs';
 import './resolve-repository-docs-pin.test.mjs';
 import './resolve-repository-docs-project.test.mjs';
 import './resolve-repository-docs-pin-union.test.mjs';
 import './resolve-repository-docs-manifest.test.mjs';
+import './resolve-repository-docs-merged-dependency.test.mjs';
 
 const env = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
@@ -66,6 +69,26 @@ test('clean merge hook stages a stale source map and stops for a reviewed commit
   const cleanMerge = spawnSync('git', ['merge', '--no-edit', 'next'], { cwd: f.root, env, encoding: 'utf8' });
   assert.equal(cleanMerge.status, 0, cleanMerge.stdout + cleanMerge.stderr);
   assert.equal(check().status, 0, check().stdout + check().stderr);
+});
+
+test('clean merge hook propagates the exact source resolver failure', (t) => {
+  const f = sourceMapFixture(t);
+  const bin = path.join(f.root, 'bin');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'python3'), `#!/bin/sh
+[ "$1" = "scripts/resolve-repository-docs.py" ] && [ "$2" = "--staged" ] || exit 1
+exit 23
+`, { mode: 0o755 });
+  const hook = fileURLToPath(new URL('../.husky/pre-merge-commit', import.meta.url));
+  const before = f.git('write-tree');
+  const projection = fs.readFileSync(path.join(f.root, f.output));
+  const result = spawnSync('sh', [hook], {
+    cwd: f.root, env: { ...env, PATH: `${bin}:${env.PATH}` }, encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 23, result.stdout + result.stderr);
+  assert.equal(f.git('write-tree'), before);
+  assert.deepEqual(fs.readFileSync(path.join(f.root, f.output)), projection);
 });
 
 for (const change of ['edit', 'delete', 'create']) {

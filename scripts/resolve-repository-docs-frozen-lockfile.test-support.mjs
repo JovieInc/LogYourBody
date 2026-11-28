@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { fixture } from './resolve-repository-docs-dependency.test.mjs';
 
 export function testFrozenLockfilePreservation(fixture) {
   for (const scenario of ['verify', 'current', 'refresh', 'failed-probe']) {
@@ -45,3 +46,5 @@ if ${scenario === 'failed-probe' ? 'True' : 'False'}:
     }
   }
 }
+
+testFrozenLockfilePreservation(fixture);
