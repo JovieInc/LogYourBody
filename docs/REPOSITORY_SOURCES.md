@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `6b5264c2ab1e207a342ccef78496aa70e861e3f1805a13c20a39a2b418706b12`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `4596a3496d29c445d173861aeae9d350d182ccca16726f2529c09e8838e54811`)
 
 ### `apps/web/package.json`: engines
 
@@ -98,7 +98,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-scroll-area": "^1.2.18",
   "@radix-ui/react-select": "^2.3.8",
   "@radix-ui/react-separator": "^1.2.0",
-  "@radix-ui/react-slider": "^1.4.7",
+  "@radix-ui/react-slider": "^1.6.1",
   "@radix-ui/react-slot": "^1.3.3",
   "@radix-ui/react-switch": "^1.4.1",
   "@radix-ui/react-tabs": "^1.1.22",
@@ -167,7 +167,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@testing-library/dom": "^10.4.2",
   "@testing-library/jest-dom": "^6.9.1",
   "@testing-library/react": "^16.3.3",
-  "@testing-library/user-event": "^14.6.8",
+  "@testing-library/user-event": "^14.6.13",
   "@types/jest": "^30.0.0",
   "@types/js-yaml": "4.0.9",
   "@types/lodash": "^4.17.27",
@@ -388,7 +388,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fc5a43b2fed86c3144518403ef49c0b5e2f5709099b2233d7c3db4a4d2f0ae5b`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `cfef537a5fded8208afe93f7ba4848518e5c0b9d16fc8dc55c85a7299719b63a`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `e2aa2e7f4c083546646d0c809080da94348e0b86723487eabf6959a3e8d25950`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `97f00f67ae13b4f9d54680778af3eb7ad02d75a5e297373a65a0885520c45e65`)
