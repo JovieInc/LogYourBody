@@ -108,6 +108,16 @@ enum AvatarBodyFatCatalog {
                 return [12, 15, 18, 21, 24, 28, 33, 40, 50, 60]
             }
         }
+
+        /// Family gate for a future calibrated tier. Not a displayed percentage.
+        var supportedBodyFatPercent: ClosedRange<Double> {
+            switch self {
+            case .male:
+                return BodyShapeCalibration.adultMale.bodyFatMin...BodyShapeCalibration.adultMale.bodyFatMax
+            case .female:
+                return BodyShapeCalibration.adultFemale.bodyFatMin...BodyShapeCalibration.adultFemale.bodyFatMax
+            }
+        }
     }
 
     struct Match: Equatable {
@@ -119,33 +129,24 @@ enum AvatarBodyFatCatalog {
         }
 
         var badgeText: String {
-            "\(sex.title) \(bucket)% body fat"
+            BodyShapeCalibration.shapeBadge
         }
 
         var accessibilityLabel: String {
-            "\(sex.title) avatar, \(bucket) percent body fat bucket"
+            BodyShapeCalibration.shapeAccessibilityLabel(sexTitle: sex.title)
         }
     }
 
     static func match(bodyFatPercentage: Double?, gender: String?) -> Match {
         let sex = Sex(gender: gender)
-        let target = bodyFatPercentage ?? Double(sex.defaultBucket)
-        let bucket = nearestBucket(to: target, in: sex.buckets, fallback: sex.defaultBucket)
-
+        let bucket = BodyShapeCalibration.displayedBucket(
+            bodyFatPercentage: bodyFatPercentage,
+            supported: sex.supportedBodyFatPercent,
+            buckets: sex.buckets,
+            fallback: sex.defaultBucket,
+            compositionPromoted: BodyShapeCalibration.compositionAppearancePromoted
+        )
         return Match(sex: sex, bucket: bucket)
-    }
-
-    private static func nearestBucket(to value: Double, in buckets: [Int], fallback: Int) -> Int {
-        buckets.min { lhs, rhs in
-            let leftDistance = abs(Double(lhs) - value)
-            let rightDistance = abs(Double(rhs) - value)
-
-            if leftDistance == rightDistance {
-                return lhs < rhs
-            }
-
-            return leftDistance < rightDistance
-        } ?? fallback
     }
 }
 

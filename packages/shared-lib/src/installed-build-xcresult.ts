@@ -184,6 +184,9 @@ export function checkInstalledBuildXcresult(input: {
 
   for (const trace of traces) {
     if (!trace || typeof trace !== 'object') continue;
+    if (trace.result !== 'Passed') {
+      add(reasons, `non-passing-trace:${text(trace.testId) || text(trace.pathId) || 'trace'}`);
+    }
     const identified = presentBuildId(trace.installedBuildId);
     if (!identified || (installedBuildId && trace.installedBuildId !== installedBuildId)) {
       add(reasons, identified ? 'installed-build-sha-mismatch' : 'installed-build-id-absent');
@@ -293,7 +296,11 @@ export function checkInstalledBuildXcresult(input: {
   if (!Number.isInteger(fixtureSeed)) add(reasons, 'missing-seed');
   if (!text(xcresult.configuration?.name)) add(reasons, 'missing-configuration');
   if (xcresult.recoveredAfterRetry === true) add(reasons, 'flaky-only-success');
+  else if (xcresult.recoveredAfterRetry !== false)
+    add(reasons, 'missing-run-accounting:recoveredAfterRetry');
   if (xcresult.infrastructureSkip === true) add(reasons, 'infrastructure-skip');
+  else if (xcresult.infrastructureSkip !== false)
+    add(reasons, 'missing-run-accounting:infrastructureSkip');
 
   const captures = (Array.isArray(xcresult.captures) ? xcresult.captures : []).filter(
     (capture): capture is { name: string; sha256: string } =>

@@ -1,4 +1,8 @@
-# Merge commits run the staged source-map repair.
-# Git invokes this hook instead of pre-commit. Husky exits 0 when this file is
-# absent, which skips that repair and can commit a clean but stale source map.
-. "$(dirname "$0")/pre-commit"
+#!/bin/sh
+before=$(git write-tree) || exit $?
+python3 scripts/resolve-repository-docs.py --staged || exit $?
+after=$(git write-tree) || exit $?
+if [ "$before" != "$after" ]; then
+  echo "Source map refreshed; review the staged merge and run git commit." >&2
+  exit 1
+fi

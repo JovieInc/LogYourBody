@@ -23,7 +23,11 @@ struct HomeV2Surface: View {
     let dateText: (BodyMetrics) -> String
     let loggedSentence: String?
     var systemState: HomeV2SystemState?
+    var healthSyncStatus: HealthSyncStateReducer?
+    var healthWeightReceipt: HealthWeightReceipt?
+    var onRecentReadings: () -> Void = {}
     let onOpenPhoto: () -> Void
+    var onAddPhoto: () -> Void = {}
     let onViewProgress: () -> Void
     let onViewMetric: (HomeV2ProgressMetric) -> Void
     let onTodayDetails: () -> Void
@@ -33,12 +37,16 @@ struct HomeV2Surface: View {
     let onDone: () -> Void
     let onUndo: () -> Void
     var onProvenancePresentationChange: (Bool) -> Void = { _ in }
+    var weeklyPhotoPrompt: WeeklyPhotoCheckInPolicy.Prompt?
+    var onAddWeeklyPhoto: () -> Void = {}
     var isPhotoScrubNavigating = false
 
     @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
     @State private var showsProvenance = false
     @State private var personalBodyDisplays: [String: PersonalBodyDisplay] = [:]
     @State private var personalBodyEnabled = false
+    @State private var appearanceDisplays: [String: PhotographicAppearanceDisplay] = [:]
+    @State private var appearanceEnabled = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var isLogged: Bool { loggedSentence != nil }
@@ -46,18 +54,32 @@ struct HomeV2Surface: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let stage = HomeV2StageReservation.size(
+                width: geometry.size.width,
+                contentHeight: geometry.size.height,
+                presentation: stagePresentation
+            )
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     systemBanner
                     HomeV2TimelinePager(
                         snapshot: timeline, selectedID: userSelection,
-                        size: CGSize(width: geometry.size.width, height: geometry.size.width / HomeV2Tokens.photoAspectRatio),
+                        size: stage,
                         unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto,
+                        onAddPhoto: onAddPhoto,
                         isNavigating: isPhotoScrubNavigating || showsProvenance,
                         bodyDisplays: personalBodyDisplays,
-                        bodyEstimateEnabled: personalBodyEnabled
+                        bodyEstimateEnabled: personalBodyEnabled,
+                        appearanceDisplays: appearanceDisplays,
+                        appearanceEnabled: appearanceEnabled
                     )
                     photoNumberBlock
+                    HomeV2DisclosureLink(
+                        title: HomeV2Copy.addPhotoRow,
+                        identifier: "home_v2_add_weekly_photo",
+                        action: onAddWeeklyPhoto
+                    )
+                    .frame(maxWidth: .infinity)
                     if hasAnyPhotoInHistory {
                         HomeV2DisclosureLink(
                             title: HomeV2PhotoCopy.allPhotos,
@@ -109,6 +131,8 @@ struct HomeV2Surface: View {
     private func reloadPersonalBody() async {
         personalBodyDisplays = [:]
         personalBodyEnabled = false
+        appearanceDisplays = [:]
+        appearanceEnabled = false
         let accountId = metric.userId
         let dates = personalBodyDates
         guard PersonalBodyPolicy.isEnabled() else { return }
@@ -116,6 +140,11 @@ struct HomeV2Surface: View {
         guard !Task.isCancelled else { return }
         personalBodyEnabled = true
         personalBodyDisplays = index.displays
+        guard PhotographicAppearancePolicy.isEnabled() else { return }
+        let appearances = await PhotographicAppearanceStore.shared.index(accountId: accountId, dates: dates)
+        guard !Task.isCancelled else { return }
+        appearanceEnabled = true
+        appearanceDisplays = appearances
     }
 
     @ViewBuilder
@@ -145,6 +174,11 @@ struct HomeV2Surface: View {
     }
 
     private var hasPhoto: Bool { PhotoTimelineHUDPolicy.hasUsablePhoto(metric) }
+
+    private var stagePresentation: HomeV2StagePresentation {
+        if systemState == .offline { return .offline }
+        return hasPhoto ? .photo : .noPhoto
+    }
 
     private var userSelection: Binding<HomeV2TimelinePolicy.EntryID> {
         Binding(get: { selectedID }, set: { next in
@@ -179,6 +213,9 @@ struct HomeV2Surface: View {
             if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
                 HomeV2ProvenanceChip(detail: provenance) { showsProvenance = true }
             }
+            if let weeklyPhotoPrompt {
+                WeeklyPhotoCheckInPrompt(prompt: weeklyPhotoPrompt, onAdd: onAddWeeklyPhoto)
+            }
 
             if HomeV2EditorialPolicy.bodyFat(in: metric) == nil {
                 compositionLine
@@ -198,6 +235,16 @@ struct HomeV2Surface: View {
                 }
             }
             .padding(.vertical, HomeV2Tokens.Space.tight)
+
+            if let healthSyncStatus {
+                HealthSyncStatusView(
+                    state: healthSyncStatus.state,
+                    lastSync: healthSyncStatus.lastSuccessfulSync,
+                    receipt: healthWeightReceipt,
+                    unit: weightUnit,
+                    onRecentReadings: onRecentReadings
+                )
+            }
 
             HomeV2Hairline()
             HomeV2StepsSummary(value: stepsValue, detail: stepsDetail, dateText: dateText(metric)) {
