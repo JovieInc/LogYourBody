@@ -10,12 +10,14 @@ from contextlib import ExitStack
 from pathlib import Path
 
 import repository_docs
+from dependency_lockfile_repair import dependency_lockfile_refresh_allowed
 from dependency_pr_body import dependency_pr_body
+from dependency_manifest_union import prepare_dependency_manifest_merge
 from json_union import _unmerged_texts, union_json
 from python_union import union_python
 # Additive manifest union keeps every parent test input; retain the shared implementation.
 from manifest_union import apply_manifest_union as union_manifests, dependency_verification_drift, projection_is_unmerged, restore_dependency_artifacts_on_failure
-from manifest_union import read_verified_react_lockfile
+from manifest_union import read_verified_react_lockfile, run_dependency_lockfile_install
 
 
 def staged_bytes(root, name):
@@ -344,8 +346,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
         if conflicted_pin[2] is not None:
             drop.add("scripts/tests/test_runner_routing.py")
         unresolved = [name for name in unresolved if name not in drop]
-    if unresolved:
-        raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
+    merge_manifests = prepare_dependency_manifest_merge(root, unresolved, refresh_lockfile)
     if conflicted_pin is not None:
         stage_conflicted_diagnostic_pin(root, conflicted_pin, output)
         return
@@ -371,7 +372,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
         errors = repository_docs.run(root)
         if errors and errors != ["source projection stale: " + output]:
             raise ValueError("; ".join(errors))
-    with ExitStack() as rollback:
+    with merge_manifests, ExitStack() as rollback:
         if refresh_lockfile or verify_lockfile:
             # Pnpm hooks, workspace npmrc files and patches also affect dependency resolution.
             # Projection configuration must be staged before dependency verification.
@@ -402,23 +403,19 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
             modes = [["--frozen-lockfile", "--offline"]]
             # Explicit repair only: normal commit hooks and CI retain frozen installs.
             if refresh_lockfile:
-                probe = subprocess.run(
-                    ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *modes[0]],
-                    cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                probe = run_dependency_lockfile_install(
+                    root, modes[0], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 )
                 print(probe.stdout, end="", flush=True)
-                # Refresh only a confirmed manifest mismatch; other failures remain blockers.
+                # Refresh only a confirmed manifest or named overrides mismatch.
                 if probe.returncode:
-                    if "ERR_PNPM_OUTDATED_LOCKFILE" not in probe.stdout:
+                    if not dependency_lockfile_refresh_allowed(probe.stdout):
                         probe.check_returncode()
                     modes.insert(0, ["--no-frozen-lockfile"])
                 else:
                     modes = []
             for mode in modes:
-                subprocess.run(
-                    ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
-                    cwd=root, check=True,
-                )
+                run_dependency_lockfile_install(root, mode).check_returncode()
             # Refuse inputs changed during verification before staging dependency artifacts.
             if dependency_verification_drift(
                     root, inputs, verified_index, refresh_lockfile is False or verify_lockfile or not modes):

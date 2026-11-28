@@ -112,12 +112,23 @@ the lockfile and projection together; verify mode stages only the projection.
 For dependency PRs, stage the reviewed manifests and run
 `python3 scripts/resolve-repository-docs.py --refresh-lockfile`. This explicit
 repair first verifies the existing lockfile offline with pinned Corepack pnpm.
-Only a confirmed manifest mismatch (`ERR_PNPM_OUTDATED_LOCKFILE`) triggers
-regeneration without lifecycle scripts and a second frozen offline check.
-Valid lockfiles keep their resolutions; other installation failures stop repair.
+A confirmed manifest mismatch or pnpm's configuration mismatch naming
+`overrides` permits regeneration without lifecycle scripts. Either path requires
+a second frozen offline check. Valid lockfiles keep their resolutions. Other
+configuration or installation failures stop repair.
+During an active Git merge, refresh mode can reconcile conflicts confined to
+`package.json` sources using their three index stages, with the generated map and
+correction ledger following their existing repair rules. It keeps independent
+additions and one-sided edits. When both sides advance compatible, stable
+three-component caret or tilde ranges, it keeps the higher range. Other
+divergent changes and worktree conflict edits require manual resolution before
+pnpm runs. Git's index lock serializes staged changes. Refresh checks for
+worktree edits before replacing manifest files. If repair fails, it preserves
+detected edits and rolls back each unaffected path independently.
 Both dependency repair modes refuse index or manifest edits made while pnpm is
 verifying inputs. They preserve those edits and restore the original generated
-artifacts; stage the reviewed inputs and retry the same command.
+artifacts without staging either file. Review the current index, stage any
+remaining input changes and retry the same command.
 Staged projection generation also rechecks the index before writing. Dependency
 repair carries the verified index through rendering, so an observed concurrent
 staged edit cannot leave the source map describing an older manifest. Review the
@@ -131,10 +142,13 @@ the same command.
 Both modes recheck for new untracked or ignored dependency inputs after verification
 and rendering, before writing artifacts. A newly created hook, npmrc file, patch or
 manifest refuses repair; the local file survives and generated artifacts are restored.
-Frozen verification also refuses lockfile changes before regenerating or staging
-the source map. Filtered worktree hashes reject assume-unchanged and skip-worktree
-edits that a diff listing omits. Only a confirmed outdated lockfile permits refresh
-mode to write new resolutions; retrying after a refusal uses the original reviewed artifacts.
+Each frozen verification checks that lockfile bytes are unchanged, including a
+failed refresh probe and the final verification after regeneration. If either
+rewrites or deletes the lockfile, repair restores the original lockfile and source
+map and stops before regenerating or staging anything else. Filtered worktree
+hashes also reject assume-unchanged and skip-worktree edits that a diff listing
+omits. Only an unchanged frozen probe that reports an outdated manifest or
+names the `overrides` configuration permits refresh mode to write new resolutions.
 If resolution, frozen verification, projection generation or Git staging fails,
 the helper restores the original lockfile and projection bytes (or absence) so
 the same command can be retried without manual cleanup. Another writer's index

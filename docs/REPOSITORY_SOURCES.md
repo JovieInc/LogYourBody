@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `9b443000411c6409c5d2440752049fddb562a1da967c4cfab1a29a1c4bb06b4e`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `ccdcded61b0e47f7750fa196eb018a6db20ced6f981f07376514f9db7c7f8415`)
 
 ### `apps/web/package.json`: engines
 
@@ -84,7 +84,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-aspect-ratio": "^1.2.0",
   "@radix-ui/react-avatar": "^1.3.1",
   "@radix-ui/react-checkbox": "^1.3.11",
-  "@radix-ui/react-collapsible": "^1.1.20",
+  "@radix-ui/react-collapsible": "^1.2.1",
   "@radix-ui/react-context-menu": "^2.3.8",
   "@radix-ui/react-dialog": "^1.1.23",
   "@radix-ui/react-dropdown-menu": "^2.1.24",
@@ -183,14 +183,14 @@ A changed fingerprint requires review of its related documentation; it does not 
   "jest": "^30.5.2",
   "jest-environment-jsdom": "^30.5.2",
   "playwright": "^1.65.0",
-  "postcss": "^8.5.30",
+  "postcss": "^8.5.32",
   "tailwindcss": "^4.3.3",
   "tsx": "^4.23.15",
   "typescript": "^5.9.3"
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `14e2d47289938d6f1b46f41b02b2773a0c494ea91808f84e97b750981b88ed98`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `44b594445680532ea5ddad02d94cf72ca020d986cb5a33fe0edd53dff0735426`)
 
 ### `package.json`: packageManager
 
@@ -283,7 +283,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "prettier": "^3.9.10",
   "prettier-plugin-tailwindcss": "^0.8.1",
   "rollup": "^4.67.5",
-  "turbo": "^2.11.9",
+  "turbo": "^2.11.10",
   "typescript": "^5.9.3",
   "vitest": "^5.1.0"
 }
@@ -386,7 +386,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fc5a43b2fed86c3144518403ef49c0b5e2f5709099b2233d7c3db4a4d2f0ae5b`)
+- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `31aeed53fc4c3687b29b896dec2105ab1ec24869611f9d17e179dfd437321fe2`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
 - `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `e2aa2e7f4c083546646d0c809080da94348e0b86723487eabf6959a3e8d25950`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
