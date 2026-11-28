@@ -1,6 +1,6 @@
 # Home check-in prompts and tutorials (LYB-325)
 
-Parent: [LYB-311](https://linear.app/jovie/issue/LYB-311).
+Parent: LYB-311.
 Status: recommended default adopted; no override.
 
 ## Decision
@@ -18,5 +18,5 @@ prompt or a separate tutorial flow.
 ## Boundary
 
 This records the product decision only. It does not change native app code,
-notification schedules, or message copy. [LYB-87](https://linear.app/jovie/issue/LYB-87)
-retains the empty stage and first-photo repair.
+notification schedules, or message copy. LYB-87 retains the empty stage and
+first-photo repair.
