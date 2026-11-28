@@ -412,6 +412,24 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "dependency-repair-react-renderer-version-alignment",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1734",
+    "correction": "PR #1734, fix-red-1423773703 occurrence 36: the React DOM 19.3.1 update retained an outdated lockfile and source projection, failing Detect Changes, parity, CI Summary and Vercel. Refreshing only React DOM resolves it against React 19.3.0 and breaks server rendering; upgrading only the web runtime leaves the linked UI workspace on React 19.3.0 and causes invalid hook calls.",
+    "mechanization": "Extend the existing explicit dependency/source-map repair helper to reject mismatched React DOM peers and multiple locked React runtimes before staging either artifact. Eight real-Git rejection regressions fail before their corresponding guard extensions and pass afterward; both matching-version cases pass, and the existing required change-detection suite runs all ten. Use the extended helper to reject the supplied mismatched lockfile, align React and React DOM to 19.3.1 in the web consumer and UI development dependencies, then refresh and freeze both dependency artifacts. Preserve the UI library's supported peer ranges. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper owns lockfile verification and source-map staging. Refusing incompatible React renderer snapshots inside its artifact rollback boundary prevents the repair from accepting dependencies that cannot render, without changing frozen CI installs or adding another shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "A dependency repair must keep React and its DOM renderer on the same version."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "launch-copy-merge-duplicate-constants",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1688",
     "correction": "PR #1688 / LYB-288, fix-red-95726c4f82 occurrence 24: merge origin/main without rebasing and preserve health-memory user/product isolation and fail-closed reads and writes. The LaunchJourney conflict must retain the canonical LaunchPromiseCopy table instead of restoring parallel legacy constants. Tently reports an AI-provider outage without code findings.",
