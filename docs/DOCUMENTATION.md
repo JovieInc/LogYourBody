@@ -116,9 +116,19 @@ A confirmed manifest mismatch or pnpm's configuration mismatch naming
 `overrides` permits regeneration without lifecycle scripts. Either path requires
 a second frozen offline check. Valid lockfiles keep their resolutions. Other
 configuration or installation failures stop repair.
+During an active Git merge, refresh mode can reconcile conflicts confined to
+`package.json` sources using their three index stages, with the generated map and
+correction ledger following their existing repair rules. It keeps independent
+additions and one-sided edits. When both sides advance compatible, stable
+three-component caret or tilde ranges, it keeps the higher range. Other
+divergent changes and worktree conflict edits require manual resolution before
+pnpm runs. Git's index lock serializes staged changes. Refresh checks for
+worktree edits before replacing manifest files. If repair fails, it preserves
+detected edits and rolls back each unaffected path independently.
 Both dependency repair modes refuse index or manifest edits made while pnpm is
 verifying inputs. They preserve those edits and restore the original generated
-artifacts; stage the reviewed inputs and retry the same command.
+artifacts without staging either file. Review the current index, stage any
+remaining input changes and retry the same command.
 Staged projection generation also rechecks the index before writing. Dependency
 repair carries the verified index through rendering, so an observed concurrent
 staged edit cannot leave the source map describing an older manifest. Review the

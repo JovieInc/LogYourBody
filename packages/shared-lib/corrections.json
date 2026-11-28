@@ -6585,6 +6585,24 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "dependency-repair-concurrent-staged-inputs",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1730",
+    "correction": "PR #1730, fix-red-1423773703 occurrence 48: merge origin/main without rebasing and repair the Collapsible 1.2.1 manifest's missing lockfile and stale source projection. Recurring dependency repair must retain a consistent reviewed dependency snapshot while pnpm runs.",
+    "mechanization": "Use the existing verifier to refuse indexed dependency inputs changed while pnpm runs. Its required real-Git cases cover staged manifest drift, artifact rollback, retention of the concurrent edit and a reviewed retry in both repair modes. Reuse the existing Collapsible 1.2.1 snapshot and generate the source map after frozen verification. The harness must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing helper owns frozen dependency verification and source-map staging. Comparing its indexed inputs across pnpm execution prevents it from accepting a lockfile verified against a different staged dependency snapshot, while its existing rollback preserves retryability."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Refuse inputs changed during verification before staging dependency artifacts."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "merge-ledger-prewrite-preserves-concurrent-edits",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1679#repair-prewrite-ledger",
     "correction": "PR #1679 / LYB-245, fix-red-e3b0c44298 occurrence 81: merge origin/main without rebasing and retain the Apple Health sync receipt, the concerning-pain policy, and both parents' correction receipts. A working-ledger edit that lands after validation and before replacement must not be overwritten.",
@@ -6948,6 +6966,24 @@
     },
     "level": "codebase",
     "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1720",
+    "correction": "PR #1720 (fix-red-1423773703): The turbo 2.11.10 bump left the source projection stale, failing Detect Changes, parity and CI Summary. Merging main also conflicted package.json because Rollup was added beside the turbo range. Repeated dependency repairs must union that manifest and refresh parity together.",
+    "mechanization": "Extend --refresh-lockfile for an active merge whose unresolved source conflicts are package.json files. Read their three index stages and reconcile independent and one-sided edits. When both sides advance overlapping stable caret or tilde ranges, retain the higher range. Preserve edited worktree conflicts and refuse incompatible or unrelated conflicts before pnpm. The required real-Git suite verifies those conditions, retry, a locked index, preservation of detected staged and worktree edits, independent rollback of unaffected manifests, frozen failure rollback and unchanged verify-lockfile refusal. Use the helper with the Turbo 2.11.10 frozen lockfile and source-parity gates. Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "reviewed-audit-pin-follows-explicit-digest",

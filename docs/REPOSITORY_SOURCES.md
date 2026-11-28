@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0c9268add19219de81762b6a23cbe87e18e63e77fc94cbbd6f04feb492068eff`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1e812450abd5cb9a358a0dfaa247c5d41d3481433d867a456c67985cd1e9ad3c`)
 
 ### `apps/web/package.json`: engines
 
@@ -84,7 +84,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-aspect-ratio": "^1.2.0",
   "@radix-ui/react-avatar": "^1.3.1",
   "@radix-ui/react-checkbox": "^1.3.11",
-  "@radix-ui/react-collapsible": "^1.1.20",
+  "@radix-ui/react-collapsible": "^1.2.1",
   "@radix-ui/react-context-menu": "^2.3.8",
   "@radix-ui/react-dialog": "^1.1.23",
   "@radix-ui/react-dropdown-menu": "^2.1.24",
@@ -190,7 +190,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c2354e226347fad9a54b5525344129b1b71fb9a790da15b53999e6c13b79cabc`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `422f586dcf91736f0787841a46c2b3db885c5ddac4189f474793accec77dadb8`)
 
 ### `package.json`: packageManager
 
@@ -283,7 +283,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "prettier": "^3.9.10",
   "prettier-plugin-tailwindcss": "^0.8.1",
   "rollup": "^4.67.5",
-  "turbo": "^2.11.9",
+  "turbo": "^2.11.10",
   "typescript": "^5.9.3",
   "vitest": "^5.1.0"
 }
