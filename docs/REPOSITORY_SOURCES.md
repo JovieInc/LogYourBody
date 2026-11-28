@@ -190,7 +190,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `2454b668a3ab6c18c9f8d216a84771571f05588a440f5f3c8926e6a3aed1208f`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `60db11f2c8455cf6bb137b8cb0073f788820f6c4c1c615b8757f41a1db240866`)
 
 ### `package.json`: packageManager
 
@@ -285,7 +285,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "rollup": "^4.67.5",
   "turbo": "^2.11.9",
   "typescript": "^5.9.3",
-  "vitest": "^5.0.5"
+  "vitest": "^5.1.0"
 }
 ```
 
@@ -354,7 +354,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `03ac456392bb92b20f266abcdca05ae701080eafd86a2df8b20578d1304f8169`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `70426c30534b712cb4f1c3f0d5c9898c6c0982fa755ad21afa93a20fed65bdf3`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -382,7 +382,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "eslint-plugin-react": "^7.37.5",
   "eslint-plugin-react-hooks": "^5.2.0",
   "typescript": "^5.9.3",
-  "vitest": "^5.0.5"
+  "vitest": "^5.1.0"
 }
 ```
 

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { testCreatedDependencyInput } from './resolve-repository-docs-created-inputs.test-support.mjs';
 
 const resolver = fileURLToPath(new URL('./resolve-repository-docs.py', import.meta.url));
 const env = {
@@ -365,6 +366,7 @@ if not marker.exists():
       assert.equal(f.git('ls-files', '--stage'), repairedIndex);
     });
   }
+  testCreatedDependencyInput(mode, fixture);
   for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch', 'apps/local-only/package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml']) {
     test(`dependency repair ${mode} refuses ignored ${input} before invoking pnpm`, (t) => {
       const f = fixture(t, input, 'untracked');
