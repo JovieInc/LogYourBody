@@ -115,10 +115,10 @@ repair first verifies the existing lockfile offline with pinned Corepack pnpm.
 Only a confirmed manifest mismatch (`ERR_PNPM_OUTDATED_LOCKFILE`) triggers
 regeneration without lifecycle scripts and a second frozen offline check.
 Valid lockfiles keep their resolutions; other installation failures stop repair.
-Both dependency repair modes refuse to stage either artifact if the index or
-manifests change while pnpm verifies inputs. Repair restores the original
-lockfile and source map and preserves the concurrent edits. Review the current
-index, stage any remaining input changes and retry the same command.
+Both dependency repair modes refuse index or manifest edits made while pnpm is
+verifying inputs. They preserve those edits and restore the original generated
+artifacts without staging either file. Review the current index, stage any
+remaining input changes and retry the same command.
 Staged projection generation also rechecks the index before writing. Dependency
 repair carries the verified index through rendering, so an observed concurrent
 staged edit cannot leave the source map describing an older manifest. Review the
