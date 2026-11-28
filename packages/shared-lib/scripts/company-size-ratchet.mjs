@@ -16,13 +16,8 @@ export function scan({ files, readSource }) {
   const findings = [];
   for (const path of files) {
     if (path === BASELINE_PATH || !CODE.test(path) || SKIP.test(path)) continue;
-    let text;
-    try {
-      text = readSource(path);
-    } catch {
-      continue;
-    }
-    if (typeof text !== 'string') continue;
+    const text = readSource(path);
+    if (typeof text !== 'string') throw new TypeError(`Unreadable source: ${path}`);
     const lines = lineCount(text);
     if (lines <= LIMIT) continue;
     if (!Object.hasOwn(baseline, path)) {

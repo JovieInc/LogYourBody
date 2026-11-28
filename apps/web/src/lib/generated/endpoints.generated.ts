@@ -486,6 +486,10 @@ export const endpoints = {
       reason: 'LYB-44 source evidence for chart responsiveness and playhead label mapping.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-64',
+      reason: 'LYB-64 source receipt for installed-build certification evidence accounting.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-74',
       reason:
         'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.',

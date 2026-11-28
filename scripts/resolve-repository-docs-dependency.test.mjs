@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { testCreatedDependencyInput } from './resolve-repository-docs-created-inputs.test-support.mjs';
 
 const resolver = fileURLToPath(new URL('./resolve-repository-docs.py', import.meta.url));
 const env = {
@@ -51,7 +52,7 @@ test('dependency PR body repair preserves prose, code meaning and existing Markd
   }
 });
 
-function fixture(t, input, state) {
+export function fixture(t, input, state) {
   const root = mkdtempSync(join(tmpdir(), 'lyb-dependency-inputs-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
@@ -365,9 +366,11 @@ if not marker.exists():
       assert.equal(f.git('ls-files', '--stage'), repairedIndex);
     });
   }
-  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch', 'apps/local-only/package.json']) {
+  testCreatedDependencyInput(mode, fixture);
+  for (const input of ['.pnpmfile.cjs', 'apps/web/.npmrc', 'patches/example.patch', 'apps/local-only/package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml']) {
     test(`dependency repair ${mode} refuses ignored ${input} before invoking pnpm`, (t) => {
       const f = fixture(t, input, 'untracked');
+      if (input === 'pnpm-lock.yaml') f.git('rm', '--cached', input);
       writeFileSync(join(f.root, '.gitignore'), `${input}\nnode_modules/\n.next/\n`);
       f.git('add', '.gitignore');
       for (const generated of ['apps/web/.next/package.json', 'apps/web/.next/types/package.json']) {
@@ -392,6 +395,10 @@ if not marker.exists():
         assert.deepEqual(readFileSync(join(f.root, name)), outputs[i]);
       }
       unlinkSync(f.path);
+      if (input === 'pnpm-lock.yaml') {
+        writeFileSync(f.path, outputs[0]);
+        f.git('add', '-f', input);
+      }
       const retry = f.resolve(mode);
       assert.equal(retry.status, 0, retry.stderr);
       const repairedIndex = f.git('ls-files', '--stage');

@@ -53,6 +53,14 @@ test('waitlist validates, recovers after failure, and accepts once', async ({ pa
     logYourBody.messages.waitlist.invalidEmail,
   );
   expect(requests).toHaveLength(0);
+  await email.fill('missing-domain');
+  await submit.click();
+  await expect(email).toBeFocused();
+  await expect(email).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#waitlist-status').getByRole('alert')).toHaveText(
+    logYourBody.messages.waitlist.invalidEmail,
+  );
+  expect(requests).toHaveLength(0);
   await email.fill('launch-fixture@example.com');
   await submit.click();
   await expect(page.locator('#waitlist-status')).toHaveText(logYourBody.messages.waitlist.error);

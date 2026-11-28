@@ -27,6 +27,7 @@ struct HomeV2Surface: View {
     var healthWeightReceipt: HealthWeightReceipt?
     var onRecentReadings: () -> Void = {}
     let onOpenPhoto: () -> Void
+    var onAddPhoto: () -> Void = {}
     let onViewProgress: () -> Void
     let onViewMetric: (HomeV2ProgressMetric) -> Void
     let onTodayDetails: () -> Void
@@ -53,13 +54,19 @@ struct HomeV2Surface: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let stage = HomeV2StageReservation.size(
+                width: geometry.size.width,
+                contentHeight: geometry.size.height,
+                presentation: stagePresentation
+            )
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     systemBanner
                     HomeV2TimelinePager(
                         snapshot: timeline, selectedID: userSelection,
-                        size: CGSize(width: geometry.size.width, height: geometry.size.width / HomeV2Tokens.photoAspectRatio),
+                        size: stage,
                         unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto,
+                        onAddPhoto: onAddPhoto,
                         isNavigating: isPhotoScrubNavigating || showsProvenance,
                         bodyDisplays: personalBodyDisplays,
                         bodyEstimateEnabled: personalBodyEnabled,
@@ -67,6 +74,12 @@ struct HomeV2Surface: View {
                         appearanceEnabled: appearanceEnabled
                     )
                     photoNumberBlock
+                    HomeV2DisclosureLink(
+                        title: HomeV2Copy.addPhotoRow,
+                        identifier: "home_v2_add_weekly_photo",
+                        action: onAddWeeklyPhoto
+                    )
+                    .frame(maxWidth: .infinity)
                     if hasAnyPhotoInHistory {
                         HomeV2DisclosureLink(
                             title: HomeV2PhotoCopy.allPhotos,
@@ -161,6 +174,11 @@ struct HomeV2Surface: View {
     }
 
     private var hasPhoto: Bool { PhotoTimelineHUDPolicy.hasUsablePhoto(metric) }
+
+    private var stagePresentation: HomeV2StagePresentation {
+        if systemState == .offline { return .offline }
+        return hasPhoto ? .photo : .noPhoto
+    }
 
     private var userSelection: Binding<HomeV2TimelinePolicy.EntryID> {
         Binding(get: { selectedID }, set: { next in

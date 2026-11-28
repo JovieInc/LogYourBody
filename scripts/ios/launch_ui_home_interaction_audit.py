@@ -483,3 +483,16 @@ def check_home_interactions(root, violations, violation):
     check_launch_interruption_taps(root, violations, violation)
     check_viewer_history_navigation(root, violations, violation)
     check_progress_share_readiness(root, violations, violation)
+    # One stage budget. A width-only 4:5 frame overflows a short Home column.
+    stage = root / "apps/ios/LogYourBody/Views/HomeV2/HomeV2Tokens.swift"
+    stage_text = text_for(stage)
+    if (stage_text.count("enum HomeV2StageReservation") != 1
+            or "contentHeight: CGFloat," not in stage_text
+            or "func homeV2ReservedStage(_ stage: CGSize)" not in stage_text
+            or "homeV2ReservedStage(width:" in stage_text
+            or 'photoLoadFailedFixtureArgument = "-lybUITestHomeV2PhotoLoadFailedFixture"' not in stage_text
+            or "func size(width: CGFloat, presentation:" in stage_text):
+        violations.append(violation(
+            check="home.reserved_stage_budget", file=str(stage.relative_to(root)), line=1,
+            detail="Keep one HomeV2StageReservation.size that takes contentHeight and apply that CGSize.",
+        ))

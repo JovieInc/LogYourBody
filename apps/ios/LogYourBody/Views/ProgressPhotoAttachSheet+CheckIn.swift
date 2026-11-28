@@ -215,18 +215,26 @@ extension ProgressPhotoAttachSheet {
                 )
             }
             let draftBase = makeDraft(uploaded: false)
-            if history.contains(where: { $0.submissionId == submission }) {
-                let replay = WeeklyPhotoCheckInPolicy.resolve(
+            let initialAttempt = await Task.detached(priority: .userInitiated) {
+                WeeklyPhotoCheckInPolicy.resolve(
                     draftBase, history: history, elapsed: Date().timeIntervalSince(started)
                 )
-                await finishCheckIn(replay, ownership: ownership)
+            }.value
+            if history.contains(where: { $0.submissionId == submission }) {
+                await finishCheckIn(initialAttempt, ownership: ownership)
+                return
+            }
+            guard let provenance = initialAttempt.outcome?.provenance else {
+                await finishCheckIn(initialAttempt, ownership: ownership)
                 return
             }
 
             do {
                 try writeAdmission()
                 let metricsResult = try await targetMetrics(
-                    userId: userId, diaryDate: effective, writeAdmission: writeAdmission
+                    userId: userId, diaryDate: effective,
+                    provenance: provenance,
+                    originalURL: prepared.fileURL, writeAdmission: writeAdmission
                 )
                 try writeAdmission()
                 let metrics = metricsResult.metrics
@@ -248,14 +256,15 @@ extension ProgressPhotoAttachSheet {
                 do {
                     _ = try await PhotoUploadManager.shared.uploadProgressPhoto(for: metrics, image: image)
                 } catch {
-                    guard WeeklyPhotoCheckInPolicy.isRetainedOffline(error) else { throw error }
+                    // A new observation is already durable on this device.
+                    guard metricsResult.createdNewEntry || WeeklyPhotoCheckInPolicy.isRetainedOffline(error) else {
+                        throw error
+                    }
                     uploaded = false
                     let linked = try await PhotoMetadataService.shared.commitWeeklyPhoto(
                         id: metrics.id,
                         userId: userId,
-                        provenance: weeklyProvenance(
-                            draftBase, uploaded: false, history: history, started: started
-                        ),
+                        provenance: provenance,
                         localDisplayURL: prepared.fileURL.absoluteString,
                         writeAdmission: writeAdmission
                     )
@@ -266,18 +275,17 @@ extension ProgressPhotoAttachSheet {
                     _ = try await PhotoMetadataService.shared.commitWeeklyPhoto(
                         id: metrics.id,
                         userId: userId,
-                        provenance: weeklyProvenance(
-                            draftBase, uploaded: true, history: history, started: started
-                        ),
+                        provenance: provenance,
                         localDisplayURL: nil,
                         writeAdmission: writeAdmission
                     )
                 }
-                let attempt = WeeklyPhotoCheckInPolicy.resolve(
-                    makeDraft(uploaded: uploaded),
-                    history: history,
-                    elapsed: Date().timeIntervalSince(started)
-                )
+                let completedDraft = makeDraft(uploaded: uploaded)
+                let attempt = await Task.detached(priority: .userInitiated) {
+                    WeeklyPhotoCheckInPolicy.resolve(
+                        completedDraft, history: history, elapsed: Date().timeIntervalSince(started)
+                    )
+                }.value
                 await finishCheckIn(attempt, ownership: ownership, metricsId: metrics.id, accountId: userId)
             } catch {
                 guard authManager.ownsAccountSession(ownership) else { return }
@@ -292,42 +300,6 @@ extension ProgressPhotoAttachSheet {
                 }
             }
         }
-    }
-
-    func weeklyProvenance(
-        _ draft: WeeklyPhotoDraft,
-        uploaded: Bool,
-        history: [WeeklyPhotoProvenance],
-        started: Date
-    ) -> WeeklyPhotoProvenance {
-        var next = draft
-        next.uploaded = uploaded
-        next.persisted = true
-        let attempt = WeeklyPhotoCheckInPolicy.resolve(
-            next, history: history, elapsed: Date().timeIntervalSince(started)
-        )
-        if let provenance = attempt.outcome?.provenance { return provenance }
-        return WeeklyPhotoProvenance(
-            submissionId: draft.submissionId,
-            originalSHA256: WeeklyPhotoCheckInPolicy.sha256Hex(draft.originalBytes),
-            originalByteCount: draft.originalBytes.count,
-            contentType: draft.contentType,
-            capturedAt: draft.capturedAt,
-            timeZoneIdentifier: draft.timeZone.identifier,
-            effectiveAt: draft.effectiveAt,
-            dateWasCorrected: draft.dateWasCorrected,
-            importedAt: draft.importedAt,
-            exifOrientation: draft.exifOrientation,
-            mirror: draft.mirror,
-            viewpoint: draft.viewpoint,
-            importSource: draft.importSource,
-            isBackfill: false,
-            isDuplicate: false,
-            fitSupportsGeometry: draft.fitSupportsGeometry,
-            isPartialOrOccluded: draft.isPartialOrOccluded,
-            countsTowardHabit: false,
-            localFileName: draft.localFileName
-        )
     }
 
     func finishCheckIn(
@@ -423,6 +395,8 @@ extension ProgressPhotoAttachSheet {
     func targetMetrics(
         userId: String,
         diaryDate: Date,
+        provenance: WeeklyPhotoProvenance,
+        originalURL: URL,
         writeAdmission: @escaping CoreDataManager.WriteAdmission
     ) async throws -> PhotoMetricsUpdateResult {
         if let targetMetric, Calendar.current.isDate(targetMetric.date, inSameDayAs: diaryDate) {
@@ -433,10 +407,9 @@ extension ProgressPhotoAttachSheet {
             )
         }
 
-        return try await PhotoMetadataService.shared.createOrUpdateMetricsForPhotoUpload(
-            for: diaryDate,
-            userId: userId,
-            writeAdmission: writeAdmission
+        let metrics = try await PhotoMetadataService.shared.createWeeklyPhotoObservation(
+            userId: userId, provenance: provenance, originalURL: originalURL, writeAdmission: writeAdmission
         )
+        return PhotoMetricsUpdateResult(metrics: metrics, createdNewEntry: true)
     }
 }

@@ -1,25 +1,61 @@
 [
   {
-    "fingerprint": "dependency-parity-covers-pnpm-lockfile",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1810",
-    "correction": "PR #1810 repair, fix-red-1423773703 occurrence 46 in 14 days: merge origin/main without rebasing, retain the @radix-ui/react-toggle-group 1.2.1 update, read failing logs and extend the existing repair machine. Detect Changes and parity reject the stale source map; CI Summary reflects that failure. Vercel reports Deployment was blocked and its details API requires authentication. The harness owns pushing and PR updates.",
-    "mechanization": "Extend the existing source-parity registry to fingerprint pnpm-lock.yaml, covering lockfile-only dependency updates as well as manifest bumps. Two real-Git regressions in the existing required Detect Changes pre-commit suite fail against the previous registry because lockfile-only drift passes parity. Both dependency repair modes must reject failed frozen verification without artifact or index changes, retain manifest and lockfile bytes, record the new lockfile fingerprint, pass parity and remain idempotent. Use the existing --verify-lockfile repair on this Radix update with pinned pnpm and unchanged resolutions. The required origin/main merge is already up to date. The harness must add exactly one PR-body line: Machine: built repository-docs.json. Fresh hosted checks and the external Vercel block remain unverified until publication; no gate or provider control is relaxed.",
+    "fingerprint": "dependency-repair-verification-created-inputs",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1752",
+    "correction": "PR #1752, fix-red-1423773703 occurrence 49: the Vitest 5.1.0 bump in the root and shared-lib manifests left the generated source map stale, failing Detect Changes, parity and CI Summary. Recurring dependency repair must reject a workspace manifest created while pnpm is verifying inputs.",
+    "mechanization": "Extend both existing dependency repair modes to repeat the untracked and ignored input preflight after pnpm verification and before staging. Two real-Git regressions fail while the previous helper regenerates the projection and pass after the refusal, preserving the index, lockfile, projection and created manifest, then succeed on retry and stay idempotent. The existing required Detect Changes pre-commit suite runs them. Merge origin/main without rebasing and use the extended --verify-lockfile helper so the valid Vitest 5.1.0 lockfile is checked frozen and offline before the source map is staged. Frozen installation and parity gates stay intact. The harness owns pushing and PR updates and must put exactly one line in the PR body: Machine: built scripts/resolve-repository-docs.py.",
     "classification": {
       "codebase": {
-        "feasible": false,
-        "rationale": "External dependency bot commits do not run local commit hooks. Product code cannot prevent a bot from omitting generated documentation; the existing parity gate and repair command own this dependency boundary."
-      },
-      "static": {
         "feasible": true,
-        "rationale": "Registering the canonical pnpm lockfile in the existing required source-parity guard deterministically rejects stale projections for every resolved dependency update, including changes that leave all manifests unchanged. The existing frozen repair refreshes the projection without changing valid dependency resolutions."
+        "rationale": "The dependency repair helper already owns the preflight, frozen verification and artifact rollback. Repeating that preflight after pnpm stops a manifest created during verification from being treated as a reviewed input."
       }
     },
     "guard": {
-      "path": "repository-docs.json",
-      "anchor": "\"path\": \"pnpm-lock.yaml\""
+      "path": "scripts/resolve-repository-docs-created-inputs.test-support.mjs",
+      "anchor": "refuses an untracked workspace manifest created during verification"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "home-photo-stage-reserved-aspect",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44709065326/job/136197157671",
+    "correction": "PR #1837 / LYB-291 repair, fix-red-1a39536f40 occurrence 6: JavaScript/TypeScript run 44709065326 failed glass-filmstrip and personal-body-estimate source contracts after main moved the Home card onto HomeV2StageReservation. CI Summary failed only because that job failed. Merge origin/main without rebasing and keep the adherence-window detector.",
+    "mechanization": "Extend the Home source contracts with one reservation checker. The surface must size the timeline through HomeV2StageReservation, and that reservation must keep a photo on the shared frame with HomeV2Tokens.photoAspectRatio. The estimate canvas must stay on that reserved stage. The inline call-site formula fails the checker; dropping the aspect ratio fails it; the merged tree passes. Both existing required shared-lib tests call the checker. No gate, timeout, or assertion outside this contract is relaxed. The harness owns push and PR edits and must add exactly one line: Machine: built packages/shared-lib/src/home-stage-reservation.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The Home view cannot stop a shared-lib source contract from pinning a call-site formula after an iOS-only change moves that formula into HomeV2StageReservation. The JavaScript job does not run for that iOS-only change."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib suite can require the surface and the estimate overlay to use HomeV2StageReservation, and require that reservation to keep the photo presentation on HomeV2Tokens.photoAspectRatio."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/home-stage-reservation.ts",
+      "anchor": "Source contracts follow HomeV2StageReservation"
     },
     "level": "static",
-    "ruleId": "ci-invariant"
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "uptime-probe-clean-merge-source-map-repair",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44613098410/job/135874773505",
+    "correction": "PR #1828 LYB-386, fix-red-1423773703 occurrence 22: merge main and repair Detect Changes, CI Summary and parity after a bot commit leaves the repository source map stale. The harness owns push and PR updates.",
+    "mechanization": "Extend the existing staged source-map repair to clean automatic merges via the pre-merge-commit hook. When regeneration changes the index, stop the automatic merge because Git has already prepared its tree; review and finish with a normal commit. A real-Git regression checks stale detection, staged repair, refusal to commit the stale tree, and the finished commit. The required Detect Changes test suite executes it. Use the staged resolver for this PR. The harness must add exactly one PR-body line: Machine: built .husky/pre-merge-commit.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The local merge hook can invoke the existing index-safe repair and prevent a stale automatic merge commit, while CI continues to detect bot commits that bypass hooks."
+      }
+    },
+    "guard": {
+      "path": ".husky/pre-merge-commit",
+      "anchor": "Source map refreshed; review the staged merge and run git commit."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "launch-recovery-readiness-avoids-redundant-polling",
@@ -6784,6 +6820,28 @@
     "ruleId": "type-or-schema"
   },
   {
+    "fingerprint": "dependency-parity-covers-pnpm-lockfile",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1810",
+    "correction": "PR #1810 repair, fix-red-1423773703 occurrence 46 in 14 days: merge origin/main without rebasing, retain the @radix-ui/react-toggle-group 1.2.1 update, read failing logs and extend the existing repair machine. Detect Changes and parity reject the stale source map; CI Summary reflects that failure. Vercel reports Deployment was blocked and its details API requires authentication. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing source-parity registry to fingerprint pnpm-lock.yaml, covering lockfile-only dependency updates as well as manifest bumps. Two real-Git regressions in the existing required Detect Changes pre-commit suite fail against the previous registry because lockfile-only drift passes parity. Both dependency repair modes must reject failed frozen verification without artifact or index changes, retain manifest and lockfile bytes, record the new lockfile fingerprint, pass parity and remain idempotent. Use the existing --verify-lockfile repair on this Radix update with pinned pnpm and unchanged resolutions. The harness must add exactly one PR-body line: Machine: built repository-docs.json. Fresh hosted checks and the external Vercel block remain unverified until publication; no gate or provider control is relaxed.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "External dependency bot commits do not run local commit hooks. Product code cannot prevent a bot from omitting generated documentation; the existing parity gate and repair command own this dependency boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "Registering the canonical pnpm lockfile in the existing required source-parity guard deterministically rejects stale projections for every resolved dependency update, including changes that leave all manifests unchanged. The existing frozen repair refreshes the projection without changing valid dependency resolutions."
+      }
+    },
+    "guard": {
+      "path": "repository-docs.json",
+      "anchor": "\"path\": \"pnpm-lock.yaml\""
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "reviewed-audit-pin-follows-explicit-digest",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1746",
     "correction": "PR #1746 / LYB-343, fix-red-d96bbbfa0f occurrence 5: Mac Runner Routing Tests rejected the dated-recovery launch audit because REVIEWED_AUDIT_SHA256 stayed at the previous digest after launch-quality-audit.sh selected each recovery case on its own. Merge origin/main without rebasing and keep goal-relative stats.",
@@ -8553,6 +8611,293 @@
     "guard": {
       "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
       "anchor": "let addition = attempt == 0 && current.isEmpty"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-ignored-workspace-configuration",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1809",
+    "correction": "PR #1809, fix-red-1423773703 occurrence 45: merge origin/main without rebasing, preserve the Playwright 1.65.0 update, and repair the stale source map reported by Detect Changes and parity. CI Summary reflects that failure; Vercel separately reports Deployment was blocked. Extend and use the existing dependency-repair machine, leaving pushes and PR edits to the harness.",
+    "mechanization": "Extend the existing ignored-input preflight to refuse an ignored pnpm-workspace.yaml before invoking pnpm in both dependency repair modes. Two real-Git regressions fail before the extension and pass afterward, proving artifacts and index remain unchanged, local workspace configuration survives refusal, and retry remains idempotent after that local input is removed. The existing required Detect Changes pre-commit-lint suite imports these cases. Use the extended --verify-lockfile helper to verify the unchanged bot lockfile and regenerate the staged source map. The harness must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py. No CI or provider gate is relaxed; Vercel's provider block still needs external verification.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency-repair preflight owns pnpm's local resolution inputs. Rejecting ignored workspace configuration prevents package discovery from using configuration absent from the reviewed index and CI checkout."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Ignored workspace configuration must not alter package discovery."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-ignored-lockfile",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1808",
+    "correction": "PR #1808, fix-red-1423773703 occurrence 21: merge origin/main without rebasing, preserve the navigation-menu 1.4.1 bump, and repair stale source parity reported by Detect Changes and parity. CI Summary reflects that failure; Vercel separately reports Deployment was blocked. Extend and use the dependency-repair machine; the harness owns pushes and PR edits.",
+    "mechanization": "Extend the existing dependency-input preflight to refuse an ignored pnpm-lock.yaml before invoking pnpm in both repair modes. The two real-Git regressions fail before this extension and pass afterward, preserving the index, lockfile, source map and local input on refusal, then proving retry and idempotence after staging the reviewed lockfile. The existing required Detect Changes pre-commit-lint suite imports these cases. Use the extended --verify-lockfile helper to verify the merged lockfile without changing resolutions and refresh the source map. The harness must include exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py. No CI or deployment gate is relaxed; Vercel requires fresh external evidence after push.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency repair preflight owns local resolver inputs. Rejecting an ignored lockfile prevents frozen verification from trusting resolutions absent from the reviewed index and CI checkout, and refuses refresh before pnpm can mutate artifacts."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Ignored lockfiles must not supply unreviewed resolutions."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "company-size-growth-stays-within-baseline",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1824",
+    "correction": "LYB-299 PR #1824 fix-red-f8dba15025 occurrence 9: Company Guards rejects training/service.ts growth from 870 to 905 lines. Merge origin/main and preserve the approved swap persistence behavior.",
+    "mechanization": "Extend the required company size ratchet to fail closed when a listed source cannot be read, with a regression that fails before the fix. Extract swap prescription helpers without raising the size baseline. The harness owns the PR body and must add exactly one line: Machine: built packages/shared-lib/scripts/company-size-ratchet.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Splitting these three files clears the current company size failures, but the product modules cannot stop a later edit from growing another source file past the company size baseline."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The correction ratchet runs the company size scanner on the git snapshot, so a baselined file that grows or a new file over 500 lines fails before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/company-size-ratchet.mjs",
+      "anchor": "Baselined files may not grow.",
+      "ratchet": {
+        "baseline": "packages/shared-lib/company-size-ratchet-baseline.json"
+      }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "export-snapshot-equatable-and-async-xctest-repair",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44607915041/job/135857884635",
+    "correction": "PR #1827 LYB-383: Launch Quality cannot synthesize Equatable for export snapshots containing non-Equatable DailyLog values. The same test target also places await directly in synchronous XCTest assertion autoclosures.",
+    "mechanization": "Remove unused snapshot equality conformances and await task results before asserting. Extend the existing required native-source evidence suite to reject a direct await as the first argument to an XCTest assertion across both test targets. Its repository regression fails on the original tests and passes after repair. The native compiler remains the authoritative conformance and test build gate. The harness owns PR edits and must add exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Removing unused equality prevents the current invalid conformance, but product code cannot prevent later async expressions in XCTest autoclosures."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required shared-lib suite can detect a direct await as the first XCTest assertion argument before native compilation."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "keeps direct awaits out of XCTest autoclosures in %s"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "export-snapshot-save-requires-last-modified",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44612154128/job/135872876903",
+    "correction": "PR 1827 LYB-383 Launch Quality run 44612154128 failed testExportSnapshotsComeFromABackgroundContext because the in-memory seed saved CachedBodyMetrics and CachedDailyMetrics without required lastModified. CI Summary failed only because Launch Quality failed.",
+    "mechanization": "Assign lastModified on both seeded rows before save. Extend the existing required launch-quality evidence suite with a source scan that rejects a later saved cache row missing that assignment, including a comment-only assignment. The scan fails on the original seed and passes after the repair, and it accepts a full attribute copy, a delete-before-save, and a forKey assignment. The fetched origin/main is already an ancestor, so the required merge adds no commit. Native execution remains on the Mac runner. The harness owns push and PR edits and must add exactly one line: Machine: built packages/shared-lib/src/launch-quality-evidence.test.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The model already rejects a nil lastModified when the native test saves, but that check does not run until Launch Quality and cannot stop the fixture from being committed."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required shared-lib suite can reject a cached metric save that never assigns lastModified before the native runner starts."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "saves cached body and daily metrics with required lastModified"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "lyb-64-installed-evidence-nonpassing-traces",
+    "source": "https://linear.app/jovie/issue/LYB-64",
+    "correction": "LYB-64 requires failed, skipped, timed-out, unavailable and stale native coverage never to be reported as passing. The installed-build xcresult adapter accepted a passing trace while discarding a non-passing repetition and manufactured negative retry and infrastructure-skip accounting when those fields were absent.",
+    "mechanization": "Extend the existing installed-build xcresult adapter to reject every non-passing trace and require explicit negative retry and infrastructure-skip accounting. Its existing required shared-lib suite runs a deliberate-red regression that fails on the previous adapter and passes after repair. This is evidence-accounting protection only; native, installed-device and TestFlight certification remain unverified. Machine: built packages/shared-lib/src/installed-build-xcresult.ts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing receipt adapter owns conversion of native traces and run accounting into certification evidence and can refuse incomplete or non-passing inputs before emitting a receipt."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/installed-build-xcresult.ts",
+      "anchor": "non-passing-trace:"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-380-automatic-ledger-merge-verification",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1830",
+    "correction": "PR #1830 LYB-380, fix-red-e3b0c44298 occurrence 116: merge origin/main without rebasing to resolve a correction ledger conflict; no checks have failed.",
+    "mechanization": "Use the existing correction ledger merge driver and extend its required real-Git regression to run the staged verifier after an automatic union, reject a staged ledger missing a parent receipt, and accept the restored union. Verify this merge against both parents with the same classifier. The harness owns PR edits and must add exactly one line: Machine: built scripts/correction-classifier-concurrency.test.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The existing driver already automatically unions additive receipts and the verifier rejects regressions; the missing protection is a combined regression exercising both in the same Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required classifier fixture can exercise an automatic merge and assert that staged verification rejects a dropped parent receipt."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier-concurrency.test.mjs",
+      "anchor": "configured git merge unions consecutive correction ledgers and keeps divergent edits conflicted"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "xctest-await-and-optional-accuracy",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44617120870",
+    "correction": "PR #1830 / LYB-380, fix-red-5df69c1e5f occurrence 14: Launch Quality run 44617120870 fails to compile ProgressPhotoImagePipelineTests and ImageCacheServiceTests. await sits inside XCTUnwrap, and optional pixel widths are passed to XCTAssertEqual accuracy. CI Summary fails only because that job fails. origin/main is already merged. The harness owns push and PR edits.",
+    "mechanization": "Extend the existing optional-CGFloat launch audit to reject await inside an XCTest autoclosure and an uncoalesced optional chain in an accuracy assertion. The audit reports those five findings on the failing sources and none after awaiting outside XCTUnwrap and unwrapping the bitmap. Coalesced values and XCTUnwrap or Double wrappers stay allowed. The existing required launch UI behavior suite covers the failing shapes, the repaired calls and the wired contribute hook. Keep every product assertion, selector, timeout and gate. The harness must add exactly one PR-body line: Machine: built scripts/ios/launch_ui_opacity_audit.py. Native execution remains for the macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Sized photo decode stays async. Production code cannot stop a later test from placing await inside an XCTest autoclosure or passing an optional pixel width to an accuracy assertion."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing launch UI opacity audit already rejects optional CGFloat conversions that fail to compile. Extending that audit rejects both recorded XCTest shapes before Launch Quality builds."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch_ui_opacity_audit.py",
+      "anchor": "Await outside an XCTest autoclosure; unwrap optional pixels before accuracy."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "performance-signpost-registry-contract-merge",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1830",
+    "correction": "PR #1830 / LYB-380, fix-red-e3b0c44298 occurrence 114: merge main's opt-in performance tracing with timeline photo instrumentation and retain the decode signpost in the surface contract.",
+    "mechanization": "Extend the required Swift performance audit to reject a missing or nonliteral Swift signpost registry and names absent from the performance contract. Its behavior tests cover missing and valid registrations. The merged checkout failed both the existing call check and the new registry check before the contract entry was added; both pass afterward. The harness owns the PR body and must add exactly one line: Machine: built scripts/ios/swift_performance_scan.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The Swift registry and JSON surface contract are maintained in different languages and cannot share a runtime definition without changing the instrumentation architecture."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing performance audit can compare the literal Swift registry against the contract during the required static audit."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/swift_performance_scan.py",
+      "anchor": "Keep the Swift test registry aligned with the merged performance contract."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "launch-repair-required-model-fixture",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44637333971/job/135960119530",
+    "correction": "PR #1831 / LYB-379, fix-red-5df69c1e5f: Launch Quality failed saving a body metric fixture with nil required timestamps before the repair ran; CI Summary reflects that failure.",
+    "mechanization": "Use valid required timestamps and retain the missing localDate repair scenario. Extend the existing required metric boundary suite to inspect directly inserted body metric fixtures against the current Core Data model and reject explicit nil assignments to required attributes before a save. The real fixture fails for createdAt, date and updatedAt before the repair and passes afterwards; negative controls cover required and optional fields. The harness owns push and PR edits and must add exactly one line: Machine: built packages/shared-lib/src/metric-correction-boundary.test.ts. Native execution remains unverified on Linux.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Core Data already enforces mandatory fields at save time; intentional validation-failure tests must remain possible, so the fixture cannot be made valid by a production model change."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required metric boundary suite can compare direct fixture insertions and explicit nil assignments against the active model before native execution."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/metric-correction-boundary.test.ts",
+      "anchor": "keeps inserted body metric test fixtures compatible with the current model"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "merge-independent-python-functions",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1831",
+    "correction": "PR #1831 / LYB-379, fix-red-e3b0c44298 occurrence 118: merge main without rebasing and preserve independent performance scanner functions and tests from both parents.",
+    "mechanization": "Extend the existing merge repair resolver with a review-only union for independently inserted Python functions. The real Git regression fails against the previous resolver and passes with the extension, including refusal of conflicting replacements. Use the resolver for both performance scanner conflicts. The required pre-commit lint suite imports the resolver tests. The harness owns PR edits and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Independent branch additions cannot be prevented from colliding at a shared insertion point by production code."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing merge repair tool can propose a conservative union from immutable Git stages and refuse overlapping changes."
+      }
+    },
+    "guard": {
+      "path": "scripts/python_union.py",
+      "anchor": "Propose a reviewed union of independently inserted Python functions."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44689925709/job/136134110584",
+    "correction": "PR #1834 / LYB-382, fix-red-5df69c1e5f occurrence 16: Launch Quality run 44689925709 failed MetricStatsSeriesStoreTests because the only daily body-fat sample was after the selected date, so the summary returned nil instead of 20. CI Summary failed only because that job failed. origin/main is already merged. The harness owns push and PR edits.",
+    "mechanization": "Keep the selected-date observation rule and place a daily body-fat sample of 20 on that date, distinct from the trend sample of 99. Extend the existing launch-quality evidence suite to reject a future-only daily sample, a trend-cache body-fat summary, a dropped selected date, and an assertion that expects the trend value. The real fixture failed those checks before the repair and passes after it. The evidence file stays at its size baseline by loading scripts/ios/stats_series_daily_cache.py. Keep every native assertion, selector, timeout and gate. The harness must add exactly one PR-body line: Machine: built scripts/ios/test_launch_quality_evidence.py. Native execution remains for the macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture launcher owns deadlines, diagnostics and descendant lifetime for every shell contract case, preventing opaque timeouts and orphan pipelines by construction without changing product behavior or native qualification gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "os.killpg(process.pid, signal.SIGKILL)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/44695708691/job/136153002163",
+    "correction": "PR #1834 / LYB-382, fix-red-5df69c1e5f occurrence 17: Launch Quality run 44695708691 failed testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance because the weight card showed the smoothed trend 181.7 while the detail headline stayed on the daily sample 181.0. CI Summary failed only because that job failed. origin/main is already merged. The harness owns push and PR edits.",
+    "mechanization": "Keep the selected-date observation rule and read weight summaries from the daily chart, distinct from the trend samples 70 and 71. Extend the existing launch-quality evidence suite to reject a trend-cache weight summary, a dropped selected date, matching daily and trend weights, and an assertion that expects the trend value. The real fixture failed those checks before the repair and passes after it. The evidence file stays at its size baseline by loading scripts/ios/stats_series_daily_cache.py. Keep every native assertion, selector, timeout and gate. The harness must add exactly one PR-body line: Machine: built scripts/ios/stats_series_daily_cache.py. Native execution remains for the macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture launcher owns deadlines, diagnostics and descendant lifetime for every shell contract case, preventing opaque timeouts and orphan pipelines by construction without changing product behavior or native qualification gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "os.killpg(process.pid, signal.SIGKILL)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-hidden-lockfile-drift",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1757",
+    "correction": "PR #1757, fix-red-1423773703 occurrence 54: merge origin/main without rebasing and preserve the @radix-ui/react-label 2.1.17 update. Detect Changes and parity reject the stale generated source map, causing CI Summary to fail. Frozen verification must also reject lockfile rewrites that assume-unchanged and skip-worktree hide from git diff.",
+    "mechanization": "Extend the existing dependency repair helper to compare filtered worktree hashes after frozen verification, including assume-unchanged and skip-worktree lockfile rewrites. Four real-Git regressions fail before the comparison and pass afterward, proving refusal, restored artifacts, retry and idempotence for both repair modes. The existing required pre-commit suite runs them with the prior drift cases. Use the extended --verify-lockfile helper to verify the merged bot lockfile and regenerate the source map. Preserve frozen installs and every CI gate. The harness owns push and PR edits and must include exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The repair helper already owns dependency verification and artifact rollback. Comparing the filtered worktree hash with the index catches hidden lockfile rewrites before a projection is staged, without relaxing frozen installs."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "assume-unchanged bits cannot hide lockfile edits"
     },
     "level": "codebase",
     "ruleId": "code-prevention"

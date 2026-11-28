@@ -12,6 +12,23 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class HomeInteractionAuditTests:
+    def test_reserved_stage_keeps_one_content_aware_budget(self):
+        from launch_ui_home_interaction_audit import check_home_interactions
+        from test_launch_ui_audit_support import AUDIT
+        path = self.app / "Views/HomeV2/HomeV2Tokens.swift"
+        source = path.read_text()
+
+        def rejected(text):
+            path.write_text(text)
+            found = []
+            check_home_interactions(self.root, found, AUDIT.AuditViolation)
+            return any(item.check == "home.reserved_stage_budget" for item in found)
+
+        self.assertFalse(rejected(source))
+        self.assertTrue(rejected(source.replace("contentHeight: CGFloat,", "presentation: HomeV2StagePresentation", 1)))
+        self.assertTrue(rejected(source.replace("func homeV2ReservedStage(_ stage: CGSize)", "func size(width: CGFloat, presentation:", 1)))
+        self.assertFalse(rejected(source))
+
     def test_synthetic_batch_retains_focus_exact_readback_and_partial_input_recovery(self):
         destination = self.root / "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift"
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -89,6 +106,48 @@ class HomeInteractionAuditTests:
                     self.assertEqual(found[0].file, str(path.relative_to(self.root)))
                     path.write_text(originals[path])
         self.assertEqual(findings(), [])
+
+    def test_xctest_compile_shapes_reject_await_and_optional_accuracy(self):
+        import launch_ui_opacity_audit as opacity
+        import launch_ui_timeline_audit as sources
+
+        root = Path(__file__).resolve().parents[2]
+        paths = [
+            root / "apps/ios/LogYourBodyTests/ProgressPhotoImagePipelineTests.swift",
+            root / "apps/ios/LogYourBodyTests/ImageCacheServiceTests.swift",
+        ]
+        texts = {path: path.read_text() for path in paths}
+        clean = []
+        opacity.check_xctest_compile_shapes(root, paths, clean, texts)
+        self.assertEqual(clean, [])
+        samples = (
+            ({paths[0]: "let image = try XCTUnwrap(\n    await decode(from: data)\n)\n"},
+             "swift.xctest_async_autoclosure"),
+            ({paths[1]: "XCTAssertEqual(small?.size.width, 40, accuracy: 0.5)\n"},
+             "swift.xctest_optional_accuracy"),
+        )
+        for sample, check in samples:
+            found = []
+            opacity.check_xctest_compile_shapes(root, list(sample), found, sample)
+            self.assertEqual([item.check for item in found], [check])
+        allowed = {paths[1]: (
+            "let image = await decode(from: data)\n"
+            "let decoded = try XCTUnwrap(image)\n"
+            "XCTAssertEqual(decoded.size.width, 40, accuracy: 0.5)\n"
+            "XCTAssertEqual(rows.first?.weight ?? 0, 1, accuracy: 0.1)\n"
+            "XCTAssertEqual(try XCTUnwrap(item?.value), 1, accuracy: 0.1)\n"
+        )}
+        found = []
+        opacity.check_xctest_compile_shapes(root, list(allowed), found, allowed)
+        self.assertEqual(found, [])
+        previous = sources.SWIFT_SOURCES
+        try:
+            sources.SWIFT_SOURCES = samples[0][0]
+            wired = []
+            opacity.contribute(root, root, wired, None, None)
+            self.assertEqual([item.check for item in wired], ["swift.xctest_async_autoclosure"])
+        finally:
+            sources.SWIFT_SOURCES = previous
 
     def test_opacity_binding_parses_reuse_content_without_hiding_type_changes(self):
         from unittest.mock import patch

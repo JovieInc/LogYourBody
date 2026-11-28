@@ -10,6 +10,7 @@ import { lintArguments } from './pre-commit-lint.mjs';
 import { resolver, sourceMapFixture } from './resolve-repository-docs.test.mjs';
 import './resolve-repository-docs-json.test.mjs';
 import './resolve-repository-docs-dependency.test.mjs';
+import './resolve-repository-docs-index-flags.test.mjs';
 import './resolve-repository-docs-ledger.test.mjs';
 import './resolve-repository-docs-pin.test.mjs';
 import './resolve-repository-docs-project.test.mjs';
@@ -26,6 +27,46 @@ const env = {
   GIT_CONFIG_GLOBAL: '/dev/null',
 };
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, env, encoding: 'utf8' }).trim();
+
+test('clean merge hook stages a stale source map and stops for a reviewed commit', (t) => {
+  const f = sourceMapFixture(t);
+  f.git('switch', '-q', 'theirs');
+  fs.writeFileSync(path.join(f.root, 'unrelated.txt'), 'incoming\n');
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  fs.writeFileSync(path.join(f.root, 'a.txt'), 'bot change\n');
+  f.commit();
+  const check = () => spawnSync('python3', [resolver.replace('resolve-repository-docs.py', 'repository_docs.py'),
+    '--root', f.root], { env, encoding: 'utf8' });
+  assert.notEqual(check().status, 0, 'fixture reproduces stale source projection');
+  fs.mkdirSync(path.join(f.root, 'scripts'));
+  const scripts = path.dirname(resolver);
+  for (const file of fs.readdirSync(scripts).filter((name) => name.endsWith('.py'))) {
+    fs.copyFileSync(path.join(scripts, file), path.join(f.root, 'scripts', file));
+  }
+  fs.mkdirSync(path.join(f.root, 'hooks'));
+  fs.copyFileSync(fileURLToPath(new URL('../.husky/pre-merge-commit', import.meta.url)),
+    path.join(f.root, 'hooks/pre-merge-commit'));
+  fs.chmodSync(path.join(f.root, 'hooks/pre-merge-commit'), 0o755);
+  fs.appendFileSync(path.join(f.root, '.git/info/exclude'), '\nscripts/\nhooks/\n');
+  f.git('config', 'core.hooksPath', 'hooks');
+  const merge = spawnSync('git', ['merge', '--no-edit', 'theirs'], { cwd: f.root, env, encoding: 'utf8' });
+  assert.notEqual(merge.status, 0, 'Git must not commit its already prepared stale tree');
+  assert.match(merge.stderr, /Source map refreshed/);
+  assert.equal(check().status, 0, check().stdout + check().stderr);
+  assert.match(f.git('show', ':SOURCES.md'), new RegExp(createHash('sha256').update('bot change\n').digest('hex')));
+  f.git('commit', '-qm', 'finish merge');
+  assert.match(f.git('show', 'HEAD:SOURCES.md'), new RegExp(createHash('sha256').update('bot change\n').digest('hex')));
+  f.git('switch', '-qc', 'next');
+  fs.writeFileSync(path.join(f.root, 'next.txt'), 'next\n');
+  f.commit();
+  f.git('switch', '-q', 'ours');
+  fs.writeFileSync(path.join(f.root, 'ours.txt'), 'ours\n');
+  f.commit();
+  const cleanMerge = spawnSync('git', ['merge', '--no-edit', 'next'], { cwd: f.root, env, encoding: 'utf8' });
+  assert.equal(cleanMerge.status, 0, cleanMerge.stdout + cleanMerge.stderr);
+  assert.equal(check().status, 0, check().stdout + check().stderr);
+});
 
 for (const mode of ['--verify-lockfile', '--refresh-lockfile']) {
   test(`dependency repair ${mode} detects and repairs lockfile-only source drift`, (t) => {

@@ -77,19 +77,26 @@ describe('WaitlistForm', () => {
     expect(JSON.stringify(track.mock.calls)).not.toContain('test_campaign');
   });
 
-  it('announces invalid email without making a request', async () => {
-    render(<WaitlistForm {...landing} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Request early access' }));
+  it.each(['', 'invalid', 'user@localhost', `${'a'.repeat(254)}@example.com`])(
+    'returns focus for invalid email without making a request',
+    async (value) => {
+      render(<WaitlistForm {...landing} />);
+      const email = screen.getByRole('textbox', { name: 'Email' });
+      fireEvent.change(email, { target: { value } });
+      fireEvent.click(screen.getByRole('button', { name: 'Request early access' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid email address.');
-    expect(fetchMock).not.toHaveBeenCalled();
-    await waitFor(() =>
-      expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
-        ...outcomeAttribution,
-        outcome: 'invalid',
-      }),
-    );
-  });
+      expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid email address.');
+      expect(email).toHaveFocus();
+      expect(email).toHaveValue(value);
+      expect(fetchMock).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
+          ...outcomeAttribution,
+          outcome: 'invalid',
+        }),
+      );
+    },
+  );
 
   it('returns server-side validation feedback to an editable form', async () => {
     fetchMock.mockResolvedValueOnce({
