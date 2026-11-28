@@ -177,25 +177,7 @@ The required `iOS` and `iOS Launch Quality Gate` jobs always use standard hosted
 availability, heartbeat state, and `MAC_RUNNER`; setting that variable cannot
 reroute either required job. Existing tests and quality gates remain required.
 
-Self-hosted Macs are optional capacity pending successful setup qualification and
-measured pickup time, execution time, and reliability benefit. A fresh heartbeat
-is not a capacity reservation: a Mac can become busy or disappear after the
-probe, and GitHub does not switch a queued self-hosted job to hosted macOS. Job
-execution timeouts do not bound that queue wait. No dispatcher or duplicate
-product/release execution path is introduced.
-
-The shared Mac workflow is manual only and cannot gate required CI. After it is
-on `main`, request a secretless setup canary explicitly:
-
-```sh
-gh workflow run mac-runner-heartbeat.yml --repo JovieInc/LogYourBody --ref main \
-  -f verify-ios-setup=true
-```
-
-Inspect the **Self-hosted iOS setup canary** job, its recorded runner name, and
-Xcode, pinned SwiftLint, xcbeautify, Ruby/Bundler and `bundle check` output. Setup
-or heartbeat success alone does not demonstrate shipping benefit or authorize
-routing required builds onto the shared Macs.
+The shared self-hosted Mac pool is retired; the manual heartbeat and setup canary have been removed.
 
 CI tests this hosted policy and the diagnostic heartbeat helpers with Bashcov
 4.0.0, requiring at least 80% executed-line coverage for each helper. The coverage

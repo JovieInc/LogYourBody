@@ -415,11 +415,9 @@ struct LogYourBodyApp: App {
 
     @MainActor
     private func scheduleDeferredMaintenance() {
+        let container = persistenceController.persistentContainer
         Task.detached(priority: .utility) {
-            let repairedCount = await CoreDataManager.shared.repairCorruptedEntries()
-            if repairedCount > 0 {
-                // print("🔧 App startup: Repaired \(repairedCount) corrupted entries")
-            }
+            await BodyMetricLaunchRepair.runOnBackgroundContext(container: container)
         }
 
         Task.detached(priority: .utility) {
@@ -467,10 +465,7 @@ struct LogYourBodyApp: App {
             arguments.contains("-lybUITestBodyScoreFirstPhotoFixture")
         let usesDailyReminderPromptFixture = arguments.contains("-lybUITestDailyReminderPromptFixture")
 
-        guard usesPaidFixture || usesWeightLoggerFixture || usesPaywallFixture || usesPaywallPlansFixture ||
-            usesFullDashboardFixture || usesPhotoTimelineHUDFixture || usesBodyScoreOnboardingFixture else {
-            return false
-        }
+        guard !RealtimeSyncManager.online(true, arguments) else { return false }
 
         let isSubscribed = usesPaidFixture ||
             usesWeightLoggerFixture ||
@@ -553,9 +548,7 @@ struct LogYourBodyApp: App {
         UserDefaults.standard.removeObject(forKey: Constants.goalWeightKey)
         OnboardingStateManager.shared.updateCompletionStatus(!usesBodyScoreOnboardingFixture)
 
-        realtimeSyncManager.isOnline = false
-        realtimeSyncManager.syncStatus = .offline
-        realtimeSyncManager.pendingSyncCount = 0
+        realtimeSyncManager.applyOfflineUITestFixture()
 
         // These data-only aliases exercise the ordinary Home policy without
         // the HomeV2 fixture arguments that force a particular rollout state.
@@ -845,7 +838,7 @@ struct LogYourBodyApp: App {
             isAuthenticated: authManager.isAuthenticated,
             user: user,
             hasCompletedOnboarding: OnboardingStateManager.shared.hasCompletedCurrentVersion(for: user?.id),
-            isSubscribed: subscriptionManager.isSubscribed
+            isSubscribed: subscriptionManager.isSubscribed, datedOutcomeEnabled: DatedOutcomeEntry.isEnabled()
         )
     }
 }

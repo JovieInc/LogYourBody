@@ -1,0 +1,58 @@
+# Symphony routing proposal for LYB-386. Install as
+# .github/workflows/lyb-386-uptime-probe.yml through Symphony only.
+# The existing production Deploy completion is an event source. An existing
+# authenticated alert/webhook bridge may also dispatch this event for LYB
+# production deployment or availability changes. The payload is only a wakeup.
+# Keep the dead-man timer until an external availability event source covers
+# silent outages and recoveries between deployments.
+# Verify the existing Slack webhook targets the LYB on-call channel before
+# enabling this route with LYB_UPTIME_PROBE_ENABLED=true.
+# At cutover, retire the legacy synthetic-monitoring schedule/manual HTTP path
+# in remediation-signal.yml to avoid a second Linear issue for the same outage.
+# Preserve its CI and Deploy remediation signals.
+name: LYB public uptime probe
+
+on:
+  repository_dispatch:
+    types: [lyb-production-availability]
+  workflow_run:
+    workflows: [Deploy]
+    types: [completed]
+  schedule:
+    - cron: '3,13,23,33,43,53 * * * *'
+
+permissions:
+  contents: read
+
+# Serialize all sources. Replaced pending runs are safe because each run probes
+# current public state and retrieves prior deliveries from Linear.
+concurrency:
+  group: lyb-386-public-uptime
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: >-
+      github.repository == 'JovieInc/LogYourBody' &&
+      github.ref == 'refs/heads/main' &&
+      vars.LYB_UPTIME_PROBE_ENABLED == 'true' &&
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        (github.event.workflow_run.path || github.event.workflow.path) == '.github/workflows/deploy.yml'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Check public hostname contracts and reconcile incidents
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          LYB_UPTIME_PROBE_ENABLED: ${{ vars.LYB_UPTIME_PROBE_ENABLED }}
+        run: node .github/scripts/lyb-uptime-probe.mjs
