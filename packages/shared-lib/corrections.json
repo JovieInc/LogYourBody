@@ -8612,6 +8612,24 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "dependency-repair-ignored-workspace-configuration",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1811",
+    "correction": "PR #1811 repair, fix-red-1423773703 occurrence 47 in 14 days: merge origin/main without rebasing, preserve the Next.js 15.5.29 update, repair stale source-map failures in Detect Changes and parity, and extend the existing repair machine. CI Summary reflects the Detect Changes failure. Vercel reports Deployment was blocked; its details API returns 403 missing an authentication token. The harness owns pushing and PR updates.",
+    "mechanization": "Keep the existing refusal of an ignored pnpm-workspace.yaml before verification. Extend the required dependency repair test matrix with four real-Git cases for an ignored pnpm-workspace.yaml created during verification or rendering in either repair mode. The tests preserve local workspace configuration, generated artifacts and the index, then retry successfully and remain idempotent. Verify the scoped Next.js 15.5.29 lockfile with frozen pnpm and regenerate the source projection.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency-repair preflight owns pnpm's local resolution inputs. Rejecting ignored workspace configuration prevents package discovery from using configuration absent from the reviewed index and CI checkout."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Ignored workspace configuration must not alter package discovery."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-repair-ignored-lockfile",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1808",
     "correction": "PR #1808, fix-red-1423773703 occurrence 21: merge origin/main without rebasing, preserve the navigation-menu 1.4.1 bump, and repair stale source parity reported by Detect Changes and parity. CI Summary reflects that failure; Vercel separately reports Deployment was blocked. Extend and use the dependency-repair machine; the harness owns pushes and PR edits.",
