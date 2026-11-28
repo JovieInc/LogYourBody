@@ -58,6 +58,46 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "preinstall-hook-guard-reads-generated-husky-files",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1721",
+    "correction": "PR #1721, fix-red-d5dac7802d occurrence 5: Detect Changes in run 42363093442 fails because the merge-hook guard copies ignored .husky/_/h before dependency installation; CI Summary consequently fails. Hook guards must run from tracked source without installed artifacts.",
+    "mechanization": "Extend the install-free pre-commit fixture to run the real tracked merge hook when the source resolver returns 23. Assert exact failure status and preservation of the staged tree and source projection. Keep the existing successful clean-merge and stale-tree refusal cases. The package and lock already resolve Statsig 3.33.7 on main.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The defect is in a pre-install test fixture, so product runtime logic cannot prevent its dependency on ignored generated files."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required hook test can execute the tracked entry in an install-free fixture and verify delegation and failure propagation before any dependency installation."
+      }
+    },
+    "guard": {
+      "path": "scripts/pre-commit-lint.test.mjs",
+      "anchor": "clean merge hook propagates the exact source resolver failure"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "merge-commit-skips-staged-source-map",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1721",
+    "correction": "PR #1721, fix-red-1423773703 occurrence 48: the @statsig/js-client 3.33.7 bump left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, parity and CI Summary. Merging origin/main auto-merged the manifest and the generated map, and the merge commit skipped the staged source-map repair.",
+    "mechanization": "Keep the tracked pre-merge-commit hook that runs the staged source resolver, propagates its failure and stops Git before a stale prepared tree can be committed. Its existing install-free fixture proves successful merge and refusal after artifact changes. The new fixture exercises exact resolver failure propagation.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The merge hook can run the existing staged source-map repair before a merge commit is created, so a clean auto-merge cannot keep a stale projection."
+      }
+    },
+    "guard": {
+      "path": ".husky/pre-merge-commit",
+      "anchor": "python3 scripts/resolve-repository-docs.py --staged || exit $?"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "launch-recovery-readiness-avoids-redundant-polling",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43370783065/job/131706803096",
     "correction": "PR #1798 repair, fix-red-5df69c1e5f occurrence 15 in 14 days: merge origin/main without rebasing, retain Addressable 2.9.1, inspect failed checks, repair Launch Quality and extend the existing machine. The unit suite passes; the UI command reaches its 1800-second cap after 43 passing cases, while repeated recovery and canvas helpers spend one second polling already present controls. CI Summary reflects that timeout. Vercel reports Deployment was blocked; its details API returns 403 missing an authentication token. The harness owns pushing and PR updates.",

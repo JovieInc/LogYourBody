@@ -69,6 +69,26 @@ test('clean merge hook stages a stale source map and stops for a reviewed commit
   assert.equal(check().status, 0, check().stdout + check().stderr);
 });
 
+test('clean merge hook propagates the exact source resolver failure', (t) => {
+  const f = sourceMapFixture(t);
+  const bin = path.join(f.root, 'bin');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'python3'), `#!/bin/sh
+[ "$1" = "scripts/resolve-repository-docs.py" ] && [ "$2" = "--staged" ] || exit 1
+exit 23
+`, { mode: 0o755 });
+  const hook = fileURLToPath(new URL('../.husky/pre-merge-commit', import.meta.url));
+  const before = f.git('write-tree');
+  const projection = fs.readFileSync(path.join(f.root, f.output));
+  const result = spawnSync('sh', [hook], {
+    cwd: f.root, env: { ...env, PATH: `${bin}:${env.PATH}` }, encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 23, result.stdout + result.stderr);
+  assert.equal(f.git('write-tree'), before);
+  assert.deepEqual(fs.readFileSync(path.join(f.root, f.output)), projection);
+});
+
 for (const change of ['edit', 'delete', 'create']) {
   test(`staged Bundler source-map repair preserves a concurrent projection ${change}`, (t) => {
     const f = sourceMapFixture(t);
