@@ -87,7 +87,13 @@ test('distinguishes a valid empty range from invalid input without substituting 
 
 test('rejects multiline, tracker-link, ticket, and oversized note copy with no partial draft', (t) => {
   const { cwd, first, input } = fixture(t);
-  for (const note of ['Test\nsecond line', 'See https://example.invalid/ticket', 'Fix DEMO-123', 'x'.repeat(1000)]) {
+  for (const note of [
+    'Test\nsecond line',
+    'See https://status.logyourbody.com',
+    'See www.example.invalid/ticket',
+    'Fix DEMO-123',
+    'x'.repeat(1000),
+  ]) {
     input.entries = [approval(first, 'Valid public copy.'), approval(input.candidate, note)];
     assert.throws(() => draftTestFlightNotes(input, { cwd }), /single-line|review budget/);
     const result = run(cwd, input);
