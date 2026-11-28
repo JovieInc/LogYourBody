@@ -48,7 +48,7 @@
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^21.2.3",
-    "@typescript-eslint/eslint-plugin": "^8.71.0",
+    "@typescript-eslint/eslint-plugin": "^8.71.2",
     "@typescript-eslint/parser": "^8.71.0",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^9.1.2",
@@ -60,7 +60,7 @@
     "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "rollup": "^4.67.5",
-    "turbo": "^2.11.9",
+    "turbo": "^2.11.10",
     "typescript": "^5.9.3",
     "vitest": "^5.1.0"
   },
@@ -75,7 +75,7 @@
       "prismjs": "1.30.0",
       "@xmldom/xmldom": ">=0.8.15",
       "fflate": ">=0.8.3",
-      "postcss": ">=8.5.23",
+      "postcss": "^8.5.32",
       "vite": "7.3.7",
       "undici": "^8.12.2",
       "fast-uri": "^3.1.9",
@@ -108,7 +108,7 @@
     ]
   },
   "dependencies": {
-    "ai": "^7.0.114",
+    "ai": "^7.0.164",
     "eve": "0.27.13",
     "zod": "^4.6.7"
   }

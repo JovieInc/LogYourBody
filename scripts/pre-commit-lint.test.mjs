@@ -10,12 +10,18 @@ import { lintArguments } from './pre-commit-lint.mjs';
 import { resolver, sourceMapFixture } from './resolve-repository-docs.test.mjs';
 import './resolve-repository-docs-json.test.mjs';
 import './resolve-repository-docs-dependency.test.mjs';
+import './resolve-repository-docs-react-lockfile.test.mjs';
+import './resolve-repository-docs-frozen-lockfile.test-support.mjs';
 import './resolve-repository-docs-index-flags.test.mjs';
+import './resolve-repository-docs-override.test.mjs';
 import './resolve-repository-docs-ledger.test.mjs';
 import './resolve-repository-docs-pin.test.mjs';
 import './resolve-repository-docs-project.test.mjs';
 import './resolve-repository-docs-pin-union.test.mjs';
 import './resolve-repository-docs-manifest.test.mjs';
+import './resolve-repository-docs-lockfile-fingerprint.test.mjs';
+import './resolve-repository-docs-merged-dependency.test.mjs';
+import './resolve-repository-docs-dependency-merge.test.mjs';
 
 const env = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
@@ -68,55 +74,25 @@ test('clean merge hook stages a stale source map and stops for a reviewed commit
   assert.equal(check().status, 0, check().stdout + check().stderr);
 });
 
-for (const mode of ['--verify-lockfile', '--refresh-lockfile']) {
-  test(`dependency repair ${mode} detects and repairs lockfile-only source drift`, (t) => {
-    const f = sourceMapFixture(t);
-    const lockfile = 'pnpm-lock.yaml';
-    const registry = JSON.parse(fs.readFileSync(new URL('../repository-docs.json', import.meta.url), 'utf8'));
-    const configPath = path.join(f.root, 'repository-docs.json');
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    config.sources.push(...registry.sources.filter((item) => item.path === lockfile));
-    fs.writeFileSync(configPath, JSON.stringify(config));
-    const manifest = '{"dependencies":{"example":"^1.0.0"}}\n';
-    fs.writeFileSync(path.join(f.root, 'package.json'), manifest);
-    fs.writeFileSync(path.join(f.root, lockfile), 'reviewed resolution 1.0.0\n');
-    f.generate();
-    f.commit();
-    const bumpedLock = 'reviewed resolution 1.0.1\n';
-    fs.writeFileSync(path.join(f.root, lockfile), bumpedLock);
-    f.git('add', lockfile);
-    const check = () => spawnSync('python3', [resolver.replace('resolve-repository-docs.py', 'repository_docs.py'),
-      '--root', f.root], { env, encoding: 'utf8' });
-    const stale = check();
-    assert.equal(stale.status, 1, 'lockfile-only updates must invalidate source parity');
-    assert.match(stale.stdout, /source projection stale/);
-    const originalProjection = fs.readFileSync(path.join(f.root, f.output));
-    const originalIndex = f.git('ls-files', '--stage');
-    fs.mkdirSync(path.join(f.root, 'bin'));
-    const corepack = path.join(f.root, 'bin/corepack');
-    fs.writeFileSync(corepack, '#!/bin/sh\nexit 23\n', { mode: 0o755 });
-    const repair = () => spawnSync('python3', [resolver, '--root', f.root, mode], {
-      env: { ...env, PATH: `${path.join(f.root, 'bin')}:${env.PATH}` }, encoding: 'utf8',
-    });
-    assert.notEqual(repair().status, 0, 'failed frozen verification must block source repair');
-    assert.deepEqual(fs.readFileSync(path.join(f.root, f.output)), originalProjection);
-    assert.equal(f.git('ls-files', '--stage'), originalIndex);
-    fs.writeFileSync(corepack, '#!/bin/sh\nprintf "%s\\n" "$*" >> pnpm-calls\n', { mode: 0o755 });
-    const repaired = repair();
-    assert.equal(repaired.status, 0, repaired.stderr);
-    assert.match(fs.readFileSync(path.join(f.root, 'pnpm-calls'), 'utf8'),
-      /pnpm install --lockfile-only --ignore-scripts --frozen-lockfile --offline/);
-    assert.equal(fs.readFileSync(path.join(f.root, 'package.json'), 'utf8'), manifest);
-    assert.equal(fs.readFileSync(path.join(f.root, lockfile), 'utf8'), bumpedLock);
-    const projection = f.git('show', `:${f.output}`);
-    assert.ok(projection.includes(createHash('sha256').update(bumpedLock).digest('hex')));
-    const verified = check();
-    assert.equal(verified.status, 0, verified.stdout + verified.stderr);
-    const repairedIndex = f.git('ls-files', '--stage');
-    assert.equal(repair().status, 0, 'repair remains idempotent');
-    assert.equal(f.git('ls-files', '--stage'), repairedIndex);
+test('clean merge hook propagates the exact source resolver failure', (t) => {
+  const f = sourceMapFixture(t);
+  const bin = path.join(f.root, 'bin');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'python3'), `#!/bin/sh
+[ "$1" = "scripts/resolve-repository-docs.py" ] && [ "$2" = "--staged" ] || exit 1
+exit 23
+`, { mode: 0o755 });
+  const hook = fileURLToPath(new URL('../.husky/pre-merge-commit', import.meta.url));
+  const before = f.git('write-tree');
+  const projection = fs.readFileSync(path.join(f.root, f.output));
+  const result = spawnSync('sh', [hook], {
+    cwd: f.root, env: { ...env, PATH: `${bin}:${env.PATH}` }, encoding: 'utf8',
   });
-}
+
+  assert.equal(result.status, 23, result.stdout + result.stderr);
+  assert.equal(f.git('write-tree'), before);
+  assert.deepEqual(fs.readFileSync(path.join(f.root, f.output)), projection);
+});
 
 for (const change of ['edit', 'delete', 'create']) {
   test(`staged Bundler source-map repair preserves a concurrent projection ${change}`, (t) => {
