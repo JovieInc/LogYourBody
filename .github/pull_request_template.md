@@ -73,6 +73,16 @@
 - [ ] New and existing unit tests pass locally with my changes
 - [ ] Any dependent changes have been merged and published
 
+## Guardrail
+
+- Class:
+- Mechanism: <!-- or Existing: <check id or path> -->
+- Enforced at:
+- Heals:
+- Status: NOW <!-- or LATER <issue link> -->
+- Simulation:
+- Encoded in: <!-- per review finding, else n/a -->
+
 ## Advisory Follow-Ups
 
 <!-- Non-blocking AI or reviewer findings should become focused follow-up work instead of delaying a landable PR -->
@@ -128,10 +138,4 @@ Performance notes:
 
 ---
 
-**Reviewer Guidelines:**
-
-- Check code quality and adherence to project standards
-- Verify all tests pass and coverage is maintained
-- Test the changes locally if significant
-- Ensure accessibility compliance for UI changes
-- Confirm documentation is adequate and up-to-date
+**Ready / auto-merge:** promoted automatically at ≥90% estimated clean landing, merge-commit auto-merge armed (`--merge` in this repo). No human approver; review findings go back to the implementer. Machines review code; Tim reviews taste in Pen only.
