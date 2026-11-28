@@ -11,6 +11,7 @@ import { resolver, sourceMapFixture } from './resolve-repository-docs.test.mjs';
 import './resolve-repository-docs-json.test.mjs';
 import './resolve-repository-docs-dependency.test.mjs';
 import './resolve-repository-docs-react-lockfile.test.mjs';
+import './resolve-repository-docs-frozen-lockfile.test-support.mjs';
 import './resolve-repository-docs-index-flags.test.mjs';
 import './resolve-repository-docs-ledger.test.mjs';
 import './resolve-repository-docs-pin.test.mjs';

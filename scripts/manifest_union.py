@@ -344,6 +344,23 @@ def read_verified_react_lockfile(path):
 
     return lockfile
 
+def run_dependency_lockfile_install(root, mode, **options):
+    """Permit lockfile changes only during the explicit non-frozen install."""
+    lockfile = repository_docs.local(root, "pnpm-lock.yaml")
+    frozen_bytes = lockfile.read_bytes() if "--frozen-lockfile" in mode else None
+    completed = subprocess.run(
+        ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
+        cwd=root, **options,
+    )
+    if frozen_bytes is not None:
+        after = lockfile.read_bytes() if lockfile.exists() else None
+        if after != frozen_bytes:
+            raise ValueError(
+                "dependency inputs changed during verification: frozen verification changed pnpm-lock.yaml"
+            )
+    return completed
+
+
 def dependency_verification_drift(root, inputs, verified_index, include_lockfile):
     """Compare filtered worktree hashes so assume-unchanged bits cannot hide lockfile edits."""
     root = str(Path(root).resolve())
