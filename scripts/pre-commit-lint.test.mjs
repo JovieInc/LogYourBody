@@ -19,6 +19,7 @@ import './resolve-repository-docs-project.test.mjs';
 import './resolve-repository-docs-pin-union.test.mjs';
 import './resolve-repository-docs-manifest.test.mjs';
 import './resolve-repository-docs-merged-dependency.test.mjs';
+import './resolve-repository-docs-dependency-merge.test.mjs';
 
 const env = {
   ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),

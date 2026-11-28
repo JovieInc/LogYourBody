@@ -190,7 +190,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `60db11f2c8455cf6bb137b8cb0073f788820f6c4c1c615b8757f41a1db240866`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `064d26044e4bc78d746ff4baa074c9f194945f3ae54839c840c90fae05ceecbc`)
 
 ### `package.json`: packageManager
 
@@ -283,7 +283,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "prettier": "^3.9.10",
   "prettier-plugin-tailwindcss": "^0.8.1",
   "rollup": "^4.67.5",
-  "turbo": "^2.11.9",
+  "turbo": "^2.11.10",
   "typescript": "^5.9.3",
   "vitest": "^5.1.0"
 }
