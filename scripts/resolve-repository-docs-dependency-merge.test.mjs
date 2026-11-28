@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fixture } from './resolve-repository-docs-dependency.test.mjs';
@@ -11,18 +11,25 @@ function manifest(spec, script = 'base', extra = {}) {
   }, null, 2) + '\n';
 }
 
-function conflict(t, ours, theirs, base = manifest('^2.11.9'), otherConflict = false) {
+function conflict(t, ours, theirs, base = manifest('^2.11.9'), otherConflict = false, nested = false) {
   const f = fixture(t, '.npmrc', 'staged');
   const file = (name) => join(f.root, name);
   writeFileSync(file('package.json'), base);
+  if (nested) {
+    mkdirSync(file('packages/ui'), { recursive: true });
+    writeFileSync(file('packages/ui/package.json'), manifest('^1.0.0'));
+    f.git('add', 'packages/ui/package.json');
+  }
   f.git('add', 'package.json');
   f.git('commit', '-qm', 'base manifest');
   f.git('branch', 'theirs');
   writeFileSync(file('package.json'), ours);
+  if (nested) writeFileSync(file('packages/ui/package.json'), manifest('^1.0.1'));
   if (otherConflict) writeFileSync(file('README.md'), 'Ours\n');
   f.git('commit', '-qam', 'ours');
   f.git('switch', '-q', 'theirs');
   writeFileSync(file('package.json'), theirs);
+  if (nested) writeFileSync(file('packages/ui/package.json'), manifest('^1.0.2'));
   if (otherConflict) writeFileSync(file('README.md'), 'Theirs\n');
   f.git('commit', '-qam', 'theirs');
   f.git('switch', '-q', 'dependency');
@@ -45,7 +52,8 @@ elif Path('fail-final').exists():
     print('final frozen verification failed', file=sys.stderr)
     sys.exit(17)
 elif Path('concurrent-edit').exists():
-    Path('package.json').write_text(Path('concurrent-edit').read_text())
+    target = Path('concurrent-path')
+    Path(target.read_text() if target.exists() else 'package.json').write_text(Path('concurrent-edit').read_text())
 `, { mode: 0o755 });
   const state = () => ({
     index: f.git('ls-files', '--stage'),
@@ -213,5 +221,27 @@ os.execv(git, [git, *args])
     assert.equal(f.state().lock, before.lock);
     assert.equal(f.state().projection, before.projection);
     assert.equal(existsSync(f.file('.git/index.lock')), false);
+  });
+}
+
+for (const changed of ['package.json', 'packages/ui/package.json']) {
+  test(`dependency manifest merge restores unaffected packages when ${changed} is edited`, (t) => {
+    const f = conflict(t, manifest('^2.11.10'), manifest('^2.11.9', 'main', { rollup: '^4.65.0' }),
+      manifest('^2.11.9'), false, true);
+    const unchanged = changed === 'package.json' ? 'packages/ui/package.json' : 'package.json';
+    const initialStages = f.git('ls-files', '--stage', '--', unchanged);
+    const initial = readFileSync(f.file(unchanged), 'utf8');
+    const before = f.state();
+    const concurrent = manifest('^2.11.12');
+    writeFileSync(f.file('concurrent-path'), changed);
+    writeFileSync(f.file('concurrent-edit'), concurrent);
+    const result = f.resolve('--refresh-lockfile');
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /changed during repair; review and retry/);
+    assert.equal(readFileSync(f.file(changed), 'utf8'), concurrent);
+    assert.equal(readFileSync(f.file(unchanged), 'utf8'), initial);
+    assert.equal(f.git('ls-files', '--stage', '--', unchanged), initialStages);
+    assert.equal(f.state().lock, before.lock);
+    assert.equal(f.state().projection, before.projection);
   });
 }

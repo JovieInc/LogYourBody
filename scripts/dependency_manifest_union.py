@@ -120,11 +120,26 @@ def _render_package(source, ours, merged):
     return source.encode()
 
 
+def _identity(info):
+    return (info.st_dev, info.st_ino, info.st_mode)
+
+
 def _snapshot(path):
-    info = path.lstat()
-    if not stat.S_ISREG(info.st_mode):
+    named = path.lstat()
+    if not stat.S_ISREG(named.st_mode):
         raise ValueError("dependency manifest union requires a regular worktree file: " + str(path))
-    return (info.st_dev, info.st_ino, info.st_mode), path.read_bytes()
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    with os.fdopen(os.open(path, flags), "rb") as stream:
+        opened = os.fstat(stream.fileno())
+        if _identity(named) != _identity(opened):
+            raise ValueError("dependency manifest union file changed while opening: " + str(path))
+        data = stream.read()
+        current = os.fstat(stream.fileno())
+    stamp = (opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns)
+    if (_identity(path.lstat()) != _identity(opened) or _identity(current) != _identity(opened)
+            or stamp != (current.st_size, current.st_mtime_ns, current.st_ctime_ns)):
+        raise ValueError("dependency manifest union file changed while reading: " + str(path))
+    return _identity(opened), data
 
 
 def _write_if_unchanged(path, expected, rendered):
@@ -190,6 +205,41 @@ def _edit_index(root, index_args, expected, edit, verify):
             lock.unlink()
 
 
+def _index_entries(index, name):
+    encoded = name.encode()
+    return b"".join(entry + b"\0" for entry in index.split(b"\0") if entry.partition(b"\t")[2] == encoded)
+
+
+def _restore_index_path(root, name, index, staged):
+    original = _index_entries(index, name)
+    expected = _index_entries(staged, name)
+    object_width = len(original.split(b" ", 2)[1])
+    remove = b"0 " + b"0" * object_width + b"\t" + name.encode() + b"\0"
+
+    def restore(env):
+        _git(root, "update-index", "-z", "--index-info", data=remove + original, env=env)
+
+    def verify(_env, restored):
+        if restored != original:
+            raise ValueError("dependency manifest union could not restore the original stages: " + name)
+
+    _edit_index(root, ("ls-files", "--stage", "-z", "--", name), expected, restore, verify)
+
+
+def _restore_path(root, name, path, original, written, index, staged):
+    try:
+        owned = _snapshot(path) == written
+    except (ValueError, OSError):
+        owned = False
+    if not owned:
+        raise ValueError("dependency manifest union changed during repair; review and retry: " + name)
+    try:
+        if staged is not None:
+            _restore_index_path(root, name, index, staged)
+    finally:
+        _write_if_unchanged(path, written, original[1])
+
+
 @contextmanager
 def _stage_conflicts(root, names):
     _git(root, "rev-parse", "--verify", "MERGE_HEAD")
@@ -205,31 +255,23 @@ def _stage_conflicts(root, names):
                for name, (_, _, rendered) in zip(names, plan)):
             raise ValueError("dependency manifest union worktree changed; review and retry")
 
-    def restore(env):
-        object_width = len(original_index.split(b" ", 2)[1])
-        remove = b"".join(b"0 " + b"0" * object_width + b"\t" + name.encode() + b"\0" for name in names)
-        _git(root, "update-index", "-z", "--index-info", data=remove + original_index, env=env)
-
-    def verify_restore(_env, restored):
-        if restored != original_index:
-            raise ValueError("dependency manifest union could not restore the original stages")
-
     written = []
     staged = None
     try:
-        for path, original, rendered in plan:
-            written.append((path, original, _write_if_unchanged(path, original, rendered)))
+        for name, (path, original, rendered) in zip(names, plan):
+            written.append((name, path, original, _write_if_unchanged(path, original, rendered)))
         staged = _edit_index(root, index_args, original_index, add, verify_add)
         yield
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
-        if any(_snapshot(path) != state for path, _, state in written):
-            raise ValueError("dependency manifest union changed during repair; review and retry") from error
-        try:
-            if staged is not None:
-                _edit_index(root, index_args, staged, restore, verify_restore)
-        finally:
-            for path, (_, original), state in written:
-                _write_if_unchanged(path, state, original)
+        refusal = None
+        for name, path, original, state in written:
+            try:
+                _restore_path(root, name, path, original, state, original_index, staged)
+            except (ValueError, OSError, subprocess.CalledProcessError) as issue:
+                if refusal is None:
+                    refusal = issue
+        if refusal is not None:
+            raise refusal from error
         raise
 
 def prepare_dependency_manifest_merge(root, unresolved, refresh):
