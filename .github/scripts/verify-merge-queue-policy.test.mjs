@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
-import { verifyCompanyGuards, verifyPolicy, verifyRepository } from './verify-merge-queue-policy.mjs';
+import { refreshCompanyPins, verifyCompanyGuards, verifyPolicy, verifyRepository } from './verify-merge-queue-policy.mjs';
 import './merge-queue-enrollment.test.mjs';
 
 const validPolicy = {
@@ -121,6 +123,83 @@ test('Company Guards must block detection and the required CI Summary', () => {
       ),
     /Company Guards/,
   );
+});
+
+function pinFixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lyb-company-pins-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, '.github/workflows'), { recursive: true });
+  const head = 'a'.repeat(40);
+  const guard = 'b'.repeat(40);
+  const older = 'c'.repeat(40);
+  const files = ['company-guards', 'public-app-certification'].map((name) => {
+    const file = path.join(root, `.github/workflows/${name}.yml`);
+    const source = fs.readFileSync(`.github/workflows/${name}.yml`, 'utf8');
+    fs.writeFileSync(file, source);
+    return { file, source, pin: source.match(/ci-ref: ([a-f0-9]{40})/)[1] };
+  });
+  const tree = {
+    truncated: false,
+    tree: ['canon', 'guards', '.github/workflows/company-guards.yml'].map((name) => ({
+      path: name, mode: name.endsWith('.yml') ? '100644' : '040000',
+      type: name.endsWith('.yml') ? 'blob' : 'tree', sha: 'd'.repeat(40),
+    })),
+  };
+  const api = (endpoint) => {
+    if (endpoint === 'commits/main') return { sha: head };
+    if (endpoint === `git/trees/${head}?recursive=1` || endpoint === `git/trees/${guard}?recursive=1`) return structuredClone(tree);
+    assert.match(endpoint, new RegExp(`^commits\\?sha=${head}&path=.+&per_page=1$`));
+    const isWorkflow = endpoint.includes('path=.github');
+    return [{ sha: isWorkflow ? older : guard,
+      commit: { committer: { date: isWorkflow ? '2026-11-11T00:00:00Z' : '2026-11-12T00:00:00Z' } } }];
+  };
+  return { root, files, head, guard, api };
+}
+
+test('company pin refresh selects guard history while retaining newer certification code', (t) => {
+  const f = pinFixture(t);
+  assert.deepEqual(refreshCompanyPins(f.root, f.api), { guards: f.guard, certification: f.head });
+  for (const [index, { file, source, pin }] of f.files.entries()) {
+    assert.equal(fs.readFileSync(file, 'utf8'), source.replaceAll(pin, index === 0 ? f.guard : f.head));
+  }
+  assert.deepEqual(refreshCompanyPins(f.root, f.api), { guards: f.guard, certification: f.head });
+});
+
+test('company pin refresh refuses lost guards, incomplete trees and missing history without writing', (t) => {
+  const f = pinFixture(t);
+  for (const [endpoint, result] of [
+    [`git/trees/${f.guard}?recursive=1`, { truncated: false, tree: [] }],
+    [`git/trees/${f.head}?recursive=1`, { truncated: true, tree: [] }],
+    [`git/trees/${f.head}?recursive=1`, { truncated: false,
+      tree: f.api(`git/trees/${f.head}?recursive=1`).tree.map(({ path }) => ({ path })) }],
+    [`commits?sha=${f.head}&path=canon&per_page=1`, []],
+    ['commits/main', { sha: 'main' }],
+    [`commits?sha=${f.head}&path=guards&per_page=1`, [{ sha: f.guard, commit: { committer: { date: 'invalid' } } }]],
+  ]) {
+    assert.throws(() => refreshCompanyPins(f.root, (request) => request === endpoint ? result : f.api(request)),
+      /Company|company/);
+    for (const { file, source } of f.files) assert.equal(fs.readFileSync(file, 'utf8'), source);
+  }
+  const changed = f.api(`git/trees/${f.guard}?recursive=1`);
+  changed.tree[0].sha = 'e'.repeat(40);
+  assert.throws(() => refreshCompanyPins(f.root, (request) =>
+    request === `git/trees/${f.guard}?recursive=1` ? changed : f.api(request)), /omit changes/);
+  for (const { file, source } of f.files) assert.equal(fs.readFileSync(file, 'utf8'), source);
+});
+
+test('company pin refresh rejects mismatched, duplicate and mutable pins before either write', (t) => {
+  const f = pinFixture(t);
+  const { file, source } = f.files[1];
+  for (const bad of [
+    source.replace(/ci-ref: [a-f0-9]{40}/, `ci-ref: ${'f'.repeat(40)}`),
+    `${source}      ci-ref: ${'f'.repeat(40)}\n`,
+    source.replace(/ci-ref: [a-f0-9]{40}/, 'ci-ref: main'),
+  ]) {
+    fs.writeFileSync(file, bad);
+    assert.throws(() => refreshCompanyPins(f.root, f.api), /unique full SHAs and agree/);
+    assert.equal(fs.readFileSync(f.files[0].file, 'utf8'), f.files[0].source);
+    assert.equal(fs.readFileSync(file, 'utf8'), bad);
+  }
 });
 
 test('deliberate red: quoted branch patterns are rejected', () => {

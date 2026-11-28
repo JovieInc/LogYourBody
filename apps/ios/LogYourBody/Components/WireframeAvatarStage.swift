@@ -139,6 +139,12 @@ struct WireframeAvatarStage: View {
             }
             if showsShape {
                 sliders
+                Text(BodyShapeCalibration.wireframeAccessibilityLabel(presentation: presentation))
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(HomeV2Tokens.Colors.ink.opacity(0.82))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(width: 188, alignment: .leading)
+                    .accessibilityIdentifier("home_wireframe_claim")
             }
         }
         .padding(.top, topInset)
@@ -170,8 +176,7 @@ struct WireframeAvatarStage: View {
     }
 
     private var accessibilityLabel: String {
-        let body = presentation == "female" ? "female" : "male"
-        return "Illustrative \(body) wireframe. Not a body-fat percentage."
+        BodyShapeCalibration.wireframeAccessibilityLabel(presentation: presentation)
     }
 
     private var turnHint: String {
@@ -185,12 +190,18 @@ struct WireframeAvatarStage: View {
         let vertices: [SIMD3<Double>]
         let wires: [[Int]]
         if let asset {
+            let shape = PersonalBodyEngine.appliedIllustration(
+                storedAdiposity: adiposity,
+                storedMuscularity: muscularity,
+                storedFrame: frame,
+                photoByteCount: 0
+            )
             vertices = WireframeAvatarLibrary.vertices(
                 asset: asset,
                 presentation: presentation,
-                adiposity: adiposity,
-                muscularity: muscularity,
-                frame: frame
+                adiposity: shape.adiposity,
+                muscularity: shape.muscularity,
+                frame: shape.frame
             )
             wires = asset.wires
         } else {

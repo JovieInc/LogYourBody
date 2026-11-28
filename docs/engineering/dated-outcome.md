@@ -19,6 +19,9 @@ keeps the date. Cloud sync stays behind that gate. API traffic requires
 `LYB_DATED_OUTCOME_ENABLED=true`. Enable the gate only after migration and
 native validation.
 
+The gated native entry and contextual editor now consume this store; see
+[LYB-341 entry, recovery and evidence boundaries](dated-outcome-entry.md).
+
 The additive V6 Core Data model adds `CachedDatedOutcome` while preserving V1–V5 byte-for-byte. Main’s V5 contains `CachedWorkoutReconciliationDay`; the earlier dated-outcome V5 proposal must not replace that published schema. Both app and widget select V6.
 An owner-scoped journal commits each value and recompute request together.
 Unchanged values create no request. The current value and pending requests

@@ -69,3 +69,10 @@ The optional personal outline uses the on-device wireframe. It does not add a
 provider, credential, or upload. External processing is refused at the privacy
 consent boundary. Derived outlines are deleted with the source photo and the
 account. That later slice does not change this decision.
+
+## LYB-319 use
+
+Photographic appearance projects samples already on the phone onto the accepted
+outline. It does not add a provider, credential, or upload. DiGS-Avatar is not
+bundled. Derived textures and splats delete with the source photo and the
+account. That later slice does not change this decision.

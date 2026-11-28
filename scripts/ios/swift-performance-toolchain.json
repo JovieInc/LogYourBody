@@ -1,0 +1,24 @@
+{
+  "SWIFT_VERSION": "5.0",
+  "concurrentAttributeEnabled": false,
+  "configurationsAgree": true,
+  "defaultActorIsolation": null,
+  "kind": "lyb.swift-toolchain-receipt",
+  "note": "SWIFT_VERSION is the Swift language mode. No default-actor-isolation setting is present, so @concurrent is not enabled.",
+  "rows": [
+    "LogYourBody|Debug|swift=5.0|strict=|isolation=|upcoming=|trace=false",
+    "LogYourBody|Release|swift=5.0|strict=|isolation=|upcoming=|trace=false",
+    "LogYourBodyRestTimer|Debug|swift=5.0|strict=|isolation=|upcoming=|trace=false",
+    "LogYourBodyRestTimer|Release|swift=5.0|strict=|isolation=|upcoming=|trace=false",
+    "LogYourBodyTests|Debug|swift=5.0|strict=|isolation=|upcoming=|trace=false",
+    "LogYourBodyTests|Release|swift=5.0|strict=|isolation=|upcoming=|trace=false",
+    "LogYourBodyUITests|Debug|swift=5.0|strict=|isolation=|upcoming=|trace=false",
+    "LogYourBodyUITests|Release|swift=5.0|strict=|isolation=|upcoming=|trace=false"
+  ],
+  "schemaVersion": 1,
+  "source": "apps/ios/LogYourBody.xcodeproj/project.pbxproj",
+  "strictConcurrency": null,
+  "swiftLanguageMode": "5.0",
+  "traceSignpostsEnabled": false,
+  "upcomingFeatures": []
+}

@@ -78,7 +78,9 @@ struct TrainingCoachCard: View {
                 }
                 Button(action: onStart) {
                     HStack {
-                        Text("Start session")
+                        Text(TrainingCoachEntryPolicy.primaryActionTitle(
+                            hasRecordedProgress: TrainingCoachEntryPolicy.hasRecordedProgress(session)
+                        ))
                         Spacer()
                         Image(systemName: "arrow.up.right")
                     }
@@ -89,7 +91,9 @@ struct TrainingCoachCard: View {
                     .background(theme.colors.text, in: Capsule())
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier("training_start_session")
+                .accessibilityIdentifier(TrainingCoachEntryPolicy.accessibilityIdentifier(
+                    hasRecordedProgress: TrainingCoachEntryPolicy.hasRecordedProgress(session)
+                ))
             }
 
             Button("Stop coaching and delete training data", role: .destructive) {

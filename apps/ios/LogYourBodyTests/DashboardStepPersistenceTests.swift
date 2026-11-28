@@ -361,6 +361,32 @@ final class DashboardStepPersistenceTests: XCTestCase {
         XCTAssertEqual(stored.userId, userId)
     }
 
+    func testUITestOfflineFixtureIgnoresSatisfiedPath() {
+        let sync = ownedSync()
+        sync.isOnline = true
+        sync.syncStatus = .idle
+        sync.applyOfflineUITestFixture()
+        sync.handleNetworkPathUpdate(isOnline: true)
+        XCTAssertFalse(sync.isOnline)
+        XCTAssertEqual(sync.syncStatus, .offline)
+    }
+
+    func testSatisfiedPathStaysIdleWhenTheFixtureIsAlreadyOnline() {
+        let sync = ownedSync()
+        sync.isOnline = true
+        sync.handleNetworkPathUpdate(isOnline: true)
+        XCTAssertTrue(sync.isOnline)
+        XCTAssertEqual(sync.syncStatus, .idle)
+    }
+
+    func testUnsatisfiedPathForcesOfflineWithoutTheUITestFixture() {
+        let sync = ownedSync()
+        sync.isOnline = true
+        sync.handleNetworkPathUpdate(isOnline: false)
+        XCTAssertFalse(sync.isOnline)
+        XCTAssertEqual(sync.syncStatus, .offline)
+    }
+
     private func dashboard() -> DashboardViewModel {
         DashboardViewModel(
             healthKitManager: HealthKitManager.shared,
