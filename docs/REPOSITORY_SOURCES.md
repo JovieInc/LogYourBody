@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `7e9e9a9b07c1d43c6aceab215c841d218ab3d9a7874797d67d6f5551eb040072`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1e812450abd5cb9a358a0dfaa247c5d41d3481433d867a456c67985cd1e9ad3c`)
 
 ### `apps/web/package.json`: engines
 
@@ -183,14 +183,14 @@ A changed fingerprint requires review of its related documentation; it does not 
   "jest": "^30.5.2",
   "jest-environment-jsdom": "^30.5.2",
   "playwright": "^1.65.0",
-  "postcss": "^8.5.30",
+  "postcss": "^8.5.32",
   "tailwindcss": "^4.3.3",
   "tsx": "^4.23.15",
   "typescript": "^5.9.3"
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `064d26044e4bc78d746ff4baa074c9f194945f3ae54839c840c90fae05ceecbc`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `422f586dcf91736f0787841a46c2b3db885c5ddac4189f474793accec77dadb8`)
 
 ### `package.json`: packageManager
 
@@ -386,7 +386,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fc5a43b2fed86c3144518403ef49c0b5e2f5709099b2233d7c3db4a4d2f0ae5b`)
+- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `31aeed53fc4c3687b29b896dec2105ab1ec24869611f9d17e179dfd437321fe2`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
 - `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `e2aa2e7f4c083546646d0c809080da94348e0b86723487eabf6959a3e8d25950`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)

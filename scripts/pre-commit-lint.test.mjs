@@ -13,6 +13,7 @@ import './resolve-repository-docs-dependency.test.mjs';
 import './resolve-repository-docs-react-lockfile.test.mjs';
 import './resolve-repository-docs-frozen-lockfile.test-support.mjs';
 import './resolve-repository-docs-index-flags.test.mjs';
+import './resolve-repository-docs-override.test.mjs';
 import './resolve-repository-docs-ledger.test.mjs';
 import './resolve-repository-docs-pin.test.mjs';
 import './resolve-repository-docs-project.test.mjs';

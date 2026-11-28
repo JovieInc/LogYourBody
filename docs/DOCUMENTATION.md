@@ -112,9 +112,10 @@ the lockfile and projection together; verify mode stages only the projection.
 For dependency PRs, stage the reviewed manifests and run
 `python3 scripts/resolve-repository-docs.py --refresh-lockfile`. This explicit
 repair first verifies the existing lockfile offline with pinned Corepack pnpm.
-Only a confirmed manifest mismatch (`ERR_PNPM_OUTDATED_LOCKFILE`) triggers
-regeneration without lifecycle scripts and a second frozen offline check.
-Valid lockfiles keep their resolutions; other installation failures stop repair.
+A confirmed manifest mismatch or pnpm's configuration mismatch naming
+`overrides` permits regeneration without lifecycle scripts. Either path requires
+a second frozen offline check. Valid lockfiles keep their resolutions. Other
+configuration or installation failures stop repair.
 During an active Git merge, refresh mode can reconcile conflicts confined to
 `package.json` sources using their three index stages, with the generated map and
 correction ledger following their existing repair rules. It keeps independent
@@ -146,8 +147,8 @@ failed refresh probe and the final verification after regeneration. If either
 rewrites or deletes the lockfile, repair restores the original lockfile and source
 map and stops before regenerating or staging anything else. Filtered worktree
 hashes also reject assume-unchanged and skip-worktree edits that a diff listing
-omits. Only an unchanged frozen probe that reports an outdated lockfile permits
-refresh mode to write new resolutions.
+omits. Only an unchanged frozen probe that reports an outdated manifest or
+names the `overrides` configuration permits refresh mode to write new resolutions.
 If resolution, frozen verification, projection generation or Git staging fails,
 the helper restores the original lockfile and projection bytes (or absence) so
 the same command can be retried without manual cleanup. Another writer's index

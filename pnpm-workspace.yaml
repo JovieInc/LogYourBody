@@ -14,7 +14,7 @@ overrides:
   prismjs: 1.30.0
   "@xmldom/xmldom": ">=0.8.15"
   fflate: ">=0.8.3"
-  postcss: ">=8.5.23"
+  postcss: "^8.5.32"
   vite: "7.3.7"
   source-map-js: 1.2.2
   postcss-selector-parser: 7.1.6

@@ -10,6 +10,7 @@ from contextlib import ExitStack
 from pathlib import Path
 
 import repository_docs
+from dependency_lockfile_repair import dependency_lockfile_refresh_allowed
 from dependency_pr_body import dependency_pr_body
 from dependency_manifest_union import prepare_dependency_manifest_merge
 from json_union import _unmerged_texts, union_json
@@ -406,9 +407,9 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                     root, modes[0], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 )
                 print(probe.stdout, end="", flush=True)
-                # Refresh only a confirmed manifest mismatch; other failures remain blockers.
+                # Refresh only a confirmed manifest or named overrides mismatch.
                 if probe.returncode:
-                    if "ERR_PNPM_OUTDATED_LOCKFILE" not in probe.stdout:
+                    if not dependency_lockfile_refresh_allowed(probe.stdout):
                         probe.check_returncode()
                     modes.insert(0, ["--no-frozen-lockfile"])
                 else:
