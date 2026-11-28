@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f15c466b6890833aab58b2180d0a62bd630328029bc0fa20fab13c1e3aed1f02`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `846d12b0aeef782c8767779afdec681e71ae9311625ed4e135d573215f5606d3`)
 
 ### `apps/web/package.json`: engines
 
@@ -144,7 +144,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "react-markdown": "^10.1.0",
   "react-resizable-panels": "^3.0.6",
   "react-syntax-highlighter": "^16.1.2",
-  "read-excel-file": "^6.0.3",
+  "read-excel-file": "^9.3.14",
   "recharts": "^3.10.1",
   "server-only": "^0.0.1",
   "sonner": "^2.0.8",
