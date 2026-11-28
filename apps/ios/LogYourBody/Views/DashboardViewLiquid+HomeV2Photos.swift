@@ -120,7 +120,8 @@ extension DashboardViewLiquid {
                 bodyMetrics: bodyMetrics,
                 formatters: homeV2Formatters,
                 onPick: { homeV2PhotoRoute = .compare($0) },
-                onCancel: { homeV2PhotoRoute = .compare(pair) }
+                onCancel: { homeV2PhotoRoute = .compare(pair) },
+                onAddPhoto: { presentHomePhotoAdd() }
             )
         case .allPhotos:
             HomeV2AllPhotosView(
@@ -131,7 +132,8 @@ extension DashboardViewLiquid {
                     selectedIndex = index
                     homeV2PhotoRoute = nil
                 },
-                onClose: { homeV2PhotoRoute = nil }
+                onClose: { homeV2PhotoRoute = nil },
+                onAddPhoto: { presentHomePhotoAdd() }
             )
         case .share(let pair):
             HomeV2ShareView(
@@ -189,8 +191,21 @@ extension DashboardViewLiquid {
                     isHomeV2ViewerPresented = true
                 }
             },
-            onClose: { isHomeV2AllPhotosPresented = false }
+            onClose: { isHomeV2AllPhotosPresented = false },
+            onAddPhoto: { presentHomePhotoAdd() }
         )
+    }
+
+    /// The photos cover sits above the attach sheet. Dismiss it, then open the
+    /// existing capture and import sheet for today.
+    func presentHomePhotoAdd() {
+        homeV2PhotoRoute = nil
+        isHomeV2ViewerPresented = false
+        isHomeV2AllPhotosPresented = false
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(450))
+            presentProgressPhotoAttach(for: homeV2DisplayedTodayMetric())
+        }
     }
 }
 
@@ -200,6 +215,7 @@ struct HomeV2AllPhotosPicker: View {
     let formatters: HomeV2Formatters
     let onPick: (HomeV2PhotoPair) -> Void
     let onCancel: () -> Void
+    var onAddPhoto: (() -> Void)?
 
     @State private var before: Int?
 
@@ -217,6 +233,7 @@ struct HomeV2AllPhotosPicker: View {
                 }
             },
             onClose: onCancel,
+            onAddPhoto: onAddPhoto,
             pickHint: before == nil ? HomeV2PhotoCopy.chooseBefore : HomeV2PhotoCopy.chooseAfter
         )
     }

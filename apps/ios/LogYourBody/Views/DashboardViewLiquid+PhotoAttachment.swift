@@ -2,7 +2,10 @@ import SwiftUI
 
 extension DashboardViewLiquid {
     var progressPhotoAttachFallbackDate: Date {
-        currentMetric?.date ?? globalTimelineStore.cursor?.date ?? activeTimelineBucket?.endDate ?? Date()
+        if let progressPhotoAttachFallbackOverride {
+            return progressPhotoAttachFallbackOverride
+        }
+        return currentMetric?.date ?? globalTimelineStore.cursor?.date ?? activeTimelineBucket?.endDate ?? Date()
     }
 
     var progressPhotoAttachMetric: BodyMetrics? {
@@ -20,6 +23,7 @@ extension DashboardViewLiquid {
         if isDatedTimelineEnabled {
             guard datedTimelineIsOwned, metric == nil || metric?.userId == datedTimelineOwner?.subject else { return }
         }
+        progressPhotoAttachFallbackOverride = nil
         progressPhotoAttachTarget = metric
         HapticManager.shared.selection()
         isProgressPhotoAttachPresented = true

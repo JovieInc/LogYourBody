@@ -1,0 +1,19 @@
+{
+  "counts": {
+    "interaction.perform_and_wait|apps/ios/LogYourBody/Helpers/MetricChartDataHelper.swift": 2,
+    "interaction.perform_and_wait|apps/ios/LogYourBody/Services/CoreDataManager+Part01.swift": 1,
+    "interaction.perform_and_wait|apps/ios/LogYourBody/Services/CoreDataManager+Part02.swift": 1,
+    "interaction.perform_and_wait|apps/ios/LogYourBody/Services/CoreDataManager+Part06.swift": 1,
+    "interaction.perform_and_wait|apps/ios/LogYourBody/Services/DatedOutcomeStore.swift": 5,
+    "interaction.uiimage_data_in_view_body|apps/ios/LogYourBody/Views/CameraView.swift": 1,
+    "swiftui.no_inline_collection_transform_in_foreach|apps/ios/LogYourBody/Views/HomeV2/HomeV2Surface.swift": 1,
+    "swiftui.no_per_render_uuid_identity|apps/ios/LogYourBody/Components/MetricChartView.swift": 1,
+    "swiftui.no_per_render_uuid_identity|apps/ios/LogYourBody/DesignSystem/Components/StandardHeader.swift": 1,
+    "swiftui.no_per_render_uuid_identity|apps/ios/LogYourBody/DesignSystem/Organisms/SettingsSectionGroup.swift": 1,
+    "swiftui.no_per_render_uuid_identity|apps/ios/LogYourBody/Features/Onboarding/Views/BodyScoreHealthConfirmationView.swift": 1,
+    "swiftui.no_per_render_uuid_identity|apps/ios/LogYourBody/Views/DexaPDFImportSheet.swift": 1
+  },
+  "kind": "lyb.swift-performance-baseline",
+  "policy": "Counts may only fall. A stale-high baseline fails until it is lowered to the live tree.",
+  "schemaVersion": 1
+}

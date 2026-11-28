@@ -10,6 +10,7 @@ import {
   type WaitlistVariant,
 } from '@/lib/analytics-schema';
 import { cn } from '@/lib/utils';
+import { normalizeWaitlistEmail } from '@/lib/waitlist/normalize-email';
 import { waitlistLandingCopy } from './waitlist-copy';
 
 type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
@@ -38,6 +39,7 @@ export function WaitlistForm({ landingId, variant }: WaitlistFormProps) {
   const [email, setEmail] = useState('');
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const emailInput = useRef<HTMLInputElement>(null);
   const started = useRef(false);
 
   useEffect(() => {
@@ -73,8 +75,9 @@ export function WaitlistForm({ landingId, variant }: WaitlistFormProps) {
     setFieldError(null);
 
     const trimmed = email.trim();
-    if (!trimmed) {
+    if (!normalizeWaitlistEmail(trimmed)) {
       setFieldError(waitlistLandingCopy.invalidEmailMessage);
+      emailInput.current?.focus();
       trackResult('invalid');
       return;
     }
@@ -133,6 +136,7 @@ export function WaitlistForm({ landingId, variant }: WaitlistFormProps) {
         </label>
         <div className="min-w-0 flex-1 basis-48">
           <Input
+            ref={emailInput}
             id="waitlist-email"
             name="email"
             type="email"

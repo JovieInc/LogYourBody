@@ -4,6 +4,7 @@ import type {
   NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
 import { reviewExerciseSelection, selectionContextSchema } from './selection';
+import { reloadApprovedSwap, rollbackApprovedSwap, storeApprovedSwap } from './swap-persistence';
 import {
   captureTrainingAdmission,
   requireAdmittedSetup,
@@ -147,6 +148,7 @@ export async function applyWorkoutAction(input: {
   let executionPaused = session.executionPaused ?? false;
   let status = record.status;
   let event: WorkoutSessionEvent;
+  let swapPersistence = record.swapPersistence;
 
   switch (input.action.kind) {
     case 'swap': {
@@ -212,6 +214,19 @@ export async function applyWorkoutAction(input: {
         createdAt: input.now.toISOString(),
         ...(context ? { selectionContext: context, previousExercise: current } : {}),
       };
+      if (context) {
+        swapPersistence =
+          storeApprovedSwap(
+            {
+              gymId: context.gymId,
+              approvedExerciseId: replacement.id,
+              setupId: replacement.id,
+              previousExerciseId: current.id,
+              confirmedEquipment: context.availableEquipment,
+            },
+            { sessionId: session.id, updatedAt: input.now.toISOString() },
+          ) ?? swapPersistence;
+      }
       break;
     }
     case 'restore_swap': {
@@ -242,6 +257,9 @@ export async function applyWorkoutAction(input: {
         replacementExerciseId: prior.exerciseId,
         restoresEventId: prior.id,
       };
+      const currentSwap = reloadApprovedSwap(swapPersistence);
+      if (currentSwap)
+        swapPersistence = rollbackApprovedSwap(currentSwap, input.now.toISOString()) ?? currentSwap;
       break;
     }
     case 'equipment_unavailable': {
@@ -375,6 +393,7 @@ export async function applyWorkoutAction(input: {
       ...record,
       status,
       prescription: updated,
+      ...(swapPersistence ? { swapPersistence } : {}),
       ...(status === 'completed' ? { completedAt: input.now.toISOString() } : {}),
     },
   );

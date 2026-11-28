@@ -1406,7 +1406,10 @@ struct ChatTabView: View {
                 if let session = response.session {
                     try TrainingDraftStore.shared.cacheActiveSession(session, ownerId: ownership.subject)
                 } else {
-                    try TrainingDraftStore.shared.clearActiveSession(ownerId: ownership.subject)
+                    // Preserve continue/reopen when local logged or pending sets remain.
+                    try TrainingDraftStore.shared.clearActiveSessionIfNoUnfinishedWork(
+                        ownerId: ownership.subject
+                    )
                 }
             }
             trainingEnrollmentRequired = false
