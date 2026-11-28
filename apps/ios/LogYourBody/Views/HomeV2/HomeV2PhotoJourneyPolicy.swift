@@ -18,6 +18,7 @@ enum HomeV2PhotoCopy {
     static let shareBoundary = "Share progress opens a preview. Review what is included before sharing."
     static let photos = "Photos"
     static let tapToOpen = "Tap a photo to open"
+    static let tryPhotoAgain = "Try again"
     static let chooseBefore = "Choose the before photo"
     static let chooseAfter = "Choose the after photo"
     static let compare = "Compare"
@@ -115,6 +116,20 @@ enum HomeV2PhotoCopy {
     static func signed(_ value: Double, decimals: Int = 1) -> String {
         let magnitude = String(format: "%.\(decimals)f", abs(value))
         return "\(value < 0 ? "−" : "+")\(magnitude)"
+    }
+}
+
+/// Empty Photos library. The existing attach sheet owns capture, import,
+/// cancel, a denied-permission explanation and retry.
+enum HomeV2EmptyPhotoLibrary {
+    static let title = "Add progress photo"
+    static let why = "A photo on a weigh-in day sits with the weight for that day. You can skip it."
+    static let privacy = "Photos are optional. Camera and photo library access are asked only when you add one."
+    static let posing = "Optional: use the same place and lighting each week."
+    static let captureOrImport = "Take a photo or choose one from your library."
+
+    static func showsEmptyState(photoCount: Int) -> Bool {
+        photoCount <= 0
     }
 }
 

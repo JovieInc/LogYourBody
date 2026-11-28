@@ -61,10 +61,20 @@ jobs:
       tag: ${{ steps.pin.outputs.tag }}
       pinned: ${{ steps.pin.outputs.pinned }}
       created_tag: ${{ steps.pin.outputs.created_tag }}
+      already_deployed: ${{ steps.completed.outputs.already_deployed }}
     steps:
       - uses: actions/checkout@v6
 
+      - name: Find a completed TestFlight release for this commit
+        id: completed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node .github/scripts/ios-release-tag.mjs version apps/ios/LogYourBody.xcodeproj/project.pbxproj)
+          node .github/scripts/find-completed-testflight-release.mjs "$version"
+
       - name: Pin the release tag to this commit
+        if: steps.completed.outputs.already_deployed == 'false'
         id: pin
         env:
           RELEASE_TYPE: ${{ github.event.inputs.release_type || 'testflight' }}
@@ -74,7 +84,7 @@ jobs:
   # StoreKit job CI Summary is waiting on.
   validate-release:
     name: Validate Release
-    if: github.event.inputs.release_type != 'app_store'
+    if: github.event.inputs.release_type != 'app_store' && needs.pin-release-tag.outputs.already_deployed == 'false'
     needs: pin-release-tag
     runs-on: ubuntu-latest
     # Must exceed validate-release-source.sh's RELEASE_CHECK_TIMEOUT_SECONDS (10901s).
@@ -313,8 +323,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          cd apps/ios
-          # API key is now handled via environment variables
+          rm -f apps/ios/fastlane/api_key.json
 
   deploy-testflight:
     name: Deploy to TestFlight

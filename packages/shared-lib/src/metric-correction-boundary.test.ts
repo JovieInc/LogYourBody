@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
@@ -9,6 +9,55 @@ const source = (path: string) =>
     'utf8',
   );
 const code = (path: string) => source(path).replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '');
+
+// A fixture saved successfully must not explicitly nil a required model attribute.
+function invalidInsertedMetricFields(swift: string, model: string): string[] {
+  const entity = model.match(/<entity name="CachedBodyMetrics"[\s\S]*?<\/entity>/)?.[0];
+  if (!entity) throw new Error('CachedBodyMetrics model missing');
+  const required = [...entity.matchAll(/<attribute\s+([^>]+)\/>/g)]
+    .filter(([, attributes]) => !/\boptional="YES"/.test(attributes))
+    .map(([, attributes]) => attributes.match(/\bname="([^"]+)"/)?.[1]);
+  const findings: string[] = [];
+  for (const insertion of swift.matchAll(
+    /\blet\s+(\w+)\s*=\s*CachedBodyMetrics\(context:\s*(\w+)\)/g,
+  )) {
+    const [, row, context] = insertion;
+    const rest = swift.slice(insertion.index! + insertion[0].length);
+    const save = new RegExp(`\\btry\\s+${context}\\.save\\(\\)`).exec(rest);
+    if (!save) continue;
+    const assignments = rest.slice(0, save.index);
+    for (const field of required) {
+      if (field && new RegExp(`\\b${row}\\.${field}\\s*=\\s*nil\\b`).test(assignments)) {
+        findings.push(field);
+      }
+    }
+  }
+  return findings;
+}
+
+it('keeps inserted body metric test fixtures compatible with the current model', () => {
+  const models = 'Models/LogYourBody.xcdatamodeld/';
+  const version = source(models + '.xccurrentversion').match(
+    /<string>([^<]+\.xcdatamodel)<\/string>/,
+  )?.[1];
+  if (!version) throw new Error('Current Core Data model missing');
+  const model = source(`${models}${version}/contents`);
+  const directory = fileURLToPath(new URL('../../../apps/ios/LogYourBodyTests/', import.meta.url));
+  for (const file of readdirSync(directory, { recursive: true }).filter((name) =>
+    name.endsWith('.swift'),
+  )) {
+    expect(
+      invalidInsertedMetricFields(readFileSync(`${directory}/${file}`, 'utf8'), model),
+      file,
+    ).toEqual([]);
+  }
+  const invalid =
+    'let item = CachedBodyMetrics(context: context)\nitem.date = nil\ntry context.save()';
+  expect(invalidInsertedMetricFields(invalid, model)).toEqual(['date']);
+  expect(
+    invalidInsertedMetricFields(invalid.replace('item.date', 'item.localDate'), model),
+  ).toEqual([]);
+});
 
 it('keeps retained V5 and V6 immutable and adds overlays only in V7', () => {
   const models = 'Models/LogYourBody.xcdatamodeld/';

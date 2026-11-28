@@ -3,8 +3,10 @@
 // LogYourBody
 //
 // Lightweight performance signposts for profiling hot paths (launch, scrub,
-// chart generation) in Instruments. Active only in DEBUG builds — in release
-// every call compiles down to a no-op, so there is zero shipping overhead.
+// chart generation) in Instruments. The OSSignposter calls compile only into
+// an opt-in trace build (`SWIFT_ACTIVE_COMPILATION_CONDITIONS` includes
+// `LYB_PERF_TRACE`). Checked-in Debug and Release configurations leave the
+// flag unset, so the App Store binary does not contain them.
 //
 // Usage:
 //   PerfSignpost.measure("scrub_select_closest") { ... }   // time a sync block
@@ -16,7 +18,14 @@ import Foundation
 import os
 
 enum PerfSignpost {
-    #if DEBUG
+    /// Instruments names this binary is allowed to emit. Photo decode tests fail
+    /// if `timeline_photo_decode` drops out of this list.
+    static let registeredNames = [
+        "timeline_photo_decode",
+        "stats_series"
+    ]
+
+    #if LYB_PERF_TRACE
     private static let signposter = OSSignposter(
         subsystem: Bundle.main.bundleIdentifier ?? "LogYourBody",
         category: "perf"
@@ -25,7 +34,7 @@ enum PerfSignpost {
 
     /// Opaque handle for an in-flight interval. Pass it back to `end` to close it.
     struct IntervalToken {
-        #if DEBUG
+        #if LYB_PERF_TRACE
         fileprivate let name: StaticString
         fileprivate let state: OSSignpostIntervalState
         #endif
@@ -34,7 +43,7 @@ enum PerfSignpost {
     /// Begin a named interval that will be closed later by `end`. Prefer `measure`
     /// for spans that begin and end in the same scope.
     static func begin(_ name: StaticString) -> IntervalToken {
-        #if DEBUG
+        #if LYB_PERF_TRACE
         return IntervalToken(name: name, state: signposter.beginInterval(name))
         #else
         return IntervalToken()
@@ -42,14 +51,14 @@ enum PerfSignpost {
     }
 
     static func end(_ token: IntervalToken) {
-        #if DEBUG
+        #if LYB_PERF_TRACE
         signposter.endInterval(token.name, token.state)
         #endif
     }
 
     /// Measure a synchronous block as a signpost interval and return its result.
     static func measure<T>(_ name: StaticString, _ work: () throws -> T) rethrows -> T {
-        #if DEBUG
+        #if LYB_PERF_TRACE
         let state = signposter.beginInterval(name)
         defer { signposter.endInterval(name, state) }
         return try work()
@@ -59,9 +68,9 @@ enum PerfSignpost {
     }
 
     /// Emit a one-shot point-of-interest event. The message autoclosure is only
-    /// evaluated in DEBUG builds.
+    /// evaluated in an opt-in `LYB_PERF_TRACE` build.
     static func event(_ name: StaticString, _ message: @autoclosure () -> String = "") {
-        #if DEBUG
+        #if LYB_PERF_TRACE
         let text = message()
         if text.isEmpty {
             signposter.emitEvent(name)

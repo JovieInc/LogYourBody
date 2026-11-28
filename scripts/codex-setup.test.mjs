@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   copyFileSync,
   mkdirSync,
@@ -13,7 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
-import { bootstrap } from './codex-setup.mjs';
+import { bootstrap, installCorrectionLedgerMergeDriver, installGitHooks, maybeRunCli } from './codex-setup.mjs';
 
 function fixture(t, behavior = '') {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'jovie-codex-')));
@@ -32,6 +32,11 @@ if [[ "$*" == '--version' ]]; then
   ${behavior || "echo '9.15.9'"}
   exit 0
 fi
+if [[ "$*" == 'exec husky' ]]; then
+  git config core.hooksPath .husky
+  printf 'husky\\n' > "$PWD/husky-receipt"
+  exit 0
+fi
 printf '%s\\n' "$PWD" "$*" "$PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD" "\${ONNXRUNTIME_NODE_INSTALL:-unset}" > "$PWD/install-receipt"
 exit "\${INSTALL_STATUS:-0}"
 `,
@@ -39,6 +44,96 @@ exit "\${INSTALL_STATUS:-0}"
   );
   return { root, env: { PATH: `${join(root, 'bin')}:/usr/bin:/bin` } };
 }
+
+function armHookLayout(root) {
+  mkdirSync(join(root, 'scripts/hooks'), { recursive: true });
+  mkdirSync(join(root, '.husky'), { recursive: true });
+  for (const name of ['pre-commit', 'pre-push']) {
+    writeFileSync(join(root, `.husky/${name}`), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  }
+  copyFileSync(resolve('scripts/hooks/verify-git-hooks.sh'), join(root, 'scripts/hooks/verify-git-hooks.sh'));
+}
+
+test('installs the correction ledger merge driver in a git checkout', (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'jovie-codex-driver-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const options = {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  assert.equal(installCorrectionLedgerMergeDriver(root, options.env), false);
+  execFileSync('git', ['init'], options);
+  assert.equal(installCorrectionLedgerMergeDriver(root, options.env), true);
+  assert.equal(
+    execFileSync(
+      'git',
+      ['config', '--local', '--get', 'merge.correction-ledger.driver'],
+      options,
+    ).trim(),
+    'node scripts/correction-classifier.mjs --merge-driver %O %A %B',
+  );
+});
+
+test('propagates merge driver configuration failures and signals', (t) => {
+  for (const [behavior, expected] of [
+    ['exit 42', /merge driver was not installed \(42\)/],
+    ['kill -TERM $$', /merge driver was not installed \(SIGTERM\)/],
+  ]) {
+    const { root, env } = fixture(t);
+    writeFileSync(
+      join(root, 'bin/git'),
+      `#!/bin/bash\nif [[ "$1" == 'rev-parse' ]]; then exit 0; fi\n${behavior}\n`,
+      { mode: 0o755 },
+    );
+    assert.throws(() => installCorrectionLedgerMergeDriver(root, env), expected);
+  }
+});
+
+test('handles missing git and reports its disappearance after the checkout probe', (t) => {
+  const { root } = fixture(t);
+  assert.equal(installCorrectionLedgerMergeDriver(root, { PATH: join(root, 'missing') }), false);
+  writeFileSync(join(root, 'bin/git'), '#!/bin/bash\n/bin/rm -- "$0"\n', { mode: 0o755 });
+  assert.throws(() => installCorrectionLedgerMergeDriver(root, { PATH: join(root, 'bin') }), {
+    code: 'ENOENT',
+  });
+});
+
+test('the successful CLI installs dependencies and the merge driver in its own checkout', (t) => {
+  const { root, env } = fixture(t);
+  mkdirSync(join(root, 'scripts'));
+  mkdirSync(join(root, 'nested'));
+  copyFileSync(resolve('scripts/codex-setup.mjs'), join(root, 'scripts/codex-setup.mjs'));
+  armHookLayout(root);
+  const options = {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  execFileSync('git', ['init', '--quiet'], options);
+  execFileSync('git', ['config', 'commit.gpgsign', 'false'], options);
+  const result = spawnSync(process.execPath, [join(root, 'scripts/codex-setup.mjs')], {
+    ...options,
+    cwd: join(root, 'nested'),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    readFileSync(join(root, 'install-receipt'), 'utf8'),
+    `${root}\ninstall --frozen-lockfile --prefer-offline\n1\nunset\n`,
+  );
+  assert.equal(
+    execFileSync(
+      'git',
+      ['config', '--local', '--get', 'merge.correction-ledger.driver'],
+      options,
+    ).trim(),
+    'node scripts/correction-classifier.mjs --merge-driver %O %A %B',
+  );
+  assert.equal(
+    execFileSync('git', ['config', '--get', 'core.hooksPath'], options).trim(),
+    '.husky',
+  );
+});
 
 test('installs frozen dependencies in the repository without touching environment or lockfiles', (t) => {
   const { root, env } = fixture(t);
@@ -49,6 +144,212 @@ test('installs frozen dependencies in the repository without touching environmen
   );
   assert.equal(readFileSync(join(root, '.env.local'), 'utf8'), 'preserve environment');
   assert.equal(readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8'), 'preserve lock');
+});
+
+
+test('installGitHooks skips when the directory is not a git checkout', (t) => {
+  const { root, env } = fixture(t);
+  assert.equal(installGitHooks(root, env), false);
+});
+
+test('Codex setup in a git checkout installs husky and fails if pre-push is missing', (t) => {
+  const { root, env } = fixture(t);
+  mkdirSync(join(root, 'scripts/hooks'), { recursive: true });
+  mkdirSync(join(root, '.husky'), { recursive: true });
+  writeFileSync(join(root, '.husky/pre-commit'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  copyFileSync(resolve('scripts/hooks/verify-git-hooks.sh'), join(root, 'scripts/hooks/verify-git-hooks.sh'));
+  const options = {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  execFileSync('git', ['init', '--quiet'], options);
+  execFileSync('git', ['config', 'commit.gpgsign', 'false'], options);
+  assert.throws(() => bootstrap(root, options.env), /pre-push is missing|git hook verify failed/);
+});
+
+test('Codex setup in a git checkout fails if pre-commit is missing', (t) => {
+  const { root, env } = fixture(t);
+  mkdirSync(join(root, 'scripts/hooks'), { recursive: true });
+  mkdirSync(join(root, '.husky'), { recursive: true });
+  writeFileSync(join(root, '.husky/pre-push'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  copyFileSync(resolve('scripts/hooks/verify-git-hooks.sh'), join(root, 'scripts/hooks/verify-git-hooks.sh'));
+  const options = {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  execFileSync('git', ['init', '--quiet'], options);
+  execFileSync('git', ['config', 'commit.gpgsign', 'false'], options);
+  assert.throws(() => bootstrap(root, options.env), /pre-commit is missing|git hook verify failed/);
+});
+
+test('Codex setup in a git checkout arms core.hooksPath and the pre-push hook', (t) => {
+  const { root, env } = fixture(t);
+  armHookLayout(root);
+  const options = {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  execFileSync('git', ['init', '--quiet'], options);
+  execFileSync('git', ['config', 'commit.gpgsign', 'false'], options);
+  bootstrap(root, options.env);
+  assert.equal(readFileSync(join(root, 'husky-receipt'), 'utf8').trim(), 'husky');
+  assert.equal(execFileSync('git', ['config', '--get', 'core.hooksPath'], options).trim(), '.husky');
+});
+
+test('maybeRunCli only bootstraps when this file is the process entrypoint', (t) => {
+  const { root, env } = fixture(t);
+  armHookLayout(root);
+  const options = {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  execFileSync('git', ['init', '--quiet'], options);
+  execFileSync('git', ['config', 'commit.gpgsign', 'false'], options);
+  const modulePath = realpathSync(resolve('scripts/codex-setup.mjs'));
+  assert.equal(maybeRunCli({ argv: [process.execPath], modulePath, root, env: options.env }), false);
+  assert.equal(
+    maybeRunCli({ argv: [process.execPath, realpathSync(resolve('scripts/codex-setup.test.mjs'))], modulePath, root, env: options.env }),
+    false,
+  );
+  assert.equal(
+    maybeRunCli({ argv: [process.execPath, modulePath], modulePath, root, env: options.env }),
+    true,
+  );
+  assert.equal(execFileSync('git', ['config', '--get', 'core.hooksPath'], options).trim(), '.husky');
+});
+
+test('installGitHooks fails closed when husky exits nonzero', (t) => {
+  const { root, env } = fixture(t);
+  armHookLayout(root);
+  const options = {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  execFileSync('git', ['init', '--quiet'], options);
+  writeFileSync(
+    join(root, 'bin/pnpm'),
+    `#!/bin/bash
+if [[ "$*" == '--version' ]]; then echo '9.15.9'; exit 0; fi
+if [[ "$*" == 'exec husky' ]]; then exit 42; fi
+exit 0
+`,
+    { mode: 0o755 },
+  );
+  assert.throws(() => installGitHooks(root, options.env), /husky hook install failed \(42\)/);
+});
+
+test('installGitHooks fails closed when core.hooksPath cannot be set', (t) => {
+  const { root, env } = fixture(t);
+  armHookLayout(root);
+  const options = {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  execFileSync('git', ['init', '--quiet'], options);
+  const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
+  writeFileSync(
+    join(root, 'bin/pnpm'),
+    `#!/bin/bash
+if [[ "$*" == '--version' ]]; then echo '9.15.9'; exit 0; fi
+if [[ "$*" == 'exec husky' ]]; then exit 0; fi
+exit 0
+`,
+    { mode: 0o755 },
+  );
+  writeFileSync(
+    join(root, 'bin/git'),
+    `#!/bin/bash
+if [[ "$*" == 'config core.hooksPath .husky' ]]; then exit 42; fi
+exec ${JSON.stringify(realGit)} "$@"
+`,
+    { mode: 0o755 },
+  );
+  assert.throws(() => installGitHooks(root, options.env), /core.hooksPath was not set \(42\)/);
+});
+
+test('installGitHooks propagates husky, hooksPath, and verify failures and signals', (t) => {
+  const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
+
+  const { root: missingPnpmRoot, env: missingPnpmEnv } = fixture(t);
+  execFileSync('git', ['init', '--quiet'], {
+    cwd: missingPnpmRoot,
+    env: { ...missingPnpmEnv, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  });
+  assert.throws(
+    () => installGitHooks(missingPnpmRoot, { PATH: '/usr/bin:/bin' }),
+    { code: 'ENOENT' },
+  );
+
+  for (const [script, expected] of [
+    [
+      `#!/bin/bash
+if [[ "$*" == '--version' ]]; then echo '9.15.9'; exit 0; fi
+if [[ "$*" == 'exec husky' ]]; then kill -TERM $$; fi
+exit 0
+`,
+      /husky hook install failed \(SIGTERM\)/,
+    ],
+  ]) {
+    const { root, env } = fixture(t);
+    armHookLayout(root);
+    const options = {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+    };
+    execFileSync('git', ['init', '--quiet'], options);
+    writeFileSync(join(root, 'bin/pnpm'), script, { mode: 0o755 });
+    assert.throws(() => installGitHooks(root, options.env), expected);
+  }
+
+  const { root, env } = fixture(t);
+  armHookLayout(root);
+  const options = {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  execFileSync('git', ['init', '--quiet'], options);
+  writeFileSync(
+    join(root, 'bin/pnpm'),
+    `#!/bin/bash
+if [[ "$*" == '--version' ]]; then echo '9.15.9'; exit 0; fi
+if [[ "$*" == 'exec husky' ]]; then exit 0; fi
+exit 0
+`,
+    { mode: 0o755 },
+  );
+  writeFileSync(
+    join(root, 'bin/git'),
+    `#!/bin/bash
+if [[ "$*" == 'config core.hooksPath .husky' ]]; then kill -TERM $$; fi
+exec ${JSON.stringify(realGit)} "$@"
+`,
+    { mode: 0o755 },
+  );
+  assert.throws(() => installGitHooks(root, options.env), /core.hooksPath was not set \(SIGTERM\)/);
+
+  const verifyFixture = fixture(t);
+  armHookLayout(verifyFixture.root);
+  const verifyOptions = {
+    cwd: verifyFixture.root,
+    encoding: 'utf8',
+    env: { ...verifyFixture.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  };
+  execFileSync('git', ['init', '--quiet'], verifyOptions);
+  writeFileSync(join(verifyFixture.root, 'scripts/hooks/verify-git-hooks.sh'), '#!/bin/bash\nkill -TERM $$\n', {
+    mode: 0o755,
+  });
+  assert.throws(
+    () => installGitHooks(verifyFixture.root, verifyOptions.env),
+    /git hook verify failed \(SIGTERM\)/,
+  );
 });
 
 test('rejects a runtime mismatch before running the installer', (t) => {

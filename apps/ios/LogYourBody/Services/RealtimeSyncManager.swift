@@ -23,6 +23,7 @@ class RealtimeSyncManager: ObservableObject {
     @Published var unsyncedGlp1Count = 0
     @Published var unsyncedDexaCount = 0
     @Published var isOnline = true
+
     @Published var realtimeConnected = false
     @Published var error: String?
 
@@ -33,6 +34,34 @@ class RealtimeSyncManager: ObservableObject {
     let userDefaults: UserDefaults
     let analyticsService: AnalyticsService
     let networkMonitor: NWPathMonitor
+
+    #if DEBUG
+    private var usesOfflineUITestFixture = false
+
+    func applyOfflineUITestFixture() {
+        usesOfflineUITestFixture = true
+        networkMonitor.cancel()
+        isOnline = false
+        syncStatus = .offline
+        pendingSyncCount = 0
+    }
+    #endif
+
+    func handleNetworkPathUpdate(isOnline: Bool) {
+        // A queued path callback can outlive monitor cancellation.
+        #if DEBUG
+        guard !usesOfflineUITestFixture else { return }
+        #endif
+        let wasOffline = !self.isOnline
+        self.isOnline = Self.online(isOnline)
+        if self.isOnline {
+            syncStatus = .idle
+            if wasOffline { syncAll() }
+        } else {
+            syncStatus = .offline
+            disconnectRealtime()
+        }
+    }
 
     var syncTimer: Timer?
     var cancellables = Set<AnyCancellable>()
@@ -51,9 +80,10 @@ class RealtimeSyncManager: ObservableObject {
         }
     )
 
-    var pendingDatedOutcomeCount: Int {
+    func pendingDatedOutcomeCount() async throws -> Int {
         guard AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: DatedOutcomeStore.featureGate) else { return 0 }
-        return (try? datedOutcomeStore.pendingEdits().count) ?? 0
+        guard let owner = authManager.captureAccountSession() else { throw DatedOutcomeError.unauthenticated }
+        return try await datedOutcomeStore.pendingCountForPresentation { self.authManager.ownsAccountSession(owner) }
     }
 
     // Battery optimization settings
@@ -125,6 +155,28 @@ class RealtimeSyncManager: ObservableObject {
         self.userDefaults = userDefaults
         self.analyticsService = analyticsService
     }
+
+    /// Paid UI fixtures force offline before the first snapshot. A satisfied
+    /// path must not replace that, or an empty Stats launch classifies as no-data.
+    static func online(
+        _ pathSatisfied: Bool,
+        _ arguments: [String] = ProcessInfo.processInfo.arguments
+    ) -> Bool {
+        guard pathSatisfied else { return false }
+        let fixtureForcesOffline = offlineUITestFixtures.contains { arguments.contains($0) }
+        return !fixtureForcesOffline
+    }
+
+    static let offlineUITestFixtures = [
+        "-lybUITestPaidMVPFixture",
+        "-lybUITestWeightLoggerMVPFixture",
+        "-lybUITestPaywallFixture",
+        "-lybUITestPaywallPlansFixture",
+        "-lybUITestFullDashboardFixture",
+        "-lybUITestPhotoTimelineHUDFixture",
+        "-lybUITestBodyScoreOnboardingFixture",
+        "-lybUITestBodyScoreFirstPhotoFixture"
+    ]
 }
 
 extension PendingBodyMetricSyncItem {

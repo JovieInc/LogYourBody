@@ -14,7 +14,126 @@ import UIKit
 @testable import LogYourBody
 
 final class BackgroundRemovalServiceTests: XCTestCase {
+    func testPersonMaskRunsOnDispatchQueueAndReturnsTheRequestedMask() async throws {
+        let image = try XCTUnwrap(SyntheticImage.solidCGImage(width: 32, height: 40))
+        let mask = try XCTUnwrap(SyntheticImage.constantMask(width: 8, height: 10, value: 255))
+        let queue = DispatchQueue(label: "test.segmentation")
+        let key = DispatchSpecificKey<String>()
+        queue.setSpecific(key: key, value: "segmentation")
+        let service = BackgroundRemovalService(segmentationQueue: queue) { input, quality in
+            XCTAssertEqual(DispatchQueue.getSpecific(key: key), "segmentation")
+            XCTAssertFalse(Thread.isMainThread)
+            XCTAssertEqual(input.width, 32)
+            XCTAssertEqual(input.height, 40)
+            XCTAssertEqual(quality, 0.85)
+            return mask
+        }
+
+        let result = try await service.personMask(for: image, quality: 0.85)
+        XCTAssertTrue(result === mask)
+    }
+
+    func testPersonMaskPropagatesFailureAndTheQueueAcceptsTheNextRequest() async throws {
+        let image = try XCTUnwrap(SyntheticImage.solidCGImage(width: 32, height: 40))
+        let mask = try XCTUnwrap(SyntheticImage.constantMask(width: 8, height: 10, value: 255))
+        let failure = NSError(domain: "test.segmentation", code: 7)
+        var requests = 0
+        let service = BackgroundRemovalService { _, _ in
+            requests += 1
+            if requests == 1 { throw failure }
+            return mask
+        }
+        do {
+            _ = try await service.personMask(for: image, quality: 0.85)
+            XCTFail("A failed Vision operation must throw its original error.")
+        } catch {
+            XCTAssertEqual(error as NSError, failure)
+        }
+        let result = try await service.personMask(for: image, quality: 0.5)
+        XCTAssertTrue(result === mask)
+        XCTAssertEqual(requests, 2)
+    }
+
+    func testPersonMaskCancellationRejectsTheCompletedMask() async throws {
+        let image = try XCTUnwrap(SyntheticImage.solidCGImage(width: 32, height: 40))
+        let mask = try XCTUnwrap(SyntheticImage.constantMask(width: 8, height: 10, value: 255))
+        let started = expectation(description: "Segmentation started")
+        let release = DispatchSemaphore(value: 0)
+        let service = BackgroundRemovalService { _, _ in
+            started.fulfill()
+            guard release.wait(timeout: .now() + 5) == .success else {
+                throw BackgroundRemovalService.BackgroundRemovalError.processingFailed
+            }
+            return mask
+        }
+        let task = Task { try await service.personMask(for: image, quality: 0.85) }
+        await fulfillment(of: [started], timeout: 5)
+        task.cancel()
+        release.signal()
+        do {
+            _ = try await task.value
+            XCTFail("A cancelled preview must not receive a completed mask.")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+    }
+
+    func testConcurrentPersonMasksCompleteWithoutStarvingAsyncExecutor() async throws {
+        let image = try XCTUnwrap(SyntheticImage.solidCGImage(width: 32, height: 40))
+        await withTaskGroup(of: Bool.self) { group in
+            for index in 0..<8 {
+                group.addTask {
+                    do {
+                        let mask = try await BackgroundRemovalService.shared.personMask(
+                            for: image, quality: index.isMultiple(of: 2) ? 0.85 : 0.5
+                        )
+                        return CVPixelBufferGetWidth(mask) > 0 && CVPixelBufferGetHeight(mask) > 0
+                    } catch {
+                        // Unsupported Vision must complete every waiter with an error.
+                        return !error.localizedDescription.isEmpty
+                    }
+                }
+            }
+            var completed = 0
+            for await validResult in group {
+                XCTAssertTrue(validResult)
+                completed += 1
+            }
+            XCTAssertEqual(completed, 8)
+        }
+    }
+
     // MARK: - Input validation
+
+    func testPersonMaskRunsOutsideCooperativeTasksAndReturnsTheMask() async throws {
+        let image = try XCTUnwrap(SyntheticImage.solidCGImage(width: 32, height: 40))
+        let mask = try XCTUnwrap(SyntheticImage.constantMask(width: 16, height: 20, value: 255))
+        let service = BackgroundRemovalService { input, quality in
+            XCTAssertFalse(Thread.isMainThread)
+            withUnsafeCurrentTask { XCTAssertNil($0, "Blocking Vision work must leave the cooperative executor") }
+            XCTAssertEqual(input.width, 32)
+            XCTAssertEqual(input.height, 40)
+            XCTAssertEqual(quality, 0.85)
+            return mask
+        }
+        let output = try await service.personMask(for: image, quality: 0.85)
+        XCTAssertTrue(output === mask)
+    }
+
+    func testPersonMaskRunsOutsideCooperativeTasksAndPreservesTheError() async throws {
+        let image = try XCTUnwrap(SyntheticImage.solidCGImage(width: 32, height: 40))
+        let service = BackgroundRemovalService { _, _ in
+            XCTAssertFalse(Thread.isMainThread)
+            withUnsafeCurrentTask { XCTAssertNil($0, "A failed Vision request must also leave the cooperative executor") }
+            throw BackgroundRemovalService.BackgroundRemovalError.processingFailed
+        }
+        do {
+            _ = try await service.personMask(for: image, quality: 0.85)
+            XCTFail("The failed request must throw")
+        } catch {
+            XCTAssertEqual(error as? BackgroundRemovalService.BackgroundRemovalError, .processingFailed)
+        }
+    }
 
     func testRemoveBackgroundSurfacesUnsupportedSegmentationAsAnErrorNotATrap() async throws {
         let cgImage = try XCTUnwrap(SyntheticImage.solidCGImage(width: 32, height: 40, red: 120, green: 120, blue: 120))

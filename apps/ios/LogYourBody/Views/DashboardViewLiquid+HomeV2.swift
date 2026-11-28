@@ -19,6 +19,24 @@ extension DashboardViewLiquid {
         HomeV2Copy.displayUnit(currentMeasurementSystem)
     }
 
+    var homeV2RecentReadingsSheet: some View {
+        HomeV2RecentReadings(
+            store: healthSyncPresentation,
+            unit: homeV2DisplayUnit,
+            correctionsEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
+                flagKey: MetricCorrectionService.featureGate
+            ),
+            ownsSession: authManager.ownsAccountSession,
+            onChanged: {
+                if let userId = authManager.currentUser?.id {
+                    BodyScoreCache.shared.invalidate(for: userId)
+                    BodyScoreRecalculationService.shared.scheduleRecalculation()
+                }
+                Task { await refreshHomeV2AfterWrite(selecting: nil) }
+            }
+        )
+    }
+
     var homeV2InsightMetrics: [BodyMetrics] {
         bodyMetrics.filter {
             !$0.isExcluded && ($0.weight == nil || HomeV2WeightQuality.isWithinSupportedLoggingRange($0.weight))
@@ -67,7 +85,16 @@ extension DashboardViewLiquid {
             dateText: { formatHUDDate($0.date) },
             loggedSentence: homeV2Logged.map { $0.confirmationText },
             systemState: homeV2SystemState,
+            healthSyncStatus: HealthSyncPresentationPolicy.isEnabled() ? healthSyncPresentation.syncStatus : nil,
+            healthWeightReceipt: healthSyncPresentation.receipt,
+            onRecentReadings: {
+                if let receipt = healthSyncPresentation.receipt {
+                    healthSyncPresentation.dismissReceipt(id: receipt.id)
+                }
+                showsRecentHealthReadings = true
+            },
             onOpenPhoto: { isHomeV2ViewerPresented = true },
+            onAddPhoto: { presentProgressPhotoAttach(for: metric) },
             onViewProgress: { openHomeV2Progress() },
             onViewMetric: { openHomeV2Progress(metric: $0) },
             onTodayDetails: { openHomeV2Context() },
@@ -79,6 +106,14 @@ extension DashboardViewLiquid {
             onDone: { homeV2Logged = nil },
             onUndo: { Task { await undoHomeV2Logged() } },
             onProvenancePresentationChange: { isHomeV2MetricProvenancePresented = $0 },
+            weeklyPhotoPrompt: WeeklyPhotoCheckInPolicy.prompt(
+                metrics: bodyMetrics,
+                dismissedWeekKey: UserDefaults.standard.string(
+                    forKey: WeeklyPhotoCheckInPolicy.dismissedWeekDefaultsKey
+                ),
+                enabled: WeeklyPhotoCheckInPolicy.promptsAreEnabled()
+            ),
+            onAddWeeklyPhoto: { presentWeeklyPhotoCheckIn() },
             isPhotoScrubNavigating: isHomeV2PhotoScrubNavigating
         )
         .task(id: homeV2StepsRequest(on: metric.date)) {
@@ -157,7 +192,8 @@ extension DashboardViewLiquid {
             onConnectHealth: {
                 Task { _ = await HealthKitManager.shared.requestAuthorization() }
             },
-            onLogWeight: { presentHomeV2LogSheet(initialTab: 1) }
+            onLogWeight: { presentHomeV2LogSheet(initialTab: 1) },
+            onAddPhoto: { presentProgressPhotoAttach(for: nil) }
         )
         .task(id: homeV2StepsRequest(on: date)) {
             guard let ownership = authManager.captureAccountSession() else { return }

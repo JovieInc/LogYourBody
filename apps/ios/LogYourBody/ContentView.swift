@@ -12,9 +12,9 @@ enum LaunchSurfacePolicy {
     }
 
     static func requiresCompleteProfile(
-        isProfileComplete: Bool
+        isProfileComplete: Bool, datedOutcomeEnabled: Bool = false
     ) -> Bool {
-        !isProfileComplete
+        !isProfileComplete && !datedOutcomeEnabled
     }
 }
 
@@ -23,7 +23,7 @@ enum EntryDeepLinkPolicy {
         isAuthenticated: Bool,
         user: User?,
         hasCompletedOnboarding: Bool,
-        isSubscribed: Bool
+        isSubscribed: Bool, datedOutcomeEnabled: Bool = false
     ) -> Bool {
         guard isAuthenticated else { return false }
 
@@ -33,30 +33,9 @@ enum EntryDeepLinkPolicy {
             hasCompletedOnboarding: hasCompletedOnboarding
         ) &&
             !LaunchSurfacePolicy.requiresCompleteProfile(
-                isProfileComplete: isProfileComplete
+                isProfileComplete: isProfileComplete, datedOutcomeEnabled: datedOutcomeEnabled
             ) &&
             isSubscribed
-    }
-}
-
-enum ProfileCompletionPolicy {
-    static func isComplete(user: User?) -> Bool {
-        guard let user else { return false }
-        return isComplete(profile: user.profile, fallbackName: user.name)
-    }
-
-    static func isComplete(profile: UserProfile?, fallbackName: String?) -> Bool {
-        guard let profile else { return false }
-
-        let profileName = profile.fullName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let fallbackDisplayName = fallbackName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let displayName = profileName?.isEmpty == false ? profileName : fallbackDisplayName
-        let hasName = !(displayName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-        let hasDOB = profile.dateOfBirth != nil
-        let hasHeight = (profile.height ?? 0) > 0
-        let hasGender = !(profile.gender?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-
-        return hasName && hasDOB && hasHeight && hasGender
     }
 }
 
@@ -86,6 +65,7 @@ struct ContentView: View {
     @State private var releaseReviewItems: [ReleaseReviewItem] = []
     @State private var releaseReviewDestination: ReleaseReviewDestination?
     @State private var pendingDexaPDF: DexaPDFFileSelection?
+    @State private var datedOutcomeGateToken = UUID()
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     private let releaseReviewStateStore = ReleaseReviewStateStore()
 
@@ -149,8 +129,13 @@ struct ContentView: View {
 
     private var shouldShowProfileCompletion: Bool {
         LaunchSurfacePolicy.requiresCompleteProfile(
-            isProfileComplete: isProfileComplete
+            isProfileComplete: isProfileComplete, datedOutcomeEnabled: isDatedOutcomeEnabled
         )
+    }
+
+    private var isDatedOutcomeEnabled: Bool {
+        _ = datedOutcomeGateToken
+        return DatedOutcomeEntry.isEnabled()
     }
 
     private var shouldShowDailyReminderPrompt: Bool {
@@ -266,6 +251,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: OnboardingStateManager.onboardingStateDidChange)) { _ in
             hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion(for: currentUserId)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            datedOutcomeGateToken = UUID()
+        }
         .onChange(of: authManager.isAuthenticated) { _, newValue in
             currentUserId = authManager.currentUser?.id
             if newValue {
@@ -346,12 +334,22 @@ struct ContentView: View {
     private var authenticatedContent: some View {
         Group {
             if shouldShowOnboarding {
-                // One first run for everyone: the onboarding_v2_focus gate now
-                // only picks the sign-in screen.
-                BodyScoreOnboardingFlowView()
-                    .onAppear {
-                        AppServicePorts.analyticsTracker.track(event: "onboarding_view")
+                if isDatedOutcomeEnabled {
+                    if let owner = authManager.captureAccountSession() {
+                        DatedOutcomeLaunchView(auth: authManager, owner: owner, store: realtimeSyncManager.datedOutcomeStore) {
+                            guard authManager.ownsAccountSession(owner) else { return }
+                            onboardingStateManager.markCompleted(userId: owner.subject)
+                        }
+                        .id(owner)
+                    } else {
+                        ProgressView()
                     }
+                } else {
+                    BodyScoreOnboardingFlowView()
+                        .onAppear {
+                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
+                        }
+                }
             } else if shouldShowProfileCompletion {
                 ProfileCompletionGateView()
             } else if !subscriptionManager.isSubscribed {

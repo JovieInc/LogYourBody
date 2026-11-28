@@ -1,0 +1,26 @@
+{
+  "schema": "lyb.correction-coverage-floor/v1",
+  "decision": "LYB-364",
+  "status": "recommended-default",
+  "scope": "Correction-pyramid mechanized-share coverage for the guard-coverage CI child.",
+  "activation": {
+    "featureGate": "lyb_correction_pyramid_coverage_floor",
+    "defaultEnabled": false,
+    "implemented": false
+  },
+  "rules": [
+    {
+      "id": "mechanized-share-nonregression",
+      "metric": "correctionPyramidCoverage.mechanizedShare",
+      "baseline": "last-recorded",
+      "failWhen": "current-less-than-baseline",
+      "absoluteFloor": null
+    }
+  ],
+  "rationale": "Reject regressions from recorded coverage without inventing an absolute percentage target.",
+  "compatibility": [
+    "This decision records policy only; the guard-coverage CI child owns enforcement, baseline recording and flag wiring.",
+    "The metric child owns measurement; compare its unrounded mechanized share with the last recorded baseline. Equal or higher shares pass this floor rule.",
+    "Existing coverage, retained-rule, source, guard and finding-baseline checks remain enforced and must not be weakened."
+  ]
+}

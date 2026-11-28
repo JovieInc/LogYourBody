@@ -102,6 +102,78 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertEqual(try reopened.activeSession(ownerId: "owner-A"), current)
     }
 
+    func testCoachEntryCTAContinuesWhenSessionAlreadyHasLoggedSets() {
+        XCTAssertFalse(TrainingCoachEntryPolicy.hasRecordedProgress(session()))
+        XCTAssertEqual(
+            TrainingCoachEntryPolicy.primaryActionTitle(hasRecordedProgress: false),
+            "Start session"
+        )
+        XCTAssertEqual(
+            TrainingCoachEntryPolicy.accessibilityIdentifier(hasRecordedProgress: false),
+            "training_start_session"
+        )
+
+        let saved = TrainingSavedSet(
+            sessionId: sessionId, exerciseId: exercise.id, setNumber: 1,
+            reps: 10, loadKg: 60, rir: 2, revision: 0, corrections: []
+        )
+        let inProgress = session(saved: [saved])
+        XCTAssertTrue(TrainingCoachEntryPolicy.hasRecordedProgress(inProgress))
+        XCTAssertEqual(
+            TrainingCoachEntryPolicy.primaryActionTitle(hasRecordedProgress: true),
+            "Continue session"
+        )
+        XCTAssertEqual(
+            TrainingCoachEntryPolicy.accessibilityIdentifier(hasRecordedProgress: true),
+            "training_continue_session"
+        )
+    }
+
+    func testNilServerSessionRetainsCacheWithLoggedOrPendingSets() throws {
+        // Isolated stores: clearActiveSession does not wipe set journals, so a
+        // leftover pending row on the same sessionId would correctly retain.
+        let loggedStore = TrainingDraftStore(rootURL: root())
+        let saved = TrainingSavedSet(
+            sessionId: sessionId, exerciseId: exercise.id, setNumber: 1,
+            reps: 10, loadKg: 60, rir: 2, revision: 0, corrections: []
+        )
+        let current = session(saved: [saved])
+        try loggedStore.cacheActiveSession(current, ownerId: "owner-A")
+        XCTAssertTrue(TrainingActiveSessionRetentionPolicy.shouldRetainCache(
+            cached: current, serverSessionPresent: false, draftRows: [:]
+        ))
+        try loggedStore.clearActiveSessionIfNoUnfinishedWork(ownerId: "owner-A")
+        XCTAssertEqual(try loggedStore.activeSession(ownerId: "owner-A"), current)
+
+        let pendingStore = TrainingDraftStore(rootURL: root())
+        try pendingStore.cacheActiveSession(session(), ownerId: "owner-A")
+        var pending = TrainingSetDraft(
+            exerciseId: exercise.id, setNumber: 1, repsText: "10", loadText: "60", rir: 2
+        )
+        pending.pendingRequest = TrainingSetLogRequest(
+            sessionId: sessionId, exerciseId: exercise.id, setNumber: 1, reps: 10, loadKg: 60, rir: 2
+        )
+        try pendingStore.put(pending, ownerId: "owner-A", sessionId: sessionId)
+        XCTAssertTrue(TrainingActiveSessionRetentionPolicy.shouldRetainCache(
+            cached: session(), serverSessionPresent: false,
+            draftRows: try pendingStore.load(ownerId: "owner-A", sessionId: sessionId)
+        ))
+        try pendingStore.clearActiveSessionIfNoUnfinishedWork(ownerId: "owner-A")
+        XCTAssertEqual(try pendingStore.activeSession(ownerId: "owner-A")?.id, sessionId)
+
+        let idleStore = TrainingDraftStore(rootURL: root())
+        try idleStore.cacheActiveSession(session(), ownerId: "owner-A")
+        XCTAssertEqual(try idleStore.load(ownerId: "owner-A", sessionId: sessionId), [:])
+        XCTAssertFalse(TrainingActiveSessionRetentionPolicy.shouldRetainCache(
+            cached: session(), serverSessionPresent: false, draftRows: [:]
+        ))
+        try idleStore.clearActiveSessionIfNoUnfinishedWork(ownerId: "owner-A")
+        XCTAssertNil(try idleStore.activeSession(ownerId: "owner-A"))
+        XCTAssertFalse(TrainingActiveSessionRetentionPolicy.shouldRetainCache(
+            cached: session(), serverSessionPresent: true, draftRows: [:]
+        ))
+    }
+
     private func model(_ store: TrainingDraftStore, owner: String = "owner-A") -> TrainingSessionDraft {
         TrainingSessionDraft(session: session(), ownerId: owner, store: store, isCurrent: { true })
     }

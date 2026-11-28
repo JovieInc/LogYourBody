@@ -30,7 +30,10 @@ Optional rotatable personal 3D is in scope only inside LYB-311. That bounded
 program replaces a blanket deferral of all 3D work. LYB-317 adds the optional
 on-device outline from a front or side capture. It does not claim body fat or
 weekly change, and an unvalidated capture stays on the photo or the generic
-wireframe. Generic avatars stay illustrative until calibrated. Personalized
+wireframe. LYB-319 can cache a photo texture on that accepted outline. The
+texture does not change the outline, it stays outside paid R1, and a missing
+texture leaves the photo and the outline in place. Generic avatars stay
+illustrative until calibrated. Personalized
 reconstruction and body-change claims wait for their recorded validation gates.
 An AI weekly average or other synthetic transformation is never shown as
 captured evidence.
