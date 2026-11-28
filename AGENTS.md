@@ -42,7 +42,7 @@ and the native SwiftUI client does not embed this TypeScript runtime. See
   - **Authentication**: Jovie Better Auth issuer with Sign in with Apple. No Clerk.
   - **Design System**: iOS 26 Liquid Glass with graceful fallbacks.
   - **Data**: Core Data is the device source of truth. Neon via first-party bearer APIs is the cloud data plane. Native never connects to Postgres.
-  - **Feature Flags**: Statsig for controlled rollouts and A/B testing.
+  - **Feature Flags**: Statsig for non-launch/core rollouts and A/B tests. Launch and core work follows contract v2 §1.16 (see [Feature Flags & Safety](#feature-flags--safety-statsig)): ship live or keep the PR a draft.
 
 ### Product Scope Guardrails
 
@@ -66,6 +66,8 @@ The canonical product and brand standards are:
 - Do not build iPad-specific layouts unless there is clear user pull, a measurable kiosk experiment, or enough active iPad usage to justify it. Target future landscape layout: photo left, stats right, timeline along the bottom.
 - The product includes an evidence-grounded hypertrophy coach. A deterministic programming engine owns all training prescriptions; the conversation model may explain only engine-returned output and cite the opaque evidence IDs supplied with it. It must not create, calculate, or adjust numeric prescriptions.
 - Do not build a food logger or a general-purpose workout tracker. Hypertrophy programming is in scope as an engine-led product capability alongside the body-composition heads-up display.
+
+**Standing rule (contract v2 §1.16):** no feature flags on launch or core work until Linear records a completed golden task by a real external person. Those changes ship live or the PR stays a draft. Details, the LogYourBody term map, and the Tim-ordered kill-switch exemption are in [Feature Flags & Safety](#feature-flags--safety-statsig).
 
 ---
 
@@ -159,6 +161,7 @@ The expected cycle is:
 - ❌ Push directly to `main`
 - ❌ Bypass required checks, required deployments, branch rulesets, merge queue, or PR requirements
 - ❌ Relax security, privacy, payment, auth, or data-loss controls to make a merge pass
+- ❌ Hide launch or core work behind a feature flag, or merge it dark. Ship those changes live or keep the PR a draft (contract v2 §1.16).
 - ❌ Ship App Store, billing, legal, credential, or customer-data changes without the release evidence required by this file and the relevant checklist
 - ❌ Change branch protection, CI configuration, workflow files, or this file unless explicitly requested
 - ❌ Relax security or quality gates
@@ -319,42 +322,77 @@ See `docs/architecture/shared-product-platform.md` for the architecture and extr
 
 ## Feature Flags & Safety (Statsig)
 
-### Core Principle
+### No flags on launch or core work (company contract v2 §1.16)
 
-**Any user-visible or risky change must be behind a Statsig feature gate.**
+Until Linear records at least one completed golden task by a real external person (paid or free; not Tim, the team, test accounts, or agents; finished end to end, not just started), launch and core changes ship live: no default-off, percentage, or allowlist flags, and no merged-but-dark code. If a change is not safe to ship live, it does not merge; it stays a draft until it is. Any runtime toggle that hides launch or core behavior counts as a flag, whatever it is named (Statsig gate, environment variable, allowlist, or otherwise).
 
-### Gate Naming Examples
+**Launch/core in this repo** uses the names already defined in these docs:
 
-- `new_onboarding_v2`
-- `new_dashboard_v2`
+| Company term | LogYourBody equivalent |
+| --- | --- |
+| Signup | Sign in with Apple / "continue with Apple" ([GOLDEN_PATH.md](docs/GOLDEN_PATH.md) stage 2, Sign in) |
+| Onboarding | First-run and profile completion (name + DOB + height + gender; "authed + onboarded + complete profile") |
+| The golden path | The six stages in [GOLDEN_PATH.md](docs/GOLDEN_PATH.md): Launch, Sign in, Subscribe, Log weight, See it, It survives |
+| Pricing / billing / checkout | Subscribe stage, the RevenueCat `Premium` entitlement, and the paywall |
+| Homepage and launch surfaces | The Home canvas (photo timeline HUD / body through time), the pinned paid surface, and the web marketing, legal, and billing surfaces that unblock iOS |
+| Launch dependencies | Anything those stages depend on, including Jovie Better Auth, Core Data persistence, and sync |
+| Public profiles | Not a named LogYourBody product surface in these docs today; the company term still applies if one is added |
+
+Non-core internal tooling and non-launch accelerants (for example hypertrophy-coach experiments, voice, or training MCP) may still use flags. For launch and core work, this rule overrides every "default-off flag" or "gate every user-visible change" line elsewhere in this file and in adjacent repo docs, including the Agent Build Rules in [docs/product-development-roadmap.md](docs/product-development-roadmap.md).
+
+**Exempt:** incident kill switches Tim explicitly ordered. Those default ON and exist only to roll back, never to hide unshipped work.
+
+Existing launch or core flags should be inventoried into Linear and removed (shipped on or deleted) through normal autonomous landing. This docs change does not flip product flags.
+
+Company canon remains `JovieInc/ci canon/COMPANY.md` (this file is the repo delta). Keep the required pointer line at the bottom of this file. The LogYourBody term map and the conflicting-rule fixes in this delta stay here even if the shared canon later restates §1.16.
+
+### When flags are still used (non-core work)
+
+Statsig remains the feature-flag vendor for non-core work, accessed only through Platform Ports (see Vendor Adapter Rule below).
+
+### Gate Naming Examples (non-core)
+
+- `hypertrophy_coach_voice_v1`
+- `training_optimizer_experiment`
 - `strict_reminders`
-- `enable_healthkit_sync`
 
-### Pattern for Changes
+Do not add default-off, percentage, or allowlist gates named for launch or core surfaces such as `new_onboarding_v2`, `new_dashboard_v2`, or other Golden Path / Home / paywall / sign-in toggles.
 
-1. **Implement new logic behind a Statsig gate.**
+### Pattern for non-core changes
+
+1. **Implement new non-core logic behind a Statsig gate.**
 2. **Default gate OFF** for production users.
 3. **Internal testing**: Enable for staff/test users via Statsig console.
 4. **Gradual rollout**: 1% → 10% → 50% → 100%, controlled outside code.
 
 ### Agent Rules
 
-- ✅ Respect existing gates.
-- ✅ Add new gates for new behavior rather than rewriting code to bypass gates.
-- ❌ Never hard-code permanent "new behavior" without a gate if it is risky or user-facing.
-- ❌ Never remove or bypass existing feature gates without explicit human approval.
+- ✅ Ship launch and core changes live, or keep the PR a draft until they are safe to ship live.
+- ✅ Respect existing gates. Do not silently bypass them.
+- ✅ Add new gates only for non-core behavior, or for a Tim-ordered incident kill switch (default ON, rollback-only).
+- ❌ Never hide launch or core behavior behind a default-off, percentage, or allowlist flag, and never merge it dark.
+- ❌ Never hard-code a Tim-ordered kill switch to the unsafe side.
+- Existing launch or core flags are removed by inventorying them in Linear and shipping them on or deleting them through a normal PR, not by bypassing the gate in place.
 
-**Example**:
+**Example** (launch/core — ships live or stays a draft):
 
 ```typescript
-// Good: Feature-gated new behavior
+// Good: new onboarding ships live
+return <NewOnboardingFlow />;
+
+// Bad: launch/core work hidden behind a flag
 if (statsig.checkGate('new_onboarding_v2')) {
   return <NewOnboardingFlow />;
 }
 return <LegacyOnboardingFlow />;
+```
 
-// Bad: Hard-coded new behavior
-return <NewOnboardingFlow />; // ❌ No gate!
+**Example** (non-core work may still be gated):
+
+```typescript
+if (statsig.checkGate('hypertrophy_coach_voice_v1')) {
+  return <VoiceCoach />;
+}
 ```
 
 ---
@@ -626,14 +664,14 @@ owns push/PR operations retains that ownership; do not create a second shipper.
 4. **PRs**: Include test results and coverage in PR descriptions.
 5. **Branch naming**: Follow the branching conventions (`feat/*`, `fix/*`, `refactor/*`, `agent/*`).
 6. **Commit messages**: Use Conventional Commits style.
-7. **Feature flags**: Gate risky changes with Statsig.
+7. **Feature flags**: For launch or core work, ship live or keep the PR a draft (§1.16). Gate only non-core risky changes with Statsig.
 
 ### Common Tasks
 
 - **Adding a new feature**:
   1. Create a branch: `feat/<short-desc>` off `main`.
   2. Start by understanding existing patterns in similar features.
-  3. Implement behind a Statsig gate if user-visible or risky.
+  3. If the change is launch or core work, ship it live or keep the PR a draft (§1.16). Otherwise, implement behind a Statsig gate if it is user-visible or risky.
   4. Run `pnpm lint`, `pnpm typecheck`, `pnpm test` before pushing.
   5. Open a PR targeting `main`.
   6. Land through the configured PR/merge-queue path once required checks and deployments pass.
@@ -743,7 +781,7 @@ Doppler remains the secrets manager. Operating rules are in [docs/engineering/se
 1. ❌ **NEVER push directly to `main`**
 2. ❌ **NEVER bypass PRs, required checks, required deployments, branch rulesets, or merge queue**
 3. ❌ **NEVER use npm or yarn** (always use `pnpm`)
-4. ❌ **NEVER bypass feature gates** for risky/user-facing changes
+4. ❌ **NEVER hide launch or core work behind a flag**, and never silently bypass an existing gate
 5. ❌ **NEVER change branch protection or CI configuration** without explicit request
 6. ❌ **NEVER relax security or quality gates**
 
@@ -752,7 +790,7 @@ Doppler remains the secrets manager. Operating rules are in [docs/engineering/se
 1. ✅ Work on short-lived branches off `main` (`feat/*`, `fix/*`, `refactor/*`, `agent/*`)
 2. ✅ Run `pnpm lint`, `pnpm typecheck`, `pnpm test` before declaring work complete
 3. ✅ Use Conventional Commits style (`feat:`, `fix:`, `refactor:`, etc.)
-4. ✅ Gate risky changes with Statsig feature flags
+4. ✅ Ship launch or core changes live or keep the PR a draft; gate only non-core risky changes with Statsig
 5. ✅ Open PRs targeting `main` and land them through the configured autonomous PR/merge-queue path when gates are green
 6. ✅ Keep PRs small and focused
 7. ✅ Use root-level `pnpm` scripts that leverage Turborepo
