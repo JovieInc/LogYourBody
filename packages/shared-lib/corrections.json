@@ -58,6 +58,46 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "preinstall-hook-guard-reads-generated-husky-files",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1721",
+    "correction": "PR #1721, fix-red-d5dac7802d occurrence 5: Detect Changes in run 42363093442 fails because the merge-hook guard copies ignored .husky/_/h before dependency installation; CI Summary consequently fails. Hook guards must run from tracked source without installed artifacts.",
+    "mechanization": "Extend the install-free pre-commit fixture to run the real tracked merge hook when the source resolver returns 23. Assert exact failure status and preservation of the staged tree and source projection. Keep the existing successful clean-merge and stale-tree refusal cases. The package and lock already resolve Statsig 3.33.7 on main.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The defect is in a pre-install test fixture, so product runtime logic cannot prevent its dependency on ignored generated files."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required hook test can execute the tracked entry in an install-free fixture and verify delegation and failure propagation before any dependency installation."
+      }
+    },
+    "guard": {
+      "path": "scripts/pre-commit-lint.test.mjs",
+      "anchor": "clean merge hook propagates the exact source resolver failure"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "merge-commit-skips-staged-source-map",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1721",
+    "correction": "PR #1721, fix-red-1423773703 occurrence 48: the @statsig/js-client 3.33.7 bump left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, parity and CI Summary. Merging origin/main auto-merged the manifest and the generated map, and the merge commit skipped the staged source-map repair.",
+    "mechanization": "Keep the tracked pre-merge-commit hook that runs the staged source resolver, propagates its failure and stops Git before a stale prepared tree can be committed. Its existing install-free fixture proves successful merge and refusal after artifact changes. The new fixture exercises exact resolver failure propagation.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The merge hook can run the existing staged source-map repair before a merge commit is created, so a clean auto-merge cannot keep a stale projection."
+      }
+    },
+    "guard": {
+      "path": ".husky/pre-merge-commit",
+      "anchor": "python3 scripts/resolve-repository-docs.py --staged || exit $?"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "launch-recovery-readiness-avoids-redundant-polling",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/43370783065/job/131706803096",
     "correction": "PR #1798 repair, fix-red-5df69c1e5f occurrence 15 in 14 days: merge origin/main without rebasing, retain Addressable 2.9.1, inspect failed checks, repair Launch Quality and extend the existing machine. The unit suite passes; the UI command reaches its 1800-second cap after 43 passing cases, while repeated recovery and canvas helpers spend one second polling already present controls. CI Summary reflects that timeout. Vercel reports Deployment was blocked; its details API returns 403 missing an authentication token. The harness owns pushing and PR updates.",
@@ -367,6 +407,24 @@
     "guard": {
       "path": "packages/shared-lib/src/dependency-security.test.ts",
       "anchor": "renders HTML with the installed web React and React DOM pair"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-react-renderer-version-alignment",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1734",
+    "correction": "PR #1734, fix-red-1423773703 occurrence 36: the React DOM 19.3.1 update retained an outdated lockfile and source projection, failing Detect Changes, parity, CI Summary and Vercel. Refreshing only React DOM resolves it against React 19.3.0 and breaks server rendering; upgrading only the web runtime leaves the linked UI workspace on React 19.3.0 and causes invalid hook calls.",
+    "mechanization": "Extend the existing explicit dependency/source-map repair helper to reject mismatched React DOM peers and multiple locked React runtimes before staging either artifact. Eight real-Git rejection regressions fail before their corresponding guard extensions and pass afterward; both matching-version cases pass, and the existing required change-detection suite runs all ten. Use the extended helper to reject the supplied mismatched lockfile, align React and React DOM to 19.3.1 in the web consumer and UI development dependencies, then refresh and freeze both dependency artifacts. Preserve the UI library's supported peer ranges. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper owns lockfile verification and source-map staging. Refusing incompatible React renderer snapshots inside its artifact rollback boundary prevents the repair from accepting dependencies that cannot render, without changing frozen CI installs or adding another shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/manifest_union.py",
+      "anchor": "A dependency repair must keep React and its DOM renderer on the same version."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -8612,14 +8670,14 @@
     "ruleId": "code-prevention"
   },
   {
-    "fingerprint": "dependency-repair-ignored-workspace-config",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1760",
-    "correction": "PR #1760, fix-red-1423773703 occurrence 58: preserve the ai 7.0.164 update and repair the stale generated source map reported by Detect Changes and parity, which also fails CI Summary. Extend and use the existing dependency-repair machine in the same PR.",
-    "mechanization": "Reuse the existing dependency repair guard that refuses ignored pnpm-workspace.yaml before invoking pnpm in both modes. The required real-Git regressions verify refusal, preservation of local workspace input and generated artifacts, reviewed retry and idempotence. Verify the scoped AI SDK 7.0.164 lockfile with frozen pnpm and regenerate the source projection. The harness must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "fingerprint": "dependency-repair-ignored-workspace-configuration",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1811",
+    "correction": "PR #1811 repair, fix-red-1423773703 occurrence 47 in 14 days: merge origin/main without rebasing, preserve the Next.js 15.5.29 update, repair stale source-map failures in Detect Changes and parity, and extend the existing repair machine. CI Summary reflects the Detect Changes failure. Vercel reports Deployment was blocked; its details API returns 403 missing an authentication token. The harness owns pushing and PR updates.",
+    "mechanization": "Keep the existing refusal of an ignored pnpm-workspace.yaml before verification. Extend the required dependency repair test matrix with four real-Git cases for an ignored pnpm-workspace.yaml created during verification or rendering in either repair mode. The tests preserve local workspace configuration, generated artifacts and the index, then retry successfully and remain idempotent. Verify the scoped Next.js 15.5.29 lockfile with frozen pnpm and regenerate the source projection.",
     "classification": {
       "codebase": {
         "feasible": true,
-        "rationale": "The existing repair helper owns dependency preflight and artifact staging. Rejecting ignored workspace configuration before pnpm runs prevents local-only workspace definitions, catalogs or resolver settings from authorizing committed dependency artifacts."
+        "rationale": "The existing dependency-repair preflight owns pnpm's local resolution inputs. Rejecting ignored workspace configuration prevents package discovery from using configuration absent from the reviewed index and CI checkout."
       }
     },
     "guard": {
@@ -8894,6 +8952,42 @@
     "guard": {
       "path": "scripts/manifest_union.py",
       "anchor": "assume-unchanged bits cannot hide lockfile edits"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-unmerged-projection",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1722",
+    "correction": "PR #1722 (fix-red-1423773703 occurrence 48): the @typescript-eslint/eslint-plugin 8.71.2 bump left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, parity and CI Summary. Merging origin/main can also leave that generated projection unmerged while the lockfile auto-merges and stays frozen-valid. Dependency repair must rebuild that projection from the merged index instead of treating the conflict as an unstaged edit.",
+    "mechanization": "Extend both dependency repair modes to ignore an unmerged source projection in the preflight and rebuild it from staged sources after the frozen lockfile check. Two real-Git regressions fail with the previous unstaged-edit refusal and pass after the extension, keeping the auto-merged lockfile, both parent fingerprints and unrelated unstaged bytes. A resolved unstaged projection edit still refuses before pnpm. Use --verify-lockfile on this bump so the valid merged lockfile stays intact and the source map matches the merged manifests. Retain every frozen-install and parity gate. The harness owns push and PR-body updates and must add exactly one line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dependency repair helper already verifies the lockfile and stages the projection. Skipping only an unmerged projection in that preflight lets the existing index renderer replace either parent's map without accepting an unresolved manifest or a hand-edited projection."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "An unmerged source projection does not block dependency repair; rebuild it from the index."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-repair-ignored-workspace-config",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1760",
+    "correction": "PR #1760, fix-red-1423773703 occurrence 58: preserve the ai 7.0.164 update and repair the stale generated source map reported by Detect Changes and parity, which also fails CI Summary. Extend and use the existing dependency-repair machine in the same PR.",
+    "mechanization": "Reuse the existing dependency repair guard that refuses ignored pnpm-workspace.yaml before invoking pnpm in both modes. The required real-Git regressions verify refusal, preservation of local workspace input and generated artifacts, reviewed retry and idempotence. Verify the scoped AI SDK 7.0.164 lockfile with frozen pnpm and regenerate the source projection. The harness must add exactly one PR-body line: Machine: built scripts/resolve-repository-docs.py.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper owns dependency preflight and artifact staging. Rejecting ignored workspace configuration before pnpm runs prevents local-only workspace definitions, catalogs or resolver settings from authorizing committed dependency artifacts."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Ignored workspace configuration must not alter package discovery."
     },
     "level": "codebase",
     "ruleId": "code-prevention"

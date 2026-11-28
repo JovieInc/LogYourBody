@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `176af8714f5a3527ce9c5f745ba0a7ef19b2e32ab5a5fd8810dc1df00703f186`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `5e14ff5566c14b54a65ad6795fec709a2045478c228ce99a8396f25455f4e800`)
 
 ### `apps/web/package.json`: engines
 
@@ -131,7 +131,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "js-yaml": "5.4.3",
   "lodash": "^4.18.1",
   "lucide-react": "^1.55.0",
-  "next": "15.5.28",
+  "next": "15.5.29",
   "next-themes": "^0.4.6",
   "openai": "^7.38.0",
   "pdf-lib": "^1.17.1",
@@ -190,7 +190,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `d3a4f6367ef11b0724cafef78d3e4dc7858614a61cf85eb919078e116615212e`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `14e2d47289938d6f1b46f41b02b2773a0c494ea91808f84e97b750981b88ed98`)
 
 ### `package.json`: packageManager
 
@@ -271,7 +271,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 {
   "@commitlint/cli": "^19.8.1",
   "@commitlint/config-conventional": "^21.2.3",
-  "@typescript-eslint/eslint-plugin": "^8.71.0",
+  "@typescript-eslint/eslint-plugin": "^8.71.2",
   "@typescript-eslint/parser": "^8.71.0",
   "eslint": "^9.39.5",
   "eslint-config-prettier": "^9.1.2",
@@ -325,7 +325,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/product-registry/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1a424be8f931f22855a53e0b20c61342d5012a9c34fa8011c08ad9c409683e43`)
+- `packages/product-registry/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a7af4f5df690199f38ee522d697f57a1138868ebbf565089cf51f2ceb61318b5`)
 
 ### `packages/product-registry/package.json`: scripts
 
@@ -346,7 +346,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@typescript-eslint/eslint-plugin": "^8.71.0",
+  "@typescript-eslint/eslint-plugin": "^8.71.2",
   "@typescript-eslint/parser": "^8.71.0",
   "eslint": "^9.39.5",
   "prettier": "^3.9.10",
@@ -354,7 +354,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `8c4ae35316e03be1c27b1bbfc80b7c212e128c0d2aec357e6d016178b3843c38`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `70426c30534b712cb4f1c3f0d5c9898c6c0982fa755ad21afa93a20fed65bdf3`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -374,7 +374,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 ```json
 {
   "@types/node": "^22.20.4",
-  "@typescript-eslint/eslint-plugin": "^8.71.0",
+  "@typescript-eslint/eslint-plugin": "^8.71.2",
   "@typescript-eslint/parser": "^8.71.0",
   "eslint": "^9.39.5",
   "eslint-config-prettier": "^9.1.2",

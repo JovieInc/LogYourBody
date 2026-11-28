@@ -327,6 +327,23 @@ def _preserved(base, ours, theirs, merged, path):
             _preserved(base[key], ours[key], theirs[key], merged[key], path + (str(key),))
 
 
+def read_verified_react_lockfile(path):
+    lockfile = path.read_bytes()
+    # A dependency repair must keep React and its DOM renderer on the same version.
+    snapshots = re.findall(
+        r"""(?m)^ {2}(?P<quote>['"]?)react-dom@([^\s(]+)\(react@([^\s)]+)\)"""
+        r"(?P=quote):[ \t]*(?:\{\})?[ \t]*\r?$",
+        lockfile.decode(),
+    )
+    for _, renderer, react in snapshots:
+        if renderer != react:
+            raise ValueError(f"react-dom@{renderer} requires matching react, got {react}")
+    versions = sorted({react for _, _, react in snapshots})
+    if len(versions) > 1:
+        raise ValueError("multiple React runtime versions: " + ", ".join(versions))
+
+    return lockfile
+
 def dependency_verification_drift(root, inputs, verified_index, include_lockfile):
     """Compare filtered worktree hashes so assume-unchanged bits cannot hide lockfile edits."""
     root = str(Path(root).resolve())
