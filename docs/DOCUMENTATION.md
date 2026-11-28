@@ -159,6 +159,10 @@ files and `patches/` as dependency inputs. Stage reviewed changes to these files
 before repair; local edits remain untouched when the preflight refuses them.
 Both modes refuse indexed symlinks before invoking pnpm; dependency inputs must
 be regular indexed files, including executable hooks.
+Both modes refuse ignored `pnpm-workspace.yaml` files, including files created
+during verification or rendering. The refusal preserves local files, generated
+artifacts and the index so you can review and stage workspace configuration
+before retrying.
 
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the

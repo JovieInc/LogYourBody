@@ -378,6 +378,7 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False, reviewed_projec
                       "pnpm-lock.yaml", ".npmrc", "**/.npmrc", ".pnpmfile.cjs",
                       "**/.pnpmfile.cjs", "patches/**", "repository-docs.json"]
             # Rebuild a conflicted projection only after frozen dependency verification.
+            # An unmerged source projection does not block dependency repair; rebuild it from the index.
             if not projection_is_unmerged(root, output):
                 inputs.append(output)
             dirty = subprocess.run(
@@ -493,7 +494,6 @@ def main():
                     args.reviewed_project_sha256, args.reviewed_audit_sha256)
     except (ValueError, KeyError, TypeError, OSError, subprocess.CalledProcessError) as exc:
         parser.exit(1, "repository-docs: " + str(exc) + "\n")
-
 
 if __name__ == "__main__":
     main()
