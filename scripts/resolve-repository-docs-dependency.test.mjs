@@ -51,7 +51,7 @@ test('dependency PR body repair preserves prose, code meaning and existing Markd
   }
 });
 
-function fixture(t, input, state) {
+export function fixture(t, input, state) {
   const root = mkdtempSync(join(tmpdir(), 'lyb-dependency-inputs-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' });
