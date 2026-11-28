@@ -94,8 +94,7 @@ class LoadingManager: ObservableObject {
         resetLoadingState()
 
         // Step 1: Initialize
-        await performInitializationStep()
-        // Removed artificial 0.2s delay
+        performInitializationStep()
 
         // Step 2: Check Authentication
         await performAuthStep()
@@ -104,7 +103,7 @@ class LoadingManager: ObservableObject {
         await performProfileStepIfNeeded()
 
         // Step 4: Complete blocking phase
-        await completeBlockingPhase()
+        completeBlockingPhase()
 
         // Step 5: Warm-up tasks (HealthKit, local data, sync) in background
         scheduleWarmUpTasksIfNeeded()
@@ -116,18 +115,18 @@ class LoadingManager: ObservableObject {
         completedWeight = 0.0
     }
 
-    private func performInitializationStep() async {
-        await updateProgress(for: .initialize)
+    private func performInitializationStep() {
+        updateProgress(for: .initialize)
     }
 
     private func performAuthStep() async {
-        await updateProgress(for: .checkAuth, partial: 0.5)
+        updateProgress(for: .checkAuth, partial: 0.5)
 
         // Skip provider loading wait if using mock auth
         if !Constants.useMockAuth {
             #if DEBUG
             if usesUITestAuthFixture {
-                await updateProgress(for: .checkAuth)
+                updateProgress(for: .checkAuth)
                 return
             }
             #endif
@@ -147,7 +146,7 @@ class LoadingManager: ObservableObject {
             }
         }
 
-        await updateProgress(for: .checkAuth)
+        updateProgress(for: .checkAuth)
     }
 
     func loadCachedProfile(for userId: String) async -> CachedProfile? {
@@ -160,7 +159,7 @@ class LoadingManager: ObservableObject {
 
     private func performProfileStepIfNeeded() async {
         if authManager.isAuthenticated {
-            await updateProgress(for: .loadProfile, partial: 0.3)
+            updateProgress(for: .loadProfile, partial: 0.3)
 
             if let userId = authManager.currentUser?.id {
                 // print("📱 LoadingManager: Loading profile for user \(userId)")
@@ -192,7 +191,7 @@ class LoadingManager: ObservableObject {
                 // print("⚠️ LoadingManager: Authenticated but no user ID available")
             }
 
-            await updateProgress(for: .loadProfile)
+            updateProgress(for: .loadProfile)
         } else {
             // Skip profile step weight if not authenticated
             completedWeight += LoadingStep.loadProfile.weight
@@ -200,13 +199,10 @@ class LoadingManager: ObservableObject {
         }
     }
 
-    private func completeBlockingPhase() async {
-        await updateProgress(for: .complete)
+    private func completeBlockingPhase() {
+        updateProgress(for: .complete)
         progress = 1.0
         loadingStatus = "Ready!"
-
-        // Minimal delay just for UI transition
-        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
         isLoading = false
     }
 
@@ -244,16 +240,13 @@ class LoadingManager: ObservableObject {
         }
     }
 
-    private func updateProgress(for step: LoadingStep, partial: Double = 1.0) async {
+    private func updateProgress(for step: LoadingStep, partial: Double = 1.0) {
         loadingStatus = step.status
 
         let stepProgress = step.weight * partial
         completedWeight = min(max(completedWeight + stepProgress, 0), 1.0)
 
         progress = min(max(completedWeight, 0), 0.99) // Keep at 99% until truly complete
-
-        // Minimal delay only for UI responsiveness
-        try? await Task.sleep(nanoseconds: 10_000_000) // 0.01s
     }
 
     func waitForAuthInitialization(timeoutNanoseconds: UInt64) async -> Bool {

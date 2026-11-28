@@ -37,6 +37,7 @@ struct SubjectPlateView: View {
     @State private var focus: CGPoint?
     @State private var stageSized = false
     @State private var showsRetry = false
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         ZStack {
@@ -132,7 +133,11 @@ struct SubjectPlateView: View {
         plate = nil
         stageSized = false
 
-        guard let image = await ImageCacheService.shared.loadImage(from: urlString), !Task.isCancelled else {
+        guard let pixels = ProgressPhotoImagePipeline.targetMaxPixelSize(points: safeSize, scale: displayScale) else {
+            return
+        }
+        guard let image = await ImageCacheService.shared.loadImage(from: urlString, maxPixelSize: pixels),
+              !Task.isCancelled else {
             return
         }
         original = image
@@ -187,5 +192,41 @@ struct SubjectPlateView: View {
         guard size.width >= 120, size.height >= 120,
               let retry = SubjectPlateStore.shared.maskRetry(for: urlString) else { return false }
         return retry.canRetry
+    }
+}
+
+/// Load-failure controls sit above the photo tap. They exist only after a failure,
+/// so a loaded photo does not advertise a retry.
+struct HomeV2PhotoLoadFailureChrome: ViewModifier {
+    let failed: Bool
+    let retry: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if failed {
+            content
+                .accessibilityAction(named: Text(HomeV2PhotoCopy.tryPhotoAgain), retry)
+                .overlay(alignment: .top) { failureChrome }
+        } else {
+            content
+        }
+    }
+
+    private var failureChrome: some View {
+        VStack(spacing: HomeV2Tokens.Space.tight) {
+            Text("Photo unavailable")
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                .foregroundStyle(HomeV2Tokens.Colors.ink)
+                .padding(HomeV2Tokens.Space.tight)
+                .background(HomeV2Tokens.Colors.shell)
+                .allowsHitTesting(false)
+            Button(HomeV2PhotoCopy.tryPhotoAgain, action: retry)
+                .buttonStyle(.plain)
+                .padding(.horizontal, HomeV2Tokens.Space.row)
+                .frame(minHeight: JovieTokens.minimumHitTarget)
+                .background(HomeV2Tokens.Colors.shell, in: Capsule())
+                .accessibilityIdentifier("home_v2_photo_load_retry")
+        }
+        .padding(.top, HomeV2Tokens.Space.tight)
     }
 }

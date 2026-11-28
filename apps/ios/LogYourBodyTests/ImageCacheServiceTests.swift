@@ -103,6 +103,79 @@ final class ImageCacheServiceTests: XCTestCase {
         XCTAssertEqual(loadCount, 2)
     }
 
+    func testCacheCountAndCostLimitsStay() {
+        XCTAssertEqual(ImageCacheService.cacheCountLimit, 100)
+        XCTAssertEqual(ImageCacheService.cacheCostLimit, 100 * 1_024 * 1_024)
+        let service = ImageCacheService(
+            imageLoader: CountingImageLoader(image: makeImage(color: .systemGray), delayNanoseconds: 0),
+            notificationCenter: NotificationCenter()
+        )
+        XCTAssertEqual(service.cacheCountLimitForTests, ImageCacheService.cacheCountLimit)
+        XCTAssertEqual(service.cacheCostLimitForTests, ImageCacheService.cacheCostLimit)
+    }
+
+    func testCancelledPrefetchDoesNotInstallImage() async throws {
+        let loader = CountingImageLoader(image: makeImage(color: .systemRed), delayNanoseconds: 400_000_000)
+        let service = ImageCacheService(imageLoader: loader, notificationCenter: NotificationCenter())
+        let url = "https://example.com/cancelled-prefetch.jpg"
+
+        let task = Task { await service.loadImage(from: url, maxPixelSize: 200) }
+        try await waitUntil { await loader.loadCount() == 1 }
+        task.cancel()
+        let image = await task.value
+
+        XCTAssertNil(image)
+        XCTAssertNil(service.cachedImage(for: url, maxPixelSize: 200))
+        XCTAssertNil(service.cachedImage(for: url))
+        // A late decode must not fill the slot after the scrub has moved on.
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertNil(service.cachedImage(for: url, maxPixelSize: 200))
+    }
+
+    func testDifferentPixelSizeDoesNotReuseCachedBitmap() async throws {
+        let loader = CountingImageLoader(image: makeImage(color: .systemIndigo), delayNanoseconds: 0)
+        let service = ImageCacheService(imageLoader: loader, notificationCenter: NotificationCenter())
+        let url = "https://example.com/sized-photo.jpg"
+
+        let small = await service.loadImage(from: url, maxPixelSize: 40)
+        let large = await service.loadImage(from: url, maxPixelSize: 120)
+        let smallAgain = await service.loadImage(from: url, maxPixelSize: 40)
+        let loadCount = await loader.loadCount()
+        let smallImage = try XCTUnwrap(small)
+        let largeImage = try XCTUnwrap(large)
+
+        XCTAssertEqual(smallImage.size.width, 40, accuracy: 0.5)
+        XCTAssertEqual(largeImage.size.width, 120, accuracy: 0.5)
+        XCTAssertFalse(smallImage === largeImage)
+        XCTAssertTrue(small === smallAgain)
+        XCTAssertEqual(loadCount, 2)
+        XCTAssertNil(service.cachedImage(for: url))
+        XCTAssertTrue(service.cachedImage(for: url, maxPixelSize: 40) === small)
+        XCTAssertTrue(service.cachedImage(for: url, maxPixelSize: 120) === large)
+    }
+
+    func testPreloadDeduplicatesPerURLAndPixelSize() async throws {
+        let loader = CountingImageLoader(image: makeImage(color: .systemGreen), delayNanoseconds: 0)
+        let service = ImageCacheService(imageLoader: loader, notificationCenter: NotificationCenter())
+        let url = "https://example.com/neighbor.jpg"
+
+        service.preloadImages([url, url, ""], maxPixelSize: 64)
+        service.preloadImages([url], maxPixelSize: 96)
+
+        try await waitUntil { await loader.loadCount() == 2 }
+        try await Task.sleep(nanoseconds: 20_000_000)
+        let loadCount = await loader.loadCount()
+        let small = service.cachedImage(for: url, maxPixelSize: 64)
+        let large = service.cachedImage(for: url, maxPixelSize: 96)
+        let smallImage = try XCTUnwrap(small)
+        let largeImage = try XCTUnwrap(large)
+
+        XCTAssertEqual(loadCount, 2)
+        XCTAssertEqual(smallImage.size.width, 64, accuracy: 0.5)
+        XCTAssertEqual(largeImage.size.width, 96, accuracy: 0.5)
+        XCTAssertFalse(smallImage === largeImage)
+    }
+
     private func waitUntil(
         timeout: TimeInterval = 2.0,
         _ condition: () async -> Bool
@@ -140,13 +213,26 @@ private final class CountingImageLoader: ProgressPhotoImageLoading {
     }
 
     func loadImage(urlString _: String) async throws -> UIImage {
-        await counter.increment()
+        try await nextImage(sized: nil)
+    }
 
+    func loadImage(urlString _: String, maxPixelSize: Int) async throws -> UIImage {
+        try await nextImage(sized: maxPixelSize)
+    }
+
+    private func nextImage(sized maxPixelSize: Int?) async throws -> UIImage {
+        await counter.increment()
         if delayNanoseconds > 0 {
             try await Task.sleep(nanoseconds: delayNanoseconds)
         }
-
-        return image
+        guard let maxPixelSize else { return image }
+        let side = CGFloat(max(maxPixelSize, 1))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { context in
+            UIColor.systemRed.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: side, height: side))
+        }
     }
 }
 

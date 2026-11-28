@@ -64,6 +64,12 @@ source edits, and refuses unstaged projection edits or pinned-source drift.
 Bot commits created outside local hooks still need this refresh during repair;
 CI continues to reject stale output.
 
+The pre-merge-commit hook runs the same staged repair for clean automatic
+merges, which do not invoke pre-commit. If it changes the map, it stops the
+merge so the staged result can be reviewed and committed: Git has already
+prepared the automatic merge tree before this hook runs. Conflicted merges use
+pre-commit after resolution. Both paths retain the resolver's protections.
+
 Staged repair also refuses a projection edited, deleted or created while sources
 are rendering, preserving that change and the index. Review and stage the edits,
 then retry `--staged`; this also refreshes fingerprints for Bundler lockfile bumps.
@@ -126,8 +132,9 @@ Both modes recheck for new untracked or ignored dependency inputs after verifica
 and rendering, before writing artifacts. A newly created hook, npmrc file, patch or
 manifest refuses repair; the local file survives and generated artifacts are restored.
 Frozen verification also refuses lockfile changes before regenerating or staging
-the source map. Only a confirmed outdated lockfile permits refresh mode to write
-new resolutions; retrying after a refusal uses the original reviewed artifacts.
+the source map. Filtered worktree hashes reject assume-unchanged and skip-worktree
+edits that a diff listing omits. Only a confirmed outdated lockfile permits refresh
+mode to write new resolutions; retrying after a refusal uses the original reviewed artifacts.
 If resolution, frozen verification, projection generation or Git staging fails,
 the helper restores the original lockfile and projection bytes (or absence) so
 the same command can be retried without manual cleanup. Another writer's index
@@ -135,7 +142,7 @@ lock and unrelated edits remain untouched.
 It then stages the lockfile and source map, refusing unresolved source conflicts,
 unstaged dependency or projection edits, untracked dependency inputs, and pinned-source drift. It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.
-Both dependency modes also refuse ignored npmrc files, pnpm hooks and patches;
+Both dependency modes also refuse ignored lockfiles, workspace configuration, npmrc files, pnpm hooks and patches;
 configuration inside installed `node_modules` and generated `.next` build output
 is excluded from this preflight. Next.js-generated manifests are preserved.
 Both dependency modes check pnpm hooks (`.pnpmfile.cjs`), workspace `.npmrc`
@@ -143,9 +150,10 @@ files and `patches/` as dependency inputs. Stage reviewed changes to these files
 before repair; local edits remain untouched when the preflight refuses them.
 Both modes refuse indexed symlinks before invoking pnpm; dependency inputs must
 be regular indexed files, including executable hooks.
-Ignored `pnpm-workspace.yaml` files also refuse dependency repair, including when
-created during verification or rendering. Review and stage workspace configuration
-before retrying; local files, generated artifacts and the index are preserved.
+Both modes refuse ignored `pnpm-workspace.yaml` files, including files created
+during verification or rendering. The refusal preserves local files, generated
+artifacts and the index so you can review and stage workspace configuration
+before retrying.
 
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the

@@ -16,6 +16,12 @@ schema. `.codex/hooks.json` supplies SessionStart and Stop. Codex requires
 review and trust of each new hook definition through `/hooks`; do not fabricate
 trust hashes or bypass review. Manual setup remains available before trust.
 
+After `pnpm install` (which runs husky via `prepare`), Codex setup also runs
+`pnpm exec husky`, pins `core.hooksPath=.husky`, ensures `.husky/pre-commit`
+and `.husky/pre-push` are executable, and runs `scripts/hooks/verify-git-hooks.sh`.
+The verifier fails if either hook is not armed, so a fresh agent worktree
+cannot silently commit or push around the hooks.
+
 Stop and desktop cleanup preserve source, dependencies, build outputs, and
 shared Git metadata. A turn ending is not a worktree release. For a managed
 Codex worktree, use Codex's archive operation, which saves a recoverable Git

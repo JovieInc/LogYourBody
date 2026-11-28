@@ -327,9 +327,9 @@ class EvidenceTests(unittest.TestCase):
         command = source[start:source.index('\n\npython3 ', start)]
         setup_start = source.index('CHAT_QUALIFICATION_UNIT_TESTS=(')
         setup = source[setup_start:source.index('\n# StoreKitPurchaseRestoreTests', setup_start)]
-        # Replay the real, populated argument construction. Bash3 treats an empty
-        # array as unset under nounset; the former synthetic empty array failed
-        # before exercising the command on hosted macOS.
+        daily_spec = importlib.util.spec_from_file_location('stats_series_daily_cache', Path(__file__).with_name('stats_series_daily_cache.py'))
+        daily_cache = importlib.util.module_from_spec(daily_spec); daily_spec.loader.exec_module(daily_cache); daily_cache.check_repository(Path(__file__).resolve().parents[2])
+        # Replay the real argument array. Bash 3 treats an empty array as unset under nounset.
         result = run_shell(['-c', 'set -euo pipefail\nARTIFACT_DIR=/tmp\n' + setup +
                             '\nassert_xcresult_evidence() { printf "%s\\n" "$@"; }\n' + command])
         self.assertEqual(result.returncode, 0, result.stderr)

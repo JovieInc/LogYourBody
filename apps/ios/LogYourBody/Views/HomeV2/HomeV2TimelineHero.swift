@@ -137,6 +137,7 @@ struct HomeV2TimelinePager: View {
     let unit: String
     let dateText: (BodyMetrics) -> String
     let onOpenPhoto: () -> Void
+    var onAddPhoto: () -> Void = {}
     var isNavigating = false
     var bodyDisplays: [String: PersonalBodyDisplay] = [:]
     var bodyEstimateEnabled = false
@@ -145,6 +146,7 @@ struct HomeV2TimelinePager: View {
     @State private var bodyYaw = 0.0
     @State private var bodyScale = 1.0
     @AppStorage("personal_body_stage_mode") private var bodyMode = "photo"
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         HomeV2PhotoScrubber(
@@ -155,11 +157,11 @@ struct HomeV2TimelinePager: View {
         ) { isScrubbing in
             Group {
                 if isScrubbing, let metric = snapshot.metric(for: selectedID) {
-                    page(for: metric, openPhoto: {}, preparedOnly: true)
+                    page(for: metric, openPhoto: {}, onAddPhoto: onAddPhoto, preparedOnly: true)
                 } else {
                     TabView(selection: $selectedID) {
                         ForEach(snapshot.metrics) { metric in
-                            page(for: metric, openPhoto: onOpenPhoto)
+                            page(for: metric, openPhoto: onOpenPhoto, onAddPhoto: onAddPhoto)
                                 .tag(HomeV2TimelinePolicy.EntryID(metric))
                                 .accessibilityHidden(HomeV2TimelinePolicy.EntryID(metric) != selectedID)
                         }
@@ -197,17 +199,26 @@ struct HomeV2TimelinePager: View {
         let ordered = Array(snapshot.metrics.reversed())
         guard let index = ordered.firstIndex(where: { HomeV2TimelinePolicy.EntryID($0) == selectedID }) else { return }
         let urls = BodyPhotoPreparationPlan.neighborURLs(around: index, urls: ordered.map(\.photoUrl))
+        guard let pixels = ProgressPhotoImagePipeline.targetMaxPixelSize(points: size, scale: displayScale) else {
+            return
+        }
         for url in urls {
             guard !Task.isCancelled else { return }
             if SubjectPlateStore.shared.scrubImage(for: url, target: size) != nil { continue }
-            guard let image = await ImageCacheService.shared.loadImage(from: url), !Task.isCancelled else { continue }
+            guard let image = await ImageCacheService.shared.loadImage(from: url, maxPixelSize: pixels),
+                  !Task.isCancelled else { continue }
             _ = await SubjectPlateStore.shared.prepare(
                 urlString: url, image: image, target: size, retaining: urls
             )
         }
     }
 
-    private func page(for metric: BodyMetrics, openPhoto: @escaping () -> Void, preparedOnly: Bool = false) -> some View {
+    private func page(
+        for metric: BodyMetrics,
+        openPhoto: @escaping () -> Void,
+        onAddPhoto: @escaping () -> Void = {},
+        preparedOnly: Bool = false
+    ) -> some View {
         HomeV2TimelinePage(
             metric: metric,
             metrics: snapshot.metrics,
@@ -215,6 +226,7 @@ struct HomeV2TimelinePager: View {
             unit: unit,
             dateText: dateText(metric),
             onOpenPhoto: openPhoto,
+            onAddPhoto: onAddPhoto,
             preparedOnly: preparedOnly,
             bodyMode: $bodyMode,
             bodyYaw: $bodyYaw,
@@ -236,6 +248,7 @@ private struct HomeV2TimelinePage: View {
     let unit: String
     let dateText: String
     let onOpenPhoto: () -> Void
+    var onAddPhoto: () -> Void = {}
     var preparedOnly = false
     @Binding var bodyMode: String
     @Binding var bodyYaw: Double
@@ -246,6 +259,7 @@ private struct HomeV2TimelinePage: View {
     let appearanceEnabled: Bool
     @State private var editorialPhoto: (key: String, image: UIImage?)?
     @State private var showsRetry = false
+    @Environment(\.displayScale) private var displayScale
 
     private var selectedOutline: PersonalBodyDisplay? {
         bodyDisplays[PersonalBodyDay.key(metric.date)]
@@ -277,10 +291,16 @@ private struct HomeV2TimelinePage: View {
                     .accessibilityIdentifier("home_v2_metric_first")
             }
         }
-        .frame(width: size.width, height: size.height)
+        .homeV2ReservedStage(size)
         .overlay { estimateCanvas }
         .overlay(alignment: .top) { estimateMode }
         .overlay(alignment: .bottom) { estimateFallback }
+        .overlay(alignment: .bottom) {
+            if !PhotoTimelineHUDPolicy.hasUsablePhoto(metric) {
+                HomeV2AddPhotoButton(action: onAddPhoto)
+                    .padding(.bottom, HomeV2Tokens.Space.tight)
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home_v2_editorial_card")
         .id(HomeV2TimelinePolicy.EntryID(metric))
@@ -340,14 +360,17 @@ private struct HomeV2TimelinePage: View {
                     }
             } else {
                 HomeV2DataHero(metric: metric, metrics: metrics, unit: unit)
-                Text(failed ? "Photo unavailable" : "Loading photo…")
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
-                    .foregroundStyle(HomeV2Tokens.Colors.ink)
-                    .padding(HomeV2Tokens.Space.tight)
-                    .background(HomeV2Tokens.Colors.shell)
+                if !failed {
+                    Text("Loading photo…")
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                        .foregroundStyle(HomeV2Tokens.Colors.ink)
+                        .padding(HomeV2Tokens.Space.tight)
+                        .background(HomeV2Tokens.Colors.shell)
+                        .allowsHitTesting(false)
+                }
             }
         }
-        .frame(width: size.width, height: size.height)
+        .homeV2ReservedStage(size)
         .clipped()
         .contentShape(Rectangle())
         .gesture(HomeV2PhotoTap(onTap: onOpenPhoto))
@@ -362,10 +385,18 @@ private struct HomeV2TimelinePage: View {
             guard showsRetry else { return }
             Task { await retry(url: url) }
         }
-        .task(id: key) { await load(url: url, key: key) }
+        .modifier(HomeV2PhotoLoadFailureChrome(failed: failed) {
+            Task { await retry(url: url) }
+        })
+        .task(id: "\(key)|\(photoPixels)") { await load(url: url, key: key) }
     }
 
     private func load(url: String, key: String) async {
+        if HomeV2StageReservation.photoLoadFailedFixture {
+            editorialPhoto = (key, nil)
+            showsRetry = false
+            return
+        }
         if preparedOnly {
             showsRetry = false
             if let prepared = SubjectPlateStore.shared.scrubImage(for: url, target: size) {
@@ -378,7 +409,10 @@ private struct HomeV2TimelinePage: View {
             showsRetry = SubjectPlateStore.shared.maskRetry(for: url)?.canRetry == true
             return
         }
-        let image = await ImageCacheService.shared.loadImage(from: url)
+        guard let pixels = ProgressPhotoImagePipeline.targetMaxPixelSize(points: size, scale: displayScale) else {
+            return
+        }
+        let image = await ImageCacheService.shared.loadImage(from: url, maxPixelSize: pixels)
         guard !Task.isCancelled else { return }
         guard let image else {
             editorialPhoto = (key, nil)
@@ -388,6 +422,10 @@ private struct HomeV2TimelinePage: View {
         guard !Task.isCancelled else { return }
         editorialPhoto = (key, plate ?? image)
         showsRetry = SubjectPlateStore.shared.maskRetry(for: url)?.canRetry == true
+    }
+
+    private var photoPixels: Int {
+        ProgressPhotoImagePipeline.targetMaxPixelSize(points: size, scale: displayScale) ?? 0
     }
 
     private func retry(url: String) async {

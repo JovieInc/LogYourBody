@@ -42,9 +42,9 @@ describe('curated exercise variant contract', () => {
     );
   });
 
-  it('validates the whole library and attaches all 25 seed records to existing IDs', () => {
+  it('validates the whole library and attaches all 26 seed records to existing IDs', () => {
     const seed = catalogVariantSeedSchema.parse(variantSeed);
-    expect(seed).toHaveLength(25);
+    expect(seed).toHaveLength(26);
     expect(new Set(EXERCISE_CATALOG.map((entry) => entry.id)).size).toBe(EXERCISE_CATALOG.length);
     for (const entry of EXERCISE_CATALOG) {
       expect(catalogVariantSchema.parse(entry)).toEqual(entry);
@@ -55,7 +55,7 @@ describe('curated exercise variant contract', () => {
       expect(entry.requires.length).toBeGreaterThan(0);
       expect(entry.bodyPosition.length).toBeGreaterThan(0);
     }
-    expect(EXERCISE_CATALOG.filter((entry) => entry.variantMetadata)).toHaveLength(25);
+    expect(EXERCISE_CATALOG.filter((entry) => entry.variantMetadata)).toHaveLength(26);
     expect(catalogVariantById('dead_bug')?.variantMetadata).toBeUndefined();
     expect([...new Set(seed.map((entry) => entry.targetRegion))].sort()).toEqual([
       'biceps',

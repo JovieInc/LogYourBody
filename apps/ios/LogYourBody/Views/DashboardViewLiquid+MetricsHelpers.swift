@@ -344,24 +344,23 @@ extension DashboardViewLiquid {
         DashboardMetricFormatting.readingDateLabel(effectiveDate: date)
     }
 
+    func statsSeriesInput(selectedDate: Date? = nil) -> MetricStatsSeriesStore.Input {
+        MetricStatsSeriesStore.Input(
+            chart: fullChartCache,
+            trend: fullTrendChartCache,
+            fingerprint: statsSeriesStore.publishedFingerprint,
+            ready: statsSeriesStore.isReady,
+            weightUsesTrend: weightUsesTrend,
+            range: selectedRange,
+            selectedDate: selectedDate,
+            now: Date(),
+            calendar: .current,
+            onCacheMiss: { scheduleMetricCacheRefreshIfIdle() }
+        )
+    }
+
     func generateStepsChartData() -> [MetricDataPoint] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let lookup = dailyMetricsLookup()
-
-        guard !lookup.isEmpty else { return [] }
-
-        var chartData: [MetricDataPoint] = []
-
-        for offset in stride(from: 6, through: 0, by: -1) {
-            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
-            let stepsValue = lookup[date]?.steps
-            chartData.append(
-                MetricDataPoint(index: 6 - offset, value: Double(max(stepsValue ?? 0, 0)))
-            )
-        }
-
-        return chartData
+        statsSeriesStore.cardPoints(for: .steps, statsSeriesInput())
     }
 
     func latestStepsSnapshot() -> (value: Int?, date: Date?) {
@@ -409,63 +408,15 @@ extension DashboardViewLiquid {
     }
 
     func generateWeightChartData() -> [MetricDataPoint] {
-        let system = currentMeasurementSystem
-
-        let allPoints: [Double] = sortedBodyMetricsAscending.filter { !$0.isExcluded }.compactMap { metric in
-            guard let weight = metric.weight else { return nil }
-            return convertWeight(weight, to: system) ?? weight
-        }
-
-        let tail = Array(allPoints.suffix(7))
-        return tail.enumerated().map { index, value in
-            MetricDataPoint(index: index, value: value)
-        }
+        statsSeriesStore.cardPoints(for: .weight, statsSeriesInput())
     }
 
     func generateBodyFatChartData() -> [MetricDataPoint] {
-        let interpolationContext = MetricsInterpolationService.shared
-            .makeBodyFatInterpolationContext(for: bodyMetrics)
-
-        let allPoints: [Double] = sortedBodyMetricsAscending.filter { !$0.isExcluded }.compactMap { metric in
-            if let bf = metric.bodyFatPercentage {
-                return bf
-            }
-            if let estimated = interpolationContext?.estimate(for: metric.date) {
-                return estimated.value
-            }
-            return nil
-        }
-
-        let tail = Array(allPoints.suffix(7))
-        return tail.enumerated().map { index, value in
-            MetricDataPoint(index: index, value: value)
-        }
+        statsSeriesStore.cardPoints(for: .bodyFat, statsSeriesInput())
     }
 
     func generateFFMIChartData() -> [MetricDataPoint] {
-        let heightInches = convertHeightToInches(
-            height: authManager.currentUser?.profile?.height,
-            heightUnit: authManager.currentUser?.profile?.heightUnit
-        )
-
-        guard let heightInches else { return [] }
-
-        guard let interpolationContext = MetricsInterpolationService.shared
-            .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
-            return []
-        }
-
-        let allPoints: [Double] = sortedBodyMetricsAscending.filter { !$0.isExcluded }.compactMap { metric in
-            guard let ffmiResult = interpolationContext.estimate(for: metric.date) else {
-                return nil
-            }
-            return ffmiResult.value
-        }
-
-        let tail = Array(allPoints.suffix(7))
-        return tail.enumerated().map { index, value in
-            MetricDataPoint(index: index, value: value)
-        }
+        statsSeriesStore.cardPoints(for: .ffmi, statsSeriesInput())
     }
 
     func filteredMetrics(for range: TimeRange) -> [BodyMetrics] {
@@ -491,55 +442,36 @@ extension DashboardViewLiquid {
         if let cached = fullChartCache[type] {
             return cached
         }
-        return generator()
+        // GLP-1 is not part of the body-history prewarm.
+        if type == .glp1 {
+            return generator()
+        }
+        if !fullChartCache.isEmpty || !fullTrendChartCache.isEmpty {
+            return []
+        }
+        return statsSeriesStore.chartPoints(for: type, statsSeriesInput())
     }
 
-    func cachedTrendChartData(
-        for type: MetricType,
-        generator: () -> [MetricChartDataPoint]
-    ) -> [MetricChartDataPoint] {
+    func cachedTrendChartData(for type: MetricType) -> [MetricChartDataPoint] {
         if let cached = fullTrendChartCache[type] {
             return cached
         }
-        return generator()
+        if !fullChartCache.isEmpty || !fullTrendChartCache.isEmpty {
+            return []
+        }
+        return statsSeriesStore.trendPoints(for: type, statsSeriesInput())
     }
 
     func weightRangeStats() -> MetricRangeStats? {
-        let system = currentMeasurementSystem
-        return computeRangeStats(metrics: filteredMetrics(for: selectedRange)) { metric in
-            guard let weight = metric.weight else { return nil }
-            return convertWeight(weight, to: system) ?? weight
-        }
+        statsSeriesStore.rangeStats(for: .weight, statsSeriesInput())
     }
 
     func bodyFatRangeStats() -> MetricRangeStats? {
-        let interpolationContext = MetricsInterpolationService.shared
-            .makeBodyFatInterpolationContext(for: bodyMetrics)
-
-        return computeRangeStats(metrics: filteredMetrics(for: selectedRange)) { metric in
-            if let value = metric.bodyFatPercentage {
-                return value
-            }
-            return interpolationContext?.estimate(for: metric.date)?.value
-        }
+        statsSeriesStore.rangeStats(for: .bodyFat, statsSeriesInput())
     }
 
     func ffmiRangeStats() -> MetricRangeStats? {
-        let heightInches = convertHeightToInches(
-            height: authManager.currentUser?.profile?.height,
-            heightUnit: authManager.currentUser?.profile?.heightUnit
-        )
-
-        guard let heightInches else { return nil }
-
-        guard let interpolationContext = MetricsInterpolationService.shared
-            .makeFFMIInterpolationContext(for: bodyMetrics, heightInches: heightInches) else {
-            return nil
-        }
-
-        return computeRangeStats(metrics: filteredMetrics(for: selectedRange)) { metric in
-            interpolationContext.estimate(for: metric.date)?.value
-        }
+        statsSeriesStore.rangeStats(for: .ffmi, statsSeriesInput())
     }
 }
 
