@@ -171,7 +171,9 @@ def resolve_staged(root, extra_outputs=(), expected_index=None, expected_lockfil
         for name in sorted(names):
             target = repository_docs.local(snapshot, name)
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(staged_bytes(root, name))
+            # Refresh stages the frozen-verified lockfile alongside the projection.
+            content = expected_lockfile if name == "pnpm-lock.yaml" and name in extra_outputs else None
+            target.write_bytes(staged_bytes(root, name) if content is None else content)
         errors = repository_docs.run(snapshot, write=True)
         if errors:
             raise ValueError("; ".join(errors))

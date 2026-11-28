@@ -6968,6 +6968,28 @@
     "ruleId": "type-or-schema"
   },
   {
+    "fingerprint": "dependency-parity-covers-pnpm-lockfile",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1810",
+    "correction": "PR #1810 repair, fix-red-1423773703 occurrence 46 in 14 days: merge origin/main without rebasing, retain the @radix-ui/react-toggle-group 1.2.1 update, read failing logs and extend the existing repair machine. Detect Changes and parity reject the stale source map; CI Summary reflects that failure. Vercel reports Deployment was blocked and its details API requires authentication. The harness owns pushing and PR updates.",
+    "mechanization": "Extend the existing source-parity registry to fingerprint pnpm-lock.yaml, covering lockfile-only dependency updates as well as manifest bumps. Two real-Git regressions in the existing required Detect Changes pre-commit suite fail against the previous registry because lockfile-only drift passes parity. Both dependency repair modes must reject failed frozen verification without artifact or index changes, retain manifest and lockfile bytes, record the new lockfile fingerprint, pass parity and remain idempotent. A third case refreshes a staged dependency edit, proves rollback after final frozen verification fails, and fingerprints the frozen-verified replacement lockfile on retry. Use the existing --verify-lockfile repair on this Radix update with pinned pnpm and unchanged resolutions. The harness must add exactly one PR-body line: Machine: built repository-docs.json. Fresh hosted checks and the external Vercel block remain unverified until publication; no gate or provider control is relaxed.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "External dependency bot commits do not run local commit hooks. Product code cannot prevent a bot from omitting generated documentation; the existing parity gate and repair command own this dependency boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "Registering the canonical pnpm lockfile in the existing required source-parity guard deterministically rejects stale projections for every resolved dependency update, including changes that leave all manifests unchanged. The existing frozen repair refreshes the projection without changing valid dependency resolutions."
+      }
+    },
+    "guard": {
+      "path": "repository-docs.json",
+      "anchor": "\"path\": \"pnpm-lock.yaml\""
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "dependency-update-lockfile-and-source-parity",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1720",
     "correction": "PR #1720 (fix-red-1423773703): The turbo 2.11.10 bump left the source projection stale, failing Detect Changes, parity and CI Summary. Merging main also conflicted package.json because Rollup was added beside the turbo range. Repeated dependency repairs must union that manifest and refresh parity together.",
